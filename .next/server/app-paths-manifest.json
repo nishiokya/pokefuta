@@ -1,6 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/api/manholes/route": "app/api/manholes/route.js",
-  "/api/photo-stats/route": "app/api/photo-stats/route.js",
-  "/api/minimal-upload/route": "app/api/minimal-upload/route.js"
-}
