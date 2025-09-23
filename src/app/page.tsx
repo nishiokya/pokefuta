@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Camera, Map, History, Settings } from 'lucide-react';
+import { Camera, Map, History, Settings, Navigation } from 'lucide-react';
 
 interface Stats {
   totalManholes: number;
@@ -106,13 +106,21 @@ export default function HomePage() {
           <div className="text-sm opacity-90">新しい訪問記録を追加</div>
         </Link>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           <Link
             href="/map"
             className="btn-pokemon-secondary text-center py-4 block"
           >
             <Map className="w-6 h-6 mx-auto mb-1" />
-            <div className="font-semibold">マップ</div>
+            <div className="font-semibold text-sm">マップ</div>
+          </Link>
+
+          <Link
+            href="/nearby"
+            className="btn-pokemon-secondary text-center py-4 block"
+          >
+            <Navigation className="w-6 h-6 mx-auto mb-1" />
+            <div className="font-semibold text-sm">近くの未訪問</div>
           </Link>
 
           <Link
@@ -120,7 +128,7 @@ export default function HomePage() {
             className="btn-pokemon-secondary text-center py-4 block"
           >
             <History className="w-6 h-6 mx-auto mb-1" />
-            <div className="font-semibold">履歴</div>
+            <div className="font-semibold text-sm">履歴</div>
           </Link>
         </div>
       </div>
@@ -147,9 +155,9 @@ export default function HomePage() {
           <br />
           近くのマンホールを表示します
         </div>
-        <button className="btn-pokemon-secondary w-full mt-4">
-          位置情報を許可
-        </button>
+        <Link href="/nearby" className="btn-pokemon-secondary w-full mt-4 block text-center">
+          近くの未訪問を検索
+        </Link>
       </div>
 
       {/* Bottom Navigation */}
@@ -163,6 +171,10 @@ export default function HomePage() {
             <Map className="w-6 h-6 mb-1" />
             <span className="text-xs">マップ</span>
           </Link>
+          <Link href="/nearby" className="nav-item">
+            <Navigation className="w-6 h-6 mb-1" />
+            <span className="text-xs">近く</span>
+          </Link>
           <Link href="/upload" className="nav-item">
             <Camera className="w-6 h-6 mb-1" />
             <span className="text-xs">登録</span>
@@ -170,10 +182,6 @@ export default function HomePage() {
           <Link href="/visits" className="nav-item">
             <History className="w-6 h-6 mb-1" />
             <span className="text-xs">履歴</span>
-          </Link>
-          <Link href="/settings" className="nav-item">
-            <Settings className="w-6 h-6 mb-1" />
-            <span className="text-xs">設定</span>
           </Link>
         </div>
       </nav>

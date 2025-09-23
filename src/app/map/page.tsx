@@ -51,10 +51,15 @@ export default function MapPage() {
 
   const loadManholes = async () => {
     try {
+      console.log('Loading manholes from API...');
       const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
+        console.log(`Loaded ${data.length} manholes from database`);
+        console.log('Sample manhole:', data[0]);
         setManholes(data);
+      } else {
+        console.error('Failed to fetch manholes:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to load manholes:', error);
