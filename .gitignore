@@ -9,6 +9,7 @@ create_pr.flag
 node_modules
 .env.local
 .env
+
 *.pack.gz
 .next/
 .next/trace
