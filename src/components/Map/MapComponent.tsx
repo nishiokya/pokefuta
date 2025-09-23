@@ -140,33 +140,54 @@ export default function MapComponent({
         });
 
         // Add popup
+        const pokemonInfo = manhole.pokemons && manhole.pokemons.length > 0
+          ? `<div class="mb-2">
+               <div class="text-xs font-semibold mb-1">ポケモン:</div>
+               <div class="flex flex-wrap gap-1">
+                 ${manhole.pokemons.slice(0, 3).map(pokemon =>
+                   `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${pokemon}</span>`
+                 ).join('')}
+                 ${manhole.pokemons.length > 3 ? `<span class="text-xs text-gray-500">+${manhole.pokemons.length - 3}</span>` : ''}
+               </div>
+             </div>`
+          : '';
+
         const popupContent = `
-          <div class="p-2">
-            <h3 class="font-bold text-sm mb-1">${manhole.name || 'ポケふた'}</h3>
-            ${manhole.description ? `<p class="text-xs text-gray-600 mb-2">${manhole.description}</p>` : ''}
-            <div class="text-xs">
-              <div class="mb-1">
-                <span class="font-semibold">場所:</span> ${manhole.prefecture || ''} ${manhole.city || ''}
+          <div class="p-3 min-w-64">
+            <h3 class="font-bold text-base mb-2 text-blue-800">${manhole.name || manhole.title || 'ポケふた'}</h3>
+            ${manhole.description ? `<p class="text-sm text-gray-600 mb-3">${manhole.description}</p>` : ''}
+            <div class="text-sm space-y-2">
+              <div class="flex items-center">
+                <svg class="w-4 h-4 mr-2 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                </svg>
+                <span>${manhole.prefecture || ''} ${manhole.city || manhole.municipality || ''}</span>
               </div>
-              ${manhole.address ? `<div class="mb-1"><span class="font-semibold">住所:</span> ${manhole.address}</div>` : ''}
-              <div class="mb-2">
-                <span class="badge-pokemon">
-                  ${isVisited ? '訪問済み' : '未訪問'}
+              ${manhole.address ? `
+                <div class="text-xs text-gray-500 ml-6">${manhole.address}</div>
+              ` : ''}
+              ${pokemonInfo}
+              <div class="flex items-center justify-between pt-3 border-t">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isVisited ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                  ${isVisited ? '✓ 訪問済み' : '? 未訪問'}
                 </span>
+                <button
+                  onclick="window.location.href='/manhole/${manhole.id}'"
+                  class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                >
+                  詳細を見る
+                </button>
               </div>
-              <button
-                onclick="window.location.href='/manhole/${manhole.id}'"
-                class="btn-pokemon-secondary text-xs px-3 py-1"
-              >
-                詳細を見る
-              </button>
             </div>
           </div>
         `;
 
         marker.bindPopup(popupContent, {
-          maxWidth: 250,
-          className: 'pokemon-popup'
+          maxWidth: 300,
+          className: 'pokemon-popup',
+          closeButton: true,
+          autoClose: false,
+          closeOnEscapeKey: true
         });
 
         // Add click handler

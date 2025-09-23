@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
-import sampleManholes from '@/data/sample-manholes.json';
 
 // Helper functions to extract coordinates from PostGIS format
 function extractLatFromLocation(location: string): number | undefined {
@@ -93,31 +92,12 @@ export async function GET(request: NextRequest) {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('dummy')) {
-      // Return sample data if Supabase is not configured
-      console.log('Using sample manhole data');
-
-      let filteredManholes = sampleManholes;
-
-      // Apply visited filter
-      if (visited === 'true') {
-        filteredManholes = sampleManholes.filter(m => m.is_visited);
-      } else if (visited === 'false') {
-        filteredManholes = sampleManholes.filter(m => !m.is_visited);
-      }
-
-      // Apply nearby filter if coordinates provided
-      if (isNearbySearch) {
-        filteredManholes = filteredManholes
-          .map(manhole => ({
-            ...manhole,
-            distance: calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude)
-          }))
-          .filter(manhole => manhole.distance <= radius)
-          .sort((a, b) => a.distance - b.distance)
-          .slice(0, limit);
-      }
-
-      return NextResponse.json(filteredManholes);
+      // Return error if Supabase is not configured
+      console.error('Supabase is not configured properly');
+      return NextResponse.json(
+        { error: 'Database configuration error. Please check your Supabase settings.' },
+        { status: 500 }
+      );
     }
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -127,44 +107,26 @@ export async function GET(request: NextRequest) {
         // Use PostGIS for nearby search
         console.log(`Searching for manholes within ${radius}km of ${lat}, ${lng}`);
 
-        const radiusMeters = radius * 1000;
-        const pointWKT = `POINT(${lng} ${lat})`;
 
-        const query = `
-          SELECT
-            id,
-            title,
-            prefecture,
-            municipality,
-            pokemons,
-            detail_url,
-            prefecture_site_url,
-            source_last_checked,
-            created_at,
-            updated_at,
-            ST_X(location::geometry) as longitude,
-            ST_Y(location::geometry) as latitude,
-            ST_Distance(location, ST_GeogFromText('${pointWKT}')) / 1000 as distance_km
-          FROM manhole
-          WHERE ST_DWithin(location, ST_GeogFromText('${pointWKT}'), ${radiusMeters})
-          ORDER BY distance_km
-          LIMIT ${limit}
-        `;
-
-        const { data: nearbyManholes, error: nearbyError } = await supabase.rpc('exec_sql', {
-          sql: query
-        });
+        // Use direct PostGIS functions with Supabase
+        const { data: nearbyManholes, error: nearbyError } = await supabase
+          .rpc('get_nearby_manholes', {
+            search_lat: lat,
+            search_lng: lng,
+            radius_km: radius,
+            max_results: limit
+          });
 
         if (nearbyError) {
-          console.log('PostGIS query failed, using fallback method:', nearbyError.message);
-          throw new Error('PostGIS query failed');
+          console.log('PostGIS function failed, using coordinate estimation fallback:', nearbyError.message);
+          throw new Error('PostGIS function failed');
         }
 
         if (nearbyManholes && nearbyManholes.length > 0) {
           console.log(`Found ${nearbyManholes.length} nearby manholes using PostGIS`);
 
           const formattedManholes = nearbyManholes
-            .map(manhole => ({
+            .map((manhole: any) => ({
               ...manhole,
               name: manhole.title || 'ポケふた',
               description: manhole.description || '',
@@ -175,7 +137,7 @@ export async function GET(request: NextRequest) {
               photo_count: 0,
               distance: manhole.distance_km
             }))
-            .filter(manhole => {
+            .filter((manhole: any) => {
               if (visited === 'true') return manhole.is_visited;
               if (visited === 'false') return !manhole.is_visited;
               return true;
@@ -235,35 +197,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(filteredManholes);
       }
 
-      // If table is empty, fall back to sample data
-      console.log('Manhole table is empty, using sample data');
-      throw new Error('Table is empty');
+      // If table is empty, return empty array
+      console.log('Manhole table is empty');
+      return NextResponse.json([]);
 
     } catch (dbError) {
-      console.log('Database error, falling back to sample data:', (dbError as Error).message);
-
-      let filteredManholes = sampleManholes;
-
-      // Apply visited filter
-      if (visited === 'true') {
-        filteredManholes = sampleManholes.filter(m => m.is_visited);
-      } else if (visited === 'false') {
-        filteredManholes = sampleManholes.filter(m => !m.is_visited);
-      }
-
-      // Apply nearby filter if coordinates provided
-      if (isNearbySearch) {
-        filteredManholes = filteredManholes
-          .map(manhole => ({
-            ...manhole,
-            distance: calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude)
-          }))
-          .filter(manhole => manhole.distance <= radius)
-          .sort((a, b) => a.distance - b.distance)
-          .slice(0, limit);
-      }
-
-      return NextResponse.json(filteredManholes);
+      console.error('Database error:', (dbError as Error).message);
+      return NextResponse.json(
+        { error: 'Database query failed. Please try again later.' },
+        { status: 500 }
+      );
     }
 
   } catch (error) {
