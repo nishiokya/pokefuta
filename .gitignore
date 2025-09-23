@@ -1,11 +1,65 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+.next/
+out/
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Python (for any utility scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Project specific
 manhole_images/*
 *.raw.ndjson
-*.log
-__pycache__/
-*.pyc
-*.pyo
 change_summary.json
 create_pr.flag
-node_modules
-.env.local
-.env
+*.pack.gz
+test-pokemon.png
