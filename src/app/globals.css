@@ -273,3 +273,33 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* Range slider styles */
+.slider {
+  @apply appearance-none bg-gray-200 rounded-lg cursor-pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  @apply appearance-none w-6 h-6 rounded-full;
+  @apply bg-gradient-to-r from-pokemon-red to-pokemon-blue;
+  @apply border-2 border-white;
+  @apply shadow-pokemon;
+  @apply cursor-pointer;
+}
+
+.slider::-moz-range-thumb {
+  @apply w-6 h-6 rounded-full;
+  @apply bg-gradient-to-r from-pokemon-red to-pokemon-blue;
+  @apply border-2 border-white;
+  @apply shadow-pokemon;
+  @apply cursor-pointer;
+  border: none;
+}
+
+.slider:focus {
+  @apply outline-none;
+}
+
+.slider:focus::-webkit-slider-thumb {
+  @apply ring-2 ring-pokemon-yellow;
+}
