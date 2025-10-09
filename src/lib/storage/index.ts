@@ -1,9 +1,10 @@
 import { SupabaseStorageAdapter } from './supabase';
+import { R2StorageAdapter } from './r2';
 import type { StorageAdapter, StorageConfig } from './types';
 
 export function createStorageAdapter(config?: StorageConfig): StorageAdapter {
   const provider = config?.provider ?? (process.env.STORAGE_PROVIDER as any) ?? 'supabase';
-  const bucket = config?.bucket ?? process.env.SUPABASE_BUCKET ?? 'photos';
+  const bucket = config?.bucket ?? process.env.SUPABASE_BUCKET ?? process.env.R2_BUCKET ?? 'photos';
 
   switch (provider) {
     case 'supabase':
@@ -12,8 +13,7 @@ export function createStorageAdapter(config?: StorageConfig): StorageAdapter {
       // TODO: Implement S3StorageAdapter
       throw new Error('S3 storage adapter not implemented yet');
     case 'r2':
-      // TODO: Implement R2StorageAdapter
-      throw new Error('R2 storage adapter not implemented yet');
+      return new R2StorageAdapter(bucket);
     default:
       throw new Error(`Unknown storage provider: ${provider}`);
   }
@@ -65,3 +65,4 @@ export function parseStorageKey(key: string) {
 
 export * from './types';
 export { SupabaseStorageAdapter };
+export { R2StorageAdapter };

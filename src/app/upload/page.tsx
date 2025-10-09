@@ -164,7 +164,21 @@ export default function UploadPage() {
 
       // Add manhole ID if matched
       if (photo.matchedManhole) {
-        formData.append('manholeId', photo.matchedManhole.id.toString());
+        formData.append('manhole_id', photo.matchedManhole.id.toString());
+      }
+
+      // Add visit metadata
+      formData.append('shot_at', photo.metadata.datetime || new Date().toISOString());
+
+      // Add location data if available
+      if (photo.metadata.latitude && photo.metadata.longitude) {
+        formData.append('latitude', photo.metadata.latitude.toString());
+        formData.append('longitude', photo.metadata.longitude.toString());
+      }
+
+      // Add note if manhole was matched
+      if (photo.matchedManhole) {
+        formData.append('note', `Visited ${photo.matchedManhole.name || photo.matchedManhole.title}`);
       }
 
       // Add metadata
@@ -199,13 +213,13 @@ export default function UploadPage() {
         } : p
       ));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
           uploading: false,
-          error: error.message || 'アップロードに失敗しました'
+          error: error?.message || 'アップロードに失敗しました'
         } : p
       ));
     }

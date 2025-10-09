@@ -37,25 +37,41 @@ export default function VisitsPage() {
 
   const loadVisits = async () => {
     try {
-      // In a real app, this would fetch from Supabase
-      // For now, generate sample data based on visited manholes
-      const response = await fetch('/api/manholes?visited=true');
+      // Fetch visits from the API
+      const response = await fetch('/api/visits');
       if (response.ok) {
-        const visitedManholes = await response.json();
+        const data = await response.json();
 
-        const sampleVisits: Visit[] = visitedManholes.map((manhole: Manhole, index: number) => ({
-          id: `visit-${index + 1}`,
-          manhole,
-          visited_at: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-          photos: Array.from({ length: Math.floor(Math.random() * 4) + 1 }, (_, i) => ({
-            id: `photo-${index}-${i}`,
-            url: `/api/placeholder/photo/${index}-${i}`,
-            thumbnail_url: `/api/placeholder/thumb/${index}-${i}`
-          })),
-          notes: Math.random() > 0.5 ? '美しいポケふたでした！' : undefined
-        }));
+        if (data.success && data.visits) {
+          // Transform API response to match our Visit interface
+          const apiVisits: Visit[] = data.visits.map((visit: any) => ({
+            id: visit.id,
+            manhole: {
+              id: visit.manhole?.id || 0,
+              title: visit.manhole?.title || 'Unknown Manhole',
+              prefecture: visit.manhole?.prefecture || '',
+              municipality: visit.manhole?.municipality || null,
+              location: visit.manhole?.location || '',
+              pokemons: visit.manhole?.pokemons || [],
+              name: visit.manhole?.title,
+              description: visit.note,
+              city: visit.manhole?.municipality,
+              created_at: visit.created_at,
+              updated_at: visit.updated_at,
+              detail_url: visit.manhole?.detail_url || null,
+              prefecture_site_url: visit.manhole?.prefecture_site_url || null,
+            },
+            visited_at: visit.shot_at,
+            photos: visit.photos.map((photo: any) => ({
+              id: photo.id,
+              url: photo.url,
+              thumbnail_url: photo.thumbnail_url
+            })),
+            notes: visit.note
+          }));
 
-        setVisits(sampleVisits);
+          setVisits(apiVisits);
+        }
       }
     } catch (error) {
       console.error('Failed to load visits:', error);
@@ -277,12 +293,26 @@ export default function VisitsPage() {
                   {/* Photos */}
                   <div className={viewMode === 'grid' ? 'w-full' : 'flex-shrink-0 w-32'}>
                     {visit.photos.length > 0 ? (
-                      <div className={`photo-grid ${viewMode === 'list' ? 'grid-cols-2' : ''}`}>
+                      <div className={`grid gap-1 ${viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-2'}`}>
                         {visit.photos.slice(0, 4).map((photo, index) => (
-                          <div key={photo.id} className="photo-item">
-                            <div className="w-full h-full bg-gradient-to-br from-pokemon-lightBlue to-pokemon-blue flex items-center justify-center">
-                              <Camera className="w-8 h-8 text-white" />
-                            </div>
+                          <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden">
+                            <img
+                              src={photo.thumbnail_url}
+                              alt={`Photo ${index + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.parentElement!.innerHTML = `
+                                  <div class="w-full h-full bg-gradient-to-br from-pokemon-lightBlue to-pokemon-blue flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                  </div>
+                                `;
+                              }}
+                            />
                             {visit.photos.length > 4 && index === 3 && (
                               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                 <span className="text-white font-bold">
