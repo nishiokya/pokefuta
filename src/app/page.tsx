@@ -77,9 +77,17 @@ export default function HomePage() {
             .filter((manhole: Manhole | undefined): manhole is Manhole => manhole !== undefined);
           setVisitedManholes(manholes);
         }
+      } else if (response.status === 401) {
+        // 未認証の場合は空の配列を設定
+        console.log('User not authenticated');
+        setVisits([]);
+        setVisitedManholes([]);
       }
     } catch (error) {
       console.error('Failed to load visits:', error);
+      // エラーの場合も空の配列を設定
+      setVisits([]);
+      setVisitedManholes([]);
     } finally {
       setLoading(false);
     }

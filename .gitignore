@@ -7,10 +7,20 @@ __pycache__/
 change_summary.json
 create_pr.flag
 node_modules
-.env.local
+
+.env*.local
+.env.production
 .env
+
+# Vercel/Amplify
+.vercel
+.amplify
 
 *.pack.gz
 .next/
 .next/trace
 *.tsbuildinfo
+
+.claude/*
+CLAUDE.md
+.env.example

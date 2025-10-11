@@ -70,10 +70,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           note: string | null;
-          with_family: boolean;
-          tags: string[];
-          weather: Weather | null;
-          rating: number | null;
+          // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Insert: {
           id?: string;
@@ -82,20 +79,14 @@ export interface Database {
           shot_location?: string | null;
           shot_at: string;
           note?: string | null;
-          with_family?: boolean;
-          tags?: string[];
-          weather?: Weather | null;
-          rating?: number | null;
+          // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Update: {
           manhole_id?: number | null;
           shot_location?: string | null;
           shot_at?: string;
           note?: string | null;
-          with_family?: boolean;
-          tags?: string[];
-          weather?: Weather | null;
-          rating?: number | null;
+          // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
       };
       photo: {
@@ -345,10 +336,7 @@ export interface VisitWithPhotos {
   created_at: string;
   updated_at: string;
   note: string | null;
-  with_family: boolean;
-  tags: string[];
-  weather: Weather | null;
-  rating: number | null;
+  // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
   photos: Database['public']['Tables']['photo']['Row'][];
 }
 

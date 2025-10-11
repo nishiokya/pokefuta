@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import DevDebugPanel from '@/components/DevDebugPanel';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased`}>
         <div id="app" className="min-h-screen bg-gradient-to-br from-pokemon-red via-pokemon-blue to-pokemon-yellow">
           {children}
+          <DevDebugPanel />
         </div>
       </body>
     </html>

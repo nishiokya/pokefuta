@@ -17,6 +17,28 @@ export async function GET(request: NextRequest) {
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
 
+    // ✅ 認証されていない場合は空の配列を返す
+    if (!session?.user) {
+      return NextResponse.json({
+        success: true,
+        visits: [],
+        stats: {
+          total_visits: 0,
+          total_photos: 0,
+          prefectures: [],
+          date_range: {
+            first: null,
+            last: null
+          }
+        },
+        pagination: {
+          limit,
+          offset,
+          total: 0
+        }
+      });
+    }
+
     // Build query
     let query = supabase
       .from('visit')
@@ -41,13 +63,8 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('shot_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    // Apply filters
-    if (session?.user) {
-      // If authenticated, filter by user
-      query = query.eq('user_id', session.user.id);
-    }
+      .range(offset, offset + limit - 1)
+      .eq('user_id', session.user.id);  // ✅ 必ず自分のデータのみ取得
 
     if (prefecture) {
       // Note: This requires a join, handled by the query above
@@ -82,10 +99,7 @@ export async function GET(request: NextRequest) {
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
         note: visit.note,
-        with_family: visit.with_family,
-        tags: visit.tags,
-        weather: visit.weather,
-        rating: visit.rating,
+        // Removed fields that don't exist in schema: with_family, tags, weather, rating
         created_at: visit.created_at,
         updated_at: visit.updated_at,
         photos: photos.map((photo: any) => ({
@@ -183,11 +197,8 @@ export async function POST(request: NextRequest) {
       manhole_id,
       shot_location,
       shot_at,
-      note,
-      with_family,
-      tags,
-      weather,
-      rating
+      note
+      // Removed fields that don't exist in schema: with_family, tags, weather, rating
     } = body;
 
     // Validate required fields
@@ -206,11 +217,8 @@ export async function POST(request: NextRequest) {
         manhole_id: manhole_id || null,
         shot_location: shot_location || null,
         shot_at,
-        note: note || null,
-        with_family: with_family || false,
-        tags: tags || [],
-        weather: weather || null,
-        rating: rating || null
+        note: note || null
+        // Removed fields that don't exist in schema: with_family, tags, weather, rating
       })
       .select()
       .single();
