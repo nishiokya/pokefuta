@@ -8,8 +8,15 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Get user session (optional - can be used without auth for demo)
+    // ✅ 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required'
+      }, { status: 401 });
+    }
 
     // Parse multipart form data
     const formData = await request.formData();
@@ -59,14 +66,8 @@ export async function POST(request: NextRequest) {
     let imageId: string | null = null;
 
     try {
-      // Create or find user (for demo purposes, create fallback user if not authenticated)
-      let userId: string | null = session?.user?.id || null;
-
-      if (!userId) {
-        // Use fallback user ID directly
-        userId = 'e67889cd-a51e-4e08-aa00-73acaaa788d4';
-        console.log('Using fallback user:', userId);
-      }
+      // ✅ 強制的にログインユーザーのIDを使用
+      const userId = session.user.id;
 
       // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
       let shotAtDate: Date;
@@ -92,39 +93,35 @@ export async function POST(request: NextRequest) {
 
       // Create visit record with proper Date type
       console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());
-      if (userId) {
-        const visitInsert: any = {
-          user_id: userId,
-          shot_at: shotAtDate, // Pass Date object, not string
-          with_family: false, // Required field with default
-        };
 
-        // Add optional fields only if they exist in schema
-        if (manholeId) {
-          visitInsert.manhole_id = parseInt(manholeId as string);
-        }
-        if (shotLocationGeom) {
-          visitInsert.shot_location = shotLocationGeom;
-        }
-        if (note) {
-          visitInsert.note = note as string;
-        }
+      const visitInsert: any = {
+        user_id: userId,  // ✅ 必ず自分のID
+        shot_at: shotAtDate, // Pass Date object, not string
+      };
 
-        const { data: visitData, error: visitError } = await supabase
-          .from('visit')
-          .insert(visitInsert)
-          .select()
-          .single();
+      // Add optional fields only if they exist in schema
+      if (manholeId) {
+        visitInsert.manhole_id = parseInt(manholeId as string);
+      }
+      if (shotLocationGeom) {
+        visitInsert.shot_location = shotLocationGeom;
+      }
+      if (note) {
+        visitInsert.note = note as string;
+      }
 
-        if (!visitError && visitData) {
-          visitId = visitData.id;
-          console.log('Successfully created visit record:', visitId);
-        } else {
-          console.error('Failed to create visit record:', visitError?.message);
-          throw new Error(`Visit creation failed: ${visitError?.message}`);
-        }
+      const { data: visitData, error: visitError } = await supabase
+        .from('visit')
+        .insert(visitInsert)
+        .select()
+        .single();
+
+      if (!visitError && visitData) {
+        visitId = visitData.id;
+        console.log('Successfully created visit record:', visitId);
       } else {
-        throw new Error('userId is required');
+        console.error('Failed to create visit record:', visitError?.message);
+        throw new Error(`Visit creation failed: ${visitError?.message}`);
       }
 
       // Create photo record with minimal required fields

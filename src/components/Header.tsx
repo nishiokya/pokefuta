@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Map, Navigation, Camera, History, List } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon } from 'lucide-react';
+import { createBrowserClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 interface HeaderProps {
   title?: string;
@@ -12,7 +14,44 @@ interface HeaderProps {
 
 export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+
+  let supabase;
+  try {
+    supabase = createBrowserClient();
+  } catch (error: any) {
+    console.error('Supabase initialization error:', error);
+    setSupabaseError(error.message);
+  }
+
+  useEffect(() => {
+    // Supabaseクライアントが初期化できなかった場合はスキップ
+    if (!supabase || supabaseError) {
+      return;
+    }
+
+    // ユーザー情報取得
+    const getUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Failed to get user session:', error);
+      }
+    };
+
+    getUser();
+
+    // 認証状態の変更を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, supabaseError]);
 
   const menuItems = [
     { href: '/', label: 'ホーム', icon: <Home className="w-5 h-5" /> },
@@ -23,6 +62,20 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
   ];
 
   const isActive = (href: string) => pathname === href;
+
+  const handleLogout = async () => {
+    if (!supabase) return;
+
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await supabase.auth.signOut();
+      setIsMenuOpen(false);
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   return (
     <>
@@ -59,6 +112,39 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
           <div className="fixed top-16 right-0 w-64 z-50 animate-slide-in">
             <div className="rpg-window m-2">
               <h3 className="rpg-window-title text-sm mb-2">MENU</h3>
+
+              {/* User Info */}
+              {user ? (
+                <div className="mb-3 pb-3 border-b-2 border-rpg-border">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-rpg-bgLight">
+                    <div className="w-8 h-8 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                      <UserIcon className="w-4 h-4 text-rpg-textDark" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
+                        {user.user_metadata?.display_name || user.email?.split('@')[0] || 'トレーナー'}
+                      </p>
+                      <p className="font-pixelJp text-xs text-rpg-textDark opacity-50 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-3 pb-3 border-b-2 border-rpg-border">
+                  <div
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      window.location.href = '/login';
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-rpg-yellow cursor-pointer hover:opacity-80"
+                  >
+                    <UserIcon className="w-4 h-4 text-rpg-textDark" />
+                    <span className="font-pixelJp text-sm text-rpg-textDark font-bold">ログイン</span>
+                  </div>
+                </div>
+              )}
+
               <nav className="space-y-1">
                 {menuItems.map((item) => (
                   <div
@@ -77,6 +163,17 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
                     <span>{item.label}</span>
                   </div>
                 ))}
+
+                {/* Logout Button */}
+                {user && (
+                  <div
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t-2 border-rpg-border mt-2 pt-2"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span>ログアウト</span>
+                  </div>
+                )}
               </nav>
             </div>
           </div>
