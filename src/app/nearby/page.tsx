@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Navigation, Camera, Clock, Route, Map } from 'lucide-react';
+import { MapPin, Navigation, Camera, Route, Map, History } from 'lucide-react';
 import { Manhole } from '@/types/database';
+import Header from '@/components/Header';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -28,7 +30,7 @@ export default function NearbyPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [radius, setRadius] = useState(10); // Default 10km
+  const [radius, setRadius] = useState(30); // Default 30km
   const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
@@ -68,13 +70,39 @@ export default function NearbyPage() {
 
   const loadNearbyManholes = async (lat: number, lng: number) => {
     try {
-      const response = await fetch(`/api/manholes?lat=${lat}&lng=${lng}&radius=${radius}&limit=20&visited=false`);
-      if (response.ok) {
-        const data = await response.json();
-        setNearbyManholes(data);
-      } else {
+      // Fetch nearby manholes
+      const manholesResponse = await fetch(`/api/manholes?lat=${lat}&lng=${lng}&radius=${radius}&limit=100`);
+
+      if (!manholesResponse.ok) {
         console.error('Failed to load nearby manholes');
+        setLoading(false);
+        return;
       }
+
+      const allNearbyManholes = await manholesResponse.json();
+
+      // Fetch visits to determine which manholes have been visited
+      const visitsResponse = await fetch('/api/visits');
+      let visitedManholeIds = new Set<number>();
+
+      if (visitsResponse.ok) {
+        const visitsData = await visitsResponse.json();
+        if (visitsData.success && visitsData.visits) {
+          // Collect all visited manhole IDs
+          visitedManholeIds = new Set(
+            visitsData.visits
+              .map((visit: any) => visit.manhole_id)
+              .filter((id: any) => id !== null)
+          );
+        }
+      }
+
+      // Filter out visited manholes and limit to 20
+      const unvisitedManholes = allNearbyManholes
+        .filter((manhole: ManholeWithDistance) => !visitedManholeIds.has(manhole.id))
+        .slice(0, 20);
+
+      setNearbyManholes(unvisitedManholes);
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
     } finally {
@@ -95,36 +123,30 @@ export default function NearbyPage() {
   };
 
   const viewOnMap = (manhole: ManholeWithDistance) => {
-    window.location.href = `/map?center=${manhole.latitude},${manhole.longitude}&zoom=15`;
+    window.location.href = `/?center=${manhole.latitude},${manhole.longitude}&zoom=15`;
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-pokemon-red via-pokemon-blue to-pokemon-yellow p-4 text-white">
-        <div className="container-pokemon">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Navigation className="w-6 h-6" />
-              <h1 className="text-xl font-bold text-shadow-pokemon">近くの未訪問ポケふた</h1>
-            </div>
-            <button
-              onClick={getCurrentLocationAndLoadManholes}
-              className="btn-pokemon-secondary"
-              title="現在地を更新"
-            >
-              <MapPin className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
+      <Header title="📍 近くのダンジョン" icon={<Navigation className="w-6 h-6" />} />
 
       {/* Controls */}
-      <div className="p-4">
-        <div className="card-pokemon p-4 mb-4">
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={getCurrentLocationAndLoadManholes}
+            className="rpg-button text-xs py-2 px-3 flex items-center gap-2"
+            title="現在地を更新"
+          >
+            <MapPin className="w-4 h-4" />
+            現在地更新
+          </button>
+        </div>
+
+        <div className="rpg-window mb-4">
           <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-semibold text-pokemon-darkBlue">検索範囲</label>
-            <span className="text-pokemon-blue font-bold">{radius}km</span>
+            <label className="font-pixelJp text-sm text-rpg-textDark">検索範囲</label>
+            <span className="font-pixel text-rpg-yellow">{radius}km</span>
           </div>
           <input
             type="range"
@@ -132,46 +154,49 @@ export default function NearbyPage() {
             max="100"
             value={radius}
             onChange={(e) => setRadius(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-2 bg-rpg-bgDark border-2 border-rpg-border appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #F1C40F 0%, #F1C40F ${radius}%, #2C3E50 ${radius}%, #2C3E50 100%)`
+            }}
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
             <span>1km</span>
             <span>100km</span>
           </div>
         </div>
 
         {locationError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {locationError}
+          <div className="rpg-window mb-4 bg-rpg-red/20 border-rpg-red">
+            <p className="font-pixelJp text-sm text-rpg-red">{locationError}</p>
           </div>
         )}
 
         {userLocation && (
-          <div className="card-pokemon p-3 mb-4">
-            <div className="flex items-center justify-between text-sm mb-3">
-              <div className="text-center">
-                <div className="font-bold text-pokemon-darkBlue">{nearbyManholes.length}</div>
-                <div className="text-gray-600">見つかった</div>
+          <div className="rpg-window mb-4">
+            <div className="rpg-status mb-3">
+              <div className="rpg-stat-item">
+                <div className="rpg-stat-value">{nearbyManholes.length}</div>
+                <div className="rpg-stat-label">発見</div>
               </div>
-              <div className="text-center">
-                <div className="font-bold text-pokemon-blue">{radius}km</div>
-                <div className="text-gray-600">範囲内</div>
+              <div className="rpg-stat-item">
+                <div className="rpg-stat-value">{radius}</div>
+                <div className="rpg-stat-label">範囲km</div>
               </div>
-              <div className="text-center">
-                <div className="font-bold text-pokemon-red">
+              <div className="rpg-stat-item">
+                <div className="rpg-stat-value">
                   {nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-'}
                 </div>
-                <div className="text-gray-600">最寄り</div>
+                <div className="rpg-stat-label">最寄り</div>
               </div>
             </div>
             <button
               onClick={() => setShowMap(!showMap)}
-              className={`w-full btn-pokemon-secondary text-sm py-2 flex items-center justify-center ${
-                showMap ? 'bg-pokemon-yellow text-pokemon-darkBlue' : ''
-              }`}
+              className={`w-full rpg-button text-sm ${showMap ? 'rpg-button-primary' : ''}`}
             >
-              <Map className="w-4 h-4 mr-2" />
-              {showMap ? 'リストを表示' : 'マップを表示'}
+              <div className="flex items-center justify-center gap-2">
+                <Map className="w-4 h-4" />
+                <span className="font-pixelJp">{showMap ? 'リスト表示' : 'マップ表示'}</span>
+              </div>
             </button>
           </div>
         )}
@@ -181,26 +206,23 @@ export default function NearbyPage() {
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <div className="loading-pokemon mb-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pokemon-red to-pokemon-blue loading-spin mx-auto"></div>
+            <div className="font-pixelJp text-rpg-textGold">
+              検索中<span className="rpg-loading"></span>
             </div>
-            <p className="text-pokemon-darkBlue font-semibold">近くのポケふたを検索中...</p>
           </div>
         </div>
       )}
 
       {/* Map View */}
       {!loading && showMap && userLocation && (
-        <div className="px-4 mb-4">
-          <div className="card-pokemon p-2">
+        <div className="px-4 mb-4 max-w-2xl mx-auto">
+          <div className="rpg-window p-2">
             <div style={{ height: '400px' }}>
               <MapComponent
                 center={userLocation}
                 manholes={nearbyManholes}
                 onManholeClick={(manhole) => {
-                  // Show details in list view
                   setShowMap(false);
-                  // Scroll to manhole in list (could be enhanced)
                 }}
                 userLocation={userLocation}
               />
@@ -211,62 +233,78 @@ export default function NearbyPage() {
 
       {/* Manholes List */}
       {!loading && !showMap && (
-        <div className="px-4 pb-20">
+        <div className="px-4 pb-20 max-w-2xl mx-auto">
           {nearbyManholes.length === 0 ? (
             <div className="text-center py-12">
-              <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2">近くに未訪問のポケふたが見つかりませんでした</p>
-              <p className="text-sm text-gray-500">検索範囲を広げてみてください</p>
+              <div className="rpg-window">
+                <MapPin className="w-12 h-12 text-rpg-textDark opacity-50 mx-auto mb-4" />
+                <p className="font-pixelJp text-sm text-rpg-textDark mb-2">
+                  近くに未訪問のポケふたが見つかりませんでした
+                </p>
+                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+                  検索範囲を広げてみてください
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
               {nearbyManholes.map((manhole) => (
-                <div key={manhole.id} className="card-pokemon p-4">
-                  <div className="flex justify-between items-start mb-3">
+                <div key={manhole.id} className="rpg-window">
+                  <div className="flex justify-between items-start mb-3 pb-3 border-b-2 border-rpg-border">
                     <div className="flex-1">
-                      <h3 className="font-bold text-pokemon-darkBlue mb-1">
+                      <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-2">
                         {manhole.name || 'ポケふた'}
                       </h3>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <MapPin className="w-4 h-4 mr-1" />
+                      <div className="flex items-center font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
+                        <MapPin className="w-3 h-3 mr-1" />
                         <span>{manhole.prefecture} {manhole.city}</span>
                       </div>
                       {manhole.description && (
-                        <p className="text-sm text-gray-700 mb-2">{manhole.description}</p>
+                        <p className="font-pixelJp text-xs text-rpg-textDark mb-2 line-clamp-2">
+                          {manhole.description}
+                        </p>
                       )}
                       {manhole.pokemons && manhole.pokemons.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {manhole.pokemons.map((pokemon, index) => (
-                            <span key={index} className="badge-pokemon text-xs">
+                          {manhole.pokemons.slice(0, 3).map((pokemon, index) => (
+                            <span
+                              key={index}
+                              className="bg-rpg-yellow px-2 py-1 border-2 border-rpg-border font-pixelJp text-xs text-rpg-textDark"
+                            >
                               {pokemon}
                             </span>
                           ))}
+                          {manhole.pokemons.length > 3 && (
+                            <span className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+                              +{manhole.pokemons.length - 3}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
                     <div className="text-right ml-4">
-                      <div className="font-bold text-pokemon-blue text-lg">
+                      <div className="font-pixel text-lg text-rpg-blue">
                         {formatDistance(manhole.distance)}
                       </div>
-                      <div className="text-xs text-gray-500">距離</div>
+                      <div className="font-pixelJp text-xs text-rpg-textDark opacity-70">距離</div>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => viewOnMap(manhole)}
-                      className="flex-1 btn-pokemon-secondary text-sm py-2 flex items-center justify-center"
+                      className="flex-1 rpg-button text-xs flex items-center justify-center gap-1"
                     >
-                      <MapPin className="w-4 h-4 mr-1" />
-                      マップで見る
+                      <MapPin className="w-3 h-3" />
+                      <span className="font-pixelJp">マップ</span>
                     </button>
                     <button
                       onClick={() => openInMaps(manhole)}
-                      className="flex-1 btn-pokemon text-sm py-2 flex items-center justify-center"
+                      className="flex-1 rpg-button rpg-button-success text-xs flex items-center justify-center gap-1"
                     >
-                      <Route className="w-4 h-4 mr-1" />
-                      経路案内
+                      <Route className="w-3 h-3" />
+                      <span className="font-pixelJp">経路</span>
                     </button>
                   </div>
                 </div>
@@ -276,16 +314,27 @@ export default function NearbyPage() {
         </div>
       )}
 
-      {/* Floating Camera Button */}
-      <div className="fixed bottom-20 right-4 z-10">
-        <button
-          onClick={() => window.location.href = '/upload'}
-          className="w-16 h-16 btn-pokemon rounded-full flex items-center justify-center shadow-pokemon-hover"
-          title="写真をアップロード"
-        >
-          <Camera className="w-8 h-8" />
-        </button>
-      </div>
+      {/* Bottom Navigation - RPG Style */}
+      <nav className="nav-rpg">
+        <div className="flex justify-around items-center max-w-md mx-auto py-2">
+          <Link href="/" className="nav-rpg-item">
+            <MapPin className="w-6 h-6 mb-1" />
+            <span>マップ</span>
+          </Link>
+          <Link href="/nearby" className="nav-rpg-item active">
+            <Navigation className="w-6 h-6 mb-1" />
+            <span>近く</span>
+          </Link>
+          <Link href="/upload" className="nav-rpg-item">
+            <Camera className="w-6 h-6 mb-1" />
+            <span>登録</span>
+          </Link>
+          <Link href="/visits" className="nav-rpg-item">
+            <History className="w-6 h-6 mb-1" />
+            <span>履歴</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }

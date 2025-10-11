@@ -113,13 +113,61 @@ POKEFUTA_DATA_URL=/api/manholes
 - **クラスタリング**: ズームレベル別グループ化
 - **フィルタ**: 都道府県/ポケモン別表示
 
-## 📸 写真処理
+## 📸 写真処理・ストレージ
 
+### ストレージ設定
+
+このアプリケーションは複数のストレージプロバイダーに対応しています：
+
+#### Cloudflare R2 (推奨)
 1. **アップロード**: ドラッグ&ドロップ or カメラ
 2. **EXIF解析**: 位置情報・撮影日時抽出
 3. **重複検出**: SHA-256ハッシュ比較
 4. **サムネイル生成**: 320px/800px/1600px
-5. **ストレージ保存**: Supabase Storage
+5. **ストレージ保存**: Cloudflare R2 (S3互換)
+
+#### Supabase Storage (代替)
+従来のSupabase Storageも引き続き利用可能です。
+
+### R2設定方法
+
+1. **Cloudflare R2バケットの作成**
+   - Cloudflareダッシュボードでバケットを作成
+   - 提供されたエンドポイントURL：`https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com`
+
+2. **API Tokenの作成**
+   - R2 Token API で Access Key ID と Secret Access Key を生成
+   - 権限は `Object Read/Write` を設定
+
+3. **環境変数の設定**
+   ```bash
+   # ストレージプロバイダーをR2に設定
+   STORAGE_PROVIDER=r2
+   
+   # R2の認証情報
+   R2_ACCESS_KEY_ID=your_access_key_id
+   R2_SECRET_ACCESS_KEY=your_secret_access_key
+   R2_ENDPOINT=https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com
+   R2_PUBLIC_URL=https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com
+   R2_BUCKET=pokefuta-photos
+   ```
+
+4. **シークレット保存場所**
+   - **ローカル開発**: `.env.local` ファイル（`.gitignore`に含める）
+   - **Vercel Deploy**: Vercelダッシュボードの環境変数設定
+   - **その他PaaS**: 各プラットフォームの環境変数設定機能を使用
+
+### ストレージの切り替え
+
+環境変数 `STORAGE_PROVIDER` を変更することで、ストレージプロバイダーを切り替えできます：
+
+```bash
+# Cloudflare R2を使用
+STORAGE_PROVIDER=r2
+
+# Supabase Storageを使用
+STORAGE_PROVIDER=supabase
+```
 
 ## 🔍 近傍マッチング
 
@@ -136,7 +184,7 @@ POKEFUTA_DATA_URL=/api/manholes
 
 ## 📊 コスト見積もり
 
-- **Vercel**: $0-20/月（Hobby→Pro）
+- **  **: $0-20/月（Hobby→Pro）
 - **Supabase**: $0-25/月（Free→Pro）
 - **ドメイン**: ¥1,000/年
 - **合計**: ¥1,000-5,000/月程度

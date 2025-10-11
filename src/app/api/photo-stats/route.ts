@@ -25,39 +25,21 @@ export async function GET(request: NextRequest) {
       console.log('Photo table not accessible');
     }
 
-    // Get count from in-memory minimal-upload storage
-    let minimalUploadCount = 0;
-    try {
-      const minimalUploadResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/minimal-upload`);
-      if (minimalUploadResponse.ok) {
-        const uploadData = await minimalUploadResponse.json();
-        if (uploadData.success && uploadData.count) {
-          minimalUploadCount = uploadData.count;
-        }
-      }
-    } catch (error) {
-      console.log('Minimal upload API not accessible');
-    }
-
-    // Use the maximum count (since some photos might be in both)
-    const photoCount = Math.max(photoTableCount, minimalUploadCount);
-
     return NextResponse.json({
       success: true,
-      photo_count: photoCount,
+      photo_count: photoTableCount,
       sources: {
-        photo_table: photoTableCount,
-        minimal_upload: minimalUploadCount
+        photo_table: photoTableCount
       },
-      message: `Found ${photoCount} photos total (${photoTableCount} in DB, ${minimalUploadCount} in memory)`
+      message: `Found ${photoTableCount} photos in database`
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Photo stats error:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to get photo statistics',
-      details: error.message,
+      details: error?.message || 'Unknown error',
       photo_count: 0
     }, { status: 500 });
   }
