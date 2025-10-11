@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const manholeId = formData.get('manhole_id');
-    const shotAt = formData.get('shot_at') || new Date().toISOString();
+    const shotAt = formData.get('shot_at');
     const note = formData.get('note');
     const shotLocation = formData.get('shot_location');
     const latitude = formData.get('latitude');
@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
 
-    // Generate storage key
+    // Generate storage key for R2
     const storageKey = generateStorageKey('original');
 
-    // Upload to storage (R2 or Supabase depending on STORAGE_PROVIDER env var)
+    // Upload to R2 storage
     await storage.put(storageKey, arrayBuffer, {
       contentType: file.type,
       cacheControl: 'public, max-age=31536000, immutable',
@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
     // Get signed URL for the uploaded file
     const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour
 
-    // Create visit record first
+    // Create visit and image records
     let visitId: string | null = null;
-    let photoId: string | null = null;
+    let imageId: string | null = null;
 
     try {
       // Create or find user (for demo purposes, create fallback user if not authenticated)
@@ -66,6 +66,18 @@ export async function POST(request: NextRequest) {
         // Use fallback user ID directly
         userId = 'e67889cd-a51e-4e08-aa00-73acaaa788d4';
         console.log('Using fallback user:', userId);
+      }
+
+      // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
+      let shotAtDate: Date;
+      if (shotAt) {
+        shotAtDate = new Date(shotAt as string);
+        // Validate date
+        if (isNaN(shotAtDate.getTime())) {
+          shotAtDate = new Date(); // Fallback to current time
+        }
+      } else {
+        shotAtDate = new Date();
       }
 
       // Build shot_location as PostGIS POINT if coordinates are provided
@@ -78,11 +90,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create visit record
+      // Create visit record with proper Date type
+      console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());
       if (userId) {
         const visitInsert: any = {
           user_id: userId,
-          shot_at: shotAt as string,
+          shot_at: shotAtDate, // Pass Date object, not string
           with_family: false, // Required field with default
         };
 
@@ -107,18 +120,24 @@ export async function POST(request: NextRequest) {
           visitId = visitData.id;
           console.log('Successfully created visit record:', visitId);
         } else {
-          console.log('Failed to create visit record:', visitError?.message);
+          console.error('Failed to create visit record:', visitError?.message);
+          throw new Error(`Visit creation failed: ${visitError?.message}`);
         }
+      } else {
+        throw new Error('userId is required');
       }
 
-      // Create photo record linked to visit
-      // Note: Using actual database column names (storage_path instead of storage_key)
+      // Create photo record with minimal required fields
+      // Note: Adjust fields based on actual database schema
       const photoInsert: any = {
         visit_id: visitId,
-        storage_path: storageKey,  // Database uses 'storage_path' not 'storage_key'
-        file_size: fileSize,
-        content_type: file.type,
+        storage_key: storageKey,
       };
+
+      // Add optional fields if they exist in schema
+      if (fileSize) photoInsert.file_size = fileSize;
+      if (file.type) photoInsert.content_type = file.type;
+      if (file.name) photoInsert.original_name = file.name;
 
       const { data: photoData, error: photoError } = await supabase
         .from('photo')
@@ -127,13 +146,20 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!photoError && photoData) {
-        photoId = photoData.id;
-        console.log('Successfully stored photo metadata in database:', photoId);
+        imageId = photoData.id;
+        console.log('Successfully stored photo metadata in database:', imageId);
       } else {
-        console.log('Database insert failed:', photoError?.message);
+        console.error('Photo insert failed:', photoError?.message);
+        throw new Error(`Photo creation failed: ${photoError?.message}`);
       }
+
     } catch (dbError: any) {
-      console.log('Database storage failed:', dbError?.message);
+      console.error('Database operation failed:', dbError?.message);
+      return NextResponse.json({
+        success: false,
+        error: 'Database operation failed',
+        details: dbError?.message
+      }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -141,7 +167,7 @@ export async function POST(request: NextRequest) {
       message: 'Image uploaded successfully',
       visit_id: visitId,
       image: {
-        id: photoId || storageKey,
+        id: imageId,
         filename: file.name,
         content_type: file.type,
         file_size: fileSize,
@@ -150,7 +176,7 @@ export async function POST(request: NextRequest) {
         url: signedUrl.url,
         expires_at: signedUrl.expiresAt,
       },
-      storage_provider: process.env.STORAGE_PROVIDER || 'supabase',
+      storage_provider: process.env.STORAGE_PROVIDER || 'r2',
     });
 
   } catch (error: any) {
@@ -172,20 +198,28 @@ export async function GET(request: NextRequest) {
     if (storageKey) {
       // Redirect to signed URL for the specific image
       const signedUrl = await storage.getSignedUrl(storageKey, 3600);
-
       return NextResponse.redirect(signedUrl.url);
     } else {
-      // Return list of uploaded images from database
-      const { data: photos, error } = await supabase
+      // Return list of uploaded photos from database
+      const { data: images, error } = await supabase
         .from('photo')
-        .select('*')
+        .select(`
+          *,
+          visit!inner(
+            id,
+            user_id,
+            shot_at,
+            manhole_id,
+            note
+          )
+        `)
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) {
         return NextResponse.json({
           success: false,
-          error: 'Failed to fetch photos',
+          error: 'Failed to fetch images',
           details: error.message
         }, { status: 500 });
       }
@@ -193,8 +227,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Images retrieved successfully',
-        images: photos || [],
-        count: photos?.length || 0,
+        images: images || [],
+        count: images?.length || 0,
       });
     }
 

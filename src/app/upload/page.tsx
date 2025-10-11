@@ -2,10 +2,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X } from 'lucide-react';
+import Link from 'next/link';
+import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History } from 'lucide-react';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
+import Header from '@/components/Header';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -152,11 +154,13 @@ export default function UploadPage() {
 
     try {
       // Compress image
+      console.log('Starting image compression for:', photo.file.name, 'Size:', photo.file.size);
       const compressedFile = await imageCompression(photo.file, {
         maxSizeMB: 2,
         maxWidthOrHeight: 1920,
         useWebWorker: true
       });
+      console.log('Image compressed successfully. New size:', compressedFile.size);
 
       // Prepare form data for upload
       const formData = new FormData();
@@ -193,12 +197,15 @@ export default function UploadPage() {
       formData.append('metadata', JSON.stringify(metadata));
 
       // Upload to binary storage API
-      const uploadResponse = await fetch('/api/minimal-upload', {
+      console.log('Uploading to /api/image-upload...');
+      const uploadResponse = await fetch('/api/image-upload', {
         method: 'POST',
         body: formData
       });
 
+      console.log('Upload response status:', uploadResponse.status);
       const uploadResult = await uploadResponse.json();
+      console.log('Upload result:', uploadResult);
 
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || 'Upload failed');
@@ -250,51 +257,40 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-pokemon-red via-pokemon-blue to-pokemon-yellow p-4 text-white">
-        <div className="container-pokemon">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Upload className="w-6 h-6" />
-              <h1 className="text-xl font-bold text-shadow-pokemon">写真アップロード</h1>
-            </div>
-            <button
-              onClick={() => window.history.back()}
-              className="btn-pokemon-secondary"
-            >
-              戻る
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
+      <Header title="📷 写真登録" icon={<Upload className="w-6 h-6" />} />
 
-      <div className="container-pokemon py-6 space-y-6">
+      <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         {/* Upload Area */}
         <div className="space-y-4">
           <div
             {...getRootProps()}
-            className={`dropzone ${isDragActive ? 'active' : ''}`}
+            className={`rpg-window cursor-pointer transition-all ${
+              isDragActive ? 'bg-rpg-yellow/20 border-rpg-yellow' : ''
+            }`}
           >
             <input {...getInputProps()} />
-            <div className="text-center">
-              <Upload className="w-12 h-12 mx-auto mb-4 text-pokemon-blue" />
-              <p className="text-lg font-semibold mb-2">
-                {isDragActive ? '写真をドロップしてください' : '写真を選択またはドロップ'}
+            <div className="text-center py-8">
+              <Upload className={`w-16 h-16 mx-auto mb-4 ${isDragActive ? 'text-rpg-yellow' : 'text-rpg-blue'}`} />
+              <p className="font-pixelJp text-lg text-rpg-textDark mb-2">
+                {isDragActive ? '写真をドロップ!' : '写真を選択またはドロップ'}
               </p>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
                 JPEG, PNG, HEIC形式に対応
               </p>
-              <div className="flex gap-4 justify-center">
-                <button className="btn-pokemon-secondary">
-                  ファイルを選択
+              <div className="flex gap-2 justify-center">
+                <button className="rpg-button text-xs">
+                  <span className="font-pixelJp">ファイル選択</span>
                 </button>
                 <button
-                  onClick={captureFromCamera}
-                  className="btn-pokemon flex items-center gap-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    captureFromCamera();
+                  }}
+                  className="rpg-button rpg-button-success text-xs flex items-center gap-2"
                 >
-                  <Camera className="w-5 h-5" />
-                  カメラで撮影
+                  <Camera className="w-4 h-4" />
+                  <span className="font-pixelJp">カメラ</span>
                 </button>
               </div>
             </div>
@@ -302,50 +298,54 @@ export default function UploadPage() {
 
           {loading && (
             <div className="text-center py-4">
-              <div className="loading-pokemon mb-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pokemon-red to-pokemon-blue loading-spin mx-auto"></div>
+              <div className="font-pixelJp text-rpg-textGold">
+                処理中<span className="rpg-loading"></span>
               </div>
-              <p className="text-sm text-gray-600">写真を処理中...</p>
             </div>
           )}
         </div>
 
         {/* Photos List */}
         {photos.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-pokemon-darkBlue">
-                選択された写真 ({photos.length})
-              </h2>
-              <button
-                onClick={uploadAllPhotos}
-                className="btn-pokemon"
-                disabled={photos.every(p => p.uploaded || p.uploading)}
-              >
-                全てアップロード
-              </button>
+          <div className="space-y-4 pb-20">
+            <div className="rpg-window">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold">
+                  選択済み ({photos.length}枚)
+                </h2>
+                <button
+                  onClick={uploadAllPhotos}
+                  className="rpg-button rpg-button-primary text-xs"
+                  disabled={photos.every(p => p.uploaded || p.uploading)}
+                >
+                  <span className="font-pixelJp">全て登録</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
               {photos.map((photo) => (
-                <div key={photo.id} className="card-pokemon p-4">
-                  <div className="flex gap-4">
+                <div key={photo.id} className="rpg-window">
+                  <div className="flex gap-3">
                     {/* Photo Preview */}
                     <div className="flex-shrink-0">
                       <img
                         src={photo.preview}
                         alt="Preview"
-                        className="w-20 h-20 object-cover rounded-lg"
+                        className="w-20 h-20 object-cover border-2 border-rpg-border"
+                        style={{ imageRendering: 'pixelated' }}
                       />
                     </div>
 
                     {/* Photo Info */}
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">{photo.file.name}</h3>
+                        <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
+                          {photo.file.name}
+                        </h3>
                         <button
                           onClick={() => removePhoto(photo.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-rpg-red hover:opacity-70"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -353,73 +353,58 @@ export default function UploadPage() {
 
                       {/* Location Info */}
                       {photo.metadata.latitude && photo.metadata.longitude ? (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          <span>
-                            {photo.metadata.latitude.toFixed(6)}, {photo.metadata.longitude.toFixed(6)}
+                        <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-textDark opacity-70">
+                          <MapPin className="w-3 h-3" />
+                          <span className="truncate">
+                            {photo.metadata.latitude.toFixed(4)}, {photo.metadata.longitude.toFixed(4)}
                           </span>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">位置情報なし</p>
+                        <p className="font-pixelJp text-xs text-rpg-textDark opacity-50">位置情報なし</p>
                       )}
 
                       {/* Matched Manhole */}
                       {photo.matchedManhole && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-2">
-                          <div className="flex items-center gap-2 text-sm text-green-700">
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="font-semibold">マンホールを検出:</span>
+                        <div className="bg-rpg-green/20 border-2 border-rpg-green p-2">
+                          <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-green">
+                            <CheckCircle className="w-3 h-3" />
+                            <span>マンホール検出!</span>
                           </div>
-                          <p className="text-sm text-green-600 mt-1">
+                          <p className="font-pixelJp text-xs text-rpg-textDark mt-1">
                             {photo.matchedManhole.name} ({photo.matchedManhole.city})
                           </p>
                         </div>
                       )}
 
                       {/* Upload Status */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center gap-2 flex-1">
                           {photo.uploaded ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1 text-green-600">
-                                <CheckCircle className="w-4 h-4" />
-                                <span className="text-sm">アップロード完了</span>
-                              </div>
-                              {photo.uploadedImageId && (
-                                <div className="text-xs text-gray-500">
-                                  画像ID: {photo.uploadedImageId}
-                                  <a
-                                    href={`/api/minimal-upload?id=${photo.uploadedImageId}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="ml-2 text-pokemon-blue hover:underline"
-                                  >
-                                    表示
-                                  </a>
-                                </div>
-                              )}
+                            <div className="flex items-center gap-1 text-rpg-green">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-pixelJp text-xs">完了</span>
                             </div>
                           ) : photo.uploading ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-4 h-4 rounded-full bg-gradient-to-r from-pokemon-red to-pokemon-blue loading-spin"></div>
-                              <span className="text-sm">アップロード中...</span>
+                              <div className="rpg-loading inline-block"></div>
+                              <span className="font-pixelJp text-xs text-rpg-textDark">登録中</span>
                             </div>
                           ) : photo.error ? (
-                            <div className="flex items-center gap-1 text-red-600">
+                            <div className="flex items-center gap-1 text-rpg-red">
                               <AlertCircle className="w-4 h-4" />
-                              <span className="text-sm">{photo.error}</span>
+                              <span className="font-pixelJp text-xs">{photo.error}</span>
                             </div>
                           ) : (
-                            <span className="text-sm text-gray-500">未アップロード</span>
+                            <span className="font-pixelJp text-xs text-rpg-textDark opacity-50">未登録</span>
                           )}
                         </div>
 
                         {!photo.uploaded && !photo.uploading && (
                           <button
                             onClick={() => uploadPhoto(photo.id)}
-                            className="btn-pokemon-secondary text-sm px-3 py-1"
+                            className="rpg-button text-xs px-2 py-1"
                           >
-                            アップロード
+                            <span className="font-pixelJp">登録</span>
                           </button>
                         )}
                       </div>
@@ -431,6 +416,28 @@ export default function UploadPage() {
           </div>
         )}
       </div>
+
+      {/* Bottom Navigation - RPG Style */}
+      <nav className="nav-rpg">
+        <div className="flex justify-around items-center max-w-md mx-auto py-2">
+          <Link href="/" className="nav-rpg-item">
+            <MapPin className="w-6 h-6 mb-1" />
+            <span>マップ</span>
+          </Link>
+          <Link href="/nearby" className="nav-rpg-item">
+            <Navigation className="w-6 h-6 mb-1" />
+            <span>近く</span>
+          </Link>
+          <Link href="/upload" className="nav-rpg-item active">
+            <Camera className="w-6 h-6 mb-1" />
+            <span>登録</span>
+          </Link>
+          <Link href="/visits" className="nav-rpg-item">
+            <History className="w-6 h-6 mb-1" />
+            <span>履歴</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }

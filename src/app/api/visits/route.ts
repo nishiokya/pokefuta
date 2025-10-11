@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         ),
         photos:photo (
           id,
-          storage_path,
+          storage_key,
           content_type,
           file_size,
           width,
@@ -90,13 +90,13 @@ export async function GET(request: NextRequest) {
         updated_at: visit.updated_at,
         photos: photos.map((photo: any) => ({
           id: photo.id,
-          storage_path: photo.storage_path,
+          storage_key: photo.storage_key,
           content_type: photo.content_type,
           file_size: photo.file_size,
           width: photo.width,
           height: photo.height,
           created_at: photo.created_at,
-          // Generate URL based on storage path
+          // Generate URL based on storage key
           url: `/api/photo/${photo.id}`,
           thumbnail_url: `/api/photo/${photo.id}?size=small`
         }))

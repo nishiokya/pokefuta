@@ -28,15 +28,14 @@ export async function GET(
       }, { status: 404 });
     }
 
-    // Determine which storage path to use based on size
-    // Note: Database uses 'storage_path' instead of 'storage_key'
-    let storagePath = photo.storage_path;
+    // Determine which storage key to use based on size
+    let storageKey = photo.storage_key;
 
     // For now, we don't have separate thumbnails, so just use the main image
     // TODO: Generate and store thumbnails
 
     // Get signed URL from storage provider
-    const signedUrl = await storage.getSignedUrl(storagePath, 3600); // 1 hour expiry
+    const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour expiry
 
     // Redirect to the signed URL
     return NextResponse.redirect(signedUrl.url);
