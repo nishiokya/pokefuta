@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
     try {
       // ✅ 強制的にログインユーザーのIDを使用
       const userId = session.user.id;
+      console.log('Creating visit with user_id:', userId);
 
       // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
       let shotAtDate: Date;

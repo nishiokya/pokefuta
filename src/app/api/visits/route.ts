@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     const { data: visit, error } = await supabase
       .from('visit')
       .insert({
-        user_id: session.user.id,
+        user_id: session.user.id,  // ✅ 必ず自分のID
         manhole_id: manhole_id || null,
         shot_location: shot_location || null,
         shot_at,
