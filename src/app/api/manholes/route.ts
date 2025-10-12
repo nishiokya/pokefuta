@@ -104,11 +104,39 @@ export async function GET(request: NextRequest) {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
     try {
-      // Query all manholes from database
+      // まず全体の統計情報を取得（軽量クエリ）
+      const { count: totalCount, error: countError } = await supabase
+        .from('manhole')
+        .select('*', { count: 'exact', head: true });
+
+      if (countError) {
+        console.error('Count query error:', countError);
+      }
+
+      // 写真があるマンホールの数を取得（COUNT DISTINCT）
+      const { data: photoCountData, error: photoCountError } = await supabase
+        .rpc('count_manholes_with_photos' as any)
+        .single();
+
+      let photosCount = 0;
+      if (!photoCountError && photoCountData) {
+        photosCount = photoCountData.count || 0;
+      } else {
+        // フォールバック: 全件取得
+        const { data: photosData } = await supabase
+          .from('photo')
+          .select('manhole_id')
+          .not('manhole_id', 'is', null);
+        photosCount = new Set(photosData?.map(p => p.manhole_id) || []).size;
+      }
+
+      // 実際のマンホールデータを取得（limitを適用）
+      const actualLimit = Math.min(limit, 1000);
       const { data: allManholes, error: queryError } = await supabase
         .from('manhole')
         .select('*')
-        .limit(1000);
+        .order('id', { ascending: false })
+        .limit(actualLimit);
 
       if (queryError) {
         console.error('Database query error:', queryError);
@@ -120,15 +148,17 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: true,
           manholes: [],
-          total: 0,
-          with_photos: 0
+          total: totalCount || 0,
+          with_photos: photosCount
         });
       }
 
-      // 写真があるマンホールのIDを取得
-      const { data: photosData, error: photosError } = await supabase
+      // 取得したマンホールの写真有無を確認
+      const manholeIds = allManholes.map(m => m.id);
+      const { data: photosData } = await supabase
         .from('photo')
         .select('manhole_id')
+        .in('manhole_id', manholeIds)
         .not('manhole_id', 'is', null);
 
       const manholesWithPhotosSet = new Set(
@@ -177,8 +207,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: true,
           manholes: manholesWithDistance,
-          total: allManholes.length,
-          with_photos: manholesWithPhotosSet.size
+          total: totalCount || 0,
+          with_photos: photosCount
         });
       }
 
@@ -211,15 +241,14 @@ export async function GET(request: NextRequest) {
           if (visited === 'true') return manhole.is_visited;
           if (visited === 'false') return !manhole.is_visited;
           return true;
-        })
-        .slice(0, limit);
+        });
 
       console.log(`Returning ${manholesWithCoordinates.length} manholes with coordinates`);
       return NextResponse.json({
         success: true,
         manholes: manholesWithCoordinates,
-        total: allManholes.length,
-        with_photos: manholesWithPhotosSet.size
+        total: totalCount || 0,
+        with_photos: photosCount
       });
 
     } catch (dbError) {

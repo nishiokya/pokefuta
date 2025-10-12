@@ -174,7 +174,7 @@ export default function NearbyPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-gray-50">
-      <Header title="📍 近くのダンジョン" icon={<Navigation className="w-6 h-6" />} />
+      <Header title="📍 近くのポケモンマンホール" icon={<Navigation className="w-6 h-6" />} />
 
       {/* Controls */}
       <div className="p-2 max-w-2xl mx-auto">

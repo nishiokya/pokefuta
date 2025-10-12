@@ -73,12 +73,10 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // statsが存在し、total_visitsが0の場合はログイン済みだが訪問記録がない状態
-          // statsが存在しない、またはvisitsが空配列の場合は未ログイン
-          const hasAuth = data.stats && (data.stats.total_visits > 0 || data.visits !== undefined);
-
-          if (hasAuth) {
+          // authenticatedフラグで明確に判定
+          if (data.authenticated === true) {
             // ログイン済み
+            console.log('User authenticated');
             setIsLoggedIn(true);
             setVisits(data.visits || []);
 
