@@ -1,0 +1,36 @@
+version: 1
+# AWS Amplify Build Configuration for Next.js 14 App Router
+# https://docs.amplify.aws/guides/hosting/nextjs/q/platform/js/
+
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        - env | grep -e NEXT_PUBLIC_ -e SUPABASE_ -e R2_ >> .env.production
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
+      - node_modules/**/*
+
+# Environment variables reference
+# Set these in Amplify Console > App Settings > Environment variables:
+# - NEXT_PUBLIC_SUPABASE_URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY
+# - SUPABASE_SERVICE_ROLE_KEY (for server-side operations)
+# - R2_ACCESS_KEY_ID
+# - R2_SECRET_ACCESS_KEY
+# - R2_ENDPOINT
+# - R2_BUCKET
+# - NEXT_PUBLIC_R2_PUBLIC_URL
+# - NEXT_PUBLIC_APP_URL (e.g., https://yourdomain.amplifyapp.com)
+# - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT
+# - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG
