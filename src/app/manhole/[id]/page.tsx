@@ -66,7 +66,7 @@ export default function ManholeDetailPage() {
   };
 
   const openInMaps = () => {
-    if (manhole) {
+    if (manhole && manhole.latitude && manhole.longitude) {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
       window.open(url, '_blank');
     }
@@ -202,7 +202,10 @@ export default function ManholeDetailPage() {
           <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">地図</h3>
           <div className="h-64 border-2 border-rpg-border overflow-hidden">
             <MapComponent
-              center={{ lat: manhole.latitude, lng: manhole.longitude }}
+              center={{
+                lat: manhole.latitude ?? 36.0,
+                lng: manhole.longitude ?? 138.0
+              }}
               manholes={[manhole]}
               onManholeClick={handleManholeClick}
               userLocation={null}

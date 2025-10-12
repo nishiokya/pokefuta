@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
-import type { User } from '@supabase/supabase-js';
+import type { User, SupabaseClient } from '@supabase/supabase-js';
 
 interface HeaderProps {
   title?: string;
@@ -19,7 +19,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
 
-  let supabase;
+  let supabase: SupabaseClient | undefined;
   try {
     supabase = createBrowserClient();
   } catch (error: any) {
