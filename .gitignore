@@ -21,5 +21,13 @@ node_modules
 .next/trace
 *.tsbuildinfo
 
+# PWA (next-pwa auto-generated files)
+public/sw.js
+public/workbox-*.js
+public/worker-*.js
+public/sw.js.map
+public/workbox-*.js.map
+public/worker-*.js.map
+
 .claude/*
 
