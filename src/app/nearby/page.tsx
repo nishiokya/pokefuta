@@ -94,11 +94,15 @@ export default function NearbyPage() {
         return;
       }
 
-      const allNearbyManholes = await manholesResponse.json();
+      const manholesData = await manholesResponse.json();
+      console.log('Manholes response:', manholesData);
+
+      // Handle new API format
+      const allNearbyManholes = manholesData.manholes || [];
       console.log(`Loaded ${allNearbyManholes.length} nearby manholes`);
 
       if (!Array.isArray(allNearbyManholes)) {
-        console.error('Invalid response format:', allNearbyManholes);
+        console.error('Invalid response format:', manholesData);
         setDataError('マンホールデータの形式が不正です');
         setLoading(false);
         return;
@@ -269,7 +273,7 @@ export default function NearbyPage() {
               <MapComponent
                 center={userLocation}
                 manholes={nearbyManholes}
-                onManholeClick={(manhole) => {
+                onManholeClick={() => {
                   setShowMap(false);
                 }}
                 userLocation={userLocation}

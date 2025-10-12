@@ -117,8 +117,23 @@ export async function GET(request: NextRequest) {
 
       if (!allManholes || allManholes.length === 0) {
         console.log('No manholes found in database');
-        return NextResponse.json([]);
+        return NextResponse.json({
+          success: true,
+          manholes: [],
+          total: 0,
+          with_photos: 0
+        });
       }
+
+      // 写真があるマンホールのIDを取得
+      const { data: photosData, error: photosError } = await supabase
+        .from('photo')
+        .select('manhole_id')
+        .not('manhole_id', 'is', null);
+
+      const manholesWithPhotosSet = new Set(
+        photosData?.map(p => p.manhole_id) || []
+      );
 
       if (isNearbySearch) {
         console.log(`Searching for manholes within ${radius}km of ${lat}, ${lng}`);
@@ -134,6 +149,8 @@ export async function GET(request: NextRequest) {
 
             const distance = calculateDistance(lat!, lng!, realCoords.lat, realCoords.lng);
 
+            const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+
             return {
               ...manhole,
               name: manhole.title || 'ポケふた',
@@ -142,7 +159,7 @@ export async function GET(request: NextRequest) {
               longitude: realCoords.lng,
               is_visited: false,
               last_visit: null,
-              photo_count: 0,
+              photo_count: hasPhotos ? 1 : 0,
               distance: distance
             };
           })
@@ -157,7 +174,12 @@ export async function GET(request: NextRequest) {
           .slice(0, limit);
 
         console.log(`Found ${manholesWithDistance.length} nearby manholes`);
-        return NextResponse.json(manholesWithDistance);
+        return NextResponse.json({
+          success: true,
+          manholes: manholesWithDistance,
+          total: allManholes.length,
+          with_photos: manholesWithPhotosSet.size
+        });
       }
 
       // Regular search for all manholes (no location filtering)
@@ -171,6 +193,8 @@ export async function GET(request: NextRequest) {
             return null; // Skip manholes without extractable coordinates
           }
 
+          const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+
           return {
             ...manhole,
             name: manhole.title || 'ポケふた',
@@ -179,7 +203,7 @@ export async function GET(request: NextRequest) {
             longitude: realCoords.lng,
             is_visited: false,
             last_visit: null,
-            photo_count: 0
+            photo_count: hasPhotos ? 1 : 0
           };
         })
         .filter(manhole => manhole !== null)
@@ -191,7 +215,12 @@ export async function GET(request: NextRequest) {
         .slice(0, limit);
 
       console.log(`Returning ${manholesWithCoordinates.length} manholes with coordinates`);
-      return NextResponse.json(manholesWithCoordinates);
+      return NextResponse.json({
+        success: true,
+        manholes: manholesWithCoordinates,
+        total: allManholes.length,
+        with_photos: manholesWithPhotosSet.size
+      });
 
     } catch (dbError) {
       console.error('Database error:', (dbError as Error).message);
