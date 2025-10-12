@@ -233,7 +233,7 @@ export default function HomePage() {
                           </h3>
                         </div>
                         <div className="font-pixelJp text-xs text-rpg-textDark opacity-70">
-                          {manhole.municipality || manhole.prefecture}
+                          {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
                         </div>
                         {manhole.pokemons && manhole.pokemons.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">

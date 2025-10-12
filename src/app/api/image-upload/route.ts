@@ -35,6 +35,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ✅ Validate manhole_id is required
+    if (!manholeId) {
+      return NextResponse.json({
+        success: false,
+        error: 'manhole_id is required - photos must be linked to a manhole'
+      }, { status: 400 });
+    }
+
+    const manholeIdInt = parseInt(manholeId as string);
+    if (isNaN(manholeIdInt)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid manhole_id - must be a number'
+      }, { status: 400 });
+    }
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({
@@ -101,9 +117,9 @@ export async function POST(request: NextRequest) {
       };
 
       // Add optional fields only if they exist in schema
-      if (manholeId) {
-        visitInsert.manhole_id = parseInt(manholeId as string);
-      }
+      // manhole_id is now required (validated above)
+      visitInsert.manhole_id = manholeIdInt;
+
       if (shotLocationGeom) {
         visitInsert.shot_location = shotLocationGeom;
       }
@@ -125,10 +141,10 @@ export async function POST(request: NextRequest) {
         throw new Error(`Visit creation failed: ${visitError?.message}`);
       }
 
-      // Create photo record with minimal required fields
-      // Note: Adjust fields based on actual database schema
+      // Create photo record with required and optional fields
       const photoInsert: any = {
         visit_id: visitId,
+        manhole_id: manholeIdInt, // ✅ 必須: photoは必ずマンホールに紐づく
         storage_key: storageKey,
       };
 
@@ -192,18 +208,19 @@ export async function GET(request: NextRequest) {
     const supabase = createRouteHandlerClient<Database>({ cookies });
     const { searchParams } = new URL(request.url);
     const storageKey = searchParams.get('key');
+    const manholeId = searchParams.get('manhole_id');
 
     if (storageKey) {
       // Redirect to signed URL for the specific image
       const signedUrl = await storage.getSignedUrl(storageKey, 3600);
       return NextResponse.redirect(signedUrl.url);
     } else {
-      // Return list of uploaded photos from database
-      const { data: images, error } = await supabase
+      // Build query based on filters
+      let query = supabase
         .from('photo')
         .select(`
           *,
-          visit!inner(
+          visit(
             id,
             user_id,
             shot_at,
@@ -211,8 +228,17 @@ export async function GET(request: NextRequest) {
             note
           )
         `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .order('created_at', { ascending: false });
+
+      // Filter by manhole_id if provided
+      if (manholeId) {
+        query = query.eq('manhole_id', parseInt(manholeId));
+      }
+
+      // Limit results
+      query = query.limit(100);
+
+      const { data: images, error } = await query;
 
       if (error) {
         return NextResponse.json({

@@ -22,10 +22,22 @@ const MapComponent = dynamic(
   }
 );
 
+interface Photo {
+  id: string;
+  storage_key: string;
+  content_type: string;
+  created_at: string;
+  visit?: {
+    shot_at: string;
+    note?: string;
+  };
+}
+
 export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [manhole, setManhole] = useState<Manhole | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +45,7 @@ export default function ManholeDetailPage() {
     const manholeId = params.id;
     if (manholeId) {
       loadManholeDetail(manholeId as string);
+      loadPhotos(manholeId as string);
     }
   }, [params.id]);
 
@@ -41,8 +54,9 @@ export default function ManholeDetailPage() {
       // First try to get all manholes and find the specific one
       const response = await fetch('/api/manholes');
       if (response.ok) {
-        const manholes = await response.json();
-        const foundManhole = manholes.find((m: Manhole) => m.id.toString() === id);
+        const data = await response.json();
+        const manholesList = data.manholes || [];
+        const foundManhole = manholesList.find((m: Manhole) => m.id.toString() === id);
 
         if (foundManhole) {
           setManhole(foundManhole);
@@ -57,6 +71,20 @@ export default function ManholeDetailPage() {
       setError('データの取得に失敗しました');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPhotos = async (id: string) => {
+    try {
+      const response = await fetch(`/api/image-upload?manhole_id=${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.images) {
+          setPhotos(data.images);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load photos:', err);
     }
   };
 
@@ -192,6 +220,40 @@ export default function ManholeDetailPage() {
                 >
                   {pokemon}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Photos */}
+        {photos.length > 0 && (
+          <div className="rpg-window">
+            <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">
+              📸 マンホール写真 ({photos.length}枚)
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden group cursor-pointer hover:border-rpg-yellow transition-colors"
+                >
+                  <img
+                    src={`/api/photo/${photo.id}?size=small`}
+                    alt="マンホール写真"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {photo.visit?.shot_at && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 p-1">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-rpg-textGold" />
+                        <span className="font-pixelJp text-[10px] text-rpg-textGold">
+                          {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>

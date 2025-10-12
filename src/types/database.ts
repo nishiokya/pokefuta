@@ -93,7 +93,7 @@ export interface Database {
         Row: {
           id: string;
           visit_id: string | null;
-          manhole_id: number | null;
+          manhole_id: number; // NOT NULL - 写真は必ずマンホールに紐づく
           storage_provider: string;
           storage_key: string;
           original_name: string | null;
@@ -115,7 +115,7 @@ export interface Database {
         Insert: {
           id?: string;
           visit_id?: string | null;
-          manhole_id?: number | null;
+          manhole_id: number; // 必須 - マンホールなしの写真は登録不可
           storage_provider?: string;
           storage_key?: string;
           original_name?: string | null;
@@ -135,7 +135,7 @@ export interface Database {
         };
         Update: {
           visit_id?: string | null;
-          manhole_id?: number | null;
+          manhole_id?: number; // 更新時はオプショナル
           storage_provider?: string;
           storage_key?: string;
           original_name?: string | null;
