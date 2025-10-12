@@ -279,17 +279,11 @@ CREATE TABLE IF NOT EXISTS photo (
 -- RLS有効化
 ALTER TABLE photo ENABLE ROW LEVEL SECURITY;
 
--- RLSポリシー（visit経由でチェック）
-DROP POLICY IF EXISTS "users_select_own_photos" ON photo;
-CREATE POLICY "users_select_own_photos"
+-- RLSポリシー（全員が閲覧可能、作成・更新・削除はvisit所有者のみ）
+DROP POLICY IF EXISTS "public_select_photos" ON photo;
+CREATE POLICY "public_select_photos"
 ON photo FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM visit
-    WHERE visit.id = photo.visit_id
-    AND visit.user_id = auth.uid()
-  )
-);
+USING (true);
 
 DROP POLICY IF EXISTS "users_insert_own_photos" ON photo;
 CREATE POLICY "users_insert_own_photos"
@@ -330,6 +324,9 @@ USING (
     AND visit.user_id = auth.uid()
   )
 );
+
+-- ⚠️ 注意: 既存の制限的なSELECTポリシーを削除
+DROP POLICY IF EXISTS "users_select_own_photos" ON photo;
 
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_photo_visit_id ON photo(visit_id);
@@ -442,18 +439,13 @@ CREATE INDEX IF NOT EXISTS idx_visit_shot_at ON visit(shot_at DESC);
 -- RLS有効化
 ALTER TABLE photo ENABLE ROW LEVEL SECURITY;
 
--- visit経由で所有権チェック（visit.user_id = auth.uid()）
+-- 📸 写真は全員が閲覧可能（公開データ）
+-- これにより、ログインしていないユーザーも写真を見ることができます
 
--- 自分の写真のみ閲覧可能
-CREATE POLICY "users_select_own_photos"
+-- 全員が写真を閲覧可能（公開データ）
+CREATE POLICY "public_select_photos"
 ON photo FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM visit
-    WHERE visit.id = photo.visit_id
-    AND visit.user_id = auth.uid()
-  )
-);
+USING (true);
 
 -- 自分の訪問記録に紐づく写真のみ作成可能
 CREATE POLICY "users_insert_own_photos"
@@ -527,9 +519,10 @@ USING (true);
    - アプリ固有の設定やメタデータ
    - visitとは独立して管理
 
-3. **photo テーブルは visit 経由でチェック**
-   - photoには直接user_idが無い
-   - visitテーブルとJOINして所有権確認
+3. **photo テーブルは公開データ**
+   - 全員が写真を閲覧可能（`USING (true)`）
+   - 作成・更新・削除はvisit所有者のみ可能
+   - これにより、ログインしていないユーザーも写真を見ることができます
 
 4. **manhole は公開データ**
    - 全員が閲覧可能（`USING (true)`）
