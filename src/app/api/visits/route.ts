@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
 
-    // ✅ 認証されていない場合は空の配列を返す
+    // ✅ 認証されていない場合は空の配列を返す（authenticatedフラグで明示）
     if (!session?.user) {
       return NextResponse.json({
         success: true,
+        authenticated: false,
         visits: [],
         stats: {
           total_visits: 0,
@@ -158,6 +159,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      authenticated: true,
       visits: filteredVisits,
       stats,
       pagination: {
