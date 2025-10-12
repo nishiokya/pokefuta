@@ -3,8 +3,8 @@ import { R2StorageAdapter } from './r2';
 import type { StorageAdapter, StorageConfig } from './types';
 
 export function createStorageAdapter(config?: StorageConfig): StorageAdapter {
-  const provider = config?.provider ?? (process.env.STORAGE_PROVIDER as any) ?? 'supabase';
-  const bucket = config?.bucket ?? process.env.SUPABASE_BUCKET ?? process.env.R2_BUCKET ?? 'photos';
+  const provider = config?.provider ?? (process.env.STORAGE_PROVIDER as any) ?? 'r2';
+  const bucket = config?.bucket ?? process.env.R2_BUCKET ?? process.env.SUPABASE_BUCKET ?? 'image';
 
   switch (provider) {
     case 'supabase':
