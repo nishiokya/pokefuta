@@ -2,15 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Pixel Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap');
+/* Import Modern Japanese Fonts */
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
 @layer base {
   html {
-    font-family: 'DotGothic16', system-ui, sans-serif;
+    font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    image-rendering: pixelated; /* ピクセル保持 */
+    font-size: 14px;
   }
 
   body {
@@ -46,62 +46,35 @@
   /* RPG Window (ピクセルウィンドウ) */
   .rpg-window {
     @apply bg-rpg-bgPaper;
-    @apply border-4 border-rpg-border;
-    box-shadow:
-      inset 0 0 0 2px theme('colors.rpg.bgLight'),
-      inset 0 0 0 4px theme('colors.rpg.border'),
-      8px 8px 0 rgba(0, 0, 0, 0.5);
-    background-image:
-      repeating-linear-gradient(
-        90deg,
-        transparent 0px,
-        transparent 2px,
-        rgba(0,0,0,0.02) 2px,
-        rgba(0,0,0,0.02) 4px
-      ),
-      repeating-linear-gradient(
-        0deg,
-        transparent 0px,
-        transparent 2px,
-        rgba(0,0,0,0.02) 2px,
-        rgba(0,0,0,0.02) 4px
-      );
-    @apply p-rpg-2;
+    @apply border-2 border-rpg-border;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    @apply p-3 rounded-lg;
   }
 
   .rpg-window-title {
-    @apply font-pixelJp text-lg;
+    @apply text-base font-bold;
     @apply text-rpg-textGold;
-    @apply mb-rpg-2;
-    text-shadow:
-      2px 2px 0 theme('colors.rpg.border'),
-      4px 4px 0 rgba(0, 0, 0, 0.5);
+    @apply mb-2;
   }
 
-  /* RPG Button (8bitボタン) */
+  /* RPG Button (モダンボタン) */
   .rpg-button {
-    @apply font-pixelJp;
-    @apply border-4;
-    border-color:
-      theme('colors.rpg.bgLight')
-      theme('colors.rpg.border')
-      theme('colors.rpg.border')
-      theme('colors.rpg.bgLight');
+    @apply font-medium text-sm;
+    @apply border-2 border-rpg-border;
     @apply bg-rpg-blue text-white;
-    @apply px-rpg-3 py-rpg-2;
-    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
-    transition: none; /* ピクセルは滑らかな遷移なし */
+    @apply px-4 py-2 rounded-md;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
   }
 
   .rpg-button:hover {
     @apply bg-rpg-yellow text-rpg-textDark;
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
   }
 
   .rpg-button:active {
-    transform: translate(4px, 4px);
-    box-shadow: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transform: translateY(1px);
   }
 
   .rpg-button-primary {
@@ -114,53 +87,37 @@
 
   /* HP/MPバー風プログレスバー */
   .rpg-hp-bar {
-    @apply relative h-6;
-    @apply border-4 border-rpg-border;
+    @apply relative h-4;
+    @apply border border-rpg-border rounded;
     @apply bg-rpg-bgDark;
   }
 
   .rpg-hp-fill {
-    @apply h-full;
-    background:
-      repeating-linear-gradient(
-        90deg,
-        theme('colors.rpg.green') 0px,
-        theme('colors.rpg.green') 4px,
-        #27AE60 4px,
-        #27AE60 8px
-      );
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: hp-pulse 1s steps(2) infinite;
-  }
-
-  @keyframes hp-pulse {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.2); }
+    @apply h-full rounded-sm;
+    @apply bg-rpg-green;
+    transition: width 0.3s ease-out;
   }
 
   /* RPG Status Display */
   .rpg-status {
-    @apply grid grid-cols-3 gap-rpg-1;
-    @apply p-rpg-2;
-    @apply bg-rpg-bgDark;
-    @apply border-4 border-rpg-border;
+    @apply grid grid-cols-3 gap-2;
+    @apply p-2;
+    @apply bg-rpg-bgDark/50 rounded-lg;
   }
 
   .rpg-stat-item {
-    @apply text-center p-rpg-2;
-    @apply border-2 border-rpg-border;
+    @apply text-center p-2 rounded;
     @apply bg-rpg-bgPaper;
   }
 
   .rpg-stat-value {
-    @apply font-pixel text-2xl;
+    @apply font-bold text-xl;
     @apply text-rpg-yellow;
-    text-shadow: 2px 2px 0 theme('colors.rpg.border');
   }
 
   .rpg-stat-label {
-    @apply font-pixelJp text-sm;
-    @apply text-rpg-textDark mt-1;
+    @apply text-xs;
+    @apply text-rpg-textDark mt-0.5;
   }
 
   /* ========================================
@@ -303,28 +260,27 @@
   /* Navigation - RPG Style (新デザイン) */
   .nav-rpg {
     @apply fixed bottom-0 left-0 right-0;
-    @apply bg-rpg-bgDark;
-    @apply border-t-4 border-rpg-border;
+    @apply bg-white/95 backdrop-blur-sm;
+    @apply border-t-2 border-gray-200;
+    @apply shadow-lg;
     @apply z-40;
   }
 
   .nav-rpg-item {
     @apply flex flex-col items-center justify-center;
-    @apply py-2 px-3;
-    @apply font-pixelJp text-xs;
-    @apply text-rpg-bgLight;
+    @apply py-2 px-2;
+    @apply text-xs font-medium;
+    @apply text-gray-600;
     @apply transition-colors;
-    transition: none; /* ピクセルは滑らかな遷移なし */
   }
 
   .nav-rpg-item:hover {
-    @apply bg-rpg-bgLight/10;
+    @apply text-rpg-blue;
   }
 
   .nav-rpg-item.active {
-    @apply bg-rpg-yellow/20;
-    @apply border-2 border-rpg-yellow;
-    @apply text-rpg-yellow;
+    @apply text-rpg-blue;
+    @apply bg-rpg-blue/10 rounded-lg;
   }
 }
 
