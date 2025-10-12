@@ -331,6 +331,68 @@ DROP POLICY IF EXISTS "users_select_own_photos" ON photo;
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_photo_visit_id ON photo(visit_id);
 CREATE INDEX IF NOT EXISTS idx_photo_storage_key ON photo(storage_key);
+CREATE INDEX IF NOT EXISTS idx_photo_manhole_id ON photo(manhole_id);
+
+-- ==========================================
+-- 📸 photoテーブルのスキーマ変更（2025-10-12）
+-- ==========================================
+-- 変更内容:
+-- 1. manhole_id を NOT NULL に変更（写真は必ずマンホールに紐づける）
+-- 2. visit_id はオプショナルのまま（visitなしでもマンホール情報から表示可能）
+--
+-- 目的:
+-- - 写真をマンホールなしでアップロードできないようにする
+-- - visitがなくてもマンホールの詳細を表示できるようにする
+
+-- ⚠️ 既存データのクリーンアップ（manhole_idがNULLのphotoを削除）
+-- 本番環境では、manhole_idがNULLの写真を適切に処理してから実行してください
+DELETE FROM photo WHERE manhole_id IS NULL;
+
+-- manhole_idをNOT NULLに変更
+ALTER TABLE photo ALTER COLUMN manhole_id SET NOT NULL;
+
+-- ==========================================
+-- RLSポリシーに関する注意事項
+-- ==========================================
+-- 現在のRLSポリシー:
+-- - SELECT: public_select_photos (全員が閲覧可能)
+-- - INSERT/UPDATE/DELETE: visit経由でチェック
+--
+-- 現在の実装では、photoは常にvisitと一緒に作成されるため、
+-- visit_idは常に存在します。そのため、既存のRLSポリシーで問題ありません。
+--
+-- ⚠️ 将来の考慮事項:
+-- もし将来、visit_idがNULLのphotoを作成する機能を追加する場合は、
+-- INSERT/UPDATE/DELETEポリシーを以下のように更新する必要があります:
+--
+-- CREATE POLICY "users_insert_own_photos_v2"
+-- ON photo FOR INSERT
+-- WITH CHECK (
+--   -- visitがある場合はvisit経由でチェック
+--   (visit_id IS NOT NULL AND EXISTS (
+--     SELECT 1 FROM visit
+--     WHERE visit.id = photo.visit_id
+--     AND visit.user_id = auth.uid()
+--   ))
+--   OR
+--   -- visitがない場合はmanhole_idの存在のみチェック
+--   (visit_id IS NULL AND manhole_id IS NOT NULL)
+-- );
+--
+-- 現時点では変更不要です。
+
+-- インデックスの追加（既に存在する場合はスキップ）
+CREATE INDEX IF NOT EXISTS idx_photo_manhole_id ON photo(manhole_id);
+
+-- 確認クエリ
+-- 以下を実行して、manhole_idがNOT NULLになっているか確認:
+SELECT column_name, is_nullable, data_type
+FROM information_schema.columns
+WHERE table_name = 'photo' AND column_name IN ('visit_id', 'manhole_id');
+
+-- 期待される結果:
+-- visit_id    | YES      | uuid
+-- manhole_id  | NO       | integer
 
 -- ==========================================
 -- 4. manhole テーブルのRLS設定
