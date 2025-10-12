@@ -1367,7 +1367,6 @@ GitHub (main) → AWS Amplify → CloudFront → ユーザー
 #### 公開可能（NEXT_PUBLIC_*）
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase プロジェクトURL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase Anon Key（RLSで保護される）
-- `NEXT_PUBLIC_R2_PUBLIC_URL`: R2公開URL
 - `NEXT_PUBLIC_APP_URL`: アプリURL
 - `NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT`: 地図デフォルト緯度
 - `NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG`: 地図デフォルト経度
@@ -1378,6 +1377,7 @@ GitHub (main) → AWS Amplify → CloudFront → ユーザー
 - `R2_SECRET_ACCESS_KEY`: Cloudflare R2 Secret Key
 - `R2_ENDPOINT`: R2エンドポイント
 - `R2_BUCKET`: R2バケット名
+# 注: 画像はsigned URLで配信されるため、公開URLは不要
 
 ### セキュリティ設定
 
