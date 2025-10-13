@@ -7,12 +7,12 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'ポケふた写真トラッカー',
-  description: 'ポケモンマンホールの訪問記録と写真を管理するアプリ',
+  description: 'ポケふたの訪問記録と写真を管理するアプリ',
   manifest: '/manifest.json',
   icons: {
     apple: '/icon-192.png',
   },
-  keywords: ['ポケモン', 'マンホール', 'ポケふた', '写真', '旅行', '記録'],
+  keywords: ['ポケモン', 'ポケふた', '写真', '旅行', '記録'],
   authors: [{ name: 'ポケふたトラッカー開発チーム' }],
   creator: 'ポケふたトラッカー',
   publisher: 'ポケふたトラッカー',

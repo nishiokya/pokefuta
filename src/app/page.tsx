@@ -2,26 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { MapPin, Camera, Navigation, History } from 'lucide-react';
+import { MapPin, Camera, Navigation, History, Map, Home } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
-
-const MapComponent = dynamic(
-  () => import('@/components/Map/MapComponent'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-rpg-bgDark">
-        <div className="text-center">
-          <div className="font-pixelJp text-rpg-textGold">
-            読み込み中<span className="rpg-loading"></span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-);
 
 interface Visit {
   id: string;
@@ -34,37 +17,26 @@ interface Visit {
   }[];
 }
 
+interface Photo {
+  id: string;
+  storage_key: string;
+  manhole_id: number;
+  created_at: string;
+}
+
 export default function HomePage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitedManholes, setVisitedManholes] = useState<Manhole[]>([]);
   const [recentManholes, setRecentManholes] = useState<Manhole[]>([]);
+  const [recentPhotos, setRecentPhotos] = useState<Photo[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
   const [manholesWithPhotos, setManholesWithPhotos] = useState(0);
 
   useEffect(() => {
-    // Get user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.warn('Location access denied:', error);
-          setUserLocation({
-            lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
-            lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
-          });
-        }
-      );
-    }
-
     loadVisits();
+    loadRecentPhotos();
   }, []);
 
   const loadVisits = async () => {
@@ -135,8 +107,26 @@ export default function HomePage() {
     }
   };
 
+  const loadRecentPhotos = async () => {
+    try {
+      const response = await fetch('/api/image-upload?limit=12');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.images) {
+          setRecentPhotos(data.images);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load recent photos:', error);
+    }
+  };
+
   const handleManholeClick = (manhole: Manhole) => {
     window.location.href = `/manhole/${manhole.id}`;
+  };
+
+  const handlePhotoClick = (photo: Photo) => {
+    window.location.href = `/manhole/${photo.manhole_id}`;
   };
 
   return (
@@ -178,10 +168,10 @@ export default function HomePage() {
               <div className="rpg-window">
                 <div className="text-center mb-4">
                   <h2 className="font-pixelJp text-lg text-rpg-textDark mb-3">
-                    📸 ポケモンマンホール写真館
+                    📸 ポケふた写真館
                   </h2>
                   <p className="font-pixelJp text-sm text-rpg-textDark leading-relaxed mb-4">
-                    全国各地に設置されているポケモンマンホール「ポケふた」の写真を集めています。
+                    全国各地に設置されている「ポケふた」の写真を集めています。
                     あなたも見つけたポケふたの写真を登録して、みんなとシェアしませんか？
                   </p>
                 </div>
@@ -190,7 +180,7 @@ export default function HomePage() {
                 <div className="flex gap-4 mb-4">
                   <div className="flex-1 text-center">
                     <div className="font-pixel text-3xl text-rpg-yellow">{totalManholes}</div>
-                    <div className="font-pixelJp text-xs text-rpg-textDark">全マンホール</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">全ポケふた</div>
                   </div>
                   <div className="flex-1 text-center">
                     <div className="font-pixel text-3xl text-rpg-blue">{manholesWithPhotos}</div>
@@ -210,6 +200,31 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Photo Gallery - 最近のポケふた写真 */}
+            {recentPhotos.length > 0 && (
+              <div className="rpg-window">
+                <h2 className="rpg-window-title text-sm mb-4">
+                  📸 最近のポケふた写真
+                </h2>
+                <div className="grid grid-cols-3 gap-2">
+                  {recentPhotos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      onClick={() => handlePhotoClick(photo)}
+                      className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden cursor-pointer hover:border-rpg-yellow transition-colors"
+                    >
+                      <img
+                        src={`/api/photo/${photo.id}?size=small`}
+                        alt="ポケふた写真"
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Manholes Grid - 訪問済みまたは最近のマンホール */}
             {(isLoggedIn ? visitedManholes : recentManholes).length > 0 ? (
               <>
@@ -224,19 +239,11 @@ export default function HomePage() {
                         onClick={() => handleManholeClick(manhole)}
                         className="rpg-window p-3 cursor-pointer hover:bg-rpg-bgLight transition-colors"
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center flex-shrink-0">
-                            <MapPin className="w-5 h-5 text-rpg-textDark" />
-                          </div>
-                          <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold line-clamp-2">
-                            ID: {manhole.id}
-                          </h3>
-                        </div>
-                        <div className="font-pixelJp text-xs text-rpg-textDark opacity-70">
-                          {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
-                        </div>
+                        <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold mb-2">
+                          {manhole.prefecture}{manhole.municipality || ''}({manhole.id})
+                        </h3>
                         {manhole.pokemons && manhole.pokemons.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1">
                             {manhole.pokemons.slice(0, 2).map((pokemon, index) => (
                               <span
                                 key={index}
@@ -255,22 +262,13 @@ export default function HomePage() {
                       </div>
                     ))}
                   </div>
-                </div>
 
-                {/* Map */}
-                <div className="rpg-window">
-                  <h2 className="rpg-window-title text-sm mb-4">
-                    {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
-                  </h2>
-                  <div className="h-96 border-2 border-rpg-border overflow-hidden">
-                    {userLocation && (
-                      <MapComponent
-                        center={userLocation}
-                        manholes={isLoggedIn ? visitedManholes : recentManholes}
-                        onManholeClick={handleManholeClick}
-                        userLocation={userLocation}
-                      />
-                    )}
+                  {/* View on Map Link */}
+                  <div className="mt-4 text-center">
+                    <Link href="/map" className="rpg-button rpg-button-primary inline-flex items-center gap-2">
+                      <Map className="w-4 h-4" />
+                      <span className="font-pixelJp">マップで見る</span>
+                    </Link>
                   </div>
                 </div>
               </>
@@ -301,8 +299,12 @@ export default function HomePage() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
           <Link href="/" className="nav-rpg-item active">
-            <MapPin className="w-6 h-6 mb-1" />
+            <Home className="w-6 h-6 mb-1" />
             <span>ホーム</span>
+          </Link>
+          <Link href="/map" className="nav-rpg-item">
+            <MapPin className="w-6 h-6 mb-1" />
+            <span>マップ</span>
           </Link>
           <Link href="/nearby" className="nav-rpg-item">
             <Navigation className="w-6 h-6 mb-1" />

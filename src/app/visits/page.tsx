@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, Camera, Navigation, History, Heart, MessageCircle, Send, Bookmark } from 'lucide-react';
+import { MapPin, Calendar, Camera, Navigation, History, Heart, MessageCircle, Send, Bookmark, Home } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
@@ -262,6 +262,10 @@ export default function VisitsPage() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
           <Link href="/" className="nav-rpg-item">
+            <Home className="w-6 h-6 mb-1" />
+            <span>ホーム</span>
+          </Link>
+          <Link href="/map" className="nav-rpg-item">
             <MapPin className="w-6 h-6 mb-1" />
             <span>マップ</span>
           </Link>

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 
@@ -229,7 +229,7 @@ export default function ManholeDetailPage() {
         {photos.length > 0 && (
           <div className="rpg-window">
             <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">
-              📸 マンホール写真 ({photos.length}枚)
+              📸 ポケふた写真 ({photos.length}枚)
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {photos.map((photo) => (
@@ -239,7 +239,7 @@ export default function ManholeDetailPage() {
                 >
                   <img
                     src={`/api/photo/${photo.id}?size=small`}
-                    alt="マンホール写真"
+                    alt="ポケふた写真"
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
@@ -336,6 +336,10 @@ export default function ManholeDetailPage() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
           <Link href="/" className="nav-rpg-item">
+            <Home className="w-6 h-6 mb-1" />
+            <span>ホーム</span>
+          </Link>
+          <Link href="/map" className="nav-rpg-item">
             <MapPin className="w-6 h-6 mb-1" />
             <span>マップ</span>
           </Link>

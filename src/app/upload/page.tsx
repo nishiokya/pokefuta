@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
-import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History } from 'lucide-react';
+import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History, Home } from 'lucide-react';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
@@ -421,6 +421,10 @@ export default function UploadPage() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
           <Link href="/" className="nav-rpg-item">
+            <Home className="w-6 h-6 mb-1" />
+            <span>ホーム</span>
+          </Link>
+          <Link href="/map" className="nav-rpg-item">
             <MapPin className="w-6 h-6 mb-1" />
             <span>マップ</span>
           </Link>

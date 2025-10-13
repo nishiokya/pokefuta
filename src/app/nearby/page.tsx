@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Navigation, Camera, Route, Map as MapIcon, History } from 'lucide-react';
+import { MapPin, Navigation, Camera, Route, Map as MapIcon, History, Home } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
 
@@ -174,7 +174,7 @@ export default function NearbyPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-gray-50">
-      <Header title="📍 近くのポケモンマンホール" icon={<Navigation className="w-6 h-6" />} />
+      <Header title="📍 近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
 
       {/* Controls */}
       <div className="p-2 max-w-2xl mx-auto">
@@ -326,7 +326,7 @@ export default function NearbyPage() {
                           >
                             <img
                               src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
-                              alt="訪問写真"
+                              alt="ポケふた写真"
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />
@@ -409,6 +409,10 @@ export default function NearbyPage() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-1">
           <Link href="/" className="nav-rpg-item">
+            <Home className="w-5 h-5 mb-0.5" />
+            <span>ホーム</span>
+          </Link>
+          <Link href="/map" className="nav-rpg-item">
             <MapPin className="w-5 h-5 mb-0.5" />
             <span>マップ</span>
           </Link>
