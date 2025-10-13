@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Navigation, Camera, Route, Map as MapIcon, History, Home } from 'lucide-react';
+import { MapPin, Navigation, Camera, ExternalLink, Map as MapIcon, History, Home } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
 
@@ -163,17 +163,18 @@ export default function NearbyPage() {
     return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
   };
 
-  const openInMaps = (manhole: ManholeWithDistance) => {
+  const openInMaps = (manhole: ManholeWithDistance, event: React.MouseEvent) => {
+    event.stopPropagation(); // 親要素のクリックイベントを防ぐ
     const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
     window.open(url, '_blank');
   };
 
-  const viewOnMap = (manhole: ManholeWithDistance) => {
-    window.location.href = `/?center=${manhole.latitude},${manhole.longitude}&zoom=15`;
+  const viewManholeDetail = (manhole: ManholeWithDistance) => {
+    window.location.href = `/manhole/${manhole.id}`;
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-gray-50">
+    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
       <Header title="📍 近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
 
       {/* Controls */}
@@ -258,7 +259,7 @@ export default function NearbyPage() {
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
-            <div className="text-rpg-blue font-medium">
+            <div className="font-pixelJp text-rpg-textGold">
               検索中<span className="rpg-loading"></span>
             </div>
           </div>
@@ -289,40 +290,63 @@ export default function NearbyPage() {
           {nearbyManholes.length === 0 ? (
             <div className="text-center py-8">
               <div className="rpg-window">
-                <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                <p className="text-sm text-gray-600 mb-1">
+                <MapPin className="w-10 h-10 text-rpg-textDark opacity-50 mx-auto mb-3" />
+                <p className="font-pixelJp text-sm text-rpg-textDark mb-1">
                   近くにポケふたが見つかりませんでした
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
                   検索範囲を広げてみてください
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {nearbyManholes.map((manhole) => (
-                <div key={manhole.id} className={`rpg-window ${manhole.visit ? 'border-rpg-green' : ''}`}>
-                  {/* 訪問済みバッジ */}
-                  {manhole.visit && (
-                    <div className="mb-2 flex items-center gap-2 bg-green-50 border border-green-300 p-2 rounded">
-                      <Camera className="w-4 h-4 text-green-600" />
-                      <span className="text-xs text-green-700 font-medium">
-                        訪問済み
-                      </span>
-                      <span className="text-xs text-gray-600 ml-auto">
-                        {formatDate(manhole.visit.shot_at)}
-                      </span>
+                <div
+                  key={manhole.id}
+                  className={`rpg-window cursor-pointer hover:bg-rpg-bgLight transition-colors ${manhole.visit ? 'border-rpg-green' : ''}`}
+                  onClick={() => viewManholeDetail(manhole)}
+                >
+                  {/* Header with location and distance */}
+                  <div className="flex justify-between items-start mb-3 pb-2 border-b-2 border-rpg-border">
+                    <div className="flex-1">
+                      <h3 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">
+                        {manhole.prefecture}{manhole.municipality || manhole.city || ''}({manhole.id})
+                      </h3>
+                      {manhole.visit && (
+                        <div className="flex items-center gap-1 text-xs text-rpg-green">
+                          <Camera className="w-3 h-3" />
+                          <span className="font-pixelJp">訪問済み</span>
+                          <span className="font-pixelJp opacity-70">
+                            {formatDate(manhole.visit.shot_at)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="font-pixel text-base text-rpg-blue">
+                          {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => openInMaps(manhole, e)}
+                        className="rpg-button p-2 hover:bg-rpg-yellow transition-colors"
+                        title="Google Mapsで経路を表示"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
 
                   {/* 訪問済みの場合、写真を表示 */}
                   {manhole.visit && manhole.visit.photos && manhole.visit.photos.length > 0 && (
-                    <div className="mb-2">
-                      <div className="grid grid-cols-3 gap-1.5">
+                    <div className="mb-3">
+                      <div className="grid grid-cols-3 gap-2">
                         {manhole.visit.photos.slice(0, 3).map((photo: any) => (
                           <div
                             key={photo.id}
-                            className="relative aspect-square bg-gray-100 border border-gray-300 overflow-hidden rounded"
+                            className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden"
                           >
                             <img
                               src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
@@ -334,70 +358,31 @@ export default function NearbyPage() {
                         ))}
                       </div>
                       {manhole.visit.photos.length > 3 && (
-                        <p className="text-xs text-gray-500 mt-1 text-center">
+                        <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1 text-center">
                           +{manhole.visit.photos.length - 3} 枚
                         </p>
                       )}
                     </div>
                   )}
 
-                  <div className="flex justify-between items-start mb-2 pb-2 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-bold text-gray-800 mb-1">
-                        {manhole.name || 'ポケふた'}
-                      </h3>
-                      <div className="flex items-center text-xs text-gray-500 mb-1">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        <span>{manhole.prefecture} {manhole.city}</span>
-                      </div>
-                      {manhole.description && (
-                        <p className="text-xs text-gray-600 mb-1.5 line-clamp-2">
-                          {manhole.description}
-                        </p>
-                      )}
-                      {manhole.pokemons && manhole.pokemons.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {manhole.pokemons.slice(0, 3).map((pokemon, index) => (
-                            <span
-                              key={index}
-                              className="bg-yellow-100 px-2 py-0.5 border border-yellow-300 text-xs text-gray-700 rounded"
-                            >
-                              {pokemon}
-                            </span>
-                          ))}
-                          {manhole.pokemons.length > 3 && (
-                            <span className="text-xs text-gray-500">
-                              +{manhole.pokemons.length - 3}
-                            </span>
-                          )}
-                        </div>
+                  {/* Pokemon tags */}
+                  {manhole.pokemons && manhole.pokemons.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {manhole.pokemons.slice(0, 3).map((pokemon, index) => (
+                        <span
+                          key={index}
+                          className="bg-rpg-yellow px-2 py-1 border-2 border-rpg-border font-pixelJp text-xs text-rpg-textDark"
+                        >
+                          {pokemon}
+                        </span>
+                      ))}
+                      {manhole.pokemons.length > 3 && (
+                        <span className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+                          +{manhole.pokemons.length - 3}
+                        </span>
                       )}
                     </div>
-                    <div className="text-right ml-3">
-                      <div className="font-bold text-base text-rpg-blue">
-                        {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
-                      </div>
-                      <div className="text-xs text-gray-500">距離</div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => viewOnMap(manhole)}
-                      className="flex-1 rpg-button text-xs flex items-center justify-center gap-1 py-1.5"
-                    >
-                      <MapPin className="w-3 h-3" />
-                      <span>マップ</span>
-                    </button>
-                    <button
-                      onClick={() => openInMaps(manhole)}
-                      className="flex-1 rpg-button rpg-button-success text-xs flex items-center justify-center gap-1 py-1.5"
-                    >
-                      <Route className="w-3 h-3" />
-                      <span>経路</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -18,13 +18,15 @@ interface MapComponentProps {
   manholes: Manhole[];
   onManholeClick: (manhole: Manhole) => void;
   userLocation?: { lat: number; lng: number } | null;
+  zoom?: number;
 }
 
 export default function MapComponent({
   center,
   manholes,
   onManholeClick,
-  userLocation
+  userLocation,
+  zoom
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -60,12 +62,16 @@ export default function MapComponent({
     };
   }, []);
 
-  // Update map center when center prop changes
+  // Update map center and zoom when props change
   useEffect(() => {
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([center.lat, center.lng]);
+      const currentZoom = zoom || mapInstanceRef.current.getZoom();
+      mapInstanceRef.current.setView([center.lat, center.lng], currentZoom, {
+        animate: true,
+        duration: 0.5
+      });
     }
-  }, [center]);
+  }, [center, zoom]);
 
   // Update user location marker
   useEffect(() => {
