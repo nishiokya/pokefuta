@@ -32,6 +32,14 @@ interface ManholeWithDistance extends Manhole {
       url?: string;
     }>;
   };
+  allPhotos?: Array<{
+    id: string;
+    storage_key: string;
+    created_at: string;
+    visit?: {
+      shot_at: string;
+    };
+  }>;
 }
 
 export default function NearbyPage() {
@@ -130,15 +138,39 @@ export default function NearbyPage() {
         }
       }
 
-      // Add visit information to manholes and limit to 50
-      const manholesWithVisits = allNearbyManholes
+      // Fetch photos for each manhole
+      const manholePhotosMap = new Map<number, any[]>();
+
+      // Get unique manhole IDs (limited to first 50)
+      const limitedManholes = allNearbyManholes.slice(0, 50);
+      const manholeIds = limitedManholes.map((m: any) => m.id);
+
+      // Fetch photos for all manholes in parallel
+      await Promise.all(
+        manholeIds.map(async (manholeId: number) => {
+          try {
+            const photosResponse = await fetch(`/api/image-upload?manhole_id=${manholeId}`);
+            if (photosResponse.ok) {
+              const photosData = await photosResponse.json();
+              if (photosData.success && photosData.images && photosData.images.length > 0) {
+                manholePhotosMap.set(manholeId, photosData.images);
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to load photos for manhole ${manholeId}:`, err);
+          }
+        })
+      );
+
+      // Add visit information and photos to manholes
+      const manholesWithVisits = limitedManholes
         .map((manhole: any) => ({
           ...manhole,
-          visit: visitsByManholeId.get(manhole.id)
-        }))
-        .slice(0, 50);
+          visit: visitsByManholeId.get(manhole.id),
+          allPhotos: manholePhotosMap.get(manhole.id) || []
+        }));
 
-      console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
+      console.log(`Setting ${manholesWithVisits.length} manholes with visit and photo info`);
       setNearbyManholes(manholesWithVisits);
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
@@ -315,27 +347,27 @@ export default function NearbyPage() {
                     </div>
                   )}
 
-                  {/* 訪問済みの場合、写真を表示 */}
-                  {manhole.visit && manhole.visit.photos && manhole.visit.photos.length > 0 && (
+                  {/* 写真を表示（訪問済みでなくても表示） */}
+                  {manhole.allPhotos && manhole.allPhotos.length > 0 && (
                     <div className="mb-2">
                       <div className="grid grid-cols-3 gap-1.5">
-                        {manhole.visit.photos.slice(0, 3).map((photo: any) => (
+                        {manhole.allPhotos.slice(0, 3).map((photo: any) => (
                           <div
                             key={photo.id}
                             className="relative aspect-square bg-gray-100 border border-gray-300 overflow-hidden rounded"
                           >
                             <img
-                              src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
-                              alt="訪問写真"
+                              src={`/api/photo/${photo.id}?size=small`}
+                              alt="マンホール写真"
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />
                           </div>
                         ))}
                       </div>
-                      {manhole.visit.photos.length > 3 && (
+                      {manhole.allPhotos.length > 3 && (
                         <p className="text-xs text-gray-500 mt-1 text-center">
-                          +{manhole.visit.photos.length - 3} 枚
+                          +{manhole.allPhotos.length - 3} 枚
                         </p>
                       )}
                     </div>
