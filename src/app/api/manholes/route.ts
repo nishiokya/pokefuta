@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
 
       let photosCount = 0;
       if (!photoCountError && photoCountData) {
-        photosCount = photoCountData.count || 0;
+        photosCount = (photoCountData as any).count || 0;
       } else {
         // フォールバック: 全件取得
         const { data: photosData } = await supabase
