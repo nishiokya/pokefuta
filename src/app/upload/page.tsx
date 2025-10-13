@@ -43,7 +43,9 @@ export default function UploadPage() {
       const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
-        setManholes(data);
+        if (data.success && data.manholes) {
+          setManholes(data.manholes);
+        }
       }
     } catch (error) {
       console.error('Failed to load manholes:', error);
@@ -102,7 +104,7 @@ export default function UploadPage() {
     const newPhotos: UploadedPhoto[] = [];
 
     for (const file of acceptedFiles) {
-      const id = Math.random().toString(36).substr(2, 9);
+      const id = Math.random().toString(36).substring(2, 11);
       const preview = URL.createObjectURL(file);
       const metadata = await extractMetadata(file);
 
@@ -122,7 +124,8 @@ export default function UploadPage() {
       });
     }
 
-    setPhotos(prev => [...prev, ...newPhotos]);
+    // Replace existing photo with the new one (only 1 photo allowed)
+    setPhotos(newPhotos);
     setLoading(false);
   }, [manholes]);
 
@@ -131,7 +134,8 @@ export default function UploadPage() {
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.heic', '.heif']
     },
-    multiple: true
+    multiple: false,
+    maxFiles: 1
   });
 
   const removePhoto = (id: string) => {
@@ -258,7 +262,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="📷 写真登録" icon={<Upload className="w-6 h-6" />} />
+      <Header title="📷 ポケふた写真登録" icon={<Upload className="w-6 h-6" />} />
 
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         {/* Upload Area */}
@@ -273,7 +277,7 @@ export default function UploadPage() {
             <div className="text-center py-8">
               <Upload className={`w-16 h-16 mx-auto mb-4 ${isDragActive ? 'text-rpg-yellow' : 'text-rpg-blue'}`} />
               <p className="font-pixelJp text-lg text-rpg-textDark mb-2">
-                {isDragActive ? '写真をドロップ!' : '写真を選択またはドロップ'}
+                {isDragActive ? '写真をドロップ!' : '写真を1枚選択またはドロップ'}
               </p>
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
                 JPEG, PNG, HEIC形式に対応
@@ -311,14 +315,14 @@ export default function UploadPage() {
             <div className="rpg-window">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold">
-                  選択済み ({photos.length}枚)
+                  選択済み写真
                 </h2>
                 <button
                   onClick={uploadAllPhotos}
                   className="rpg-button rpg-button-primary text-xs"
                   disabled={photos.every(p => p.uploaded || p.uploading)}
                 >
-                  <span className="font-pixelJp">全て登録</span>
+                  <span className="font-pixelJp">登録</span>
                 </button>
               </div>
             </div>

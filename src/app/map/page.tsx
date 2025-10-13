@@ -5,7 +5,6 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -157,7 +156,9 @@ export default function MapPage() {
 
             const manholes = (data.visits || [])
               .map((visit: Visit) => visit.manhole)
-              .filter((manhole: Manhole | undefined): manhole is Manhole => manhole !== undefined);
+              .filter((manhole: Manhole | undefined): manhole is Manhole =>
+                manhole !== undefined && manhole !== null && manhole.latitude !== undefined && manhole.latitude !== null
+              );
             setVisitedManholes(manholes);
           } else {
             console.log('User not authenticated - showing recent manholes');
@@ -188,8 +189,12 @@ export default function MapPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.manholes) {
-          setAllManholes(data.manholes);
-          setRecentManholes(data.manholes.slice(0, 100));
+          // Filter out null/undefined manholes and manholes without coordinates
+          const validManholes = data.manholes.filter((m: Manhole) =>
+            m && m.latitude !== null && m.latitude !== undefined
+          );
+          setAllManholes(validManholes);
+          setRecentManholes(validManholes.slice(0, 100));
         }
       }
     } catch (error) {
@@ -202,6 +207,7 @@ export default function MapPage() {
 
     // 都道府県ごとにマンホール数を集計
     allManholes.forEach(manhole => {
+      if (!manhole || !manhole.prefecture) return;
       const prefecture = manhole.prefecture;
       counts.set(prefecture, (counts.get(prefecture) || 0) + 1);
     });
@@ -230,11 +236,6 @@ export default function MapPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header
-        title={isLoggedIn ? "🗺️ 訪問マップ" : "🗺️ ポケふたマップ"}
-        icon={<MapPin className="w-6 h-6" />}
-      />
-
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -268,26 +269,21 @@ export default function MapPage() {
               {/* 都道府県リスト（フロート） */}
               {prefectureCounts.length > 0 && (
                 <div className="absolute top-4 right-4 z-[1000]">
-                  {/* トグルボタン */}
-                  <button
-                    onClick={() => setShowPrefectureList(!showPrefectureList)}
-                    className="rpg-button p-2 mb-2 bg-rpg-bgLight border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors"
-                    title={showPrefectureList ? '都道府県リストを隠す' : '都道府県リストを表示'}
-                  >
-                    {showPrefectureList ? (
-                      <ChevronRight className="w-4 h-4" />
-                    ) : (
-                      <ChevronLeft className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  {/* リスト本体 */}
-                  {showPrefectureList && (
+                  {showPrefectureList ? (
                     <div className="w-64 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden">
                       <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border p-2">
-                        <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold">
-                          都道府県別 ({prefectureCounts.length})
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold">
+                            都道府県別 ({prefectureCounts.length})
+                          </h3>
+                          <button
+                            onClick={() => setShowPrefectureList(false)}
+                            className="rpg-button p-1 hover:bg-rpg-yellow transition-colors"
+                            title="都道府県リストを隠す"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="overflow-y-auto max-h-[calc(70vh-6rem)] p-2 space-y-1">
                         {prefectureCounts
@@ -310,6 +306,14 @@ export default function MapPage() {
                           ))}
                       </div>
                     </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowPrefectureList(true)}
+                      className="rpg-button p-2 bg-rpg-bgLight border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors"
+                      title="都道府県リストを表示"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               )}

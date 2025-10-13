@@ -37,31 +37,34 @@ export default function VisitsPage() {
 
         if (data.success && data.visits) {
           // Transform API response to match our Visit interface
-          const apiVisits: Visit[] = data.visits.map((visit: any) => ({
-            id: visit.id,
-            manhole: {
-              id: visit.manhole?.id || 0,
-              title: visit.manhole?.title || 'Unknown Manhole',
-              prefecture: visit.manhole?.prefecture || '',
-              municipality: visit.manhole?.municipality || null,
-              location: visit.manhole?.location || '',
-              pokemons: visit.manhole?.pokemons || [],
-              name: visit.manhole?.title,
-              description: visit.note,
-              city: visit.manhole?.municipality,
-              created_at: visit.created_at,
-              updated_at: visit.updated_at,
-              detail_url: visit.manhole?.detail_url || null,
-              prefecture_site_url: visit.manhole?.prefecture_site_url || null,
-            },
-            visited_at: visit.shot_at,
-            photos: visit.photos.map((photo: any) => ({
-              id: photo.id,
-              url: photo.url,
-              thumbnail_url: photo.thumbnail_url
-            })),
-            notes: visit.note
-          }));
+          // Filter out visits without manhole data
+          const apiVisits: Visit[] = data.visits
+            .filter((visit: any) => visit.manhole && visit.manhole.id)
+            .map((visit: any) => ({
+              id: visit.id,
+              manhole: {
+                id: visit.manhole.id,
+                title: visit.manhole.title || 'ポケふた',
+                prefecture: visit.manhole.prefecture || '',
+                municipality: visit.manhole.municipality || null,
+                location: visit.manhole.location || '',
+                pokemons: visit.manhole.pokemons || [],
+                name: visit.manhole.title,
+                description: visit.note,
+                city: visit.manhole.municipality,
+                created_at: visit.created_at,
+                updated_at: visit.updated_at,
+                detail_url: visit.manhole.detail_url || null,
+                prefecture_site_url: visit.manhole.prefecture_site_url || null,
+              },
+              visited_at: visit.shot_at,
+              photos: visit.photos?.map((photo: any) => ({
+                id: photo.id,
+                url: photo.url,
+                thumbnail_url: photo.thumbnail_url
+              })) || [],
+              notes: visit.note
+            }));
 
           setVisits(apiVisits);
         }
@@ -91,7 +94,7 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="📚 冒険の記録" icon={<History className="w-6 h-6" />} />
+      <Header title="📚 ポケふたの記録" icon={<History className="w-6 h-6" />} />
 
       {/* Feed Container */}
       <div className="max-w-2xl mx-auto pb-20">
