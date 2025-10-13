@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Camera, Navigation, History, Home } from 'lucide-react';
+import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
 
@@ -105,6 +105,7 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState<number>(6);
   const [loading, setLoading] = useState(true);
   const [prefectureCounts, setPrefectureCounts] = useState<PrefectureCount[]>([]);
+  const [showPrefectureList, setShowPrefectureList] = useState(true);
 
   useEffect(() => {
     // Get user location
@@ -266,32 +267,50 @@ export default function MapPage() {
 
               {/* 都道府県リスト（フロート） */}
               {prefectureCounts.length > 0 && (
-                <div className="absolute top-4 right-4 w-64 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden z-10">
-                  <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border p-2">
-                    <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold">
-                      都道府県別 ({prefectureCounts.length})
-                    </h3>
-                  </div>
-                  <div className="overflow-y-auto max-h-[calc(70vh-6rem)] p-2 space-y-1">
-                    {prefectureCounts
-                      .sort((a, b) => b.count - a.count)
-                      .map((pref) => (
-                        <button
-                          key={pref.code}
-                          onClick={() => handlePrefectureClick(pref)}
-                          className="w-full rpg-button text-left p-2 hover:bg-rpg-yellow transition-colors"
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
-                              {pref.name}
-                            </span>
-                            <span className="font-pixel text-xs text-rpg-blue ml-2">
-                              {pref.count}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
+                <div className="absolute top-4 right-4 z-[1000]">
+                  {/* トグルボタン */}
+                  <button
+                    onClick={() => setShowPrefectureList(!showPrefectureList)}
+                    className="rpg-button p-2 mb-2 bg-rpg-bgLight border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors"
+                    title={showPrefectureList ? '都道府県リストを隠す' : '都道府県リストを表示'}
+                  >
+                    {showPrefectureList ? (
+                      <ChevronRight className="w-4 h-4" />
+                    ) : (
+                      <ChevronLeft className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* リスト本体 */}
+                  {showPrefectureList && (
+                    <div className="w-64 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden">
+                      <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border p-2">
+                        <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold">
+                          都道府県別 ({prefectureCounts.length})
+                        </h3>
+                      </div>
+                      <div className="overflow-y-auto max-h-[calc(70vh-6rem)] p-2 space-y-1">
+                        {prefectureCounts
+                          .sort((a, b) => b.count - a.count)
+                          .map((pref) => (
+                            <button
+                              key={pref.code}
+                              onClick={() => handlePrefectureClick(pref)}
+                              className="w-full rpg-button text-left p-2 hover:bg-rpg-yellow transition-colors"
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
+                                  {pref.name}
+                                </span>
+                                <span className="font-pixel text-xs text-rpg-blue ml-2">
+                                  {pref.count}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
