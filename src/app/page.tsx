@@ -22,6 +22,7 @@ interface Photo {
   storage_key: string;
   manhole_id: number;
   created_at: string;
+  manhole?: Manhole;
 }
 
 export default function HomePage() {
@@ -113,7 +114,27 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.images) {
-          setRecentPhotos(data.images);
+          // 写真のマンホールIDを取得
+          const manholeIds = [...new Set(data.images.map((img: Photo) => img.manhole_id))];
+
+          // マンホール情報を取得
+          const manholesResponse = await fetch('/api/manholes');
+          if (manholesResponse.ok) {
+            const manholesData = await manholesResponse.json();
+            if (manholesData.success && manholesData.manholes) {
+              const manholesMap = new Map(
+                manholesData.manholes.map((m: Manhole) => [m.id, m])
+              );
+
+              // 写真にマンホール情報を追加
+              const photosWithManholes = data.images.map((photo: Photo) => ({
+                ...photo,
+                manhole: manholesMap.get(photo.manhole_id)
+              }));
+
+              setRecentPhotos(photosWithManholes);
+            }
+          }
         }
       }
     } catch (error) {
@@ -211,7 +232,7 @@ export default function HomePage() {
                     <div
                       key={photo.id}
                       onClick={() => handlePhotoClick(photo)}
-                      className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden cursor-pointer hover:border-rpg-yellow transition-colors"
+                      className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden cursor-pointer hover:border-rpg-yellow transition-colors group"
                     >
                       <img
                         src={`/api/photo/${photo.id}?size=small`}
@@ -219,6 +240,13 @@ export default function HomePage() {
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                      {photo.manhole && (
+                        <div className="absolute top-0 left-0 right-0 bg-black/70 p-1">
+                          <p className="font-pixelJp text-[10px] text-white truncate">
+                            {photo.manhole.prefecture}{photo.manhole.municipality || ''}({photo.manhole.id})
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
