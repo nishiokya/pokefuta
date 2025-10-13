@@ -209,6 +209,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const storageKey = searchParams.get('key');
     const manholeId = searchParams.get('manhole_id');
+    const limitParam = searchParams.get('limit');
 
     if (storageKey) {
       // Redirect to signed URL for the specific image
@@ -228,6 +229,7 @@ export async function GET(request: NextRequest) {
             note
           )
         `)
+        .order('manhole_id', { ascending: false })
         .order('created_at', { ascending: false });
 
       // Filter by manhole_id if provided
@@ -235,8 +237,9 @@ export async function GET(request: NextRequest) {
         query = query.eq('manhole_id', parseInt(manholeId));
       }
 
-      // Limit results
-      query = query.limit(100);
+      // Apply limit from query parameter or default to 100
+      const limit = limitParam ? parseInt(limitParam) : 100;
+      query = query.limit(limit);
 
       const { data: images, error } = await query;
 
