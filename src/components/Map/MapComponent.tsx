@@ -112,6 +112,7 @@ export default function MapComponent({
 
     // Add manhole markers
     manholes.forEach((manhole) => {
+      if (!manhole) return; // Skip null/undefined manholes
       if (manhole.latitude && manhole.longitude) {
         const isVisited = manhole.is_visited;
 
