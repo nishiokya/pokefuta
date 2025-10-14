@@ -114,22 +114,21 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.images) {
-          // 写真のマンホールIDを取得
-          const manholeIds = [...new Set(data.images.map((img: Photo) => img.manhole_id))];
-
           // マンホール情報を取得
           const manholesResponse = await fetch('/api/manholes');
           if (manholesResponse.ok) {
             const manholesData = await manholesResponse.json();
             if (manholesData.success && manholesData.manholes) {
-              const manholesMap = new Map(
-                manholesData.manholes.map((m: Manhole) => [m.id, m])
-              );
+              // マンホール情報をオブジェクトに変換（より確実）
+              const manholesMap: { [key: number]: Manhole } = {};
+              manholesData.manholes.forEach((m: Manhole) => {
+                manholesMap[m.id] = m;
+              });
 
               // 写真にマンホール情報を追加
               const photosWithManholes = data.images.map((photo: Photo) => ({
                 ...photo,
-                manhole: manholesMap.get(photo.manhole_id)
+                manhole: manholesMap[photo.manhole_id]
               }));
 
               setRecentPhotos(photosWithManholes);
