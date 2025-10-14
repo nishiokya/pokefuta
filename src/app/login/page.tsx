@@ -91,9 +91,7 @@ function LoginForm() {
               <LogIn className="w-10 h-10 text-rpg-textDark" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-2xl text-rpg-yellow mb-2" style={{
-            textShadow: '3px 3px 0 #34495E'
-          }}>
+          <h1 className="font-pixelJp text-2xl text-rpg-yellow mb-2">
             ログイン
           </h1>
           <p className="font-pixelJp text-sm text-rpg-textDark opacity-70">

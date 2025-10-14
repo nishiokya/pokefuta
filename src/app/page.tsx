@@ -56,7 +56,9 @@ export default function HomePage() {
             // Extract visited manholes
             const manholes = (data.visits || [])
               .map((visit: Visit) => visit.manhole)
-              .filter((manhole: Manhole | undefined): manhole is Manhole => manhole !== undefined);
+              .filter((manhole: Manhole | undefined): manhole is Manhole =>
+                manhole != null && manhole.id != null
+              );
             setVisitedManholes(manholes);
           } else {
             // 未ログイン - 最近のマンホールを表示
@@ -93,7 +95,9 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.manholes) {
-          setRecentManholes(data.manholes.slice(0, 10)); // 最新10件のみ表示
+          // null/undefinedを除外してから最新10件を取得
+          const validManholes = data.manholes.filter((m: Manhole) => m != null && m.id != null);
+          setRecentManholes(validManholes.slice(0, 10));
         }
         // 統計情報を取得
         if (data.total) {
@@ -126,10 +130,12 @@ export default function HomePage() {
               });
 
               // 写真にマンホール情報を追加
-              const photosWithManholes = data.images.map((photo: Photo) => ({
-                ...photo,
-                manhole: manholesMap[photo.manhole_id]
-              }));
+              const photosWithManholes = data.images
+                .map((photo: Photo) => ({
+                  ...photo,
+                  manhole: manholesMap[photo.manhole_id]
+                }))
+                .filter((photo: Photo) => photo.manhole != null); // null/undefined を除外
 
               setRecentPhotos(photosWithManholes);
             }
@@ -242,7 +248,7 @@ export default function HomePage() {
                       {photo.manhole && (
                         <div className="absolute top-0 left-0 right-0 bg-black/70 p-1">
                           <p className="font-pixelJp text-[10px] text-white truncate">
-                            {photo.manhole.prefecture}{photo.manhole.municipality || ''}({photo.manhole.id})
+                            {photo.manhole?.prefecture || ''}{photo.manhole?.municipality || ''}({photo.manhole?.id || ''})
                           </p>
                         </div>
                       )}
@@ -260,18 +266,18 @@ export default function HomePage() {
                     {isLoggedIn ? '訪問したポケふた' : '最近のポケふた'}
                   </h2>
                   <div className="grid grid-cols-2 gap-3">
-                    {(isLoggedIn ? visitedManholes : recentManholes).map((manhole) => (
+                    {(isLoggedIn ? visitedManholes : recentManholes).map((manhole, index) => (
                       <div
-                        key={manhole.id}
+                        key={manhole?.id || `manhole-${index}`}
                         onClick={() => handleManholeClick(manhole)}
                         className="rpg-window p-3 cursor-pointer hover:bg-rpg-bgLight transition-colors"
                       >
                         <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold mb-2">
-                          {manhole.prefecture}{manhole.municipality || ''}({manhole.id})
+                          {manhole?.prefecture || ''}{manhole?.municipality || ''}({manhole?.id || ''})
                         </h3>
-                        {manhole.pokemons && manhole.pokemons.length > 0 && (
+                        {manhole?.pokemons && manhole.pokemons.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {manhole.pokemons.slice(0, 2).map((pokemon, index) => (
+                            {manhole.pokemons?.slice(0, 2).map((pokemon, index) => (
                               <span
                                 key={index}
                                 className="bg-rpg-yellow px-1 py-0.5 border border-rpg-border font-pixelJp text-[10px] text-rpg-textDark"
@@ -279,9 +285,9 @@ export default function HomePage() {
                                 {pokemon}
                               </span>
                             ))}
-                            {manhole.pokemons.length > 2 && (
+                            {(manhole.pokemons?.length || 0) > 2 && (
                               <span className="font-pixelJp text-[10px] text-rpg-textDark opacity-70">
-                                +{manhole.pokemons.length - 2}
+                                +{(manhole.pokemons?.length || 0) - 2}
                               </span>
                             )}
                           </div>
