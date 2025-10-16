@@ -4,9 +4,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
+import DeletePhotoModal from '@/components/DeletePhotoModal';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -40,6 +41,9 @@ export default function ManholeDetailPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const manholeId = params.id;
@@ -98,6 +102,53 @@ export default function ManholeDetailPage() {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
       window.open(url, '_blank');
     }
+  };
+
+  const handleDeleteClick = (photoId: string) => {
+    setSelectedPhotoId(photoId);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedPhotoId) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/photo/${selectedPhotoId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // 成功: 写真リストから削除
+        const updatedPhotos = photos.filter(p => p.id !== selectedPhotoId);
+        setPhotos(updatedPhotos);
+        setDeleteModalOpen(false);
+        setSelectedPhotoId(null);
+
+        // 成功メッセージ
+        if (updatedPhotos.length === 0) {
+          alert('写真を削除しました。このマンホールの写真はすべて削除されました。');
+        } else {
+          alert('写真を削除しました');
+        }
+      } else {
+        // エラー
+        console.error('Failed to delete photo:', data);
+        alert(`削除に失敗しました: ${data.error || '不明なエラー'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      alert('削除中にエラーが発生しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+    setSelectedPhotoId(null);
   };
 
   if (loading) {
@@ -235,16 +286,33 @@ export default function ManholeDetailPage() {
               {photos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden group cursor-pointer hover:border-rpg-yellow transition-colors"
+                  className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden group"
                 >
                   <img
                     src={`/api/photo/${photo.id}?size=small`}
                     alt="ポケふた写真"
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      // 画像読み込みエラー時の表示
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent && !parent.querySelector('.error-placeholder')) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center border-2 border-rpg-border';
+                        errorDiv.innerHTML = `
+                          <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                          </svg>
+                          <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
+                        `;
+                        parent.appendChild(errorDiv);
+                      }
+                    }}
                   />
                   {photo.visit?.shot_at && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 p-1">
+                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 p-1 z-10">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-rpg-textGold" />
                         <span className="font-pixelJp text-[10px] text-rpg-textGold">
@@ -253,6 +321,14 @@ export default function ManholeDetailPage() {
                       </div>
                     </div>
                   )}
+                  {/* Delete button - shows on hover (always display regardless of image load status) */}
+                  <button
+                    onClick={() => handleDeleteClick(photo.id)}
+                    className="absolute top-2 right-2 bg-rpg-red border-2 border-rpg-border p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
+                    title="写真を削除"
+                  >
+                    <Trash2 className="w-4 h-4 text-white" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -357,6 +433,17 @@ export default function ManholeDetailPage() {
           </Link>
         </div>
       </nav>
+
+      {/* Delete Photo Modal */}
+      {selectedPhotoId && (
+        <DeletePhotoModal
+          isOpen={deleteModalOpen}
+          photoId={selectedPhotoId}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   );
 }
