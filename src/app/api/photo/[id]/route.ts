@@ -49,3 +49,95 @@ export async function GET(
     }, { status: 500 });
   }
 }
+
+// Delete a photo
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const photoId = params.id;
+
+    // ✅ 1. 認証チェック
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required'
+      }, { status: 401 });
+    }
+
+    // ✅ 2. 写真のメタデータを取得し、所有者確認
+    const { data: photo, error: fetchError } = await supabase
+      .from('photo')
+      .select(`
+        *,
+        visit:visit_id (
+          id,
+          user_id
+        )
+      `)
+      .eq('id', photoId)
+      .single();
+
+    if (fetchError || !photo) {
+      return NextResponse.json({
+        success: false,
+        error: 'Photo not found'
+      }, { status: 404 });
+    }
+
+    // ✅ 3. 所有者チェック（visitのuser_idと一致するか確認）
+    if (!photo.visit || (photo.visit as any).user_id !== session.user.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Permission denied: You can only delete your own photos'
+      }, { status: 403 });
+    }
+
+    // ✅ 4. R2から画像ファイルを削除
+    try {
+      if (storage.delete) {
+        await storage.delete(photo.storage_key);
+        console.log(`Deleted photo from storage: ${photo.storage_key}`);
+      } else {
+        console.warn('Storage adapter does not support delete operation');
+      }
+    } catch (storageError: any) {
+      console.error('Error deleting photo from storage:', storageError);
+      // ストレージ削除に失敗してもDB削除は続行
+      // （ファイルが既に存在しない可能性もあるため）
+    }
+
+    // ✅ 5. データベースから写真レコードを削除
+    const { error: deleteError } = await supabase
+      .from('photo')
+      .delete()
+      .eq('id', photoId);
+
+    if (deleteError) {
+      console.error('Error deleting photo from database:', deleteError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to delete photo from database',
+        details: deleteError.message
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Photo deleted successfully',
+      photo_id: photoId
+    });
+
+  } catch (error: any) {
+    console.error('Unexpected error deleting photo:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Unexpected error',
+      details: error?.message || 'Unknown error'
+    }, { status: 500 });
+  }
+}

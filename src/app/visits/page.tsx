@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, Camera, Navigation, History, Heart, MessageCircle, Send, Bookmark, Home } from 'lucide-react';
+import { MapPin, Calendar, Camera, Navigation, History, Heart, MessageCircle, Send, Bookmark, Home, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
+import DeletePhotoModal from '@/components/DeletePhotoModal';
 
 interface Visit {
   id: string;
@@ -23,6 +24,9 @@ interface Visit {
 export default function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadVisits();
@@ -79,6 +83,55 @@ export default function VisitsPage() {
   const sortedVisits = [...visits].sort((a, b) =>
     new Date(b.visited_at).getTime() - new Date(a.visited_at).getTime()
   );
+
+  const handleDeleteClick = (photoId: string) => {
+    setSelectedPhotoId(photoId);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedPhotoId) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/photo/${selectedPhotoId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // 成功: 写真リストから削除し、写真がなくなったvisitは非表示
+        const updatedVisits = visits
+          .map(visit => ({
+            ...visit,
+            photos: visit.photos.filter(p => p.id !== selectedPhotoId)
+          }))
+          .filter(visit => visit.photos.length > 0); // 写真が0枚になったvisitを除外
+
+        setVisits(updatedVisits);
+        setDeleteModalOpen(false);
+        setSelectedPhotoId(null);
+
+        // 成功メッセージ（オプション）
+        alert('写真を削除しました');
+      } else {
+        // エラー
+        console.error('Failed to delete photo:', data);
+        alert(`削除に失敗しました: ${data.error || '不明なエラー'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      alert('削除中にエラーが発生しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+    setSelectedPhotoId(null);
+  };
 
   if (loading) {
     return (
@@ -142,7 +195,7 @@ export default function VisitsPage() {
                       {visit.photos.slice(0, 4).map((photo, index) => (
                         <div
                           key={photo.id}
-                          className={`relative ${visit.photos.length === 1 ? 'aspect-square' : 'aspect-square'} bg-rpg-bgDark overflow-hidden`}
+                          className={`relative ${visit.photos.length === 1 ? 'aspect-square' : 'aspect-square'} bg-rpg-bgDark overflow-hidden group border-2 border-rpg-border`}
                         >
                           <img
                             src={photo.thumbnail_url}
@@ -150,22 +203,42 @@ export default function VisitsPage() {
                             className="w-full h-full object-cover"
                             style={{ imageRendering: 'pixelated' }}
                             onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              e.currentTarget.parentElement!.innerHTML = `
-                                <div class="w-full h-full bg-rpg-bgDark flex items-center justify-center border-2 border-rpg-border">
-                                  <svg class="w-8 h-8 text-rpg-textDark opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                              // 画像読み込みエラー時の表示
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent && !parent.querySelector('.error-placeholder')) {
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center';
+                                errorDiv.innerHTML = `
+                                  <svg class="w-8 h-8 text-rpg-textDark opacity-50 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                   </svg>
-                                </div>
-                              `;
+                                  <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像なし</span>
+                                `;
+                                parent.appendChild(errorDiv);
+                              }
                             }}
                           />
                           {visit.photos.length > 4 && index === 3 && (
-                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
                               <span className="font-pixel text-white text-xl">
                                 +{visit.photos.length - 3}
                               </span>
                             </div>
+                          )}
+                          {/* Delete button - shows on hover (always display regardless of image load status) */}
+                          {visit.photos.length <= 4 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(photo.id);
+                              }}
+                              className="absolute top-2 right-2 bg-rpg-red border-2 border-rpg-border p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
+                              title="写真を削除"
+                            >
+                              <Trash2 className="w-3 h-3 text-white" />
+                            </button>
                           )}
                         </div>
                       ))}
@@ -286,6 +359,17 @@ export default function VisitsPage() {
           </Link>
         </div>
       </nav>
+
+      {/* Delete Photo Modal */}
+      {selectedPhotoId && (
+        <DeletePhotoModal
+          isOpen={deleteModalOpen}
+          photoId={selectedPhotoId}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   );
 }
