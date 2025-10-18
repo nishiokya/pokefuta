@@ -4,6 +4,68 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage } from '@/lib/storage';
 
+/**
+ * @swagger
+ * /api/photo/{id}:
+ *   get:
+ *     summary: 写真を取得
+ *     tags: [photos]
+ *     description: 写真のsigned URLにリダイレクトします。
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 写真ID
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: string
+ *           enum: [small, medium, large]
+ *         description: サムネイルサイズ
+ *     responses:
+ *       307:
+ *         description: Signed URLにリダイレクト
+ *       404:
+ *         description: 写真が見つかりません
+ *   delete:
+ *     summary: 写真を削除
+ *     tags: [photos]
+ *     description: 写真をR2ストレージとDBから削除します。自分の写真のみ削除可能。
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 写真ID
+ *     responses:
+ *       200:
+ *         description: 削除成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 photo_id:
+ *                   type: string
+ *                   format: uuid
+ *       401:
+ *         description: 認証が必要
+ *       403:
+ *         description: 権限がありません（自分の写真ではない）
+ *       404:
+ *         description: 写真が見つかりません
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

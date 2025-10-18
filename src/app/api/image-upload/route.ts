@@ -203,6 +203,54 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * @swagger
+ * /api/image-upload:
+ *   get:
+ *     summary: 写真一覧を取得
+ *     tags: [photos]
+ *     parameters:
+ *       - in: query
+ *         name: key
+ *         schema:
+ *           type: string
+ *         description: ストレージキー（指定した場合は署名付きURLへリダイレクト）
+ *       - in: query
+ *         name: manhole_id
+ *         schema:
+ *           type: integer
+ *         description: マンホールIDでフィルタ
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *         description: 取得件数
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: オフセット（ページネーション用）
+ *     responses:
+ *       200:
+ *         description: 写真一覧
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 images:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Photo'
+ *                 count:
+ *                   type: integer
+ *                 total:
+ *                   type: integer
+ */
 export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -210,6 +258,7 @@ export async function GET(request: NextRequest) {
     const storageKey = searchParams.get('key');
     const manholeId = searchParams.get('manhole_id');
     const limitParam = searchParams.get('limit');
+    const offsetParam = searchParams.get('offset');
 
     if (storageKey) {
       // Redirect to signed URL for the specific image
@@ -228,7 +277,7 @@ export async function GET(request: NextRequest) {
             manhole_id,
             note
           )
-        `)
+        `, { count: 'exact' })
         .order('manhole_id', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -237,11 +286,16 @@ export async function GET(request: NextRequest) {
         query = query.eq('manhole_id', parseInt(manholeId));
       }
 
-      // Apply limit from query parameter or default to 100
+      // Apply limit and offset from query parameters
       const limit = limitParam ? parseInt(limitParam) : 100;
-      query = query.limit(limit);
+      const offset = offsetParam ? parseInt(offsetParam) : 0;
 
-      const { data: images, error } = await query;
+      query = query.limit(limit);
+      if (offset > 0) {
+        query = query.range(offset, offset + limit - 1);
+      }
+
+      const { data: images, error, count } = await query;
 
       if (error) {
         return NextResponse.json({
@@ -256,6 +310,7 @@ export async function GET(request: NextRequest) {
         message: 'Images retrieved successfully',
         images: images || [],
         count: images?.length || 0,
+        total: count || 0,
       });
     }
 
