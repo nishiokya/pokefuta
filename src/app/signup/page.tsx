@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
+import TermsOfService from '@/components/TermsOfService';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -199,11 +201,17 @@ export default function SignUpPage() {
                 />
               </div>
 
+              {/* Terms of Service */}
+              <TermsOfService
+                isChecked={agreedToTerms}
+                onCheckChange={setAgreedToTerms}
+              />
+
               {/* Sign Up Button */}
               <button
                 type="submit"
                 className="w-full rpg-button rpg-button-primary py-3"
-                disabled={loading}
+                disabled={loading || !agreedToTerms}
               >
                 <span className="font-pixelJp">
                   {loading ? '登録中...' : '登録する'}
