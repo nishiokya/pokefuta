@@ -3,8 +3,9 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { LogIn, Mail, Lock, AlertCircle, MapPin, Camera, Navigation, History, Home } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, MapPin, Camera, Navigation, History, Home, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
+import TermsOfService from '@/components/TermsOfService';
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +14,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showTerms, setShowTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -157,6 +159,28 @@ function LoginForm() {
               </span>
             </button>
           </form>
+
+          {/* Terms of Service Link */}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setShowTerms(!showTerms)}
+              className="flex items-center gap-1 font-pixelJp text-xs text-rpg-blue hover:opacity-70 transition-opacity mx-auto"
+            >
+              <Info className="w-3 h-3" />
+              <span>利用規約を確認</span>
+            </button>
+          </div>
+
+          {showTerms && (
+            <div className="mt-3">
+              <TermsOfService
+                isChecked={false}
+                onCheckChange={() => {}}
+                className="border-rpg-yellow"
+              />
+            </div>
+          )}
 
           {/* Sign Up Link */}
           <div className="mt-6 pt-4 border-t-2 border-rpg-border text-center">
