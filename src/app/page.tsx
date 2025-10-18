@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Camera, Navigation, History, Map, Home } from 'lucide-react';
+import { MapPin, Camera, Navigation, History, Map, Home, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
 
@@ -34,11 +34,17 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
   const [manholesWithPhotos, setManholesWithPhotos] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPhotos, setTotalPhotos] = useState(0);
+  const photosPerPage = 12;
 
   useEffect(() => {
     loadVisits();
-    loadRecentPhotos();
   }, []);
+
+  useEffect(() => {
+    loadRecentPhotos();
+  }, [currentPage]);
 
   const loadVisits = async () => {
     try {
@@ -114,10 +120,16 @@ export default function HomePage() {
 
   const loadRecentPhotos = async () => {
     try {
-      const response = await fetch('/api/image-upload?limit=12');
+      const offset = (currentPage - 1) * photosPerPage;
+      const response = await fetch(`/api/image-upload?limit=${photosPerPage}&offset=${offset}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.images) {
+          // 総写真数を保存
+          if (data.total !== undefined) {
+            setTotalPhotos(data.total);
+          }
+
           // マンホール情報を取得
           const manholesResponse = await fetch('/api/manholes');
           if (manholesResponse.ok) {
@@ -255,6 +267,67 @@ export default function HomePage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPhotos > photosPerPage && (
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="rpg-button p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="前のページ"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.ceil(totalPhotos / photosPerPage) }, (_, i) => i + 1)
+                        .filter(page => {
+                          // Show first page, last page, current page, and 1 page on each side
+                          const totalPages = Math.ceil(totalPhotos / photosPerPage);
+                          return (
+                            page === 1 ||
+                            page === totalPages ||
+                            Math.abs(page - currentPage) <= 1
+                          );
+                        })
+                        .map((page, index, array) => {
+                          // Add ellipsis if there's a gap
+                          const prevPage = array[index - 1];
+                          const showEllipsis = prevPage && page - prevPage > 1;
+
+                          return (
+                            <div key={page} className="flex items-center gap-1">
+                              {showEllipsis && (
+                                <span className="font-pixel text-xs text-rpg-textDark opacity-50 px-1">
+                                  ...
+                                </span>
+                              )}
+                              <button
+                                onClick={() => setCurrentPage(page)}
+                                className={`rpg-button px-3 py-1 min-w-[2rem] ${
+                                  currentPage === page
+                                    ? 'rpg-button-primary'
+                                    : ''
+                                }`}
+                              >
+                                <span className="font-pixel text-xs">{page}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalPhotos / photosPerPage), prev + 1))}
+                      disabled={currentPage === Math.ceil(totalPhotos / photosPerPage)}
+                      className="rpg-button p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="次のページ"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

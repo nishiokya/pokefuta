@@ -16,6 +16,132 @@
 
 ---
 
+## 📖 API ドキュメント管理
+
+### Swagger/OpenAPI による API 仕様管理
+
+**⚠️ 重要: 新しいAPIを作成したら、必ずSwaggerアノテーションを追加してください！**
+
+#### ルール
+
+1. **すべてのAPI Routeファイルに`@swagger`コメントを追加**
+   - 新規API作成時は必須
+   - 既存APIの変更時も更新
+
+2. **Swaggerアノテーションの書き方**
+
+```typescript
+/**
+ * @swagger
+ * /api/your-endpoint:
+ *   get:
+ *     summary: エンドポイントの概要
+ *     tags: [タグ名]
+ *     description: 詳細な説明
+ *     security:
+ *       - cookieAuth: []  # 認証が必要な場合
+ *     parameters:
+ *       - in: query
+ *         name: パラメータ名
+ *         schema:
+ *           type: string
+ *         description: パラメータの説明
+ *     responses:
+ *       200:
+ *         description: 成功時のレスポンス
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *       401:
+ *         description: 認証エラー
+ */
+export async function GET(request: NextRequest) {
+  // ...
+}
+```
+
+3. **利用可能なタグ**
+   - `manholes`: マンホール情報API
+   - `visits`: 訪問記録API
+   - `photos`: 写真管理API
+   - `auth`: 認証API
+
+4. **共通スキーマ**
+   - `Manhole`: マンホール情報
+   - `Visit`: 訪問記録
+   - `Photo`: 写真データ
+   - `Error`: エラーレスポンス
+
+5. **セキュリティスキーム**
+   ```yaml
+   security:
+     - cookieAuth: []  # Supabase認証Cookie
+   ```
+
+#### Swagger UI の確認
+
+- **Swagger UI**: http://localhost:3000/api-docs （開発環境のみ）
+- **OpenAPI JSON**: http://localhost:3000/api/swagger （開発環境のみ）
+
+**⚠️ セキュリティ**: 本番環境では自動的に無効化され、403エラーを返します。
+
+#### 例: 新規APIの追加
+
+```typescript
+// src/app/api/your-new-api/route.ts
+
+/**
+ * @swagger
+ * /api/your-new-api:
+ *   post:
+ *     summary: 新機能のAPI
+ *     tags: [your-tag]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               field1:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 成功
+ *       401:
+ *         description: 認証が必要
+ */
+export async function POST(request: NextRequest) {
+  // ✅ 1. 認証チェック
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
+  }
+
+  // ✅ 2. 実装
+  // ...
+
+  return NextResponse.json({ success: true });
+}
+```
+
+#### チェックリスト
+
+新規API作成時は以下を確認：
+- [ ] `@swagger`コメントを追加
+- [ ] 適切なタグを設定
+- [ ] 認証が必要な場合は`security`を追加
+- [ ] パラメータとレスポンスを正確に記述
+- [ ] Swagger UIで表示を確認（http://localhost:3000/api-docs）
+
+---
+
 ## 📁 プロジェクト構造
 
 ```

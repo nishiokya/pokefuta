@@ -3,6 +3,39 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
+/**
+ * @swagger
+ * /api/manholes:
+ *   get:
+ *     summary: マンホール一覧を取得
+ *     tags: [manholes]
+ *     description: 全マンホール情報を取得します。位置情報を含みます。
+ *     responses:
+ *       200:
+ *         description: マンホール一覧
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 manholes:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Manhole'
+ *                 count:
+ *                   type: integer
+ *                   description: マンホール総数
+ *       500:
+ *         description: サーバーエラー
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
 // Helper function to extract coordinates from PostGIS WKB (Well-Known Binary) format
 function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: number } | null {
   if (!wkbHex || typeof wkbHex !== 'string') return null;
@@ -103,6 +136,10 @@ export async function GET(request: NextRequest) {
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
+    // ✅ ユーザーの認証状態を確認
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id || null;
+
     try {
       // まず全体の統計情報を取得（軽量クエリ）
       const { count: totalCount, error: countError } = await supabase
@@ -128,6 +165,33 @@ export async function GET(request: NextRequest) {
           .select('manhole_id')
           .not('manhole_id', 'is', null);
         photosCount = new Set(photosData?.map(p => p.manhole_id) || []).size;
+      }
+
+      // ✅ ログインユーザーの訪問記録を取得
+      let visitedManholeIds = new Set<number>();
+      let visitedManholeData = new Map<number, { last_visit: string }>();
+
+      if (userId) {
+        const { data: visitsData } = await supabase
+          .from('visit')
+          .select('manhole_id, shot_at')
+          .eq('user_id', userId)
+          .not('manhole_id', 'is', null)
+          .order('shot_at', { ascending: false });
+
+        if (visitsData) {
+          visitsData.forEach(visit => {
+            if (visit.manhole_id) {
+              visitedManholeIds.add(visit.manhole_id);
+              // 最新の訪問日を保存
+              if (!visitedManholeData.has(visit.manhole_id)) {
+                visitedManholeData.set(visit.manhole_id, {
+                  last_visit: visit.shot_at
+                });
+              }
+            }
+          });
+        }
       }
 
       // 実際のマンホールデータを取得（limitを適用）
@@ -180,6 +244,8 @@ export async function GET(request: NextRequest) {
             const distance = calculateDistance(lat!, lng!, realCoords.lat, realCoords.lng);
 
             const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+            const isVisited = visitedManholeIds.has(manhole.id);
+            const visitData = visitedManholeData.get(manhole.id);
 
             return {
               ...manhole,
@@ -187,8 +253,8 @@ export async function GET(request: NextRequest) {
               city: manhole.municipality || '',
               latitude: realCoords.lat,
               longitude: realCoords.lng,
-              is_visited: false,
-              last_visit: null,
+              is_visited: isVisited,
+              last_visit: visitData?.last_visit || null,
               photo_count: hasPhotos ? 1 : 0,
               distance: distance
             };
@@ -224,6 +290,8 @@ export async function GET(request: NextRequest) {
           }
 
           const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+          const isVisited = visitedManholeIds.has(manhole.id);
+          const visitData = visitedManholeData.get(manhole.id);
 
           return {
             ...manhole,
@@ -231,8 +299,8 @@ export async function GET(request: NextRequest) {
             city: manhole.municipality || '',
             latitude: realCoords.lat,
             longitude: realCoords.lng,
-            is_visited: false,
-            last_visit: null,
+            is_visited: isVisited,
+            last_visit: visitData?.last_visit || null,
             photo_count: hasPhotos ? 1 : 0
           };
         })
