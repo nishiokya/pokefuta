@@ -4,6 +4,129 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage, generateStorageKey } from '@/lib/storage';
 
+/**
+ * @swagger
+ * /api/image-upload:
+ *   post:
+ *     summary: 写真をアップロードして訪問記録を作成
+ *     tags: [photos]
+ *     description: 写真ファイルをアップロードし、マンホール訪問記録を作成します。画像はR2ストレージに保存され、訪問記録とフォトレコードがデータベースに作成されます。
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *               - manhole_id
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: アップロードする画像ファイル（JPEG/PNG/WebP、最大2MB推奨）
+ *               manhole_id:
+ *                 type: integer
+ *                 description: マンホールID（必須）
+ *               shot_at:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 撮影日時（ISO8601形式、省略時は現在時刻）
+ *               note:
+ *                 type: string
+ *                 description: 個人メモ（常に非公開、is_publicの設定に関わらず自分だけが閲覧可能）
+ *               comment:
+ *                 type: string
+ *                 maxLength: 500
+ *                 description: 訪問コメント（is_publicがtrueの場合に他のユーザーも閲覧可能、最大500文字）
+ *               is_public:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 default: 'true'
+ *                 description: 公開設定（true=他のユーザーもcommentを閲覧可能、false=自分だけが閲覧可能、デフォルト：公開）
+ *               latitude:
+ *                 type: number
+ *                 format: float
+ *                 description: 撮影位置の緯度
+ *               longitude:
+ *                 type: number
+ *                 format: float
+ *                 description: 撮影位置の経度
+ *               metadata:
+ *                 type: string
+ *                 description: 追加メタデータ（JSON文字列）
+ *     responses:
+ *       200:
+ *         description: アップロード成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Image uploaded successfully
+ *                 visit_id:
+ *                   type: string
+ *                   format: uuid
+ *                   description: 作成された訪問記録のID
+ *                 image:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     filename:
+ *                       type: string
+ *                     content_type:
+ *                       type: string
+ *                     file_size:
+ *                       type: integer
+ *                     storage_key:
+ *                       type: string
+ *                     uploaded_at:
+ *                       type: string
+ *                       format: date-time
+ *                     url:
+ *                       type: string
+ *                       description: 署名付きURL（1時間有効）
+ *                     expires_at:
+ *                       type: string
+ *                       format: date-time
+ *                 storage_provider:
+ *                   type: string
+ *                   example: r2
+ *       400:
+ *         description: バリデーションエラー
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: manhole_id is required - photos must be linked to a manhole
+ *       401:
+ *         description: 認証が必要
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: サーバーエラー
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -24,6 +147,8 @@ export async function POST(request: NextRequest) {
     const manholeId = formData.get('manhole_id');
     const shotAt = formData.get('shot_at');
     const note = formData.get('note');
+    const comment = formData.get('comment');  // 訪問コメント
+    const isPublic = formData.get('is_public');  // 公開設定
     const shotLocation = formData.get('shot_location');
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
@@ -126,6 +251,11 @@ export async function POST(request: NextRequest) {
       if (note) {
         visitInsert.note = note as string;
       }
+      if (comment) {
+        visitInsert.comment = comment as string;  // 訪問コメント
+      }
+      // is_public: デフォルトはtrue、明示的にfalseが送られた場合のみfalseにする
+      visitInsert.is_public = isPublic === 'false' ? false : true;
 
       const { data: visitData, error: visitError } = await supabase
         .from('visit')
@@ -275,7 +405,8 @@ export async function GET(request: NextRequest) {
             user_id,
             shot_at,
             manhole_id,
-            note
+            note,
+            comment
           )
         `, { count: 'exact' })
         .order('manhole_id', { ascending: false })
