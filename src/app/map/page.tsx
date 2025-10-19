@@ -96,7 +96,6 @@ interface PrefectureCount {
 export default function MapPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitedManholes, setVisitedManholes] = useState<Manhole[]>([]);
-  const [recentManholes, setRecentManholes] = useState<Manhole[]>([]);
   const [allManholes, setAllManholes] = useState<Manhole[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -145,6 +144,37 @@ export default function MapPage() {
     }
   }, [allManholes]);
 
+  // allManholesとvisitsが両方揃ったら、全マンホールに訪問済みフラグを追加
+  useEffect(() => {
+    if (isLoggedIn && allManholes.length > 0) {
+      // 訪問したマンホールIDを抽出
+      const visitedIds = new Set(
+        visits
+          .map(visit => visit.manhole_id)
+          .filter(Boolean)
+      );
+
+      console.log(`Matching ${visitedIds.size} visited IDs with ${allManholes.length} total manholes`);
+
+      // 全マンホールにis_visitedフラグを追加
+      const manholesWithVisitedFlag = allManholes.map(manhole => ({
+        ...manhole,
+        is_visited: visitedIds.has(manhole.id)
+      }));
+
+      const visitedCount = manholesWithVisitedFlag.filter(m => m.is_visited).length;
+      console.log(`Marked ${visitedCount} manholes as visited, ${allManholes.length - visitedCount} as unvisited`);
+      setVisitedManholes(manholesWithVisitedFlag);
+    } else if (!isLoggedIn && allManholes.length > 0) {
+      // 未ログイン時は全て未訪問扱い
+      const manholesWithVisitedFlag = allManholes.map(manhole => ({
+        ...manhole,
+        is_visited: false
+      }));
+      setVisitedManholes(manholesWithVisitedFlag);
+    }
+  }, [allManholes, visits, isLoggedIn]);
+
   const loadVisits = async () => {
     try {
       // 全マンホールデータを先に読み込む
@@ -155,16 +185,13 @@ export default function MapPage() {
         const data = await response.json();
         if (data.success) {
           if (data.authenticated === true) {
-            console.log('User authenticated');
+            console.log('User authenticated, visits:', data.visits?.length);
             setIsLoggedIn(true);
             setVisits(data.visits || []);
 
-            const manholes = (data.visits || [])
-              .map((visit: Visit) => visit.manhole)
-              .filter((manhole: Manhole | undefined): manhole is Manhole =>
-                manhole !== undefined && manhole !== null && manhole.latitude !== undefined && manhole.latitude !== null
-              );
-            setVisitedManholes(manholes);
+            // ⚠️ 重要: visit.manholeにはlatitude/longitudeが含まれていないため、
+            // allManholesから訪問済みマンホールを抽出する必要がある
+            // （この時点でloadRecentManholesが完了していることが前提）
           } else {
             console.log('User not authenticated - showing recent manholes');
             setIsLoggedIn(false);
@@ -203,7 +230,6 @@ export default function MapPage() {
           console.log(`MapPage: Filtered to ${validManholes.length} valid manholes with coordinates`);
           console.log('MapPage: Sample manhole:', validManholes[0]);
           setAllManholes(validManholes);
-          setRecentManholes(validManholes); // 全件表示（100件制限を解除）
         }
       }
     } catch (error) {
@@ -266,10 +292,10 @@ export default function MapPage() {
               <div className="h-[70vh] border-2 border-rpg-border overflow-hidden">
                 {mapCenter && (
                   <>
-                    {console.log(`MapPage: Rendering map - isLoggedIn=${isLoggedIn}, visitedManholes=${visitedManholes.length}, recentManholes=${recentManholes.length}`)}
+                    {console.log(`MapPage: Rendering map - isLoggedIn=${isLoggedIn}, manholes=${visitedManholes.length}`)}
                     <MapComponent
                       center={mapCenter}
-                      manholes={isLoggedIn ? visitedManholes : recentManholes}
+                      manholes={visitedManholes}
                       onManholeClick={handleManholeClick}
                       userLocation={userLocation}
                       zoom={mapZoom}
@@ -378,8 +404,8 @@ export default function MapPage() {
             <div className="mt-3 text-center">
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
                 {isLoggedIn
-                  ? `${visitedManholes.length}件の訪問済みポケふたを表示中`
-                  : `${allManholes.length}件のポケふたを表示中`
+                  ? `全${visitedManholes.length}件（訪問済み: ${visitedManholes.filter(m => m.is_visited).length}件）`
+                  : `全${visitedManholes.length}件のポケふたを表示中`
                 }
               </p>
             </div>

@@ -155,7 +155,6 @@ export async function GET(request: NextRequest) {
           title,
           prefecture,
           municipality,
-          location,
           pokemons
         ),
         photos:photo (
