@@ -196,12 +196,33 @@ export default function MapComponent({
           </div>
         `;
 
+        // ポップアップ（タップ/クリック時）
         marker.bindPopup(popupContent, {
           maxWidth: 300,
           className: 'pokemon-popup',
           closeButton: true,
           autoClose: false,
           closeOnEscapeKey: true
+        });
+
+        // ツールチップ（ホバー時 - PC用）
+        const tooltipContent = `
+          <div class="text-xs">
+            <div class="font-bold mb-1">${manhole.title || 'ポケふた'}</div>
+            <div class="text-gray-600">${manhole.prefecture || ''} ${manhole.municipality || ''}</div>
+            ${manhole.pokemons && manhole.pokemons.length > 0
+              ? `<div class="mt-1 text-blue-600">${manhole.pokemons.slice(0, 2).join(', ')}${manhole.pokemons.length > 2 ? '...' : ''}</div>`
+              : ''}
+            <div class="mt-1 ${isVisited ? 'text-green-600' : 'text-gray-500'}">${isVisited ? '✓ 訪問済み' : '未訪問'}</div>
+            <div class="text-gray-400 mt-1 text-[10px]">クリックで詳細表示</div>
+          </div>
+        `;
+
+        marker.bindTooltip(tooltipContent, {
+          direction: 'top',
+          offset: [0, -12],
+          opacity: 0.95,
+          className: 'pokemon-tooltip'
         });
 
           // Add click handler

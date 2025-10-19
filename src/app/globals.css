@@ -525,3 +525,48 @@
 .slider:focus::-webkit-slider-thumb {
   @apply ring-2 ring-pokemon-yellow;
 }
+
+/* ========================================
+   Leaflet Map Styles
+   ======================================== */
+
+/* ツールチップ（ホバー時） */
+.pokemon-tooltip {
+  @apply bg-white rounded-lg shadow-lg border-2 border-rpg-border;
+  padding: 8px 12px !important;
+  font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif !important;
+}
+
+.pokemon-tooltip::before {
+  border-top-color: #34495E !important;
+}
+
+/* ポップアップ（クリック時） */
+.pokemon-popup .leaflet-popup-content-wrapper {
+  @apply bg-white rounded-lg shadow-xl border-2 border-rpg-border;
+  font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif !important;
+  padding: 0 !important;
+}
+
+.pokemon-popup .leaflet-popup-content {
+  margin: 0 !important;
+  min-width: 250px !important;
+}
+
+.pokemon-popup .leaflet-popup-tip {
+  @apply bg-white border-rpg-border;
+}
+
+/* モバイルでのタップ対応 */
+@media (hover: none) {
+  .leaflet-tooltip {
+    display: none !important;
+  }
+}
+
+/* PCでのホバー対応 */
+@media (hover: hover) {
+  .leaflet-tooltip {
+    pointer-events: none;
+  }
+}
