@@ -131,10 +131,10 @@ export default function MapComponent({
                 width: 24px;
                 height: 24px;
                 background: ${isVisited ? '#4ecdc4' : '#ff6b6b'};
-                border: 3px solid white;
+                border: ${isVisited ? '3px solid white' : '4px solid #34495E'};
                 border-radius: 50%;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                opacity: ${isVisited ? '1' : '0.7'};
+                box-shadow: ${isVisited ? '0 2px 8px rgba(0,0,0,0.3)' : '0 0 0 2px white, 0 3px 10px rgba(0,0,0,0.5)'};
+                opacity: ${isVisited ? '1' : '1'};
                 display: flex;
                 align-items: center;
                 justify-content: center;
