@@ -2,55 +2,87 @@
 
 ポケモンマンホール（ポケふた）の訪問記録と写真を管理するPWAアプリケーション
 
+## 🌐 アプリケーション
+
+**📱 本番環境**: [https://main.d2zdmcx36mfq6u.amplifyapp.com](https://main.d2zdmcx36mfq6u.amplifyapp.com)
+
+**📚 API ドキュメント**: [https://main.d2zdmcx36mfq6u.amplifyapp.com/api-docs](https://main.d2zdmcx36mfq6u.amplifyapp.com/api-docs) (開発環境のみ)
+
 ## 📱 概要
 
 家族や個人の「訪問したポケモンマンホール」の写真・訪問記録を、スマホからサクッと登録・閲覧・共有できる仕組みです。
 
-既存のポケふた位置データ（自作スクレイパのJSONなど）と連携し、地図上での可視化・重複防止・未訪問の発見を支援します。
+既存のポケふた位置データと連携し、地図上での可視化・重複防止・未訪問の発見を支援します。
 
 ## ✨ 主な機能
 
-### MVP機能
-- 📧 **Emailログイン** - Supabase Auth
+### 現在の機能
+- 📧 **Emailログイン** - Supabase Auth（パスワードレス）
 - 📸 **写真アップロード** - 自動位置/日時抽出（EXIF）
-- 🎯 **近傍マッチング** - 近くのポケふた候補提示→確定
-- 🗺️ **地図表示** - 訪問済/未訪問を色分け
+- 🎯 **マンホール自動マッチング** - GPS位置情報から近くのポケふた候補を提示
+- 🗺️ **地図表示** - 訪問済/未訪問を色分け、都道府県別フィルタ
 - 🔍 **検索/フィルタ** - 県・市・ポケモン別
+- 📊 **訪問統計** - 訪問数、都道府県達成数
+- 🔗 **共有リンク** - 訪問記録を共有（署名URL）
+- 📖 **API ドキュメント** - Swagger/OpenAPI 自動生成
 
 ### 将来機能
 - 📱 LINE OAuth + Bot通知
-- 🔗 アルバム共有（署名URL）
 - 🏆 バッジ/統計（県/市達成、年間訪問数）
 - 👨‍👩‍👧‍👦 家族グループ共有
 - 🔄 公式データの自動クロール更新
 
 ## 🏗️ 技術スタック
 
-- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
-- **Backend**: Supabase (Auth + Database + Storage)
-- **Database**: PostgreSQL + PostGIS (地理拡張)
+### フロントエンド
+- **Framework**: Next.js 14 (App Router) + TypeScript
+- **Styling**: Tailwind CSS (RPG Pixel風デザイン)
 - **Maps**: Leaflet + React Leaflet
-- **PWA**: next-pwa
-- **Deployment**: Vercel
+- **PWA**: next-pwa (オフライン対応)
+- **UI**: Lucide React (アイコン)
+
+### バックエンド
+- **Auth**: Supabase Auth (パスワードレス認証)
+- **Database**: Supabase PostgreSQL + PostGIS (地理拡張)
+- **Storage**: Cloudflare R2 (S3互換)
+- **API**: Next.js API Routes
+- **API Documentation**: Swagger/OpenAPI
+
+### インフラ
+- **Hosting**: AWS Amplify Hosting
+- **CDN**: Cloudflare
+- **CI/CD**: GitHub → AWS Amplify (自動デプロイ)
+
+### セキュリティ
+- **RLS**: Row Level Security で自分のデータのみアクセス
+- **署名URL**: 期限付きファイルアクセス
+- **環境変数**: AWS Amplify Secrets
 
 ## 📊 データベース設計
 
 ```sql
 -- ユーザー（Supabase Auth拡張）
-app_user (id, auth_uid, display_name, stats...)
+app_user (id, auth_uid, display_name, avatar_url, stats...)
 
--- ポケふたマスタ（スクレイプデータ）
-manhole (id, title, prefecture, location, pokemons...)
+-- ポケふたマスタ（公式データ）
+manhole (id, title, prefecture, municipality, location:GEOGRAPHY, pokemons...)
 
--- 訪問記録
-visit (id, user_id, manhole_id, shot_location, shot_at, note...)
+-- 訪問記録（user_id → auth.users.id を直接参照）
+visit (id, user_id, manhole_id, shot_location:GEOGRAPHY, shot_at, note...)
 
--- 写真
-photo (id, visit_id, storage_key, exif, thumbnails...)
+-- 写真（Cloudflare R2）
+photo (id, visit_id, manhole_id, storage_key, exif, thumbnails...)
 
 -- 共有リンク
 shared_link (id, visit_id, token, expires_at...)
 ```
+
+### RLS ポリシー
+
+- **app_user**: 自分のプロフィールのみ読み書き可能
+- **manhole**: 全員が閲覧可能（公開データ）
+- **visit**: 自分の訪問記録のみ読み書き可能
+- **photo**: 全員が閲覧可能、作成・更新・削除は自分のvisit経由のみ
 
 ## 🚀 セットアップ
 
@@ -59,135 +91,171 @@ shared_link (id, visit_id, token, expires_at...)
 - Node.js 18+
 - npm または yarn
 - Supabaseプロジェクト
+- Cloudflare R2アカウント（オプション）
 
 ### インストール
 
-1. 依存関係のインストール：
+1. **リポジトリのクローン**:
+```bash
+git clone https://github.com/nishiokya/pokefuta.git
+cd pokefuta
+```
+
+2. **依存関係のインストール**:
 ```bash
 npm install
 ```
 
-2. 環境変数の設定：
+3. **環境変数の設定**:
 ```bash
 cp .env.example .env.local
 ```
 
-3. Supabaseの設定：
-   - Supabaseプロジェクトを作成
-   - データベースマイグレーションを実行
-   - Storageバケットを作成
+`.env.local`を編集：
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 
-4. 開発サーバーの起動：
+# Cloudflare R2
+R2_ACCESS_KEY_ID=xxxxx
+R2_SECRET_ACCESS_KEY=xxxxx
+R2_ENDPOINT=https://xxxxx.r2.cloudflarestorage.com
+R2_BUCKET=pokefuta-photos
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT=36.0
+NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG=138.0
+NEXT_PUBLIC_MAP_DEFAULT_ZOOM=10
+```
+
+4. **Supabaseの設定**:
+
+   `CLAUDE.md`の「データベースセットアップSQL（完全版）」を実行：
+   - Supabase SQL Editorで実行
+   - app_user, manhole, visit, photo テーブルを作成
+   - RLSポリシーを設定
+
+5. **開発サーバーの起動**:
 ```bash
 npm run dev
 ```
 
-### 環境変数
-
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_key
-
-# Storage
-SUPABASE_BUCKET=photos
-STORAGE_PROVIDER=supabase
-
-# App Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-POKEFUTA_DATA_URL=/api/manholes
-```
-
-## 📱 PWA機能
-
-- **オフライン対応**: IndexedDBで写真を一時保存
-- **カメラアクセス**: ネイティブカメラ起動
-- **位置情報**: GPS/EXIF座標取得
-- **プッシュ通知**: 将来実装予定
-
-## 🗺️ マップ機能
-
-- **ベースレイヤ**: OpenStreetMap
-- **マーカー**: 訪問済み（●）/ 未訪問（○）
-- **クラスタリング**: ズームレベル別グループ化
-- **フィルタ**: 都道府県/ポケモン別表示
+ブラウザで http://localhost:3000 を開く
 
 ## 📸 写真処理・ストレージ
 
-### ストレージ設定
+### Cloudflare R2 (推奨)
 
-このアプリケーションは複数のストレージプロバイダーに対応しています：
-
-#### Cloudflare R2 (推奨)
 1. **アップロード**: ドラッグ&ドロップ or カメラ
-2. **EXIF解析**: 位置情報・撮影日時抽出
+2. **EXIF解析**: 位置情報・撮影日時・カメラ情報抽出
 3. **重複検出**: SHA-256ハッシュ比較
-4. **サムネイル生成**: 320px/800px/1600px
+4. **サムネイル生成**: 320px/800px/1600px (自動)
 5. **ストレージ保存**: Cloudflare R2 (S3互換)
-
-#### Supabase Storage (代替)
-従来のSupabase Storageも引き続き利用可能です。
 
 ### R2設定方法
 
 1. **Cloudflare R2バケットの作成**
-   - Cloudflareダッシュボードでバケットを作成
-   - 提供されたエンドポイントURL：`https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com`
+   - [Cloudflareダッシュボード](https://dash.cloudflare.com/) → R2
+   - バケット名: `pokefuta-photos`
 
 2. **API Tokenの作成**
    - R2 Token API で Access Key ID と Secret Access Key を生成
-   - 権限は `Object Read/Write` を設定
+   - 権限: `Object Read/Write`
 
 3. **環境変数の設定**
    ```bash
-   # ストレージプロバイダーをR2に設定
-   STORAGE_PROVIDER=r2
-   
-   # R2の認証情報
    R2_ACCESS_KEY_ID=your_access_key_id
    R2_SECRET_ACCESS_KEY=your_secret_access_key
-   R2_ENDPOINT=https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com
-   R2_PUBLIC_URL=https://509ce5c2ad8789cb0c6b20908ab44404.r2.cloudflarestorage.com
+   R2_ENDPOINT=https://xxxxx.r2.cloudflarestorage.com
    R2_BUCKET=pokefuta-photos
    ```
 
-4. **シークレット保存場所**
-   - **ローカル開発**: `.env.local` ファイル（`.gitignore`に含める）
-   - **Vercel Deploy**: Vercelダッシュボードの環境変数設定
-   - **その他PaaS**: 各プラットフォームの環境変数設定機能を使用
+### 署名付きURL
 
-### ストレージの切り替え
+写真アクセスは署名付きURL（5分間有効）で提供されます：
+- セキュア: R2へのダイレクトアクセスを防止
+- キャッシュ: ブラウザキャッシュで高速表示
+- 期限付き: URLの再利用を防止
 
-環境変数 `STORAGE_PROVIDER` を変更することで、ストレージプロバイダーを切り替えできます：
+## 🗺️ マップ機能
 
-```bash
-# Cloudflare R2を使用
-STORAGE_PROVIDER=r2
+- **ベースレイヤ**: OpenStreetMap
+- **マーカー**: 訪問済み（✓ 緑）/ 未訪問（? 赤）
+- **フィルタ**: 都道府県別表示
+- **ユーザー位置**: リアルタイム表示
+- **ポップアップ**: マンホール詳細・ポケモン情報
 
-# Supabase Storageを使用
-STORAGE_PROVIDER=supabase
+## 📖 API ドキュメント
+
+### Swagger/OpenAPI
+
+本番環境: **開発環境のみ有効**（本番では403エラー）
+
+- **Swagger UI**: http://localhost:3000/api-docs
+- **OpenAPI JSON**: http://localhost:3000/api/swagger
+
+### 新規API作成時のルール
+
+1. **すべてのAPI Routeファイルに`@swagger`コメントを追加**
+2. **認証が必要な場合は`security: - cookieAuth: []`を追加**
+3. **Swagger UIで表示を確認**
+
+詳細は `CLAUDE.md` の「API ドキュメント管理」セクションを参照。
+
+## 🔒 セキュリティ
+
+### Row Level Security (RLS)
+
+すべてのテーブルでRLSが有効化されています：
+
+```sql
+-- visitテーブル: 自分のデータのみアクセス可能
+CREATE POLICY "users_select_own_visits"
+ON visit FOR SELECT
+USING (auth.uid() = user_id);
 ```
 
-## 🔍 近傍マッチング
+### 認証チェック
 
-1. **位置取得**: EXIF GPS or 端末現在地
-2. **候補検索**: 半径100m以内のマンホール
-3. **ユーザー選択**: 候補リストから確定
-4. **新規登録**: 該当なしの場合は仮ID保存
+すべてのAPI Routeで認証チェックを実装：
 
-## 🛡️ セキュリティ
+```typescript
+const { data: { session } } = await supabase.auth.getSession();
+if (!session?.user) {
+  return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+}
+```
 
-- **RLS**: Row Level Security で自分のデータのみアクセス
-- **署名URL**: 期限付きファイルアクセス
-- **EXIF**: 公開時は位置情報を市区町村レベルに丸め
+### 環境変数の保護
 
-## 📊 コスト見積もり
+- **ローカル**: `.env.local`（`.gitignore`に含める）
+- **AWS Amplify**: 環境変数設定（暗号化）
 
-- **  **: $0-20/月（Hobby→Pro）
-- **Supabase**: $0-25/月（Free→Pro）
-- **ドメイン**: ¥1,000/年
-- **合計**: ¥1,000-5,000/月程度
+## 🚀 デプロイ
+
+### AWS Amplify Hosting
+
+1. **GitHubリポジトリと連携**
+   - AWS Amplify Console → New App → GitHub
+   - リポジトリ: `nishiokya/pokefuta`
+   - ブランチ: `main`
+
+2. **ビルド設定**
+   - `amplify.yml`を使用（自動検出）
+   - Node.js 18+
+
+3. **環境変数の設定**
+   - Amplify Console → App Settings → Environment variables
+   - 上記の環境変数をすべて設定
+
+4. **デプロイ**
+   - `git push origin main` → 自動デプロイ
+   - ビルド時間: 約5-10分
+
+詳細は `DEPLOYMENT.md` を参照。
 
 ## 🧪 テスト
 
@@ -202,6 +270,45 @@ npm run lint
 npm run build
 ```
 
+## 📊 コスト見積もり
+
+- **AWS Amplify**: $0-15/月（ビルド時間・転送量による）
+- **Supabase**: $0-25/月（Free→Pro）
+- **Cloudflare R2**: $0-5/月（ストレージ・転送量による）
+- **ドメイン**: ¥1,000/年
+- **合計**: ¥1,000-5,000/月程度
+
+## 📱 PWA機能
+
+- **オフライン対応**: Service Worker + Cache API
+- **カメラアクセス**: ネイティブカメラ起動
+- **位置情報**: GPS/EXIF座標取得
+- **ホーム画面に追加**: iOS/Android対応
+- **プッシュ通知**: 将来実装予定
+
+## 🎨 デザイン
+
+**RPG Pixel風デザイン**
+- フォント: M PLUS Rounded 1c
+- カラースキーム: レトロゲーム風
+- アニメーション: ピクセルアート風
+
+## 📄 ドキュメント
+
+- **CLAUDE.md**: セキュリティ実装ガイド（RLS、API、Swagger）
+- **DEPLOYMENT.md**: AWS Amplifyデプロイ手順
+- **.env.example**: 環境変数のサンプル
+
+## 🛠️ 主要なページ
+
+- `/` - ホーム（訪問記録一覧・最近の写真）
+- `/map` - 地図表示（マンホール位置・訪問状況）
+- `/nearby` - 近くのポケふた検索
+- `/upload` - 写真アップロード
+- `/visits` - 訪問履歴
+- `/manhole/[id]` - マンホール詳細
+- `/api-docs` - Swagger UI（開発環境のみ）
+
 ## 📄 ライセンス
 
 MIT License
@@ -209,15 +316,23 @@ MIT License
 ## 👥 貢献
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Create a Pull Request
 
 ## 🐛 バグ報告・機能要求
 
-GitHub Issuesをご利用ください。
+GitHub Issuesをご利用ください: [https://github.com/nishiokya/pokefuta/issues](https://github.com/nishiokya/pokefuta/issues)
+
+## 🙏 謝辞
+
+- ポケモン公式「ポケふた」プロジェクト
+- OpenStreetMap Contributors
+- Supabase
+- Cloudflare R2
+- AWS Amplify
 
 ---
 
-🤖 **Generated with [Claude Code](https://claude.ai/code)**
+🤖 **Generated with [Claude Code](https://claude.ai/claude-code)**

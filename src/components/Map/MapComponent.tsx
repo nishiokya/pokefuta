@@ -110,41 +110,48 @@ export default function MapComponent({
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
+    console.log(`MapComponent: Rendering ${manholes.length} manholes`);
+
     // Add manhole markers
     manholes.forEach((manhole) => {
-      if (!manhole) return; // Skip null/undefined manholes
+      if (!manhole) {
+        console.log('MapComponent: Skipping null/undefined manhole');
+        return; // Skip null/undefined manholes
+      }
+      console.log(`MapComponent: Processing manhole ${manhole.id}, lat=${manhole.latitude}, lng=${manhole.longitude}`);
       if (manhole.latitude && manhole.longitude) {
-        const isVisited = manhole.is_visited;
+        try {
+          const isVisited = manhole.is_visited;
 
-        // Create custom icon based on visit status
-        const markerIcon = L.divIcon({
-          className: `manhole-marker ${isVisited ? 'marker-visited' : 'marker-unvisited'}`,
-          html: `
-            <div style="
-              width: 24px;
-              height: 24px;
-              background: ${isVisited ? '#4ecdc4' : '#ff6b6b'};
-              border: 3px solid white;
-              border-radius: 50%;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              opacity: ${isVisited ? '1' : '0.7'};
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 12px;
-              color: white;
-              font-weight: bold;
-            ">
-              ${isVisited ? '✓' : '?'}
-            </div>
-          `,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
-        });
+          // Create custom icon based on visit status
+          const markerIcon = L.divIcon({
+            className: `manhole-marker ${isVisited ? 'marker-visited' : 'marker-unvisited'}`,
+            html: `
+              <div style="
+                width: 24px;
+                height: 24px;
+                background: ${isVisited ? '#4ecdc4' : '#ff6b6b'};
+                border: 3px solid white;
+                border-radius: 50%;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                opacity: ${isVisited ? '1' : '0.7'};
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                color: white;
+                font-weight: bold;
+              ">
+                ${isVisited ? '✓' : '?'}
+              </div>
+            `,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
 
-        const marker = L.marker([manhole.latitude, manhole.longitude], {
-          icon: markerIcon
-        });
+          const marker = L.marker([manhole.latitude, manhole.longitude], {
+            icon: markerIcon
+          });
 
         // Add popup
         const pokemonInfo = manhole.pokemons && manhole.pokemons.length > 0
@@ -197,12 +204,18 @@ export default function MapComponent({
           closeOnEscapeKey: true
         });
 
-        // Add click handler
-        marker.on('click', () => {
-          onManholeClick(manhole);
-        });
+          // Add click handler
+          marker.on('click', () => {
+            onManholeClick(manhole);
+          });
 
-        markersLayerRef.current?.addLayer(marker);
+          markersLayerRef.current?.addLayer(marker);
+          console.log(`MapComponent: Successfully added marker for manhole ${manhole.id}`);
+        } catch (error) {
+          console.error(`MapComponent: Error creating marker for manhole ${manhole.id}:`, error);
+        }
+      } else {
+        console.log(`MapComponent: Skipping manhole ${manhole.id} - missing coordinates (lat=${manhole.latitude}, lng=${manhole.longitude})`);
       }
     });
   }, [manholes, onManholeClick]);
