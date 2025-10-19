@@ -217,7 +217,7 @@ export default function MapPage() {
       counts.set(prefecture, (counts.get(prefecture) || 0) + 1);
     });
 
-    // PREFECTURESと照合して結果を作成
+    // PREFECTURESと照合して結果を作成（マンホールが0件の都道府県も含む）
     const result: PrefectureCount[] = PREFECTURES.map(pref => ({
       code: pref.code,
       name: pref.name,
@@ -225,7 +225,7 @@ export default function MapPage() {
       lat: pref.lat,
       lng: pref.lng,
       zoom: pref.zoom,
-    })).filter(p => p.count > 0); // マンホールが存在する都道府県のみ
+    })); // すべての都道府県を表示
 
     setPrefectureCounts(result);
   };
@@ -282,7 +282,7 @@ export default function MapPage() {
                       <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border px-1.5 py-1">
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <h3 className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
-                            都道府県 ({prefectureCounts.length})
+                            都道府県 ({prefectureCounts.filter(p => p.count > 0).length}/47)
                           </h3>
                           <button
                             onClick={() => setShowPrefectureList(false)}
@@ -328,22 +328,34 @@ export default function MapPage() {
                               return b.count - a.count;
                             }
                           })
-                          .map((pref) => (
-                            <button
-                              key={pref.code}
-                              onClick={() => handlePrefectureClick(pref)}
-                              className="w-full text-left px-1.5 py-1 bg-white/90 hover:bg-rpg-yellow border border-rpg-border rounded transition-colors"
-                            >
-                              <div className="flex justify-between items-center gap-1">
-                                <span className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
-                                  {pref.name.replace('県', '').replace('府', '').replace('都', '')}
-                                </span>
-                                <span className="font-pixel text-[10px] text-rpg-blue flex-shrink-0">
-                                  {pref.count}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
+                          .map((pref) => {
+                            const hasManhole = pref.count > 0;
+                            return (
+                              <button
+                                key={pref.code}
+                                onClick={() => hasManhole && handlePrefectureClick(pref)}
+                                disabled={!hasManhole}
+                                className={`w-full text-left px-1.5 py-1 border border-rpg-border rounded transition-colors ${
+                                  hasManhole
+                                    ? 'bg-white/90 hover:bg-rpg-yellow cursor-pointer'
+                                    : 'bg-gray-100/50 cursor-not-allowed opacity-50'
+                                }`}
+                              >
+                                <div className="flex justify-between items-center gap-1">
+                                  <span className={`font-pixelJp text-[10px] font-bold truncate ${
+                                    hasManhole ? 'text-rpg-textDark' : 'text-gray-400'
+                                  }`}>
+                                    {pref.name.replace('県', '').replace('府', '').replace('都', '')}
+                                  </span>
+                                  <span className={`font-pixel text-[10px] flex-shrink-0 ${
+                                    hasManhole ? 'text-rpg-blue' : 'text-gray-400'
+                                  }`}>
+                                    {hasManhole ? pref.count : '-'}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
                       </div>
                     </div>
                   ) : (
