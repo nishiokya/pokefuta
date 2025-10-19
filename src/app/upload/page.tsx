@@ -33,10 +33,34 @@ export default function UploadPage() {
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [loading, setLoading] = useState(false);
+  const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
+  const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
+  const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
 
   useEffect(() => {
     loadManholes();
+    // Cookieから公開設定を読み込み
+    const savedIsPublic = getCookie('pokefuta_is_public');
+    if (savedIsPublic !== null) {
+      setIsPublic(savedIsPublic === 'true');
+    }
   }, []);
+
+  // Cookie操作ヘルパー関数
+  const getCookie = (name: string): string | null => {
+    if (typeof document === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+  };
+
+  const setCookie = (name: string, value: string, days: number = 365) => {
+    if (typeof document === 'undefined') return;
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+  };
 
   const loadManholes = async () => {
     try {
@@ -122,6 +146,32 @@ export default function UploadPage() {
         uploading: false,
         uploaded: false
       });
+
+      // 画像メタ情報からnoteのデフォルト値を生成
+      const noteLines = [];
+      if (metadata.camera) noteLines.push(`カメラ: ${metadata.camera}`);
+      if (metadata.lens) noteLines.push(`レンズ: ${metadata.lens}`);
+      if (metadata.datetime) {
+        const date = new Date(metadata.datetime);
+        noteLines.push(`撮影日時: ${date.toLocaleString('ja-JP')}`);
+      }
+      if (metadata.latitude && metadata.longitude) {
+        noteLines.push(`位置: ${metadata.latitude.toFixed(6)}, ${metadata.longitude.toFixed(6)}`);
+      }
+      // マッチしたマンホールとの距離を追加
+      if (matchedManhole && metadata.latitude && metadata.longitude && matchedManhole.latitude && matchedManhole.longitude) {
+        const distance = calculateDistance(
+          metadata.latitude,
+          metadata.longitude,
+          matchedManhole.latitude,
+          matchedManhole.longitude
+        );
+        const distanceM = Math.round(distance * 1000); // kmをmに変換
+        noteLines.push(`マンホールまでの距離: 約${distanceM}m`);
+      }
+      if (noteLines.length > 0) {
+        setVisitNote(noteLines.join('\n'));
+      }
     }
 
     // Replace existing photo with the new one (only 1 photo allowed)
@@ -184,10 +234,18 @@ export default function UploadPage() {
         formData.append('longitude', photo.metadata.longitude.toString());
       }
 
-      // Add note if manhole was matched
-      if (photo.matchedManhole) {
-        formData.append('note', `Visited ${photo.matchedManhole.name || photo.matchedManhole.title}`);
+      // Add note (個人メモ) if provided
+      if (visitNote.trim()) {
+        formData.append('note', visitNote.trim());
       }
+
+      // Add comment if provided
+      if (visitComment.trim()) {
+        formData.append('comment', visitComment.trim());
+      }
+
+      // Add is_public setting
+      formData.append('is_public', isPublic.toString());
 
       // Add metadata
       const metadata = {
@@ -381,35 +439,24 @@ export default function UploadPage() {
                       )}
 
                       {/* Upload Status */}
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          {photo.uploaded ? (
-                            <div className="flex items-center gap-1 text-rpg-green">
-                              <CheckCircle className="w-4 h-4" />
-                              <span className="font-pixelJp text-xs">完了</span>
-                            </div>
-                          ) : photo.uploading ? (
-                            <div className="flex items-center gap-2">
-                              <div className="rpg-loading inline-block"></div>
-                              <span className="font-pixelJp text-xs text-rpg-textDark">登録中</span>
-                            </div>
-                          ) : photo.error ? (
-                            <div className="flex items-center gap-1 text-rpg-red">
-                              <AlertCircle className="w-4 h-4" />
-                              <span className="font-pixelJp text-xs">{photo.error}</span>
-                            </div>
-                          ) : (
-                            <span className="font-pixelJp text-xs text-rpg-textDark opacity-50">未登録</span>
-                          )}
-                        </div>
-
-                        {!photo.uploaded && !photo.uploading && (
-                          <button
-                            onClick={() => uploadPhoto(photo.id)}
-                            className="rpg-button text-xs px-2 py-1"
-                          >
-                            <span className="font-pixelJp">登録</span>
-                          </button>
+                      <div className="pt-2">
+                        {photo.uploaded && (
+                          <div className="flex items-center gap-1 text-rpg-green">
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="font-pixelJp text-xs">登録完了</span>
+                          </div>
+                        )}
+                        {photo.uploading && (
+                          <div className="flex items-center gap-2">
+                            <div className="rpg-loading inline-block"></div>
+                            <span className="font-pixelJp text-xs text-rpg-textDark">登録中...</span>
+                          </div>
+                        )}
+                        {photo.error && (
+                          <div className="flex items-center gap-1 text-rpg-red">
+                            <AlertCircle className="w-4 h-4" />
+                            <span className="font-pixelJp text-xs">{photo.error}</span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -417,6 +464,108 @@ export default function UploadPage() {
                 </div>
               ))}
             </div>
+
+            {/* コメント入力欄 */}
+            {photos.length > 0 && (
+              <div className="rpg-window mt-4">
+                <h3 className="rpg-window-title text-sm mb-2">訪問コメント（任意）</h3>
+                <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp mb-2">
+                  公開設定がONの場合、他のユーザーも閲覧できます
+                </p>
+                <textarea
+                  className="w-full p-3 border-2 border-rpg-border rounded font-pixelJp text-sm"
+                  placeholder="このポケふたの感想を書こう！例: ピカチュウのデザインがかわいい！"
+                  rows={3}
+                  value={visitComment}
+                  onChange={(e) => setVisitComment(e.target.value)}
+                  maxLength={500}
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp">
+                    {visitComment.length}/500文字
+                  </p>
+                </div>
+
+                {/* 公開設定 */}
+                <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-pixelJp text-sm text-rpg-textDark mb-1">公開設定</h4>
+                      <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp">
+                        {isPublic ? '他のユーザーも閲覧できます' : '自分だけが閲覧できます'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newValue = !isPublic;
+                        setIsPublic(newValue);
+                        setCookie('pokefuta_is_public', newValue.toString());
+                      }}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        isPublic ? 'bg-rpg-primary' : 'bg-gray-400'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          isPublic ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 個人メモ入力欄 */}
+            {photos.length > 0 && (
+              <div className="rpg-window mt-4">
+                <h3 className="rpg-window-title text-sm mb-2">
+                  個人メモ（任意・非公開）
+                </h3>
+                <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp mb-2">
+                  カメラ情報など、自分だけが見るメモです
+                </p>
+                <textarea
+                  className="w-full p-3 border-2 border-rpg-border rounded font-pixelJp text-sm"
+                  placeholder="例: カメラ: iPhone 15 Pro&#10;レンズ: 広角&#10;撮影日時: 2025/10/20 15:30"
+                  rows={4}
+                  value={visitNote}
+                  onChange={(e) => setVisitNote(e.target.value)}
+                  maxLength={1000}
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp">
+                    {visitNote.length}/1000文字
+                  </p>
+                  <p className="text-xs text-rpg-textDark opacity-70 font-pixelJp">
+                    ※ is_publicの設定に関わらず非公開
+                  </p>
+                </div>
+
+                {/* 登録ボタン */}
+                <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+                  {photos.some(p => !p.uploaded && !p.uploading) && (
+                    <button
+                      onClick={uploadAllPhotos}
+                      className="rpg-button w-full py-3 text-base"
+                      disabled={photos.every(p => p.uploaded || p.uploading)}
+                    >
+                      <Upload className="w-5 h-5 inline mr-2" />
+                      <span className="font-pixelJp">訪問記録を登録</span>
+                    </button>
+                  )}
+                  {photos.some(p => p.uploaded) && (
+                    <div className="mt-2 p-3 bg-rpg-success bg-opacity-20 border-2 border-rpg-success rounded">
+                      <div className="flex items-center gap-2 text-rpg-success font-pixelJp text-sm">
+                        <CheckCircle className="w-5 h-5" />
+                        <span>登録完了しました！</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

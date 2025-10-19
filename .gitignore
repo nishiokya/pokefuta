@@ -31,3 +31,4 @@ public/worker-*.js.map
 
 .claude/*
 
+database/mirgrations/*

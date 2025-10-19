@@ -31,6 +31,7 @@ interface Photo {
   visit?: {
     shot_at: string;
     note?: string;
+    comment?: string;  // 訪問コメント
   };
 }
 
@@ -319,6 +320,11 @@ export default function ManholeDetailPage() {
                           {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
                         </span>
                       </div>
+                      {photo.visit.comment && (
+                        <div className="mt-1 text-[10px] text-white font-pixelJp line-clamp-2">
+                          {photo.visit.comment}
+                        </div>
+                      )}
                     </div>
                   )}
                   {/* Delete button - shows on hover (always display regardless of image load status) */}

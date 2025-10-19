@@ -245,7 +245,9 @@ CREATE TABLE IF NOT EXISTS visit (
   manhole_id INTEGER REFERENCES manhole(id),
   shot_location GEOGRAPHY(POINT, 4326),  -- PostGIS型
   shot_at TIMESTAMPTZ NOT NULL,
-  note TEXT,
+  note TEXT,  -- 個人メモ（非公開）
+  comment TEXT,  -- 公開コメント（将来のSNS機能用）
+  is_public BOOLEAN DEFAULT true,  -- 公開/非公開フラグ（デフォルト: 公開）
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -258,7 +260,7 @@ CREATE TABLE IF NOT EXISTS visit (
 CREATE TABLE IF NOT EXISTS photo (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   visit_id UUID REFERENCES visit(id) ON DELETE CASCADE,
-  manhole_id INTEGER REFERENCES manhole(id),
+  manhole_id INTEGER NOT NULL REFERENCES manhole(id),  -- 写真は必ずマンホールに紐づく
   storage_key TEXT NOT NULL,
   original_name TEXT,
   file_size INTEGER,
@@ -271,6 +273,39 @@ CREATE TABLE IF NOT EXISTS photo (
   thumbnail_800 TEXT,
   thumbnail_1600 TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==========================================
+-- manhole_comment テーブル
+-- ==========================================
+-- マンホール詳細ページでのコメント機能（将来のSNS機能用）
+-- visit とは独立したコメントシステム
+CREATE TABLE IF NOT EXISTS manhole_comment (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  manhole_id INTEGER NOT NULL REFERENCES manhole(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  parent_comment_id UUID REFERENCES manhole_comment(id) ON DELETE CASCADE,  -- 返信機能用
+  is_edited BOOLEAN DEFAULT false,
+  edited_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==========================================
+-- reaction テーブル
+-- ==========================================
+-- いいね・ブックマーク等のリアクション機能（将来のSNS機能用）
+CREATE TABLE IF NOT EXISTS reaction (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  target_type TEXT NOT NULL,  -- 'manhole', 'visit', 'comment'
+  target_id UUID NOT NULL,  -- 対象のUUID
+  manhole_id INTEGER REFERENCES manhole(id) ON DELETE CASCADE,  -- manhole用
+  reaction_type TEXT NOT NULL,  -- 'like', 'bookmark', 'heart', 'wow', etc.
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, target_type, target_id, reaction_type),
+  UNIQUE(user_id, target_type, manhole_id, reaction_type)
 );
 ```
 
