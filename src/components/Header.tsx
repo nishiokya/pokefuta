@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { User, SupabaseClient } from '@supabase/supabase-js';
 
@@ -59,6 +59,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
     { href: '/nearby', label: '近くの未訪問', icon: <Navigation className="w-5 h-5" /> },
     { href: '/upload', label: '写真を登録', icon: <Camera className="w-5 h-5" /> },
     { href: '/visits', label: '訪問履歴', icon: <History className="w-5 h-5" /> },
+    { href: '/about', label: 'このアプリについて', icon: <Info className="w-5 h-5" /> },
   ];
 
   const isActive = (href: string) => pathname === href;

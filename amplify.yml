@@ -30,7 +30,7 @@ frontend:
 # - R2_SECRET_ACCESS_KEY
 # - R2_ENDPOINT
 # - R2_BUCKET
-# - NEXT_PUBLIC_APP_URL (e.g., https://yourdomain.amplifyapp.com)
+# - NEXT_PUBLIC_APP_URL (e.g., https://pokefuta.com)
 # - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT
 # - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG
 # Note: Images are served via signed URLs, so public URL is not needed

@@ -47,7 +47,7 @@ R2_ENDPOINT=https://xxxxx.r2.cloudflarestorage.com
 R2_BUCKET=your_bucket_name
 
 # アプリURL（公開可能）
-NEXT_PUBLIC_APP_URL=https://your-app-name.amplifyapp.com
+NEXT_PUBLIC_APP_URL=https://pokefuta.com
 
 # マップデフォルト位置（公開可能）
 NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT=36.0
