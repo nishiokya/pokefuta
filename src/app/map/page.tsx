@@ -100,7 +100,11 @@ export default function MapPage() {
   const [allManholes, setAllManholes] = useState<Manhole[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  // デフォルトの中心座標（日本の中心付近）
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
+    lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
+    lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
+  });
   const [mapZoom, setMapZoom] = useState<number>(6);
   const [loading, setLoading] = useState(true);
   const [prefectureCounts, setPrefectureCounts] = useState<PrefectureCount[]>([]);
@@ -199,7 +203,7 @@ export default function MapPage() {
           console.log(`MapPage: Filtered to ${validManholes.length} valid manholes with coordinates`);
           console.log('MapPage: Sample manhole:', validManholes[0]);
           setAllManholes(validManholes);
-          setRecentManholes(validManholes.slice(0, 100));
+          setRecentManholes(validManholes); // 全件表示（100件制限を解除）
         }
       }
     } catch (error) {
