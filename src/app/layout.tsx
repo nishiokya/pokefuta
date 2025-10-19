@@ -6,16 +6,16 @@ import DevDebugPanel from '@/components/DevDebugPanel';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ポケふた写真トラッカー',
-  description: 'ポケふたの訪問記録と写真を管理するアプリ',
+  title: 'ポケふた訪問記録',
+  description: 'ポケモンマンホール（ポケふた）の訪問記録と写真を管理するアプリ',
   manifest: '/manifest.json',
   icons: {
     apple: '/icon-192.png',
   },
-  keywords: ['ポケモン', 'ポケふた', '写真', '旅行', '記録'],
-  authors: [{ name: 'ポケふたトラッカー開発チーム' }],
-  creator: 'ポケふたトラッカー',
-  publisher: 'ポケふたトラッカー',
+  keywords: ['ポケモン', 'ポケふた', 'マンホール', '訪問記録', '写真'],
+  authors: [{ name: 'ポケふた訪問記録 開発チーム' }],
+  creator: 'ポケふた訪問記録',
+  publisher: 'ポケふた訪問記録',
   formatDetection: {
     email: false,
     address: false,
@@ -39,17 +39,22 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        {/* Google Tag Manager */}
+        {/* Google Analytics 4 */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-K18NR4GZG2"
+        />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-MQLBTG83');`,
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-K18NR4GZG2');
+            `,
           }}
         />
-        {/* End Google Tag Manager */}
+        {/* End Google Analytics 4 */}
 
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -57,17 +62,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <meta name="apple-mobile-web-app-title" content="ポケふた" />
       </head>
       <body className={`${inter.className} antialiased`}>
-        {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-MQLBTG83"
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
-          />
-        </noscript>
-        {/* End Google Tag Manager (noscript) */}
-
         <div id="app" className="min-h-screen bg-gradient-to-br from-pokemon-red via-pokemon-blue to-pokemon-yellow">
           {children}
           <DevDebugPanel />
