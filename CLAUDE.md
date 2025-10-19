@@ -1425,7 +1425,7 @@ R2_SECRET_ACCESS_KEY=xxxxx
 R2_ENDPOINT=https://xxxxx.r2.cloudflarestorage.com
 R2_BUCKET=pokefuta-photos
 NEXT_PUBLIC_R2_PUBLIC_URL=https://img.yourdomain.com
-NEXT_PUBLIC_APP_URL=https://your-app.amplifyapp.com
+NEXT_PUBLIC_APP_URL=https://pokefuta.com
 ```
 
 ### 2. ビルド設定
@@ -1489,7 +1489,7 @@ SELECT * FROM pg_policies WHERE tablename = 'visit';
 // R2 CORS設定
 [
   {
-    "AllowedOrigins": ["https://your-app.amplifyapp.com"],
+    "AllowedOrigins": ["https://pokefuta.com"],
     "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3600
@@ -1592,7 +1592,7 @@ Cloudflare R2のCORS設定:
 ```json
 [
   {
-    "AllowedOrigins": ["https://your-app.amplifyapp.com"],
+    "AllowedOrigins": ["https://pokefuta.com"],
     "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3600

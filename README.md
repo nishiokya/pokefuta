@@ -4,9 +4,9 @@
 
 ## 🌐 アプリケーション
 
-**📱 本番環境**: [https://main.d2zdmcx36mfq6u.amplifyapp.com](https://main.d2zdmcx36mfq6u.amplifyapp.com)
+**📱 本番環境**: [https://pokefuta.com](https://pokefuta.com)
 
-**📚 API ドキュメント**: [https://main.d2zdmcx36mfq6u.amplifyapp.com/api-docs](https://main.d2zdmcx36mfq6u.amplifyapp.com/api-docs) (開発環境のみ)
+**📚 API ドキュメント**: http://localhost:3000/api-docs (開発環境のみ)
 
 ## 📱 概要
 
