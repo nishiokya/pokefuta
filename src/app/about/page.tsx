@@ -11,7 +11,7 @@ export default function AboutPage() {
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* アプリの説明 */}
         <section className="rpg-window">
-          <h2 className="rpg-window-title">ポケふたフォトトラッカー</h2>
+          <h2 className="rpg-window-title">ポケふた訪問記録</h2>
           <div className="space-y-3">
             <p className="font-pixelJp text-sm text-rpg-textDark leading-relaxed">
               全国各地に設置されているポケモンマンホール「ポケふた」の訪問記録を管理できるアプリです。

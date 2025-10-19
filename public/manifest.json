@@ -1,7 +1,7 @@
 {
-  "name": "ポケふた写真トラッカー",
+  "name": "ポケふた訪問記録",
   "short_name": "ポケふた",
-  "description": "ポケモンマンホールの訪問記録と写真を管理するアプリ",
+  "description": "ポケモンマンホール（ポケふた）の訪問記録と写真を管理するアプリ",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0f8ff",
