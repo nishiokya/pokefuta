@@ -105,6 +105,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [prefectureCounts, setPrefectureCounts] = useState<PrefectureCount[]>([]);
   const [showPrefectureList, setShowPrefectureList] = useState(true);
+  const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
 
   useEffect(() => {
     // Get user location
@@ -188,11 +189,15 @@ export default function MapPage() {
       const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
+        console.log('MapPage: API response:', data);
         if (data.success && data.manholes) {
+          console.log(`MapPage: Received ${data.manholes.length} manholes from API`);
           // Filter out null/undefined manholes and manholes without coordinates
           const validManholes = data.manholes.filter((m: Manhole) =>
             m && m.latitude !== null && m.latitude !== undefined
           );
+          console.log(`MapPage: Filtered to ${validManholes.length} valid manholes with coordinates`);
+          console.log('MapPage: Sample manhole:', validManholes[0]);
           setAllManholes(validManholes);
           setRecentManholes(validManholes.slice(0, 100));
         }
@@ -256,49 +261,84 @@ export default function MapPage() {
               {/* マップ */}
               <div className="h-[70vh] border-2 border-rpg-border overflow-hidden">
                 {mapCenter && (
-                  <MapComponent
-                    center={mapCenter}
-                    manholes={isLoggedIn ? visitedManholes : recentManholes}
-                    onManholeClick={handleManholeClick}
-                    userLocation={userLocation}
-                    zoom={mapZoom}
-                  />
+                  <>
+                    {console.log(`MapPage: Rendering map - isLoggedIn=${isLoggedIn}, visitedManholes=${visitedManholes.length}, recentManholes=${recentManholes.length}`)}
+                    <MapComponent
+                      center={mapCenter}
+                      manholes={isLoggedIn ? visitedManholes : recentManholes}
+                      onManholeClick={handleManholeClick}
+                      userLocation={userLocation}
+                      zoom={mapZoom}
+                    />
+                  </>
                 )}
               </div>
 
               {/* 都道府県リスト（フロート） */}
               {prefectureCounts.length > 0 && (
-                <div className="absolute top-4 right-4 z-[1000]">
+                <div className="absolute top-2 right-2 z-[1000]">
                   {showPrefectureList ? (
-                    <div className="w-64 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden">
-                      <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border p-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold">
-                            都道府県別 ({prefectureCounts.length})
+                    <div className="w-32 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden">
+                      <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border px-1.5 py-1">
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <h3 className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
+                            都道府県 ({prefectureCounts.length})
                           </h3>
                           <button
                             onClick={() => setShowPrefectureList(false)}
-                            className="rpg-button p-1 hover:bg-rpg-yellow transition-colors"
+                            className="p-0.5 bg-white/80 hover:bg-rpg-yellow border border-rpg-border rounded transition-colors flex-shrink-0"
                             title="都道府県リストを隠す"
                           >
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-3 h-3 text-rpg-textDark" />
+                          </button>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setPrefectureSortOrder('code')}
+                            className={`flex-1 px-1 py-0.5 text-[9px] font-pixelJp rounded transition-colors ${
+                              prefectureSortOrder === 'code'
+                                ? 'bg-rpg-blue text-white'
+                                : 'bg-white/80 text-rpg-textDark hover:bg-rpg-yellow'
+                            }`}
+                            title="都道府県コード順"
+                          >
+                            コード順
+                          </button>
+                          <button
+                            onClick={() => setPrefectureSortOrder('count')}
+                            className={`flex-1 px-1 py-0.5 text-[9px] font-pixelJp rounded transition-colors ${
+                              prefectureSortOrder === 'count'
+                                ? 'bg-rpg-blue text-white'
+                                : 'bg-white/80 text-rpg-textDark hover:bg-rpg-yellow'
+                            }`}
+                            title="マンホール数順"
+                          >
+                            数順
                           </button>
                         </div>
                       </div>
-                      <div className="overflow-y-auto max-h-[calc(70vh-6rem)] p-2 space-y-1">
+                      <div className="overflow-y-auto max-h-[calc(70vh-4rem)] p-1 space-y-0.5">
                         {prefectureCounts
-                          .sort((a, b) => b.count - a.count)
+                          .sort((a, b) => {
+                            if (prefectureSortOrder === 'code') {
+                              // 都道府県コード順（コードは文字列なので数値化して比較）
+                              return parseInt(a.code) - parseInt(b.code);
+                            } else {
+                              // マンホール数順（降順）
+                              return b.count - a.count;
+                            }
+                          })
                           .map((pref) => (
                             <button
                               key={pref.code}
                               onClick={() => handlePrefectureClick(pref)}
-                              className="w-full rpg-button text-left p-2 hover:bg-rpg-yellow transition-colors"
+                              className="w-full text-left px-1.5 py-1 bg-white/90 hover:bg-rpg-yellow border border-rpg-border rounded transition-colors"
                             >
-                              <div className="flex justify-between items-center">
-                                <span className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
-                                  {pref.name}
+                              <div className="flex justify-between items-center gap-1">
+                                <span className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
+                                  {pref.name.replace('県', '').replace('府', '').replace('都', '')}
                                 </span>
-                                <span className="font-pixel text-xs text-rpg-blue ml-2">
+                                <span className="font-pixel text-[10px] text-rpg-blue flex-shrink-0">
                                   {pref.count}
                                 </span>
                               </div>
@@ -309,10 +349,10 @@ export default function MapPage() {
                   ) : (
                     <button
                       onClick={() => setShowPrefectureList(true)}
-                      className="rpg-button p-2 bg-rpg-bgLight border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors"
+                      className="p-1.5 bg-white/90 border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors rounded"
                       title="都道府県リストを表示"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-3 h-3 text-rpg-textDark" />
                     </button>
                   )}
                 </div>
