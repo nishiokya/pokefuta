@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogIn, Mail, Lock, AlertCircle, MapPin, Camera, Navigation, History, Home, Info } from 'lucide-react';
@@ -19,6 +19,11 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient();
+
+  // ページタイトル設定
+  useEffect(() => {
+    document.title = 'ログイン - ポケふた訪問記録';
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,9 +101,6 @@ function LoginForm() {
           <h1 className="font-pixelJp text-2xl text-rpg-yellow mb-2">
             ログイン
           </h1>
-          <p className="font-pixelJp text-sm text-rpg-textDark opacity-70">
-            冒険を続けるにはログインしてください
-          </p>
         </div>
 
         {/* Login Form */}

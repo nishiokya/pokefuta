@@ -85,8 +85,8 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {icon}
-              <h1 className="font-pixelJp text-base text-rpg-yellow" style={{
-                textShadow: '2px 2px 0 #34495E'
+              <h1 className="font-pixelJp text-lg font-bold text-white" style={{
+                textShadow: '3px 3px 0 #2C3E50, -1px -1px 0 rgba(255,255,255,0.3), 0 0 10px rgba(255,215,0,0.5)'
               }}>{title}</h1>
             </div>
             <button

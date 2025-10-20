@@ -44,6 +44,9 @@ export default function NearbyPage() {
   const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = '近くのポケふた - ポケふた訪問記録';
+
     getCurrentLocationAndLoadManholes();
   }, [radius]);
 
@@ -175,7 +178,7 @@ export default function NearbyPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header title="📍 近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
+      <Header title="近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
 
       {/* Controls */}
       <div className="p-2 max-w-2xl mx-auto">
