@@ -38,6 +38,9 @@ export default function UploadPage() {
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = '写真登録 - ポケふた訪問記録';
+
     loadManholes();
     // Cookieから公開設定を読み込み
     const savedIsPublic = getCookie('pokefuta_is_public');
@@ -320,7 +323,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="📷 ポケふた写真登録" icon={<Upload className="w-6 h-6" />} />
+      <Header title="写真登録" icon={<Camera className="w-6 h-6" />} />
 
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         {/* Upload Area */}

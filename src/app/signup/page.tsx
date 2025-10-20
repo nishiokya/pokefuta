@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
@@ -19,6 +19,11 @@ export default function SignUpPage() {
   const [success, setSuccess] = useState(false);
 
   const supabase = createBrowserClient();
+
+  // ページタイトル設定
+  useEffect(() => {
+    document.title = '新規登録 - ポケふた訪問記録';
+  }, []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,9 +129,6 @@ export default function SignUpPage() {
           }}>
             新規登録
           </h1>
-          <p className="font-pixelJp text-sm text-rpg-textDark opacity-70">
-            冒険を始めるためにアカウントを作成
-          </p>
         </div>
 
         {/* Sign Up Form */}

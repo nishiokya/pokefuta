@@ -1,9 +1,15 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Info, Camera, Map, Navigation, History, Shield, MessageSquare, UserPlus, Github, Twitter } from 'lucide-react';
 import Header from '@/components/Header';
 
 export default function AboutPage() {
+  // ページタイトル設定
+  useEffect(() => {
+    document.title = 'このアプリについて - ポケふた訪問記録';
+  }, []);
+
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
       <Header title="このアプリについて" icon={<Info className="w-6 h-6 text-rpg-yellow" />} />

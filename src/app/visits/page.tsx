@@ -29,6 +29,9 @@ export default function VisitsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = '訪問履歴 - ポケふた訪問記録';
+
     loadVisits();
   }, []);
 
@@ -147,7 +150,7 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="📚 ポケふたの記録" icon={<History className="w-6 h-6" />} />
+      <Header title="訪問履歴" icon={<History className="w-6 h-6" />} />
 
       {/* Feed Container */}
       <div className="max-w-2xl mx-auto pb-20">

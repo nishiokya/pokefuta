@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
+import Header from '@/components/Header';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -111,6 +112,9 @@ export default function MapPage() {
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = 'マップ - ポケふた訪問記録';
+
     // Get user location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -271,6 +275,7 @@ export default function MapPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
+      <Header title="マップ" icon={<MapIcon className="w-6 h-6" />} />
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
