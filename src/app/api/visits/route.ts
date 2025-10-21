@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Build query
+    // Build query with social features
     let query = supabase
       .from('visit')
       .select(`
@@ -192,9 +192,62 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // ✅ ソーシャル機能の情報を取得
+    const visitIds = (visits || []).map(v => v.id);
+
+    // いいね数とユーザーのいいね状態を取得
+    const { data: likes } = await supabase
+      .from('visit_like')
+      .select('visit_id, user_id')
+      .in('visit_id', visitIds);
+
+    // コメント数を取得
+    const { data: commentCounts } = await supabase
+      .from('visit_comment')
+      .select('visit_id')
+      .in('visit_id', visitIds);
+
+    // ユーザーのブックマーク状態を取得
+    const { data: bookmarks } = await supabase
+      .from('visit_bookmark')
+      .select('visit_id')
+      .eq('user_id', session.user.id)
+      .in('visit_id', visitIds);
+
+    // 各訪問記録のいいね数・コメント数・状態を集計
+    const likesMap = new Map<string, { count: number; isLiked: boolean }>();
+    const commentsMap = new Map<string, number>();
+    const bookmarksSet = new Set<string>();
+
+    visitIds.forEach(id => {
+      likesMap.set(id, { count: 0, isLiked: false });
+      commentsMap.set(id, 0);
+    });
+
+    (likes || []).forEach(like => {
+      const current = likesMap.get(like.visit_id) || { count: 0, isLiked: false };
+      current.count++;
+      if (like.user_id === session.user.id) {
+        current.isLiked = true;
+      }
+      likesMap.set(like.visit_id, current);
+    });
+
+    (commentCounts || []).forEach(comment => {
+      const current = commentsMap.get(comment.visit_id) || 0;
+      commentsMap.set(comment.visit_id, current + 1);
+    });
+
+    (bookmarks || []).forEach(bookmark => {
+      bookmarksSet.add(bookmark.visit_id);
+    });
+
     // Post-process data
     const processedVisits = (visits || []).map(visit => {
       const photos = Array.isArray(visit.photos) ? visit.photos : [];
+      const likeInfo = likesMap.get(visit.id) || { count: 0, isLiked: false };
+      const commentCount = commentsMap.get(visit.id) || 0;
+      const isBookmarked = bookmarksSet.has(visit.id);
 
       return {
         id: visit.id,
@@ -204,7 +257,8 @@ export async function GET(request: NextRequest) {
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
         note: visit.note,
-        // Removed fields that don't exist in schema: with_family, tags, weather, rating
+        comment: visit.comment,
+        is_public: visit.is_public,
         created_at: visit.created_at,
         updated_at: visit.updated_at,
         photos: photos.map((photo: any) => ({
@@ -218,7 +272,12 @@ export async function GET(request: NextRequest) {
           // Generate URL based on storage key
           url: `/api/photo/${photo.id}`,
           thumbnail_url: `/api/photo/${photo.id}?size=small`
-        }))
+        })),
+        // ✅ ソーシャル機能の情報
+        likes_count: likeInfo.count,
+        is_liked: likeInfo.isLiked,
+        comments_count: commentCount,
+        is_bookmarked: isBookmarked
       };
     });
 
