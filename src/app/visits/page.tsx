@@ -19,6 +19,11 @@ interface Visit {
     thumbnail_url: string;
   }[];
   notes?: string;
+  comment?: string;
+  likes_count: number;
+  is_liked: boolean;
+  comments_count: number;
+  is_bookmarked: boolean;
 }
 
 export default function VisitsPage() {
@@ -70,7 +75,12 @@ export default function VisitsPage() {
                 url: photo.url,
                 thumbnail_url: photo.thumbnail_url
               })) || [],
-              notes: visit.note
+              notes: visit.note,
+              comment: visit.comment,
+              likes_count: visit.likes_count || 0,
+              is_liked: visit.is_liked || false,
+              comments_count: visit.comments_count || 0,
+              is_bookmarked: visit.is_bookmarked || false,
             }));
 
           setVisits(apiVisits);
@@ -134,6 +144,96 @@ export default function VisitsPage() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSelectedPhotoId(null);
+  };
+
+  const handleLikeToggle = async (visitId: string) => {
+    const visit = visits.find(v => v.id === visitId);
+    if (!visit) return;
+
+    const isLiked = visit.is_liked;
+    const method = isLiked ? 'DELETE' : 'POST';
+
+    // Optimistic update
+    setVisits(prevVisits => prevVisits.map(v =>
+      v.id === visitId
+        ? {
+            ...v,
+            is_liked: !isLiked,
+            likes_count: isLiked ? v.likes_count - 1 : v.likes_count + 1
+          }
+        : v
+    ));
+
+    try {
+      const response = await fetch(`/api/visits/${visitId}/like`, {
+        method,
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setVisits(prevVisits => prevVisits.map(v =>
+          v.id === visitId
+            ? {
+                ...v,
+                is_liked: isLiked,
+                likes_count: isLiked ? v.likes_count + 1 : v.likes_count - 1
+              }
+            : v
+        ));
+        console.error('Failed to toggle like');
+      }
+    } catch (error) {
+      // Revert on error
+      setVisits(prevVisits => prevVisits.map(v =>
+        v.id === visitId
+          ? {
+              ...v,
+              is_liked: isLiked,
+              likes_count: isLiked ? v.likes_count + 1 : v.likes_count - 1
+            }
+          : v
+      ));
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  const handleBookmarkToggle = async (visitId: string) => {
+    const visit = visits.find(v => v.id === visitId);
+    if (!visit) return;
+
+    const isBookmarked = visit.is_bookmarked;
+    const method = isBookmarked ? 'DELETE' : 'POST';
+
+    // Optimistic update
+    setVisits(prevVisits => prevVisits.map(v =>
+      v.id === visitId
+        ? { ...v, is_bookmarked: !isBookmarked }
+        : v
+    ));
+
+    try {
+      const response = await fetch(`/api/visits/${visitId}/bookmark`, {
+        method,
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setVisits(prevVisits => prevVisits.map(v =>
+          v.id === visitId
+            ? { ...v, is_bookmarked: isBookmarked }
+            : v
+        ));
+        console.error('Failed to toggle bookmark');
+      }
+    } catch (error) {
+      // Revert on error
+      setVisits(prevVisits => prevVisits.map(v =>
+        v.id === visitId
+          ? { ...v, is_bookmarked: isBookmarked }
+          : v
+      ));
+      console.error('Error toggling bookmark:', error);
+    }
   };
 
   if (loading) {
@@ -257,23 +357,61 @@ export default function VisitsPage() {
 
                 {/* Actions (Instagram-like) */}
                 <div className="flex items-center gap-4 mb-3 pb-3 border-b-2 border-rpg-border">
-                  <button className="flex items-center gap-1 hover:opacity-70">
-                    <Heart className="w-5 h-5 text-rpg-red" />
+                  <button
+                    onClick={() => handleLikeToggle(visit.id)}
+                    className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                  >
+                    <Heart
+                      className={`w-5 h-5 ${visit.is_liked ? 'fill-rpg-red text-rpg-red' : 'text-rpg-red'}`}
+                    />
+                    {visit.likes_count > 0 && (
+                      <span className="font-pixel text-xs text-rpg-textDark">
+                        {visit.likes_count}
+                      </span>
+                    )}
                   </button>
-                  <button className="flex items-center gap-1 hover:opacity-70">
+                  <button className="flex items-center gap-1 hover:opacity-70 transition-opacity">
                     <MessageCircle className="w-5 h-5 text-rpg-blue" />
+                    {visit.comments_count > 0 && (
+                      <span className="font-pixel text-xs text-rpg-textDark">
+                        {visit.comments_count}
+                      </span>
+                    )}
                   </button>
-                  <button className="flex items-center gap-1 hover:opacity-70">
+                  <button className="flex items-center gap-1 hover:opacity-70 transition-opacity">
                     <Send className="w-5 h-5 text-rpg-green" />
                   </button>
                   <div className="flex-1"></div>
-                  <button className="hover:opacity-70">
-                    <Bookmark className="w-5 h-5 text-rpg-yellow" />
+                  <button
+                    onClick={() => handleBookmarkToggle(visit.id)}
+                    className="hover:opacity-70 transition-opacity"
+                  >
+                    <Bookmark
+                      className={`w-5 h-5 ${visit.is_bookmarked ? 'fill-rpg-yellow text-rpg-yellow' : 'text-rpg-yellow'}`}
+                    />
                   </button>
                 </div>
 
                 {/* Info */}
                 <div className="space-y-2">
+                  {visit.likes_count > 0 && (
+                    <div className="font-pixelJp text-sm text-rpg-textDark">
+                      <span className="font-bold">{visit.likes_count}人</span>がいいねしました
+                    </div>
+                  )}
+
+                  {visit.comment && (
+                    <p className="font-pixelJp text-sm text-rpg-textDark">
+                      {visit.comment}
+                    </p>
+                  )}
+
+                  {visit.comments_count > 0 && (
+                    <button className="font-pixelJp text-sm text-rpg-textDark opacity-70 hover:opacity-100">
+                      コメント{visit.comments_count}件をすべて表示
+                    </button>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <span className="font-pixel text-xs text-rpg-yellow">
                       {visit.photos.length}
