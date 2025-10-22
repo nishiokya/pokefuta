@@ -192,9 +192,63 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // ==========================================
+    // Fetch social data (likes, comments, bookmarks)
+    // ==========================================
+    const visitIds = (visits || []).map(v => v.id);
+
+    // Fetch likes data
+    const { data: allLikes } = await supabase
+      .from('visit_like')
+      .select('visit_id, user_id')
+      .in('visit_id', visitIds);
+
+    // Fetch comments count
+    const { data: allComments } = await supabase
+      .from('visit_comment')
+      .select('visit_id')
+      .in('visit_id', visitIds);
+
+    // Fetch bookmarks data
+    const { data: allBookmarks } = await supabase
+      .from('visit_bookmark')
+      .select('visit_id, user_id')
+      .in('visit_id', visitIds);
+
+    // Aggregate social data per visit
+    const likesMap = new Map<string, { count: number; isLiked: boolean }>();
+    const commentsCountMap = new Map<string, number>();
+    const bookmarksMap = new Map<string, boolean>();
+
+    // Process likes
+    visitIds.forEach(visitId => {
+      const visitLikes = (allLikes || []).filter(like => like.visit_id === visitId);
+      likesMap.set(visitId, {
+        count: visitLikes.length,
+        isLiked: visitLikes.some(like => like.user_id === session?.user?.id)
+      });
+    });
+
+    // Process comments
+    visitIds.forEach(visitId => {
+      const visitComments = (allComments || []).filter(comment => comment.visit_id === visitId);
+      commentsCountMap.set(visitId, visitComments.length);
+    });
+
+    // Process bookmarks
+    visitIds.forEach(visitId => {
+      const visitBookmarks = (allBookmarks || []).filter(bookmark => bookmark.visit_id === visitId);
+      bookmarksMap.set(visitId, visitBookmarks.some(bookmark => bookmark.user_id === session?.user?.id));
+    });
+
     // Post-process data
     const processedVisits = (visits || []).map(visit => {
       const photos = Array.isArray(visit.photos) ? visit.photos : [];
+
+      // Get social data for this visit
+      const likesData = likesMap.get(visit.id) || { count: 0, isLiked: false };
+      const commentsCount = commentsCountMap.get(visit.id) || 0;
+      const isBookmarked = bookmarksMap.get(visit.id) || false;
 
       return {
         id: visit.id,
@@ -218,7 +272,12 @@ export async function GET(request: NextRequest) {
           // Generate URL based on storage key
           url: `/api/photo/${photo.id}`,
           thumbnail_url: `/api/photo/${photo.id}?size=small`
-        }))
+        })),
+        // Social data
+        likes_count: likesData.count,
+        is_liked: likesData.isLiked,
+        comments_count: commentsCount,
+        is_bookmarked: isBookmarked
       };
     });
 
