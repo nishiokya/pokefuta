@@ -29,6 +29,9 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = 'マンホール一覧 - ポケふた訪問記録';
+
     // Get user location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -88,7 +91,7 @@ export default function HomePage() {
   };
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="🗺️ マンホール一覧" icon={<MapPin className="w-6 h-6" />} />
+      <Header title="マンホール一覧" icon={<MapPin className="w-6 h-6" />} />
 
       {/* Map Container */}
       <div className="relative" style={{ height: 'calc(100vh - 140px)' }}>

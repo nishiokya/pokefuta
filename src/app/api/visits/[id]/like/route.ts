@@ -8,7 +8,8 @@ import { Database } from '@/types/database';
  * /api/visits/{id}/like:
  *   post:
  *     summary: 訪問記録にいいねを追加
- *     tags: [visits]
+ *     tags: [social]
+ *     description: 指定された訪問記録にいいねを追加します。すでにいいねしている場合はエラーを返します。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -17,17 +18,52 @@ import { Database } from '@/types/database';
  *         required: true
  *         schema:
  *           type: string
- *         description: 訪問記録ID
+ *         description: 訪問記録のID
  *     responses:
  *       200:
  *         description: いいね追加成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 like:
+ *                   type: object
+ *       401:
+ *         description: 認証が必要
+ *       409:
+ *         description: すでにいいね済み
+ *       500:
+ *         description: サーバーエラー
+ *   delete:
+ *     summary: 訪問記録のいいねを削除
+ *     tags: [social]
+ *     description: 指定された訪問記録のいいねを削除します。
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 訪問記録のID
+ *     responses:
+ *       200:
+ *         description: いいね削除成功
  *       401:
  *         description: 認証が必要
  *       404:
- *         description: 訪問記録が見つかりません
- *       409:
- *         description: すでにいいね済み
+ *         description: いいねが見つかりません
+ *       500:
+ *         description: サーバーエラー
  */
+
+// ==========================================
+// POST /api/visits/[id]/like - いいね追加
+// ==========================================
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -35,7 +71,7 @@ export async function POST(
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // 1. 認証チェック
+    // ✅ 1. 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session?.user) {
@@ -46,8 +82,9 @@ export async function POST(
     }
 
     const visitId = params.id;
+    const userId = session.user.id;
 
-    // 2. 訪問記録の存在確認
+    // ✅ 2. 訪問記録の存在確認
     const { data: visit, error: visitError } = await supabase
       .from('visit')
       .select('id')
@@ -61,12 +98,12 @@ export async function POST(
       }, { status: 404 });
     }
 
-    // 3. すでにいいね済みかチェック
+    // ✅ 3. すでにいいね済みかチェック
     const { data: existingLike } = await supabase
       .from('visit_like')
       .select('id')
       .eq('visit_id', visitId)
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .single();
 
     if (existingLike) {
@@ -76,12 +113,12 @@ export async function POST(
       }, { status: 409 });
     }
 
-    // 4. いいねを追加
+    // ✅ 4. いいねを追加
     const { data: like, error: likeError } = await supabase
       .from('visit_like')
       .insert({
         visit_id: visitId,
-        user_id: session.user.id
+        user_id: userId
       })
       .select()
       .single();
@@ -110,27 +147,9 @@ export async function POST(
   }
 }
 
-/**
- * @swagger
- * /api/visits/{id}/like:
- *   delete:
- *     summary: 訪問記録のいいねを削除
- *     tags: [visits]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: 訪問記録ID
- *     responses:
- *       200:
- *         description: いいね削除成功
- *       401:
- *         description: 認証が必要
- */
+// ==========================================
+// DELETE /api/visits/[id]/like - いいね削除
+// ==========================================
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -138,7 +157,7 @@ export async function DELETE(
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // 1. 認証チェック
+    // ✅ 1. 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session?.user) {
@@ -149,20 +168,21 @@ export async function DELETE(
     }
 
     const visitId = params.id;
+    const userId = session.user.id;
 
-    // 2. いいねを削除
-    const { error: deleteError } = await supabase
+    // ✅ 2. いいねを削除
+    const { error } = await supabase
       .from('visit_like')
       .delete()
       .eq('visit_id', visitId)
-      .eq('user_id', session.user.id);
+      .eq('user_id', userId);
 
-    if (deleteError) {
-      console.error('Error deleting like:', deleteError);
+    if (error) {
+      console.error('Error deleting like:', error);
       return NextResponse.json({
         success: false,
         error: 'Failed to delete like',
-        details: deleteError.message
+        details: error.message
       }, { status: 500 });
     }
 

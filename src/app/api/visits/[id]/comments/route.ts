@@ -1,34 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
-
-// Admin client for user lookup
-const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
 
 /**
  * @swagger
  * /api/visits/{id}/comments:
  *   get:
- *     summary: 訪問記録のコメント一覧を取得
- *     tags: [visits]
+ *     summary: 訪問記録のコメント一覧取得
+ *     tags: [social]
+ *     description: 指定された訪問記録のコメント一覧を取得します。
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: 訪問記録ID
+ *         description: 訪問記録のID
  *       - in: query
  *         name: limit
  *         schema:
@@ -43,25 +31,86 @@ const supabaseAdmin = createClient<Database>(
  *         description: オフセット
  *     responses:
  *       200:
- *         description: コメント一覧
+ *         description: コメント一覧取得成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 comments:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 total:
+ *                   type: integer
+ *       500:
+ *         description: サーバーエラー
+ *   post:
+ *     summary: 訪問記録にコメントを追加
+ *     tags: [social]
+ *     description: 指定された訪問記録にコメントを追加します。
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 訪問記録のID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 description: コメント内容（最大1000文字）
+ *     responses:
+ *       200:
+ *         description: コメント追加成功
+ *       400:
+ *         description: リクエストが不正
+ *       401:
+ *         description: 認証が必要
  *       404:
  *         description: 訪問記録が見つかりません
+ *       500:
+ *         description: サーバーエラー
  */
+
+// ==========================================
+// GET /api/visits/[id]/comments - コメント一覧取得
+// ==========================================
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
+
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
     const visitId = params.id;
 
-    // 1. コメント一覧を取得
+    // ✅ コメント一覧を取得
     const { data: comments, error, count } = await supabase
       .from('visit_comment')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        user:user_id (
+          id,
+          email
+        )
+      `, { count: 'exact' })
       .eq('visit_id', visitId)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
@@ -75,30 +124,10 @@ export async function GET(
       }, { status: 500 });
     }
 
-    // 2. ユーザー情報を取得
-    const userIds = [...new Set(comments?.map(c => c.user_id) || [])];
-
-    // auth.users テーブルから直接ユーザー情報を取得
-    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
-
-    const usersMap = new Map(
-      users?.users
-        ?.filter(u => userIds.includes(u.id))
-        .map(u => [u.id, { id: u.id, email: u.email || 'Unknown' }]) || []
-    );
-
-    // 3. コメントにユーザー情報を追加
-    const commentsWithUsers = comments?.map(comment => ({
-      ...comment,
-      user: usersMap.get(comment.user_id) || { id: comment.user_id, email: 'Unknown' }
-    })) || [];
-
     return NextResponse.json({
       success: true,
-      comments: commentsWithUsers,
-      total: count || 0,
-      limit,
-      offset
+      comments: comments || [],
+      total: count || 0
     });
 
   } catch (error: any) {
@@ -111,43 +140,9 @@ export async function GET(
   }
 }
 
-/**
- * @swagger
- * /api/visits/{id}/comments:
- *   post:
- *     summary: 訪問記録にコメントを投稿
- *     tags: [visits]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: 訪問記録ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               content:
- *                 type: string
- *                 maxLength: 1000
- *             required:
- *               - content
- *     responses:
- *       200:
- *         description: コメント投稿成功
- *       400:
- *         description: 不正なリクエスト
- *       401:
- *         description: 認証が必要
- *       404:
- *         description: 訪問記録が見つかりません
- */
+// ==========================================
+// POST /api/visits/[id]/comments - コメント追加
+// ==========================================
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -155,7 +150,7 @@ export async function POST(
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // 1. 認証チェック
+    // ✅ 1. 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session?.user) {
@@ -168,9 +163,10 @@ export async function POST(
     const body = await request.json();
     const { content } = body;
     const visitId = params.id;
+    const userId = session.user.id;
 
-    // 2. 入力検証
-    if (!content || typeof content !== 'string') {
+    // ✅ 2. 入力検証
+    if (!content || typeof content !== 'string' || content.trim() === '') {
       return NextResponse.json({
         success: false,
         error: 'Content is required'
@@ -180,11 +176,11 @@ export async function POST(
     if (content.length > 1000) {
       return NextResponse.json({
         success: false,
-        error: 'Content must be 1000 characters or less'
+        error: 'Content must be less than 1000 characters'
       }, { status: 400 });
     }
 
-    // 3. 訪問記録の存在確認
+    // ✅ 3. 訪問記録の存在確認
     const { data: visit, error: visitError } = await supabase
       .from('visit')
       .select('id')
@@ -198,15 +194,21 @@ export async function POST(
       }, { status: 404 });
     }
 
-    // 4. コメントを投稿
+    // ✅ 4. コメントを追加
     const { data: comment, error: commentError } = await supabase
       .from('visit_comment')
       .insert({
         visit_id: visitId,
-        user_id: session.user.id,
+        user_id: userId,
         content: content.trim()
       })
-      .select()
+      .select(`
+        *,
+        user:user_id (
+          id,
+          email
+        )
+      `)
       .single();
 
     if (commentError) {
@@ -218,18 +220,9 @@ export async function POST(
       }, { status: 500 });
     }
 
-    // 5. コメントにユーザー情報を追加
-    const commentWithUser = {
-      ...comment,
-      user: {
-        id: session.user.id,
-        email: session.user.email
-      }
-    };
-
     return NextResponse.json({
       success: true,
-      comment: commentWithUser
+      comment
     });
 
   } catch (error: any) {

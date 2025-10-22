@@ -39,6 +39,9 @@ export default function HomePage() {
   const photosPerPage = 12;
 
   useEffect(() => {
+    // ページタイトル設定
+    document.title = 'ホーム - ポケふた訪問記録';
+
     loadVisits();
   }, []);
 
@@ -170,7 +173,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
       <Header
-        title={isLoggedIn ? "🏆 マイコレクション" : "🔍 ポケふた一覧"}
+        title="ホーム"
         icon={<MapPin className="w-6 h-6" />}
       />
 
@@ -206,7 +209,7 @@ export default function HomePage() {
               <div className="rpg-window">
                 <div className="text-center mb-4">
                   <h2 className="font-pixelJp text-lg text-rpg-textDark mb-3">
-                    📸 ポケふた写真館
+                    ポケふた写真館
                   </h2>
                   <p className="font-pixelJp text-sm text-rpg-textDark leading-relaxed mb-4">
                     全国各地に設置されている「ポケふた」の写真を集めています。
@@ -242,7 +245,7 @@ export default function HomePage() {
             {recentPhotos.length > 0 && (
               <div className="rpg-window">
                 <h2 className="rpg-window-title text-sm mb-4">
-                  📸 最近のポケふた写真
+                  最近のポケふた写真
                 </h2>
                 <div className="grid grid-cols-3 gap-2">
                   {recentPhotos.map((photo) => (

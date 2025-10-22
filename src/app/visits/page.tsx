@@ -8,7 +8,6 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import Header from '@/components/Header';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
-import CommentModal from '@/components/CommentModal';
 
 interface Visit {
   id: string;
@@ -20,7 +19,7 @@ interface Visit {
     thumbnail_url: string;
   }[];
   notes?: string;
-  // Social features
+  comment?: string;
   likes_count: number;
   is_liked: boolean;
   comments_count: number;
@@ -33,8 +32,6 @@ export default function VisitsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [commentModalOpen, setCommentModalOpen] = useState(false);
-  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
 
   useEffect(() => {
     // ページタイトル設定
@@ -79,11 +76,11 @@ export default function VisitsPage() {
                 thumbnail_url: photo.thumbnail_url
               })) || [],
               notes: visit.note,
-              // Social data
+              comment: visit.comment,
               likes_count: visit.likes_count || 0,
               is_liked: visit.is_liked || false,
               comments_count: visit.comments_count || 0,
-              is_bookmarked: visit.is_bookmarked || false
+              is_bookmarked: visit.is_bookmarked || false,
             }));
 
           setVisits(apiVisits);
@@ -239,21 +236,6 @@ export default function VisitsPage() {
     }
   };
 
-  const handleCommentClick = (visitId: string) => {
-    setSelectedVisitId(visitId);
-    setCommentModalOpen(true);
-  };
-
-  const handleCommentModalClose = () => {
-    setCommentModalOpen(false);
-    setSelectedVisitId(null);
-  };
-
-  const handleCommentAdded = () => {
-    // Reload visits to update comment counts
-    loadVisits();
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center">
@@ -388,10 +370,7 @@ export default function VisitsPage() {
                       </span>
                     )}
                   </button>
-                  <button
-                    onClick={() => handleCommentClick(visit.id)}
-                    className="flex items-center gap-1 hover:opacity-70 transition-opacity"
-                  >
+                  <button className="flex items-center gap-1 hover:opacity-70 transition-opacity">
                     <MessageCircle className="w-5 h-5 text-rpg-blue" />
                     {visit.comments_count > 0 && (
                       <span className="font-pixel text-xs text-rpg-textDark">
@@ -428,10 +407,7 @@ export default function VisitsPage() {
                   )}
 
                   {visit.comments_count > 0 && (
-                    <button
-                      onClick={() => handleCommentClick(visit.id)}
-                      className="font-pixelJp text-sm text-rpg-textDark opacity-70 hover:opacity-100"
-                    >
+                    <button className="font-pixelJp text-sm text-rpg-textDark opacity-70 hover:opacity-100">
                       コメント{visit.comments_count}件をすべて表示
                     </button>
                   )}
@@ -533,16 +509,6 @@ export default function VisitsPage() {
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
           isDeleting={isDeleting}
-        />
-      )}
-
-      {/* Comment Modal */}
-      {selectedVisitId && (
-        <CommentModal
-          isOpen={commentModalOpen}
-          visitId={selectedVisitId}
-          onClose={handleCommentModalClose}
-          onCommentAdded={handleCommentAdded}
         />
       )}
     </div>
