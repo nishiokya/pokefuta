@@ -37,6 +37,13 @@ interface Photo {
   };
 }
 
+interface PhotoReactions {
+  likes: number;
+  bookmarks: number;
+  userLiked: boolean;
+  userBookmarked: boolean;
+}
+
 export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -48,6 +55,7 @@ export default function ManholeDetailPage() {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoReactions>>(new Map());
 
   useEffect(() => {
     const manholeId = params.id;
@@ -104,11 +112,38 @@ export default function ManholeDetailPage() {
         const data = await response.json();
         if (data.success && data.images) {
           setPhotos(data.images);
+          // 各写真のリアクション情報を読み込む
+          loadReactionsForPhotos(data.images);
         }
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
     }
+  };
+
+  const loadReactionsForPhotos = async (photos: Photo[]) => {
+    const reactionsMap = new Map<string, PhotoReactions>();
+
+    for (const photo of photos) {
+      try {
+        const response = await fetch(`/api/reactions?photo_id=${photo.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            reactionsMap.set(photo.id, {
+              likes: data.likes,
+              bookmarks: data.bookmarks,
+              userLiked: data.userLiked,
+              userBookmarked: data.userBookmarked
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load reactions for photo ${photo.id}:`, err);
+      }
+    }
+
+    setPhotoReactions(reactionsMap);
   };
 
   const handleManholeClick = (clickedManhole: Manhole) => {
@@ -168,6 +203,49 @@ export default function ManholeDetailPage() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSelectedPhotoId(null);
+  };
+
+  const handleReaction = async (photoId: string, reactionType: 'like' | 'bookmark') => {
+    try {
+      const response = await fetch('/api/reactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          photo_id: photoId,
+          reaction_type: reactionType
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // リアクション情報を再読み込み
+        const reactionsResponse = await fetch(`/api/reactions?photo_id=${photoId}`);
+        if (reactionsResponse.ok) {
+          const reactionsData = await reactionsResponse.json();
+          if (reactionsData.success) {
+            setPhotoReactions(prev => {
+              const newMap = new Map(prev);
+              newMap.set(photoId, {
+                likes: reactionsData.likes,
+                bookmarks: reactionsData.bookmarks,
+                userLiked: reactionsData.userLiked,
+                userBookmarked: reactionsData.userBookmarked
+              });
+              return newMap;
+            });
+          }
+        }
+      } else if (response.status === 401) {
+        alert('ログインが必要です');
+      } else {
+        console.error('Reaction failed:', data);
+      }
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+    }
   };
 
   if (loading) {
@@ -304,6 +382,13 @@ export default function ManholeDetailPage() {
             <div className="space-y-4">
               {photos.map((photo) => {
                 const isOwner = currentUserId && photo.visit?.user_id === currentUserId;
+                const reactions = photoReactions.get(photo.id) || {
+                  likes: 0,
+                  bookmarks: 0,
+                  userLiked: false,
+                  userBookmarked: false
+                };
+
                 return (
                   <div
                     key={photo.id}
@@ -334,24 +419,44 @@ export default function ManholeDetailPage() {
                         }}
                       />
 
-                      {/* Floating Action Buttons - Bottom */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 z-10">
-                        <div className="flex items-center justify-between">
-                          {/* Left: Like & Bookmark Buttons */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-red/80 transition-colors"
-                              title="いいね"
+                      {/* Floating Overlay - Bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 z-10">
+                        {/* Gradient Background */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pointer-events-none"></div>
+
+                        <div className="relative p-3">
+                          {/* Comment Section (上部) - Instagram style */}
+                          {photo.visit?.comment && (
+                            <div className="mb-3 group/comment">
+                              <p className="font-pixelJp text-xs text-white leading-relaxed line-clamp-2 group-hover/comment:line-clamp-none transition-all duration-200 drop-shadow-lg">
+                                {photo.visit.comment}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Action Buttons (下部) */}
+                          <div className="flex items-center justify-between">
+                            {/* Left: Like & Bookmark Buttons */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleReaction(photo.id, 'like')}
+                              className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 transition-colors ${
+                                reactions.userLiked ? 'bg-rpg-red/80' : 'hover:bg-rpg-red/80'
+                              }`}
+                              title={reactions.userLiked ? 'いいね解除' : 'いいね'}
                             >
-                              <Heart className="w-4 h-4 text-white" />
-                              <span className="font-pixel text-[10px] text-white">0</span>
+                              <Heart className={`w-4 h-4 ${reactions.userLiked ? 'fill-white' : ''} text-white`} />
+                              <span className="font-pixel text-[10px] text-white">{reactions.likes}</span>
                             </button>
                             <button
-                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-blue/80 transition-colors"
-                              title="ブックマーク"
+                              onClick={() => handleReaction(photo.id, 'bookmark')}
+                              className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 transition-colors ${
+                                reactions.userBookmarked ? 'bg-rpg-blue/80' : 'hover:bg-rpg-blue/80'
+                              }`}
+                              title={reactions.userBookmarked ? 'ブックマーク解除' : 'ブックマーク'}
                             >
-                              <Bookmark className="w-4 h-4 text-white" />
-                              <span className="font-pixel text-[10px] text-white">0</span>
+                              <Bookmark className={`w-4 h-4 ${reactions.userBookmarked ? 'fill-white' : ''} text-white`} />
+                              <span className="font-pixel text-[10px] text-white">{reactions.bookmarks}</span>
                             </button>
                             <button
                               className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-yellow/80 transition-colors"
@@ -362,38 +467,29 @@ export default function ManholeDetailPage() {
                             </button>
                           </div>
 
-                          {/* Right: Delete Button (only for owner) */}
-                          {isOwner && (
-                            <button
-                              onClick={() => handleDeleteClick(photo.id)}
-                              className="bg-rpg-red/80 backdrop-blur-sm border border-white/30 p-1.5 hover:bg-rpg-red transition-colors"
-                              title="写真を削除"
-                            >
-                              <Trash2 className="w-4 h-4 text-white" />
-                            </button>
-                          )}
+                            {/* Right: Delete Button (only for owner) */}
+                            {isOwner && (
+                              <button
+                                onClick={() => handleDeleteClick(photo.id)}
+                                className="bg-rpg-red/80 backdrop-blur-sm border border-white/30 p-1.5 hover:bg-rpg-red transition-colors"
+                                title="写真を削除"
+                              >
+                                <Trash2 className="w-4 h-4 text-white" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Photo Info */}
+                    {/* Photo Info (画像下) */}
                     <div className="p-2">
                       {photo.visit?.shot_at && (
-                        <div className="flex items-center gap-1 mb-2">
+                        <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-rpg-textDark opacity-70" />
                           <span className="font-pixelJp text-[10px] text-rpg-textDark opacity-70">
                             {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
                           </span>
-                        </div>
-                      )}
-                      {photo.visit?.comment && (
-                        <div className="font-pixelJp text-xs text-rpg-textDark">
-                          <p className="line-clamp-2">{photo.visit.comment}</p>
-                          {photo.visit.comment.length > 50 && (
-                            <button className="text-rpg-blue text-[10px] mt-1 hover:underline">
-                              もっと見る
-                            </button>
-                          )}
                         </div>
                       )}
                     </div>
