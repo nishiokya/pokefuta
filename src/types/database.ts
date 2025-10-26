@@ -70,6 +70,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
           note: string | null;
+          comment: string | null;  // 訪問コメント（公開可能）
+          is_public: boolean;  // 公開/非公開フラグ
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Insert: {
@@ -79,6 +81,8 @@ export interface Database {
           shot_location?: string | null;
           shot_at: string;
           note?: string | null;
+          comment?: string | null;  // 訪問コメント（公開可能）
+          is_public?: boolean;  // 公開/非公開フラグ（デフォルト: true）
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Update: {
@@ -86,6 +90,8 @@ export interface Database {
           shot_location?: string | null;
           shot_at?: string;
           note?: string | null;
+          comment?: string | null;  // 訪問コメント（公開可能）
+          is_public?: boolean;  // 公開/非公開フラグ
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
       };
