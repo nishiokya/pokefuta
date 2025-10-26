@@ -180,41 +180,8 @@ export default function NearbyPage() {
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
       <Header title="近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
 
-      {/* Controls */}
+      {/* Controls - Compact Layout */}
       <div className="p-2 max-w-2xl mx-auto">
-        <div className="flex justify-end mb-2">
-          <button
-            onClick={getCurrentLocationAndLoadManholes}
-            className="rpg-button text-xs py-2 px-3 flex items-center gap-2"
-            title="現在地を更新"
-          >
-            <MapPin className="w-4 h-4" />
-            現在地更新
-          </button>
-        </div>
-
-        <div className="rpg-window mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-rpg-textDark">検索範囲</label>
-            <span className="font-bold text-rpg-yellow">{radius}km</span>
-          </div>
-          <input
-            type="range"
-            min="1"
-            max="100"
-            value={radius}
-            onChange={(e) => setRadius(parseInt(e.target.value))}
-            className="w-full h-2 bg-rpg-bgDark border-2 border-rpg-border appearance-none cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, #F1C40F 0%, #F1C40F ${radius}%, #E0E0E0 ${radius}%, #E0E0E0 100%)`
-            }}
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>1km</span>
-            <span>100km</span>
-          </div>
-        </div>
-
         {locationError && (
           <div className="rpg-window mb-2 bg-red-50 border-red-300">
             <p className="text-sm text-red-600">{locationError}</p>
@@ -229,29 +196,57 @@ export default function NearbyPage() {
 
         {userLocation && (
           <div className="rpg-window mb-2">
-            <div className="rpg-status mb-3">
-              <div className="rpg-stat-item">
-                <div className="rpg-stat-value">{nearbyManholes.length}</div>
-                <div className="rpg-stat-label">発見</div>
-              </div>
-              <div className="rpg-stat-item">
-                <div className="rpg-stat-value">{radius}</div>
-                <div className="rpg-stat-label">範囲km</div>
-              </div>
-              <div className="rpg-stat-item">
-                <div className="rpg-stat-value">
-                  {nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-'}
+            {/* 1行目: 統計情報 + 現在地更新ボタン */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex gap-3 flex-1">
+                <div className="text-center">
+                  <div className="font-pixel text-lg text-rpg-yellow">{nearbyManholes.length}</div>
+                  <div className="font-pixelJp text-[10px] text-rpg-textDark">発見</div>
                 </div>
-                <div className="rpg-stat-label">最寄り</div>
+                <div className="text-center">
+                  <div className="font-pixel text-lg text-rpg-blue">{radius}km</div>
+                  <div className="font-pixelJp text-[10px] text-rpg-textDark">範囲</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-pixel text-lg text-rpg-green">
+                    {nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-'}
+                  </div>
+                  <div className="font-pixelJp text-[10px] text-rpg-textDark">最寄り</div>
+                </div>
               </div>
+              <button
+                onClick={getCurrentLocationAndLoadManholes}
+                className="rpg-button text-xs py-2 px-3 flex items-center gap-1"
+                title="現在地を更新"
+              >
+                <MapPin className="w-3 h-3" />
+                <span className="font-pixelJp">更新</span>
+              </button>
             </div>
+
+            {/* 2行目: 範囲スライダー */}
+            <div className="mb-2">
+              <input
+                type="range"
+                min="1"
+                max="100"
+                value={radius}
+                onChange={(e) => setRadius(parseInt(e.target.value))}
+                className="w-full h-2 bg-rpg-bgDark border-2 border-rpg-border appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #F1C40F 0%, #F1C40F ${radius}%, #E0E0E0 ${radius}%, #E0E0E0 100%)`
+                }}
+              />
+            </div>
+
+            {/* 3行目: マップ/リスト切り替えボタン */}
             <button
               onClick={() => setShowMap(!showMap)}
               className={`w-full rpg-button text-sm ${showMap ? 'rpg-button-primary' : ''}`}
             >
               <div className="flex items-center justify-center gap-2">
                 <MapIcon className="w-4 h-4" />
-                <span>{showMap ? 'リスト表示' : 'マップ表示'}</span>
+                <span className="font-pixelJp">{showMap ? 'リスト表示' : 'マップ表示'}</span>
               </div>
             </button>
           </div>
@@ -271,7 +266,7 @@ export default function NearbyPage() {
 
       {/* Map View */}
       {!loading && showMap && userLocation && (
-        <div className="px-2 mb-2 max-w-2xl mx-auto">
+        <div className="px-2 pb-20 max-w-2xl mx-auto">
           <div className="rpg-window p-2">
             <div style={{ height: '400px' }}>
               <MapComponent
@@ -289,7 +284,7 @@ export default function NearbyPage() {
 
       {/* Manholes List */}
       {!loading && !showMap && (
-        <div className="px-2 pb-16 max-w-2xl mx-auto">
+        <div className="px-2 pb-20 max-w-2xl mx-auto">
           {nearbyManholes.length === 0 ? (
             <div className="text-center py-8">
               <div className="rpg-window">
