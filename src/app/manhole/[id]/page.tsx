@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2 } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, MessageCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
@@ -29,6 +29,8 @@ interface Photo {
   content_type: string;
   created_at: string;
   visit?: {
+    id: string;
+    user_id: string;
     shot_at: string;
     note?: string;
     comment?: string;  // 訪問コメント
@@ -45,14 +47,30 @@ export default function ManholeDetailPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const manholeId = params.id;
     if (manholeId) {
       loadManholeDetail(manholeId as string);
       loadPhotos(manholeId as string);
+      loadCurrentUser();
     }
   }, [params.id]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch('/api/visits');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.authenticated && data.user_id) {
+          setCurrentUserId(data.user_id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load current user:', err);
+    }
+  };
 
   const loadManholeDetail = async (id: string) => {
     try {
@@ -283,60 +301,105 @@ export default function ManholeDetailPage() {
             <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">
               📸 ポケふた写真 ({photos.length}枚)
             </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden group"
-                >
-                  <img
-                    src={`/api/photo/${photo.id}?size=small`}
-                    alt="ポケふた写真"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      // 画像読み込みエラー時の表示
-                      const target = e.currentTarget;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent && !parent.querySelector('.error-placeholder')) {
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center border-2 border-rpg-border';
-                        errorDiv.innerHTML = `
-                          <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                          </svg>
-                          <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
-                        `;
-                        parent.appendChild(errorDiv);
-                      }
-                    }}
-                  />
-                  {photo.visit?.shot_at && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 p-1 z-10">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-rpg-textGold" />
-                        <span className="font-pixelJp text-[10px] text-rpg-textGold">
-                          {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
-                        </span>
+            <div className="space-y-4">
+              {photos.map((photo) => {
+                const isOwner = currentUserId && photo.visit?.user_id === currentUserId;
+                return (
+                  <div
+                    key={photo.id}
+                    className="bg-rpg-bgDark border-2 border-rpg-border"
+                  >
+                    {/* Photo Image */}
+                    <div className="relative aspect-square bg-rpg-bgDark overflow-hidden group">
+                      <img
+                        src={`/api/photo/${photo.id}?size=small`}
+                        alt="ポケふた写真"
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector('.error-placeholder')) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center border-2 border-rpg-border';
+                            errorDiv.innerHTML = `
+                              <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                              </svg>
+                              <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
+                            `;
+                            parent.appendChild(errorDiv);
+                          }
+                        }}
+                      />
+
+                      {/* Floating Action Buttons - Bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 z-10">
+                        <div className="flex items-center justify-between">
+                          {/* Left: Like & Bookmark Buttons */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-red/80 transition-colors"
+                              title="いいね"
+                            >
+                              <Heart className="w-4 h-4 text-white" />
+                              <span className="font-pixel text-[10px] text-white">0</span>
+                            </button>
+                            <button
+                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-blue/80 transition-colors"
+                              title="ブックマーク"
+                            >
+                              <Bookmark className="w-4 h-4 text-white" />
+                              <span className="font-pixel text-[10px] text-white">0</span>
+                            </button>
+                            <button
+                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-yellow/80 transition-colors"
+                              title="コメント"
+                            >
+                              <MessageCircle className="w-4 h-4 text-white" />
+                              <span className="font-pixel text-[10px] text-white">0</span>
+                            </button>
+                          </div>
+
+                          {/* Right: Delete Button (only for owner) */}
+                          {isOwner && (
+                            <button
+                              onClick={() => handleDeleteClick(photo.id)}
+                              className="bg-rpg-red/80 backdrop-blur-sm border border-white/30 p-1.5 hover:bg-rpg-red transition-colors"
+                              title="写真を削除"
+                            >
+                              <Trash2 className="w-4 h-4 text-white" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {photo.visit.comment && (
-                        <div className="mt-1 text-[10px] text-white font-pixelJp line-clamp-2">
-                          {photo.visit.comment}
+                    </div>
+
+                    {/* Photo Info */}
+                    <div className="p-2">
+                      {photo.visit?.shot_at && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <Clock className="w-3 h-3 text-rpg-textDark opacity-70" />
+                          <span className="font-pixelJp text-[10px] text-rpg-textDark opacity-70">
+                            {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
+                          </span>
+                        </div>
+                      )}
+                      {photo.visit?.comment && (
+                        <div className="font-pixelJp text-xs text-rpg-textDark">
+                          <p className="line-clamp-2">{photo.visit.comment}</p>
+                          {photo.visit.comment.length > 50 && (
+                            <button className="text-rpg-blue text-[10px] mt-1 hover:underline">
+                              もっと見る
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                  {/* Delete button - shows on hover (always display regardless of image load status) */}
-                  <button
-                    onClick={() => handleDeleteClick(photo.id)}
-                    className="absolute top-2 right-2 bg-rpg-red border-2 border-rpg-border p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
-                    title="写真を削除"
-                  >
-                    <Trash2 className="w-4 h-4 text-white" />
-                  </button>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

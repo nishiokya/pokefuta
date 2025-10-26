@@ -304,21 +304,21 @@ export default function UploadPage() {
     }
   };
 
-  const captureFromCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
+  const captureFromCamera = () => {
+    // カメラ入力用のinput要素を作成してトリガー
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment'; // 背面カメラを優先
 
-      // In a real app, you would implement camera capture UI here
-      // For now, just show an alert
-      alert('カメラ機能は開発中です。ファイルをドロップするか選択してください。');
+    input.onchange = async (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files.length > 0) {
+        await onDrop(Array.from(target.files));
+      }
+    };
 
-      stream.getTracks().forEach(track => track.stop());
-    } catch (error) {
-      console.error('Camera access denied:', error);
-      alert('カメラへのアクセスが拒否されました。');
-    }
+    input.click();
   };
 
   return (

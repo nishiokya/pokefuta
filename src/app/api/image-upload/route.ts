@@ -409,7 +409,6 @@ export async function GET(request: NextRequest) {
             comment
           )
         `, { count: 'exact' })
-        .order('manhole_id', { ascending: false })
         .order('created_at', { ascending: false });
 
       // Filter by manhole_id if provided
