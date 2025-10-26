@@ -194,13 +194,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 実際のマンホールデータを取得（limitを適用）
-      const actualLimit = Math.min(limit, 1000);
-      const { data: allManholes, error: queryError } = await supabase
-        .from('manhole')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(actualLimit);
+      // 実際のマンホールデータを取得
+      // ⚠️ nearby検索の場合はlimitを適用せず、全件取得してから距離でフィルタする
+      let query = supabase.from('manhole').select('*');
+
+      // nearby検索でない場合のみlimitを適用
+      if (!isNearbySearch) {
+        const actualLimit = Math.min(limit, 1000);
+        query = query.order('id', { ascending: false }).limit(actualLimit);
+      }
+
+      const { data: allManholes, error: queryError } = await query;
 
       if (queryError) {
         console.error('Database query error:', queryError);
