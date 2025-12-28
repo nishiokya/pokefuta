@@ -292,6 +292,16 @@ export async function POST(request: NextRequest) {
       if (!photoError && photoData) {
         imageId = photoData.id;
         console.log('Successfully stored photo metadata in database:', imageId);
+        // Mark onboarding flag as completed on first successful photo
+        const { error: onboardingFlagError } = await supabase
+          .from('app_user')
+          .update({ has_uploaded_image: true })
+          .eq('auth_uid', session.user.id)
+          .eq('has_uploaded_image', false);
+
+        if (onboardingFlagError) {
+          console.warn('Failed to update has_uploaded_image flag:', onboardingFlagError.message);
+        }
       } else {
         console.error('Photo insert failed:', photoError?.message);
         throw new Error(`Photo creation failed: ${photoError?.message}`);

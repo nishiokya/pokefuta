@@ -5,26 +5,32 @@ export interface Database {
         Row: {
           id: string;
           auth_uid: string;
+          email: string | null;
           display_name: string | null;
           avatar_url: string | null;
           created_at: string;
           updated_at: string;
           settings: Record<string, any>;
           stats: UserStats;
+          has_uploaded_image: boolean;
         };
         Insert: {
           id?: string;
           auth_uid: string;
+          email?: string | null;
           display_name?: string | null;
           avatar_url?: string | null;
           settings?: Record<string, any>;
           stats?: UserStats;
+          has_uploaded_image?: boolean;
         };
         Update: {
+          email?: string | null;
           display_name?: string | null;
           avatar_url?: string | null;
           settings?: Record<string, any>;
           stats?: UserStats;
+          has_uploaded_image?: boolean;
         };
       };
       manhole: {

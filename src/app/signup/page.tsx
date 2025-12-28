@@ -72,6 +72,7 @@ export default function SignUpPage() {
               auth_uid: data.user.id,
               email: email,
               display_name: displayName || email.split('@')[0],
+              has_uploaded_image: false,
             })
             .select()
             .single();
