@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { supabaseAdmin } from '@/lib/supabase/client';
 import { storage, generateStorageKey } from '@/lib/storage';
 
 /**
@@ -435,11 +436,81 @@ export async function GET(request: NextRequest) {
         }, { status: 500 });
       }
 
+      // Attach display_name for each photo's visit user (best-effort)
+      const visitUserIds = Array.from(
+        new Set(
+          (images || [])
+            .map((img: any) => img?.visit?.user_id)
+            .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+        )
+      );
+
+      let displayNameByAuthUid = new Map<string, string | null>();
+
+      if (visitUserIds.length > 0) {
+        // Prefer service-role client to bypass RLS when resolving other users' display_name
+        const client: any = supabaseAdmin ?? supabase;
+
+        const { data: appUsers, error: appUserError } = await client
+          .from('app_user')
+          .select('auth_uid, display_name')
+          .in('auth_uid', visitUserIds);
+
+        if (appUserError) {
+          console.warn('Failed to load app_user for photo list:', appUserError);
+        } else {
+          (appUsers || []).forEach((u: any) => {
+            if (u?.auth_uid) {
+              displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
+            }
+          });
+        }
+      }
+
+      // Fallback: resolve from Supabase Auth user_metadata when app_user.display_name is missing
+      // (requires service role)
+      if (supabaseAdmin && visitUserIds.length > 0) {
+        const unresolved = visitUserIds.filter((uid) => {
+          const v = displayNameByAuthUid.get(uid);
+          return !v || (typeof v === 'string' && v.trim().length === 0);
+        });
+
+        // Limit to keep this endpoint fast
+        const limited = unresolved.slice(0, 50);
+        for (const uid of limited) {
+          try {
+            const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(uid);
+            if (userError) continue;
+            const metaName = (userData?.user as any)?.user_metadata?.display_name;
+            if (typeof metaName === 'string' && metaName.trim().length > 0) {
+              displayNameByAuthUid.set(uid, metaName.trim());
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      const enrichedImages = (images || []).map((img: any) => {
+        const visit = img?.visit;
+        if (visit && typeof visit === 'object' && !Array.isArray(visit)) {
+          const displayName = displayNameByAuthUid.get(visit.user_id) ?? null;
+          return {
+            ...img,
+            visit: {
+              ...visit,
+              display_name: displayName
+            }
+          };
+        }
+        return img;
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Images retrieved successfully',
-        images: images || [],
-        count: images?.length || 0,
+        images: enrichedImages,
+        count: enrichedImages.length,
         total: count || 0,
       });
     }

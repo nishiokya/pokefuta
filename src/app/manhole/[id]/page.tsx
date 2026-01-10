@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, MessageCircle } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, MessageCircle, User as UserIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
@@ -31,11 +31,20 @@ interface Photo {
   visit?: {
     id: string;
     user_id: string;
+    display_name?: string | null;
     shot_at: string;
     note?: string;
     comment?: string;  // 訪問コメント
   };
 }
+
+const getPhotoUserLabel = (photo: Photo) => {
+  const name = photo.visit?.display_name;
+  if (name && name.trim().length > 0) return name;
+  const uid = photo.visit?.user_id;
+  if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
+  return '名無しのトレーナー';
+};
 
 interface PhotoReactions {
   likes: number;
@@ -420,11 +429,29 @@ export default function ManholeDetailPage() {
                       />
 
                       {/* Floating Overlay - Bottom */}
-                      <div className="absolute bottom-0 left-0 right-0 z-10">
+                        <div className="absolute bottom-0 left-0 right-0 z-10">
                         {/* Gradient Background */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pointer-events-none"></div>
 
                         <div className="relative p-3">
+                            {/* Meta Row (ユーザー名・撮影日) */}
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <UserIcon className="w-4 h-4 text-white/90" />
+                                <span className="font-pixelJp text-xs text-white/90 truncate drop-shadow">
+                                  {getPhotoUserLabel(photo)}
+                                </span>
+                              </div>
+                              {photo.visit?.shot_at && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <Clock className="w-4 h-4 text-white/90" />
+                                  <span className="font-pixelJp text-xs text-white/90 drop-shadow">
+                                    {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
                           {/* Comment Section (上部) - Instagram style */}
                           {photo.visit?.comment && (
                             <div className="mb-3 group/comment">
@@ -483,16 +510,7 @@ export default function ManholeDetailPage() {
                     </div>
 
                     {/* Photo Info (画像下) */}
-                    <div className="p-2">
-                      {photo.visit?.shot_at && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-rpg-textDark opacity-70" />
-                          <span className="font-pixelJp text-[10px] text-rpg-textDark opacity-70">
-                            {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <div className="p-0" />
                   </div>
                 );
               })}
