@@ -26,16 +26,17 @@ interface Photo {
 }
 
 export default function HomePage() {
-  const [visits, setVisits] = useState<Visit[]>([]);
   const [visitedManholes, setVisitedManholes] = useState<Manhole[]>([]);
   const [recentManholes, setRecentManholes] = useState<Manhole[]>([]);
   const [recentPhotos, setRecentPhotos] = useState<Photo[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
-  const [manholesWithPhotos, setManholesWithPhotos] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPhotos, setTotalPhotos] = useState(0);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [myPosts, setMyPosts] = useState(0);
   const photosPerPage = 12;
 
   useEffect(() => {
@@ -43,6 +44,8 @@ export default function HomePage() {
     document.title = 'ホーム - ポケふた訪問記録';
 
     loadVisits();
+    loadSiteStats();
+    loadManholeStats();
   }, []);
 
   useEffect(() => {
@@ -60,10 +63,22 @@ export default function HomePage() {
             // ログイン済み
             console.log('User authenticated');
             setIsLoggedIn(true);
-            setVisits(data.visits || []);
+
+            const visitsData: Visit[] = Array.isArray(data.visits) ? data.visits : [];
+            // 「自分が投稿したもの」= 自分の写真投稿数
+            const total = data?.stats?.total_photos;
+            if (typeof total === 'number') {
+              setMyPosts(total);
+            } else {
+              const computed = visitsData.reduce(
+                (sum, v) => sum + (Array.isArray(v.photos) ? v.photos.length : 0),
+                0
+              );
+              setMyPosts(computed);
+            }
 
             // Extract visited manholes
-            const manholes = (data.visits || [])
+            const manholes = visitsData
               .map((visit: Visit) => visit.manhole)
               .filter((manhole: Manhole | undefined): manhole is Manhole =>
                 manhole != null && manhole.id != null
@@ -73,8 +88,8 @@ export default function HomePage() {
             // 未ログイン - 最近のマンホールを表示
             console.log('User not authenticated - showing recent manholes');
             setIsLoggedIn(false);
-            setVisits([]);
             setVisitedManholes([]);
+            setMyPosts(0);
             await loadRecentManholes();
           }
         }
@@ -82,19 +97,32 @@ export default function HomePage() {
         // APIエラー - 最近のマンホールを表示
         console.log('API error - showing recent manholes');
         setIsLoggedIn(false);
-        setVisits([]);
         setVisitedManholes([]);
+        setMyPosts(0);
         await loadRecentManholes();
       }
     } catch (error) {
       console.error('Failed to load visits:', error);
       // エラーの場合も最近のマンホールを表示
       setIsLoggedIn(false);
-      setVisits([]);
       setVisitedManholes([]);
+      setMyPosts(0);
       await loadRecentManholes();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadManholeStats = async () => {
+    try {
+      const response = await fetch('/api/manholes?limit=1');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data?.success) {
+        if (typeof data.total === 'number') setTotalManholes(data.total);
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -111,9 +139,6 @@ export default function HomePage() {
         // 統計情報を取得
         if (data.total) {
           setTotalManholes(data.total);
-        }
-        if (data.with_photos) {
-          setManholesWithPhotos(data.with_photos);
         }
       }
     } catch (error) {
@@ -162,6 +187,19 @@ export default function HomePage() {
     }
   };
 
+  const loadSiteStats = async () => {
+    try {
+      const response = await fetch('/api/site-stats');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.success) return;
+      setTotalUsers(typeof data.users === 'number' ? data.users : null);
+      setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
+    } catch {
+      // ignore
+    }
+  };
+
   const handleManholeClick = (manhole: Manhole) => {
     window.location.href = `/manhole/${manhole.id}`;
   };
@@ -194,14 +232,22 @@ export default function HomePage() {
             {/* Stats & Welcome Message */}
             {isLoggedIn ? (
               <div className="rpg-window">
-                <div className="flex gap-4 text-sm">
-                  <div className="text-center flex-1">
-                    <div className="font-pixel text-2xl text-rpg-yellow">{visitedManholes.length}</div>
-                    <div className="font-pixelJp text-xs text-rpg-textDark">訪問済</div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-yellow">{totalManholes}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">全ポケふた</div>
                   </div>
-                  <div className="text-center flex-1">
-                    <div className="font-pixel text-2xl text-rpg-blue">{visits.length}</div>
-                    <div className="font-pixelJp text-xs text-rpg-textDark">記録</div>
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-blue">{myPosts}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">自分の投稿</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-yellow">{totalPosts ?? totalPhotos ?? '—'}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">全投稿</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-blue">{totalUsers ?? '—'}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">ユーザ</div>
                   </div>
                 </div>
               </div>
@@ -218,14 +264,18 @@ export default function HomePage() {
                 </div>
 
                 {/* 統計情報 */}
-                <div className="flex gap-4 mb-4">
-                  <div className="flex-1 text-center">
-                    <div className="font-pixel text-3xl text-rpg-yellow">{totalManholes}</div>
+                <div className="grid grid-cols-3 gap-2 mb-4 text-sm">
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-yellow">{totalManholes}</div>
                     <div className="font-pixelJp text-xs text-rpg-textDark">全ポケふた</div>
                   </div>
-                  <div className="flex-1 text-center">
-                    <div className="font-pixel text-3xl text-rpg-blue">{manholesWithPhotos}</div>
-                    <div className="font-pixelJp text-xs text-rpg-textDark">写真あり</div>
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-blue">{totalPosts ?? totalPhotos ?? '—'}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">投稿</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-pixel text-2xl text-rpg-yellow">{totalUsers ?? '—'}</div>
+                    <div className="font-pixelJp text-xs text-rpg-textDark">ユーザ</div>
                   </div>
                 </div>
 
@@ -235,7 +285,7 @@ export default function HomePage() {
                     <span className="font-pixelJp">ログインして写真を登録</span>
                   </Link>
                   <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-3">
-                    登録は無料です。訪問記録も管理できます！
+                    無料でかんたん登録。写真投稿と訪問記録をすぐ始められます！
                   </p>
                 </div>
               </div>
