@@ -325,7 +325,7 @@ export default function UploadPage() {
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         <div className="rpg-window">
-          <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">撮影のコツ（例）</h2>
+          <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">撮影のコツ</h2>
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
             できるだけ「真上から・マンホール全体（ふたの縁まで）が入る」写真だと、とても助かります。
           </p>
