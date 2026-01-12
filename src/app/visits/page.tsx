@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, Camera, Navigation, History, Heart, MessageCircle, Send, Bookmark, Home, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, Camera, Navigation, History, Heart, Bookmark, Home, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
@@ -370,17 +370,6 @@ export default function VisitsPage() {
                       </span>
                     )}
                   </button>
-                  <button className="flex items-center gap-1 hover:opacity-70 transition-opacity">
-                    <MessageCircle className="w-5 h-5 text-rpg-blue" />
-                    {visit.comments_count > 0 && (
-                      <span className="font-pixel text-xs text-rpg-textDark">
-                        {visit.comments_count}
-                      </span>
-                    )}
-                  </button>
-                  <button className="flex items-center gap-1 hover:opacity-70 transition-opacity">
-                    <Send className="w-5 h-5 text-rpg-green" />
-                  </button>
                   <div className="flex-1"></div>
                   <button
                     onClick={() => handleBookmarkToggle(visit.id)}
@@ -404,12 +393,6 @@ export default function VisitsPage() {
                     <p className="font-pixelJp text-sm text-rpg-textDark">
                       {visit.comment}
                     </p>
-                  )}
-
-                  {visit.comments_count > 0 && (
-                    <button className="font-pixelJp text-sm text-rpg-textDark opacity-70 hover:opacity-100">
-                      コメント{visit.comments_count}件をすべて表示
-                    </button>
                   )}
 
                   <div className="flex items-center gap-2">

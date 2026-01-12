@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { supabaseAdmin } from '@/lib/supabase/client';
 
 /**
  * @swagger
@@ -104,13 +105,7 @@ export async function GET(
     // ✅ コメント一覧を取得
     const { data: comments, error, count } = await supabase
       .from('visit_comment')
-      .select(`
-        *,
-        user:user_id (
-          id,
-          email
-        )
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('visit_id', visitId)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
@@ -124,9 +119,53 @@ export async function GET(
       }, { status: 500 });
     }
 
+    const userIds = Array.from(
+      new Set(
+        (comments || [])
+          .map((c: any) => c?.user_id)
+          .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+      )
+    );
+
+    const displayNameByAuthUid = new Map<string, string | null>();
+    const emailByAuthUid = new Map<string, string | null>();
+
+    if (userIds.length > 0) {
+      const client: any = supabaseAdmin ?? supabase;
+      const { data: appUsers, error: appUserError } = await client
+        .from('app_user')
+        .select('auth_uid, display_name, email')
+        .in('auth_uid', userIds);
+
+      if (appUserError) {
+        console.warn('Failed to load app_user for comments:', appUserError);
+      } else {
+        (appUsers || []).forEach((u: any) => {
+          if (u?.auth_uid) {
+            displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
+            emailByAuthUid.set(u.auth_uid, u.email ?? null);
+          }
+        });
+      }
+    }
+
+    const enriched = (comments || []).map((c: any) => {
+      const uid = c.user_id;
+      const displayName = typeof uid === 'string' ? (displayNameByAuthUid.get(uid) ?? null) : null;
+      const email = typeof uid === 'string' ? (emailByAuthUid.get(uid) ?? null) : null;
+      return {
+        ...c,
+        user: {
+          id: uid,
+          display_name: displayName,
+          email
+        }
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      comments: comments || [],
+      comments: enriched,
       total: count || 0
     });
 
@@ -202,13 +241,7 @@ export async function POST(
         user_id: userId,
         content: content.trim()
       })
-      .select(`
-        *,
-        user:user_id (
-          id,
-          email
-        )
-      `)
+      .select('*')
       .single();
 
     if (commentError) {
@@ -220,9 +253,34 @@ export async function POST(
       }, { status: 500 });
     }
 
+    // 表示用のユーザー情報を付与（ベストエフォート）
+    let displayName: string | null = null;
+    let email: string | null = null;
+    try {
+      const client: any = supabaseAdmin ?? supabase;
+      const { data: appUser } = await client
+        .from('app_user')
+        .select('display_name, email')
+        .eq('auth_uid', userId)
+        .maybeSingle();
+      if (appUser) {
+        displayName = appUser.display_name ?? null;
+        email = appUser.email ?? null;
+      }
+    } catch {
+      // ignore
+    }
+
     return NextResponse.json({
       success: true,
-      comment
+      comment: {
+        ...comment,
+        user: {
+          id: userId,
+          display_name: displayName,
+          email
+        }
+      }
     });
 
   } catch (error: any) {
