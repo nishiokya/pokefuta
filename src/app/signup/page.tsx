@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
+import BottomNav from '@/components/BottomNav';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -103,7 +104,7 @@ export default function SignUpPage() {
 
         // 2秒後にログインページへリダイレクト
         setTimeout(() => {
-          router.push('/login');
+          router.push('/login?redirect=/upload');
         }, 2000);
       }
     } catch (err: any) {
@@ -115,20 +116,19 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+      <div className="w-full max-w-md mx-auto p-4">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block mb-4">
-            <div className="w-20 h-20 bg-rpg-blue border-4 border-rpg-border flex items-center justify-center mx-auto">
-              <UserPlus className="w-10 h-10 text-white" />
+        <div className="rpg-window text-center mb-6">
+          <div className="inline-block mb-3">
+            <div className="w-16 h-16 bg-rpg-blue border-2 border-rpg-border flex items-center justify-center mx-auto">
+              <UserPlus className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-2xl text-rpg-blue mb-2" style={{
-            textShadow: '3px 3px 0 #34495E'
-          }}>
-            新規登録
-          </h1>
+          <h1 className="font-pixelJp text-lg text-rpg-textGold font-bold">アカウント作成</h1>
+          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
+            登録すると訪問履歴が使えるようになります
+          </p>
         </div>
 
         {/* Sign Up Form */}
@@ -219,6 +219,18 @@ export default function SignUpPage() {
                   {loading ? '登録中...' : '登録する'}
                 </span>
               </button>
+
+              {/* Conversion helper */}
+              <div className="bg-rpg-bgLight border-2 border-rpg-border p-3">
+                <p className="font-pixelJp text-xs text-rpg-textDark font-bold mb-1">
+                  登録すると使える機能（例）
+                </p>
+                <ul className="space-y-1 font-pixelJp text-xs text-rpg-textDark opacity-80">
+                  <li>・写真の登録が「訪問履歴」としてたまる</li>
+                  <li>・あとで一覧/マップで見返せる</li>
+                  <li>・公開/非公開の設定ができる</li>
+                </ul>
+              </div>
             </form>
           )}
 
@@ -233,14 +245,9 @@ export default function SignUpPage() {
             </div>
           )}
         </div>
-
-        {/* Back to Home */}
-        <div className="mt-4 text-center">
-          <Link href="/" className="font-pixelJp text-xs text-rpg-yellow hover:opacity-70">
-            ← ホームに戻る
-          </Link>
-        </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

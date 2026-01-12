@@ -143,9 +143,18 @@ export default function HomePage() {
 
             {/* Feed - 最近の公開投稿（API改修なし） */}
             <div className="rpg-window">
-              <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-3">
-                最近の投稿
-              </h2>
+              {isLoggedIn ? (
+                <div className="text-center mb-3">
+                  <h2 className="font-pixelJp text-lg text-rpg-textDark mb-2">ポケふた写真館</h2>
+                  <p className="font-pixelJp text-sm text-rpg-textDark leading-relaxed">
+                    あなたも見つけたポケふたの写真を登録して、みんなとシェアしませんか？
+                  </p>
+                </div>
+              ) : (
+                <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-3">
+                  最近の投稿
+                </h2>
+              )}
 
               {feed.length === 0 ? (
                 <div className="text-center py-8">
@@ -165,14 +174,71 @@ export default function HomePage() {
                     const idLabel = visit.manhole?.id ?? visit.manhole_id ?? '';
                     const locationLabel = title || visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
-                    const to = manholeId ? `/manhole/${manholeId}` : `/visit/${visit.id}/photos`;
+                    const canNavigate = Boolean(manholeId);
+                    const to = canNavigate ? `/manhole/${manholeId}` : '';
+
+                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} ${formatShotAt(visit.shot_at)} いいね${visit.likes_count} コメント${visit.comments_count}`;
+
+                    if (!canNavigate) {
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.warn('Home feed item missing manholeId; navigation disabled', {
+                          visitId: visit.id,
+                          manhole_id: visit.manhole_id,
+                        });
+                      }
+
+                      return (
+                        <div
+                          key={visit.id}
+                          className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden opacity-80"
+                          aria-label={commonAriaLabel}
+                        >
+                          {photo?.thumbnail_url ? (
+                            <img
+                              src={photo.thumbnail_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <MapPin className="w-6 h-6 text-rpg-textGold opacity-80" />
+                            </div>
+                          )}
+
+                          {/* Top overlay: location + date */}
+                          <div className="absolute top-0 left-0 right-0 bg-black/70 p-1">
+                            <div className="font-pixelJp text-[10px] text-white truncate">
+                              {locationLabel}{idLabel ? `(${idLabel})` : ''}
+                            </div>
+                            <div className="font-pixelJp text-[10px] text-white/80">
+                              {formatShotAt(visit.shot_at)}
+                            </div>
+                          </div>
+
+                          {/* Bottom overlay: reactions */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-1">
+                            <div className="flex items-center justify-end gap-2 text-white">
+                              <div className="flex items-center gap-1">
+                                <Heart className="w-3.5 h-3.5" />
+                                <span className="font-pixel text-[10px]">{visit.likes_count}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                <span className="font-pixel text-[10px]">{visit.comments_count}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <Link
                         key={visit.id}
                         href={to}
                         className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden hover:border-rpg-yellow transition-colors focus:outline-none focus:ring-2 focus:ring-rpg-yellow"
-                        aria-label={`${locationLabel}${idLabel ? `(${idLabel})` : ''} ${formatShotAt(visit.shot_at)} いいね${visit.likes_count} コメント${visit.comments_count}`}
+                        aria-label={commonAriaLabel}
                       >
                         {photo?.thumbnail_url ? (
                           <img

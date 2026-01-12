@@ -154,17 +154,28 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
             </div>
           ) : (
             <div className="mb-3 pb-3 border-b-2 border-rpg-border">
-              <div
-                onClick={() => {
-                  onClose();
-                  window.location.href = '/login';
-                }}
-                className="flex items-center gap-2 px-3 py-2 bg-rpg-yellow cursor-pointer hover:opacity-80"
-              >
-                <UserIcon className="w-4 h-4 text-rpg-textDark" />
-                <span className="font-pixelJp text-sm text-rpg-textDark font-bold">
-                  ログイン
-                </span>
+              <div className="space-y-2">
+                <div
+                  onClick={() => {
+                    onClose();
+                    window.location.href = '/signup';
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 bg-rpg-blue cursor-pointer hover:opacity-80"
+                >
+                  <UserIcon className="w-4 h-4 text-white" />
+                  <span className="font-pixelJp text-sm text-white font-bold">新規登録</span>
+                </div>
+
+                <div
+                  onClick={() => {
+                    onClose();
+                    window.location.href = '/login?redirect=/upload';
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 bg-rpg-yellow cursor-pointer hover:opacity-80"
+                >
+                  <UserIcon className="w-4 h-4 text-rpg-textDark" />
+                  <span className="font-pixelJp text-sm text-rpg-textDark font-bold">ログイン</span>
+                </div>
               </div>
             </div>
           )}

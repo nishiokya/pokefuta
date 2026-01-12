@@ -290,6 +290,13 @@ export default function MapPage() {
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
+            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
+              {isLoggedIn
+                ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
+                : '全国のポケふたを表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
+              }
+            </p>
+
             {/* マップとリストのコンテナ */}
             <div className="relative">
               {/* マップ */}
