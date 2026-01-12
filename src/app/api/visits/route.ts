@@ -121,55 +121,71 @@ export async function GET(request: NextRequest) {
 
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
+    const viewerUserId = session?.user?.id ?? null;
 
-    // ✅ 認証されていない場合は空の配列を返す（authenticatedフラグで明示）
-    if (!session?.user) {
-      return NextResponse.json({
-        success: true,
-        authenticated: false,
-        visits: [],
-        stats: {
-          total_visits: 0,
-          total_photos: 0,
-          prefectures: [],
-          date_range: {
-            first: null,
-            last: null
-          }
-        },
-        pagination: {
-          limit,
-          offset,
-          total: 0
-        }
-      });
+    // Build query
+    let query;
+    if (viewerUserId) {
+      // ✅ ログイン時: 従来通り、自分の訪問記録のみ
+      query = supabase
+        .from('visit')
+        .select(`
+          *,
+          manhole:manhole_id (
+            id,
+            title,
+            prefecture,
+            municipality,
+            pokemons
+          ),
+          photos:photo (
+            id,
+            storage_key,
+            content_type,
+            file_size,
+            width,
+            height,
+            created_at
+          )
+        `)
+        .order('shot_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+        .eq('user_id', viewerUserId);
+    } else {
+      // ✅ 未ログイン時: 公開(is_public=true)の訪問記録を返す（noteは返さない）
+      query = supabase
+        .from('visit')
+        .select(`
+          id,
+          user_id,
+          manhole_id,
+          shot_at,
+          shot_location,
+          comment,
+          is_public,
+          created_at,
+          updated_at,
+          manhole:manhole_id (
+            id,
+            title,
+            prefecture,
+            municipality,
+            pokemons
+          ),
+          photos:photo (
+            id,
+            storage_key,
+            content_type,
+            file_size,
+            width,
+            height,
+            created_at
+          )
+        `)
+        .order('shot_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+        .eq('is_public', true);
     }
-
-    // Build query with social features
-    let query = supabase
-      .from('visit')
-      .select(`
-        *,
-        manhole:manhole_id (
-          id,
-          title,
-          prefecture,
-          municipality,
-          pokemons
-        ),
-        photos:photo (
-          id,
-          storage_key,
-          content_type,
-          file_size,
-          width,
-          height,
-          created_at
-        )
-      `)
-      .order('shot_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-      .eq('user_id', session.user.id);  // ✅ 必ず自分のデータのみ取得
 
     if (prefecture) {
       // Note: This requires a join, handled by the query above
@@ -208,11 +224,13 @@ export async function GET(request: NextRequest) {
       .in('visit_id', visitIds);
 
     // ユーザーのブックマーク状態を取得
-    const { data: bookmarks } = await supabase
-      .from('visit_bookmark')
-      .select('visit_id')
-      .eq('user_id', session.user.id)
-      .in('visit_id', visitIds);
+    const { data: bookmarks } = viewerUserId
+      ? await supabase
+        .from('visit_bookmark')
+        .select('visit_id')
+        .eq('user_id', viewerUserId)
+        .in('visit_id', visitIds)
+      : { data: [] as any[] };
 
     // 各訪問記録のいいね数・コメント数・状態を集計
     const likesMap = new Map<string, { count: number; isLiked: boolean }>();
@@ -227,7 +245,7 @@ export async function GET(request: NextRequest) {
     (likes || []).forEach(like => {
       const current = likesMap.get(like.visit_id) || { count: 0, isLiked: false };
       current.count++;
-      if (like.user_id === session.user.id) {
+      if (viewerUserId && like.user_id === viewerUserId) {
         current.isLiked = true;
       }
       likesMap.set(like.visit_id, current);
@@ -322,7 +340,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      authenticated: true,
+      authenticated: !!viewerUserId,
       visits: filteredVisits,
       stats,
       pagination: {

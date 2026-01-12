@@ -406,8 +406,8 @@ export async function GET(request: NextRequest) {
             user_id,
             shot_at,
             manhole_id,
-            note,
-            comment
+            comment,
+            is_public
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false });

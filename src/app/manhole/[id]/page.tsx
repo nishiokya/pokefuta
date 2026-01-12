@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, MessageCircle, User as UserIcon } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, User as UserIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
@@ -33,8 +33,8 @@ interface Photo {
     user_id: string;
     display_name?: string | null;
     shot_at: string;
-    note?: string;
     comment?: string;  // 訪問コメント
+    is_public?: boolean;
   };
 }
 
@@ -46,9 +46,10 @@ const getPhotoUserLabel = (photo: Photo) => {
   return '名無しのトレーナー';
 };
 
-interface PhotoReactions {
+interface PhotoSocial {
   likes: number;
   bookmarks: number;
+  comments: number;
   userLiked: boolean;
   userBookmarked: boolean;
 }
@@ -64,7 +65,7 @@ export default function ManholeDetailPage() {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoReactions>>(new Map());
+  const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoSocial>>(new Map());
 
   useEffect(() => {
     const manholeId = params.id;
@@ -77,11 +78,11 @@ export default function ManholeDetailPage() {
 
   const loadCurrentUser = async () => {
     try {
-      const response = await fetch('/api/visits');
+      const response = await fetch('/api/auth/session');
       if (response.ok) {
         const data = await response.json();
-        if (data.authenticated && data.user_id) {
-          setCurrentUserId(data.user_id);
+        if (data.authenticated && data.user?.id) {
+          setCurrentUserId(data.user.id);
         }
       }
     } catch (err) {
@@ -121,8 +122,8 @@ export default function ManholeDetailPage() {
         const data = await response.json();
         if (data.success && data.images) {
           setPhotos(data.images);
-          // 各写真のリアクション情報を読み込む
-          loadReactionsForPhotos(data.images);
+          // 各写真のソーシャル情報を読み込む（visitに集約）
+          loadSocialForPhotos(data.images);
         }
       }
     } catch (err) {
@@ -130,18 +131,30 @@ export default function ManholeDetailPage() {
     }
   };
 
-  const loadReactionsForPhotos = async (photos: Photo[]) => {
-    const reactionsMap = new Map<string, PhotoReactions>();
+  const loadSocialForPhotos = async (photos: Photo[]) => {
+    const reactionsMap = new Map<string, PhotoSocial>();
 
     for (const photo of photos) {
+      const visitId = photo.visit?.id;
+      if (!visitId) {
+        reactionsMap.set(photo.id, {
+          likes: 0,
+          bookmarks: 0,
+          comments: 0,
+          userLiked: false,
+          userBookmarked: false
+        });
+        continue;
+      }
       try {
-        const response = await fetch(`/api/reactions?photo_id=${photo.id}`);
+        const response = await fetch(`/api/visits/${visitId}/social`);
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
             reactionsMap.set(photo.id, {
               likes: data.likes,
               bookmarks: data.bookmarks,
+              comments: data.comments,
               userLiked: data.userLiked,
               userBookmarked: data.userBookmarked
             });
@@ -214,46 +227,47 @@ export default function ManholeDetailPage() {
     setSelectedPhotoId(null);
   };
 
-  const handleReaction = async (photoId: string, reactionType: 'like' | 'bookmark') => {
+  const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {
+    const visitId = photo.visit?.id;
+    if (!visitId) return;
+
     try {
-      const response = await fetch('/api/reactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          photo_id: photoId,
-          reaction_type: reactionType
-        })
+      const current = photoReactions.get(photo.id);
+      const isOn = reactionType === 'like' ? !!current?.userLiked : !!current?.userBookmarked;
+      const endpoint = reactionType === 'like'
+        ? `/api/visits/${visitId}/like`
+        : `/api/visits/${visitId}/bookmark`;
+
+      const response = await fetch(endpoint, {
+        method: isOn ? 'DELETE' : 'POST'
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // リアクション情報を再読み込み
-        const reactionsResponse = await fetch(`/api/reactions?photo_id=${photoId}`);
-        if (reactionsResponse.ok) {
-          const reactionsData = await reactionsResponse.json();
-          if (reactionsData.success) {
-            setPhotoReactions(prev => {
-              const newMap = new Map(prev);
-              newMap.set(photoId, {
-                likes: reactionsData.likes,
-                bookmarks: reactionsData.bookmarks,
-                userLiked: reactionsData.userLiked,
-                userBookmarked: reactionsData.userBookmarked
-              });
-              return newMap;
-            });
-          }
-        }
+        // ソーシャル情報を再読み込み
+        const socialResponse = await fetch(`/api/visits/${visitId}/social`);
+        if (!socialResponse.ok) return;
+        const socialData = await socialResponse.json();
+        if (!socialData.success) return;
+        setPhotoReactions(prev => {
+          const newMap = new Map(prev);
+          newMap.set(photo.id, {
+            likes: socialData.likes,
+            bookmarks: socialData.bookmarks,
+            comments: socialData.comments,
+            userLiked: socialData.userLiked,
+            userBookmarked: socialData.userBookmarked
+          });
+          return newMap;
+        });
       } else if (response.status === 401) {
         alert('ログインが必要です');
       } else {
-        console.error('Reaction failed:', data);
+        console.error('Social action failed:', data);
       }
     } catch (error) {
-      console.error('Error handling reaction:', error);
+      console.error('Error handling social action:', error);
     }
   };
 
@@ -394,6 +408,7 @@ export default function ManholeDetailPage() {
                 const reactions = photoReactions.get(photo.id) || {
                   likes: 0,
                   bookmarks: 0,
+                  comments: 0,
                   userLiked: false,
                   userBookmarked: false
                 };
@@ -453,7 +468,7 @@ export default function ManholeDetailPage() {
                             </div>
 
                           {/* Comment Section (上部) - Instagram style */}
-                          {photo.visit?.comment && (
+                          {photo.visit?.comment && (photo.visit?.is_public || (currentUserId && photo.visit?.user_id === currentUserId)) && (
                             <div className="mb-3 group/comment">
                               <p className="font-pixelJp text-xs text-white leading-relaxed line-clamp-2 group-hover/comment:line-clamp-none transition-all duration-200 drop-shadow-lg">
                                 {photo.visit.comment}
@@ -466,7 +481,7 @@ export default function ManholeDetailPage() {
                             {/* Left: Like & Bookmark Buttons */}
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleReaction(photo.id, 'like')}
+                                onClick={() => handleReaction(photo, 'like')}
                               className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 transition-colors ${
                                 reactions.userLiked ? 'bg-rpg-red/80' : 'hover:bg-rpg-red/80'
                               }`}
@@ -476,7 +491,7 @@ export default function ManholeDetailPage() {
                               <span className="font-pixel text-[10px] text-white">{reactions.likes}</span>
                             </button>
                             <button
-                              onClick={() => handleReaction(photo.id, 'bookmark')}
+                              onClick={() => handleReaction(photo, 'bookmark')}
                               className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 transition-colors ${
                                 reactions.userBookmarked ? 'bg-rpg-blue/80' : 'hover:bg-rpg-blue/80'
                               }`}
@@ -484,13 +499,6 @@ export default function ManholeDetailPage() {
                             >
                               <Bookmark className={`w-4 h-4 ${reactions.userBookmarked ? 'fill-white' : ''} text-white`} />
                               <span className="font-pixel text-[10px] text-white">{reactions.bookmarks}</span>
-                            </button>
-                            <button
-                              className="flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-2 py-1 hover:bg-rpg-yellow/80 transition-colors"
-                              title="コメント"
-                            >
-                              <MessageCircle className="w-4 h-4 text-white" />
-                              <span className="font-pixel text-[10px] text-white">0</span>
                             </button>
                           </div>
 

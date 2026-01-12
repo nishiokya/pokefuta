@@ -12,7 +12,8 @@ interface Comment {
   updated_at: string;
   user: {
     id: string;
-    email: string;
+    email?: string | null;
+    display_name?: string | null;
   };
 }
 
@@ -29,6 +30,21 @@ export default function CommentModal({
   onClose,
   onCommentAdded,
 }: CommentModalProps) {
+    const getUserLabel = (comment: Comment) => {
+      const name = comment.user.display_name;
+      if (name && name.trim().length > 0) return name;
+      const email = comment.user.email;
+      if (email && email.trim().length > 0) return email;
+      const uid = comment.user.id;
+      if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
+      return '名無し';
+    };
+
+    const getUserInitial = (comment: Comment) => {
+      const label = getUserLabel(comment);
+      return label?.[0]?.toUpperCase() || 'U';
+    };
+
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -157,13 +173,13 @@ export default function CommentModal({
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border-2 border-rpg-border rounded-full flex items-center justify-center">
                     <span className="font-pixelJp text-xs text-rpg-textDark">
-                      {comment.user.email?.[0]?.toUpperCase() || 'U'}
+                      {getUserInitial(comment)}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-pixelJp text-sm text-rpg-textGold font-bold truncate">
-                        {comment.user.email}
+                        {getUserLabel(comment)}
                       </span>
                       <span className="font-pixelJp text-xs text-rpg-textDark opacity-70 flex-shrink-0">
                         {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
