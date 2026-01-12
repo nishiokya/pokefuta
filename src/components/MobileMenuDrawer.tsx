@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   List,
+  MapPin,
   Navigation,
   Camera,
   History,
@@ -71,21 +72,34 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
 
   const isActive = (href: string) => pathname === href;
 
-  const menuItems = [
-    { href: '/', label: 'ホーム', icon: <Home className="w-5 h-5" /> },
+  const menuItems: Array<{
+    href: string;
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+  }> = [
+    { href: '/', label: 'ホーム', description: '最近の投稿や入口', icon: <Home className="w-5 h-5" /> },
     {
       href: '/manholes',
       label: 'マンホール一覧',
+      description: 'ポケふたを検索/一覧で見る',
       icon: <List className="w-5 h-5" />,
     },
     {
       href: '/nearby',
       label: '近くの未訪問',
+      description: '今いる場所の近くを探す',
       icon: <Navigation className="w-5 h-5" />,
     },
-    { href: '/upload', label: '写真を登録', icon: <Camera className="w-5 h-5" /> },
-    { href: '/visits', label: '訪問履歴', icon: <History className="w-5 h-5" /> },
-    { href: '/about', label: 'このアプリについて', icon: <Info className="w-5 h-5" /> },
+    {
+      href: '/map',
+      label: 'マップ',
+      description: '地図で全体を見る（必要なら）',
+      icon: <MapPin className="w-5 h-5" />,
+    },
+    { href: '/upload', label: '写真を登録', description: '訪問写真を追加する', icon: <Camera className="w-5 h-5" /> },
+    { href: '/visits', label: '訪問履歴', description: '自分の訪問記録を見る', icon: <History className="w-5 h-5" /> },
+    { href: '/about', label: 'このアプリについて', description: '使い方/注意事項', icon: <Info className="w-5 h-5" /> },
   ];
 
   const handleLogout = async () => {
@@ -163,14 +177,17 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
                   onClose();
                   window.location.href = item.href;
                 }}
-                className={`flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer ${
+                className={`flex items-start gap-2 px-3 py-2 font-pixelJp cursor-pointer ${
                   isActive(item.href)
                     ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border-2 border-rpg-border'
                     : 'text-rpg-textDark hover:bg-rpg-bgLight'
                 }`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <div className="mt-0.5">{item.icon}</div>
+                <div className="min-w-0">
+                  <div className="text-sm leading-5">{item.label}</div>
+                  <div className="text-xs opacity-70 leading-4">{item.description}</div>
+                </div>
               </div>
             ))}
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Navigation, ExternalLink, Map as MapIcon } from 'lucide-react';
+import { Navigation, ExternalLink, Map as MapIcon, MapPin, Camera } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 

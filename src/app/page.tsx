@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Camera, Navigation, History, Map, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 
@@ -27,7 +27,6 @@ interface Photo {
 
 export default function HomePage() {
   const [visitedManholes, setVisitedManholes] = useState<Manhole[]>([]);
-  const [recentManholes, setRecentManholes] = useState<Manhole[]>([]);
   const [recentPhotos, setRecentPhotos] = useState<Photo[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -37,7 +36,7 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [myPosts, setMyPosts] = useState(0);
-  const photosPerPage = 12;
+  const photosPerPage = 24;
 
   useEffect(() => {
     // ページタイトル設定
@@ -90,7 +89,6 @@ export default function HomePage() {
             setIsLoggedIn(false);
             setVisitedManholes([]);
             setMyPosts(0);
-            await loadRecentManholes();
           }
         }
       } else {
@@ -99,7 +97,6 @@ export default function HomePage() {
         setIsLoggedIn(false);
         setVisitedManholes([]);
         setMyPosts(0);
-        await loadRecentManholes();
       }
     } catch (error) {
       console.error('Failed to load visits:', error);
@@ -107,7 +104,6 @@ export default function HomePage() {
       setIsLoggedIn(false);
       setVisitedManholes([]);
       setMyPosts(0);
-      await loadRecentManholes();
     } finally {
       setLoading(false);
     }
@@ -123,26 +119,6 @@ export default function HomePage() {
       }
     } catch {
       // ignore
-    }
-  };
-
-  const loadRecentManholes = async () => {
-    try {
-      const response = await fetch('/api/manholes?limit=20');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.manholes) {
-          // null/undefinedを除外してから最新10件を取得
-          const validManholes = data.manholes.filter((m: Manhole) => m != null && m.id != null);
-          setRecentManholes(validManholes.slice(0, 10));
-        }
-        // 統計情報を取得
-        if (data.total) {
-          setTotalManholes(data.total);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load recent manholes:', error);
     }
   };
 
@@ -198,10 +174,6 @@ export default function HomePage() {
     } catch {
       // ignore
     }
-  };
-
-  const handleManholeClick = (manhole: Manhole) => {
-    window.location.href = `/manhole/${manhole.id}`;
   };
 
   const handlePhotoClick = (photo: Photo) => {
@@ -289,7 +261,7 @@ export default function HomePage() {
             {/* Photo Gallery - 最近のポケふた写真 */}
             {recentPhotos.length > 0 && (
               <div className="rpg-window">
-                <h2 className="rpg-window-title text-sm mb-4">
+                <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-4">
                   最近のポケふた写真
                 </h2>
                 <div className="grid grid-cols-3 gap-2">
@@ -297,11 +269,19 @@ export default function HomePage() {
                     <div
                       key={photo.id}
                       onClick={() => handlePhotoClick(photo)}
-                      className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden cursor-pointer hover:border-rpg-yellow transition-colors group"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handlePhotoClick(photo);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      className="relative aspect-square bg-rpg-bgDark border-2 border-rpg-border overflow-hidden cursor-pointer hover:border-rpg-yellow transition-colors group focus:outline-none focus:ring-2 focus:ring-rpg-yellow"
                     >
                       <img
                         src={`/api/photo/${photo.id}?size=small`}
-                        alt="ポケふた写真"
+                        alt={`${photo.manhole?.prefecture || ''}${photo.manhole?.municipality || ''}(${photo.manhole?.id || photo.manhole_id || ''})のポケふた写真`}
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
@@ -379,72 +359,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Manholes Grid - 訪問済みまたは最近のマンホール */}
-            {(isLoggedIn ? visitedManholes : recentManholes).length > 0 ? (
-              <>
-                <div className="rpg-window">
-                  <h2 className="rpg-window-title text-sm mb-4">
-                    {isLoggedIn ? '訪問したポケふた' : '最近のポケふた'}
-                  </h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(isLoggedIn ? visitedManholes : recentManholes).map((manhole, index) => (
-                      <div
-                        key={manhole?.id || `manhole-${index}`}
-                        onClick={() => handleManholeClick(manhole)}
-                        className="rpg-window p-3 cursor-pointer hover:bg-rpg-bgLight transition-colors"
-                      >
-                        <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold mb-2">
-                          {manhole?.prefecture || ''}{manhole?.municipality || ''}({manhole?.id || ''})
-                        </h3>
-                        {manhole?.pokemons && manhole.pokemons.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {manhole.pokemons?.slice(0, 2).map((pokemon, index) => (
-                              <span
-                                key={index}
-                                className="bg-rpg-yellow px-1 py-0.5 border border-rpg-border font-pixelJp text-[10px] text-rpg-textDark"
-                              >
-                                {pokemon}
-                              </span>
-                            ))}
-                            {(manhole.pokemons?.length || 0) > 2 && (
-                              <span className="font-pixelJp text-[10px] text-rpg-textDark opacity-70">
-                                +{(manhole.pokemons?.length || 0) - 2}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* View on Map Link */}
-                  <div className="mt-4 text-center">
-                    <Link href="/map" className="rpg-button rpg-button-primary inline-flex items-center gap-2">
-                      <Map className="w-4 h-4" />
-                      <span className="font-pixelJp">マップで見る</span>
-                    </Link>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="rpg-window text-center py-12">
-                <MapPin className="w-16 h-16 text-rpg-textDark opacity-50 mx-auto mb-4" />
-                <h2 className="font-pixelJp text-lg text-rpg-textDark mb-2">
-                  {isLoggedIn ? 'まだ訪問記録がありません' : 'ポケふたが見つかりません'}
-                </h2>
-                <p className="font-pixelJp text-sm text-rpg-textDark opacity-70 mb-6">
-                  {isLoggedIn
-                    ? 'ポケふたを見つけて写真を登録しよう!'
-                    : 'ログインして訪問記録を登録しましょう'}
-                </p>
-                <button
-                  onClick={() => window.location.href = isLoggedIn ? '/upload' : '/login'}
-                  className="rpg-button rpg-button-primary"
-                >
-                  <span className="font-pixelJp">{isLoggedIn ? '写真を登録' : 'ログイン'}</span>
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>

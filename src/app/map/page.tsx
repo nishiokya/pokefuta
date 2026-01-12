@@ -286,7 +286,7 @@ export default function MapPage() {
           </div>
         ) : (
           <div className="rpg-window">
-            <h2 className="rpg-window-title text-sm mb-4">
+            <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-4">
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
