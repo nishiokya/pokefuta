@@ -418,9 +418,9 @@ export default function ManholeDetailPage() {
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* Header */}
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4 sticky top-0 z-20">
+      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4 sticky top-0 z-50">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             <button

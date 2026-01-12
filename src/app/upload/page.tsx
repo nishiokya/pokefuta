@@ -7,7 +7,7 @@ import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, Histor
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -322,9 +322,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="写真登録" icon={<Camera className="w-6 h-6" />} />
-
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         {/* Upload Area */}
         <div className="space-y-4">
@@ -372,7 +370,7 @@ export default function UploadPage() {
 
         {/* Photos List */}
         {photos.length > 0 && (
-          <div className="space-y-4 pb-20">
+          <div className="space-y-4">
             <div className="rpg-window">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold">
@@ -573,31 +571,7 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item active">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

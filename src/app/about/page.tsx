@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Info, Camera, Map, Navigation, History, Shield, MessageSquare, UserPlus, Github, Twitter } from 'lucide-react';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 export default function AboutPage() {
   // ページタイトル設定
@@ -11,9 +11,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header title="このアプリについて" icon={<Info className="w-6 h-6 text-rpg-yellow" />} />
-
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* アプリの説明 */}
         <section className="rpg-window">
@@ -240,6 +238,8 @@ export default function AboutPage() {
           </div>
         </section>
       </main>
+
+      <BottomNav />
     </div>
   );
 }

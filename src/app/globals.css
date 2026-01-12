@@ -263,6 +263,7 @@
     @apply bg-white/95 backdrop-blur-sm;
     @apply border-t-2 border-gray-200;
     @apply shadow-lg;
+    /* Below Header (z-50) / above page content */
     @apply z-40;
   }
 
@@ -305,6 +306,17 @@
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+
+  /*
+   * Fixed bottom navigation spacing.
+   *
+   * Note: We intentionally compute padding-bottom in one rule to avoid
+   * conflicts between Tailwind's `pb-*` utilities and `.safe-area-inset`
+   * (order-dependent). Use this on page root containers that render `.nav-rpg`.
+   */
+  .pb-nav-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
   }
 }
 

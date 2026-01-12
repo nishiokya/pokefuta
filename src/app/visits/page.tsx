@@ -6,7 +6,7 @@ import { MapPin, Calendar, Camera, Navigation, History, Heart, Bookmark, Home, T
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 
 interface Visit {
@@ -250,10 +250,8 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="訪問履歴" icon={<History className="w-6 h-6" />} />
-
       {/* Feed Container */}
-      <div className="max-w-2xl mx-auto pb-20">
+      <div className="max-w-2xl mx-auto pb-nav-safe">
         {sortedVisits.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="rpg-window">
@@ -458,31 +456,7 @@ export default function VisitsPage() {
         )}
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item active">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
 
       {/* Delete Photo Modal */}
       {selectedPhotoId && (

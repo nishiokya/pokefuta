@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Navigation, Camera, ExternalLink, Map as MapIcon, History, Home } from 'lucide-react';
+import { Navigation, ExternalLink, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -177,9 +176,7 @@ export default function NearbyPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header title="近くのポケふた" icon={<Navigation className="w-6 h-6" />} />
-
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* Controls - Compact Layout */}
       <div className="p-2 max-w-2xl mx-auto">
         {locationError && (
@@ -266,7 +263,7 @@ export default function NearbyPage() {
 
       {/* Map View */}
       {!loading && showMap && userLocation && (
-        <div className="px-2 pb-20 max-w-2xl mx-auto">
+        <div className="px-2 pb-nav-safe max-w-2xl mx-auto">
           <div className="rpg-window p-2">
             <div style={{ height: '400px' }}>
               <MapComponent
@@ -284,7 +281,7 @@ export default function NearbyPage() {
 
       {/* Manholes List */}
       {!loading && !showMap && (
-        <div className="px-2 pb-20 max-w-2xl mx-auto">
+        <div className="px-2 pb-nav-safe max-w-2xl mx-auto">
           {nearbyManholes.length === 0 ? (
             <div className="text-center py-8">
               <div className="rpg-window">
@@ -388,31 +385,7 @@ export default function NearbyPage() {
         </div>
       )}
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-1">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-5 h-5 mb-0.5" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-5 h-5 mb-0.5" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item active">
-            <Navigation className="w-5 h-5 mb-0.5" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-5 h-5 mb-0.5" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-5 h-5 mb-0.5" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

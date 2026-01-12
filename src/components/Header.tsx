@@ -80,7 +80,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
 
   return (
     <>
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-3 sticky top-0 z-40">
+      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-3 sticky top-0 z-50">
         <div className="container-pokemon">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -110,7 +110,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
           />
 
           {/* Menu Panel - RPG Style */}
-          <div className="fixed top-16 right-0 w-64 z-50 animate-slide-in">
+          <div className="fixed top-16 right-0 w-64 z-[60] animate-slide-in">
             <div className="rpg-window m-2">
               <h3 className="rpg-window-title text-sm mb-2">MENU</h3>
 

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Camera, Navigation, History, Map, Home, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Camera, Navigation, History, Map, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 interface Visit {
   id: string;
@@ -209,12 +209,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header
-        title="ホーム"
-        icon={<MapPin className="w-6 h-6" />}
-      />
-
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
         {/* Loading State */}
         {loading && (
@@ -454,31 +449,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item active">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }
