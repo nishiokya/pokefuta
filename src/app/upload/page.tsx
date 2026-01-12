@@ -327,7 +327,7 @@ export default function UploadPage() {
         <div className="rpg-window">
           <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">撮影のコツ（例）</h2>
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
-            できるだけ「真上から・番号が読める」写真だと、ポケふたを見つけやすくなります。
+            できるだけ「真上から・マンホール全体（ふたの縁まで）が入る」写真だと、とても助かります。
           </p>
         </div>
 
@@ -387,7 +387,7 @@ export default function UploadPage() {
               <ul className="space-y-1 font-pixelJp text-xs text-rpg-textDark opacity-80">
                 <li>・マンホール全体が入っている</li>
                 <li>・真上に近い角度で撮れている</li>
-                <li>・番号や絵柄がはっきり見える</li>
+                <li>・絵柄や文字がはっきり見える</li>
               </ul>
             </div>
 
