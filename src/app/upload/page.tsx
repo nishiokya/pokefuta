@@ -376,7 +376,7 @@ export default function UploadPage() {
         </div>
 
         <div className="rpg-window">
-          <h3 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-2">OK/NG（チュートリアル）</h3>
+          <h3 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-2">チュートリアル: OK/NG</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
             <div className="border-2 border-rpg-border bg-rpg-bgLight p-2">
