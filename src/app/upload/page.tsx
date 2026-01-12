@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History, Home } from 'lucide-react';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
@@ -36,6 +37,7 @@ export default function UploadPage() {
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
+  const [tutorialImageError, setTutorialImageError] = useState(false);
 
   useEffect(() => {
     // ページタイトル設定
@@ -420,14 +422,22 @@ export default function UploadPage() {
             </p>
           </div>
 
-          <div className="mt-4 border-2 border-rpg-border bg-rpg-bgDark overflow-hidden max-w-md mx-auto">
-            <img
-              src="/asset/tutorial_manhole.jpg"
-              alt="マンホール撮影のチュートリアル例"
-              className="w-full h-auto"
-              loading="lazy"
-            />
-          </div>
+          {!tutorialImageError && (
+            <div className="mt-4 border-2 border-rpg-border bg-rpg-bgDark overflow-hidden max-w-md mx-auto">
+              <Image
+                src="/asset/tutorial_manhole.jpg"
+                alt="マンホール撮影のチュートリアル例"
+                width={2500}
+                height={2657}
+                className="w-full h-auto"
+                priority={false}
+                onError={() => {
+                  console.error('Failed to load tutorial image');
+                  setTutorialImageError(true);
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Photos List */}
