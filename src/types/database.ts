@@ -60,6 +60,40 @@ export interface Database {
           prefecture_site_url?: string | null;
         };
       };
+      manhole_comment: {
+        Row: {
+          id: string;
+          manhole_id: number;
+          user_id: string;
+          content: string;
+          parent_comment_id: string | null;
+          is_edited: boolean;
+          edited_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          manhole_id: number;
+          user_id: string;
+          content: string;
+          parent_comment_id?: string | null;
+          is_edited?: boolean;
+          edited_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          manhole_id?: number;
+          user_id?: string;
+          content?: string;
+          parent_comment_id?: string | null;
+          is_edited?: boolean;
+          edited_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       visit: {
         Row: {
           id: string;

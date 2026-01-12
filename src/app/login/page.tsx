@@ -63,7 +63,7 @@ function LoginForm() {
         // app_userレコードの存在確認
         const { data: appUser, error: appUserError } = await supabase
           .from('app_user')
-          .select('id, auth_uid, email, display_name')
+          .select('auth_uid, display_name')
           .eq('auth_uid', data.user.id)
           .single();
 

@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, User as UserIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 
@@ -54,6 +56,18 @@ interface PhotoSocial {
   userBookmarked: boolean;
 }
 
+interface ManholeComment {
+  id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    email?: string | null;
+    display_name?: string | null;
+  };
+}
+
 export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -67,14 +81,32 @@ export default function ManholeDetailPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoSocial>>(new Map());
 
+  const [manholeComments, setManholeComments] = useState<ManholeComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsSubmitting, setCommentsSubmitting] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [newManholeComment, setNewManholeComment] = useState('');
+
   useEffect(() => {
     const manholeId = params.id;
     if (manholeId) {
       loadManholeDetail(manholeId as string);
       loadPhotos(manholeId as string);
+      loadManholeComments(manholeId as string);
       loadCurrentUser();
     }
   }, [params.id]);
+
+  const getCommentUserLabel = (comment: ManholeComment) => {
+    const name = comment.user.display_name;
+    if (name && name.trim().length > 0) return name;
+    return '名無し';
+  };
+
+  const getCommentUserInitial = (comment: ManholeComment) => {
+    const label = getCommentUserLabel(comment);
+    return label?.[0]?.toUpperCase() || 'U';
+  };
 
   const loadCurrentUser = async () => {
     try {
@@ -128,6 +160,70 @@ export default function ManholeDetailPage() {
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
+    }
+  };
+
+  const loadManholeComments = async (id: string) => {
+    setCommentsLoading(true);
+    setCommentsError(null);
+    try {
+      const response = await fetch(`/api/manholes/${id}/comments?limit=50&offset=0`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setManholeComments(data.comments || []);
+      } else {
+        setCommentsError(data.error || 'コメントの読み込みに失敗しました');
+      }
+    } catch (err) {
+      console.error('Failed to load manhole comments:', err);
+      setCommentsError('コメントの読み込み中にエラーが発生しました');
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleSubmitManholeComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentUserId) return;
+    if (!newManholeComment.trim()) return;
+
+    if (newManholeComment.length > 1000) {
+      setCommentsError('コメントは1000文字以内で入力してください');
+      return;
+    }
+
+    const manholeId = params.id;
+    if (!manholeId) return;
+
+    setCommentsSubmitting(true);
+    setCommentsError(null);
+    try {
+      const response = await fetch(`/api/manholes/${manholeId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: newManholeComment.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // APIが古い順（ascending）なので末尾に追加
+        setManholeComments((prev) => [...prev, data.comment]);
+        setNewManholeComment('');
+      } else if (response.status === 401) {
+        setCommentsError('ログインが必要です');
+      } else {
+        setCommentsError(data.error || 'コメントの投稿に失敗しました');
+      }
+    } catch (err) {
+      console.error('Failed to post manhole comment:', err);
+      setCommentsError('コメントの投稿中にエラーが発生しました');
+    } finally {
+      setCommentsSubmitting(false);
     }
   };
 
@@ -525,6 +621,80 @@ export default function ManholeDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Comments */}
+        <div className="rpg-window">
+          <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">コメント</h3>
+
+          {commentsLoading ? (
+            <div className="py-6 text-center">
+              <span className="font-pixelJp text-sm text-rpg-textDark opacity-70">読み込み中...</span>
+            </div>
+          ) : manholeComments.length === 0 ? (
+            <div className="py-6 text-center">
+              <span className="font-pixelJp text-sm text-rpg-textDark opacity-70">まだコメントがありません</span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {manholeComments.map((comment) => (
+                <div key={comment.id} className="bg-rpg-bgDark border-2 border-rpg-border p-3 rounded">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border-2 border-rpg-border rounded-full flex items-center justify-center">
+                      <span className="font-pixelJp text-xs text-rpg-textDark">{getCommentUserInitial(comment)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-pixelJp text-sm text-rpg-textGold font-bold truncate">{getCommentUserLabel(comment)}</span>
+                        <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
+                          {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
+                        </span>
+                      </div>
+                      <p className="font-pixelJp text-sm text-rpg-bgLight whitespace-pre-wrap break-words">{comment.content}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {commentsError && (
+            <div className="mt-3">
+              <div className="bg-rpg-red/20 border-2 border-rpg-red p-2 rounded">
+                <p className="font-pixelJp text-xs text-rpg-red">{commentsError}</p>
+              </div>
+            </div>
+          )}
+
+          {currentUserId ? (
+            <form onSubmit={handleSubmitManholeComment} className="mt-4 pt-4 border-t-2 border-rpg-border">
+              <div className="flex gap-2">
+                <textarea
+                  value={newManholeComment}
+                  onChange={(e) => setNewManholeComment(e.target.value)}
+                  placeholder="コメントを入力..."
+                  className="flex-1 bg-rpg-bgLight border-2 border-rpg-border p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
+                  rows={2}
+                  maxLength={1000}
+                  disabled={commentsSubmitting}
+                />
+                <button
+                  type="submit"
+                  disabled={commentsSubmitting || !newManholeComment.trim()}
+                  className="rpg-button rpg-button-success px-4 self-end disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="font-pixelJp text-xs">投稿</span>
+                </button>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="font-pixelJp text-xs text-rpg-textDark opacity-70">{newManholeComment.length}/1000</span>
+              </div>
+            </form>
+          ) : (
+            <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+              <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">ログインするとコメントを投稿できます</p>
+            </div>
+          )}
+        </div>
 
         {/* Map */}
         <div className="rpg-window">

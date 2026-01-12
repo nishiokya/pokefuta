@@ -5,18 +5,18 @@ import { Database } from '@/types/database';
 
 /**
  * @swagger
- * /api/visits/{id}/comments:
+ * /api/manholes/{id}/comments:
  *   get:
- *     summary: 訪問記録のコメント一覧取得
+ *     summary: マンホール共有コメント一覧取得
  *     tags: [social]
- *     description: 指定された訪問記録のコメント一覧を取得します。
+ *     description: 指定されたマンホールIDに紐づく共有コメント一覧を取得します。
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
- *           type: string
- *         description: 訪問記録のID
+ *           type: integer
+ *         description: マンホールID
  *       - in: query
  *         name: limit
  *         schema:
@@ -32,25 +32,14 @@ import { Database } from '@/types/database';
  *     responses:
  *       200:
  *         description: コメント一覧取得成功
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 comments:
- *                   type: array
- *                   items:
- *                     type: object
- *                 total:
- *                   type: integer
+ *       400:
+ *         description: リクエストが不正
  *       500:
  *         description: サーバーエラー
  *   post:
- *     summary: 訪問記録にコメントを追加
+ *     summary: マンホール共有コメントを追加
  *     tags: [social]
- *     description: 指定された訪問記録にコメントを追加します。
+ *     description: 指定されたマンホールIDに共有コメントを追加します。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -58,8 +47,8 @@ import { Database } from '@/types/database';
  *         name: id
  *         required: true
  *         schema:
- *           type: string
- *         description: 訪問記録のID
+ *           type: integer
+ *         description: マンホールID
  *     requestBody:
  *       required: true
  *       content:
@@ -81,13 +70,13 @@ import { Database } from '@/types/database';
  *       401:
  *         description: 認証が必要
  *       404:
- *         description: 訪問記録が見つかりません
+ *         description: マンホールが見つかりません
  *       500:
  *         description: サーバーエラー
  */
 
 // ==========================================
-// GET /api/visits/[id]/comments - コメント一覧取得
+// GET /api/manholes/[id]/comments - コメント一覧取得
 // ==========================================
 export async function GET(
   request: NextRequest,
@@ -99,23 +88,33 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
-    const visitId = params.id;
 
-    // ✅ コメント一覧を取得
+    const manholeId = Number(params.id);
+    if (!Number.isFinite(manholeId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid manhole id' },
+        { status: 400 }
+      );
+    }
+
     const { data: comments, error, count } = await supabase
-      .from('visit_comment')
+      .from('manhole_comment')
       .select('*', { count: 'exact' })
-      .eq('visit_id', visitId)
+      .eq('manhole_id', manholeId)
+      .is('parent_comment_id', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('Error fetching comments:', error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to fetch comments',
-        details: error.message
-      }, { status: 500 });
+      console.error('Error fetching manhole comments:', error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to fetch comments',
+          details: error.message,
+        },
+        { status: 500 }
+      );
     }
 
     const userIds = Array.from(
@@ -135,7 +134,7 @@ export async function GET(
         .in('auth_uid', userIds);
 
       if (appUserError) {
-        console.warn('Failed to load app_user for comments:', appUserError);
+        console.warn('Failed to load app_user for manhole comments:', appUserError);
       } else {
         (appUsers || []).forEach((u: any) => {
           if (u?.auth_uid) {
@@ -153,28 +152,30 @@ export async function GET(
         user: {
           id: uid,
           display_name: displayName,
-        }
+        },
       };
     });
 
     return NextResponse.json({
       success: true,
       comments: enriched,
-      total: count || 0
+      total: count || 0,
     });
-
   } catch (error: any) {
-    console.error('Unexpected error fetching comments:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Unexpected error',
-      details: error?.message || 'Unknown error'
-    }, { status: 500 });
+    console.error('Unexpected error fetching manhole comments:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unexpected error',
+        details: error?.message || 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }
 
 // ==========================================
-// POST /api/visits/[id]/comments - コメント追加
+// POST /api/manholes/[id]/comments - コメント追加
 // ==========================================
 export async function POST(
   request: NextRequest,
@@ -183,71 +184,77 @@ export async function POST(
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // ✅ 1. 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
-
     if (!session?.user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Authentication required'
-      }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const manholeId = Number(params.id);
+    if (!Number.isFinite(manholeId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid manhole id' },
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
-    const { content } = body;
-    const visitId = params.id;
-    const userId = session.user.id;
+    const { content } = body ?? {};
 
-    // ✅ 2. 入力検証
     if (!content || typeof content !== 'string' || content.trim() === '') {
-      return NextResponse.json({
-        success: false,
-        error: 'Content is required'
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Content is required' },
+        { status: 400 }
+      );
     }
 
     if (content.length > 1000) {
-      return NextResponse.json({
-        success: false,
-        error: 'Content must be less than 1000 characters'
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Content must be less than 1000 characters' },
+        { status: 400 }
+      );
     }
 
-    // ✅ 3. 訪問記録の存在確認
-    const { data: visit, error: visitError } = await supabase
-      .from('visit')
+    const { data: manhole, error: manholeError } = await supabase
+      .from('manhole')
       .select('id')
-      .eq('id', visitId)
+      .eq('id', manholeId)
       .single();
 
-    if (visitError || !visit) {
-      return NextResponse.json({
-        success: false,
-        error: 'Visit not found'
-      }, { status: 404 });
+    if (manholeError || !manhole) {
+      return NextResponse.json(
+        { success: false, error: 'Manhole not found' },
+        { status: 404 }
+      );
     }
 
-    // ✅ 4. コメントを追加
+    const userId = session.user.id;
+
     const { data: comment, error: commentError } = await supabase
-      .from('visit_comment')
+      .from('manhole_comment')
       .insert({
-        visit_id: visitId,
+        manhole_id: manholeId,
         user_id: userId,
-        content: content.trim()
+        content: content.trim(),
+        parent_comment_id: null,
       })
       .select('*')
       .single();
 
     if (commentError) {
-      console.error('Error creating comment:', commentError);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to create comment',
-        details: commentError.message
-      }, { status: 500 });
+      console.error('Error creating manhole comment:', commentError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to create comment',
+          details: commentError.message,
+        },
+        { status: 500 }
+      );
     }
 
-    // 表示用のユーザー情報を付与（ベストエフォート）
     let displayName: string | null = null;
     try {
       const { data: appUser } = await supabase
@@ -269,16 +276,18 @@ export async function POST(
         user: {
           id: userId,
           display_name: displayName,
-        }
-      }
+        },
+      },
     });
-
   } catch (error: any) {
-    console.error('Unexpected error creating comment:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Unexpected error',
-      details: error?.message || 'Unknown error'
-    }, { status: 500 });
+    console.error('Unexpected error creating manhole comment:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unexpected error',
+        details: error?.message || 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }

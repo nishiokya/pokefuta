@@ -33,10 +33,6 @@ export default function CommentModal({
     const getUserLabel = (comment: Comment) => {
       const name = comment.user.display_name;
       if (name && name.trim().length > 0) return name;
-      const email = comment.user.email;
-      if (email && email.trim().length > 0) return email;
-      const uid = comment.user.id;
-      if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
       return '名無し';
     };
 
@@ -181,11 +177,11 @@ export default function CommentModal({
                       <span className="font-pixelJp text-sm text-rpg-textGold font-bold truncate">
                         {getUserLabel(comment)}
                       </span>
-                      <span className="font-pixelJp text-xs text-rpg-textDark opacity-70 flex-shrink-0">
+                      <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
                         {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
                       </span>
                     </div>
-                    <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">
+                    <p className="font-pixelJp text-sm text-rpg-bgLight whitespace-pre-wrap break-words">
                       {comment.content}
                     </p>
                   </div>
