@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -274,8 +274,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
-      <Header title="マップ" icon={<MapIcon className="w-6 h-6" />} />
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -287,7 +286,7 @@ export default function MapPage() {
           </div>
         ) : (
           <div className="rpg-window">
-            <h2 className="rpg-window-title text-sm mb-4">
+            <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-4">
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
@@ -418,31 +417,7 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item active">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

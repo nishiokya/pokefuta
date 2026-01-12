@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import BottomNav from '@/components/BottomNav';
 import { LogIn, Mail, Lock, AlertCircle, MapPin, Camera, Navigation, History, Home, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
@@ -89,7 +90,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center p-4 pb-20">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -203,31 +204,7 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+        <BottomNav />
     </div>
   );
 }
@@ -235,7 +212,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center">
+      <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center">
         <div className="font-pixelJp text-rpg-textGold">
           読み込み中<span className="rpg-loading"></span>
         </div>

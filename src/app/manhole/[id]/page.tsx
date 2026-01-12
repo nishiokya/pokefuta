@@ -4,12 +4,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, History, Home, Trash2, Heart, Bookmark, User as UserIcon } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, Heart, Bookmark, User as UserIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import BottomNav from '@/components/BottomNav';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -418,9 +419,9 @@ export default function ManholeDetailPage() {
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark pb-20">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* Header */}
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4 sticky top-0 z-20">
+      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4 sticky top-0 z-50">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             <button
@@ -769,31 +770,7 @@ export default function ManholeDetailPage() {
         </div>
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
 
       {/* Delete Photo Modal */}
       {selectedPhotoId && (

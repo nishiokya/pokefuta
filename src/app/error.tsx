@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { MapPin, Camera, Navigation, History, Home, AlertCircle, RefreshCw } from 'lucide-react';
+import BottomNav from '@/components/BottomNav';
 
 export default function Error({
   error,
@@ -17,7 +18,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center p-4 pb-20">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Pokemon Manhole Icon - Error State */}
         <div className="text-center mb-8">
@@ -106,31 +107,7 @@ export default function Error({
         </div>
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item">
-            <Home className="w-6 h-6 mb-1" />
-            <span>ホーム</span>
-          </Link>
-          <Link href="/map" className="nav-rpg-item">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

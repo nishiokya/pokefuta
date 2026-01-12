@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -90,9 +90,7 @@ export default function HomePage() {
     }
   };
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
-      <Header title="マンホール一覧" icon={<MapPin className="w-6 h-6" />} />
-
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* Map Container */}
       <div className="relative" style={{ height: 'calc(100vh - 140px)' }}>
         {/* Location Button */}
@@ -162,27 +160,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Bottom Navigation - RPG Style */}
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          <Link href="/" className="nav-rpg-item active">
-            <MapPin className="w-6 h-6 mb-1" />
-            <span>マップ</span>
-          </Link>
-          <Link href="/nearby" className="nav-rpg-item">
-            <Navigation className="w-6 h-6 mb-1" />
-            <span>近く</span>
-          </Link>
-          <Link href="/upload" className="nav-rpg-item">
-            <Camera className="w-6 h-6 mb-1" />
-            <span>登録</span>
-          </Link>
-          <Link href="/visits" className="nav-rpg-item">
-            <History className="w-6 h-6 mb-1" />
-            <span>履歴</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }
