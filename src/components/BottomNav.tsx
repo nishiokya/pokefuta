@@ -44,7 +44,9 @@ export default function BottomNav() {
     () => [
       { href: '/', label: 'ホーム', icon: <Home className="w-6 h-6 mb-1" /> },
       { href: '/nearby', label: '近く', icon: <Navigation className="w-6 h-6 mb-1" /> },
-      { href: '/upload', label: '登録', icon: <Camera className="w-6 h-6 mb-1" /> },
+      isLoggedIn
+        ? { href: '/upload', label: '登録', icon: <Camera className="w-6 h-6 mb-1" /> }
+        : { href: '/signup', label: 'アカウント作成', icon: <Camera className="w-6 h-6 mb-1" /> },
       isLoggedIn
         ? { href: '/visits', label: '履歴', icon: <History className="w-6 h-6 mb-1" /> }
         : { href: '/map', label: 'マップ', icon: <MapPin className="w-6 h-6 mb-1" /> },
@@ -56,16 +58,34 @@ export default function BottomNav() {
     <>
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {items.map((item) => {
+            if (!isLoggedIn && item.href === '/signup') {
+              const active = isActivePath(pathname, '/signup');
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`nav-rpg-item ${active ? 'active' : ''}`}
+                  aria-label="アカウント作成"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </Link>
+              );
+            }
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
 
           <button
             type="button"

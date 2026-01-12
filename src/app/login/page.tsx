@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
-import { LogIn, Mail, Lock, AlertCircle, MapPin, Camera, Navigation, History, Home, Info } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
 
@@ -93,15 +93,16 @@ function LoginForm() {
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block mb-4">
-            <div className="w-20 h-20 bg-rpg-yellow border-4 border-rpg-border flex items-center justify-center mx-auto">
-              <LogIn className="w-10 h-10 text-rpg-textDark" />
+        <div className="rpg-window text-center mb-6">
+          <div className="inline-block mb-3">
+            <div className="w-16 h-16 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center mx-auto">
+              <LogIn className="w-8 h-8 text-rpg-textDark" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-2xl text-rpg-yellow mb-2">
-            ログイン
-          </h1>
+          <h1 className="font-pixelJp text-lg text-rpg-textGold font-bold">ログイン</h1>
+          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
+            アカウント作成済みの方はこちら
+          </p>
         </div>
 
         {/* Login Form */}
@@ -194,13 +195,6 @@ function LoginForm() {
               <span className="font-pixelJp">新規登録</span>
             </Link>
           </div>
-        </div>
-
-        {/* Back to Home */}
-        <div className="mt-4 text-center">
-          <Link href="/" className="font-pixelJp text-xs text-rpg-yellow hover:opacity-70">
-            ← ホームに戻る
-          </Link>
         </div>
       </div>
 
