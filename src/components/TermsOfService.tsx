@@ -48,7 +48,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
       {/* 利用規約詳細（展開時のみ表示） */}
       {isExpanded && (
         <div className="mt-3 p-3 bg-rpg-bgDark border-2 border-rpg-border max-h-64 overflow-y-auto">
-          <div className="space-y-3 font-pixelJp text-xs text-rpg-textDark">
+          <div className="space-y-3 font-pixelJp text-xs text-rpg-bgLight">
             <div>
               <h3 className="font-bold text-rpg-yellow mb-2">📸 写真の公開について</h3>
               <p className="leading-relaxed opacity-90">

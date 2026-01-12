@@ -448,10 +448,8 @@ export async function GET(request: NextRequest) {
       let displayNameByAuthUid = new Map<string, string | null>();
 
       if (visitUserIds.length > 0) {
-        // Prefer service-role client to bypass RLS when resolving other users' display_name
-        const client: any = supabaseAdmin ?? supabase;
-
-        const { data: appUsers, error: appUserError } = await client
+        // A方針: app_user.display_name を公開SELECTで解決するため、通常のroute clientを使う
+        const { data: appUsers, error: appUserError } = await supabase
           .from('app_user')
           .select('auth_uid, display_name')
           .in('auth_uid', visitUserIds);
@@ -464,30 +462,6 @@ export async function GET(request: NextRequest) {
               displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
             }
           });
-        }
-      }
-
-      // Fallback: resolve from Supabase Auth user_metadata when app_user.display_name is missing
-      // (requires service role)
-      if (supabaseAdmin && visitUserIds.length > 0) {
-        const unresolved = visitUserIds.filter((uid) => {
-          const v = displayNameByAuthUid.get(uid);
-          return !v || (typeof v === 'string' && v.trim().length === 0);
-        });
-
-        // Limit to keep this endpoint fast
-        const limited = unresolved.slice(0, 50);
-        for (const uid of limited) {
-          try {
-            const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(uid);
-            if (userError) continue;
-            const metaName = (userData?.user as any)?.user_metadata?.display_name;
-            if (typeof metaName === 'string' && metaName.trim().length > 0) {
-              displayNameByAuthUid.set(uid, metaName.trim());
-            }
-          } catch {
-            // ignore
-          }
         }
       }
 
