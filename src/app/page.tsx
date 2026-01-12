@@ -180,11 +180,12 @@ export default function HomePage() {
                     const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} ${formatShotAt(visit.shot_at)} いいね${visit.likes_count} コメント${visit.comments_count}`;
 
                     if (!canNavigate) {
-                      console.warn('Home feed item missing manholeId; navigation disabled', {
-                        visitId: visit.id,
-                        manhole_id: visit.manhole_id,
-                        manhole: visit.manhole,
-                      });
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.warn('Home feed item missing manholeId; navigation disabled', {
+                          visitId: visit.id,
+                          manhole_id: visit.manhole_id,
+                        });
+                      }
 
                       return (
                         <div
