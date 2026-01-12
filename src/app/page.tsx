@@ -143,9 +143,18 @@ export default function HomePage() {
 
             {/* Feed - 最近の公開投稿（API改修なし） */}
             <div className="rpg-window">
-              <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-3">
-                最近の投稿
-              </h2>
+              {isLoggedIn ? (
+                <div className="text-center mb-3">
+                  <h2 className="font-pixelJp text-lg text-rpg-textDark mb-2">ポケふた写真館</h2>
+                  <p className="font-pixelJp text-sm text-rpg-textDark leading-relaxed">
+                    あなたも見つけたポケふたの写真を登録して、みんなとシェアしませんか？
+                  </p>
+                </div>
+              ) : (
+                <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-3">
+                  最近の投稿
+                </h2>
+              )}
 
               {feed.length === 0 ? (
                 <div className="text-center py-8">
@@ -165,7 +174,7 @@ export default function HomePage() {
                     const idLabel = visit.manhole?.id ?? visit.manhole_id ?? '';
                     const locationLabel = title || visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
-                    const to = manholeId ? `/manhole/${manholeId}` : `/visit/${visit.id}/photos`;
+                    const to = manholeId ? `/manhole/${manholeId}` : `/manholes`;
 
                     return (
                       <Link

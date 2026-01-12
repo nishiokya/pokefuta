@@ -252,6 +252,15 @@ export default function VisitsPage() {
     <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
       {/* Feed Container */}
       <div className="max-w-2xl mx-auto pb-nav-safe">
+        <div className="p-4 pb-0">
+          <div className="rpg-window">
+            <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">訪問履歴</h2>
+            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+              登録した訪問記録を一覧で見られます。写真・コメントを確認したり、いいね/ブックマークの状態もチェックできます。
+            </p>
+          </div>
+        </div>
+
         {sortedVisits.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="rpg-window">
@@ -442,7 +451,7 @@ export default function VisitsPage() {
                     </button>
                     {visit.photos.length > 0 && (
                       <button
-                        onClick={() => window.location.href = `/visit/${visit.id}/photos`}
+                        onClick={() => window.location.href = `/manhole/${visit.manhole.id}`}
                         className="rpg-button rpg-button-success text-xs flex-1"
                       >
                         写真

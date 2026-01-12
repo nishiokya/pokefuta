@@ -324,6 +324,13 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
+        <div className="rpg-window">
+          <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">撮影のコツ（例）</h2>
+          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+            できるだけ「真上から・番号が読める」写真だと、ポケふたを見つけやすくなります。
+          </p>
+        </div>
+
         {/* Upload Area */}
         <div className="space-y-4">
           <div
@@ -366,6 +373,61 @@ export default function UploadPage() {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="rpg-window">
+          <h3 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-2">OK/NG（チュートリアル）</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+            <div className="border-2 border-rpg-border bg-rpg-bgLight p-2">
+              <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-green mb-1">
+                <CheckCircle className="w-3 h-3" />
+                <span>OK</span>
+              </div>
+              <ul className="space-y-1 font-pixelJp text-xs text-rpg-textDark opacity-80">
+                <li>・マンホール全体が入っている</li>
+                <li>・真上に近い角度で撮れている</li>
+                <li>・番号や絵柄がはっきり見える</li>
+              </ul>
+            </div>
+
+            <div className="border-2 border-rpg-border bg-rpg-bgLight p-2">
+              <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-red mb-1">
+                <AlertCircle className="w-3 h-3" />
+                <span>NG</span>
+              </div>
+              <ul className="space-y-1 font-pixelJp text-xs text-rpg-textDark opacity-80">
+                <li>・斜めすぎて歪んでいる</li>
+                <li>・反射/影で見えにくい</li>
+                <li>・暗い/ブレている</li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="font-pixelJp text-[10px] text-rpg-textDark opacity-60 mt-2">
+            位置情報が入っている写真は、候補の絞り込みがスムーズになります（なくても登録できます）。
+          </p>
+
+          <div className="mt-3 space-y-1">
+            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+              過去に撮った写真も登録できます。ただしトップページは日付順に並ぶため、昔の日付で登録すると下の方に表示されます。
+            </p>
+            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+              同じポケふたに複数の写真を登録できます（別角度・別日・アップなど）。あとから追加登録もOKです。
+            </p>
+            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+              いい写真が撮れたら、ぜひ新規投稿して図鑑を盛り上げてください。
+            </p>
+          </div>
+
+          <div className="mt-4 border-2 border-rpg-border bg-rpg-bgDark overflow-hidden max-w-md mx-auto">
+            <img
+              src="/asset/tutorial_manhole.jpg"
+              alt="マンホール撮影のチュートリアル例"
+              className="w-full h-auto"
+              loading="lazy"
+            />
+          </div>
         </div>
 
         {/* Photos List */}

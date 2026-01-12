@@ -179,6 +179,13 @@ export default function NearbyPage() {
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* Controls - Compact Layout */}
       <div className="p-2 max-w-2xl mx-auto">
+        <div className="rpg-window mb-2">
+          <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">近くのポケふた</h2>
+          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
+            現在地の周辺にあるポケふたを探します。範囲（km）を調整して、行けそうな場所から見つけてください。
+          </p>
+        </div>
+
         {locationError && (
           <div className="rpg-window mb-2 bg-red-50 border-red-300">
             <p className="text-sm text-red-600">{locationError}</p>
