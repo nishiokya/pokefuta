@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History, Home } from 'lucide-react';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
@@ -421,11 +422,17 @@ export default function UploadPage() {
           </div>
 
           <div className="mt-4 border-2 border-rpg-border bg-rpg-bgDark overflow-hidden max-w-md mx-auto">
-            <img
+            <Image
               src="/asset/tutorial_manhole.jpg"
               alt="マンホール撮影のチュートリアル例"
+              width={2500}
+              height={2657}
               className="w-full h-auto"
-              loading="lazy"
+              priority={false}
+              onError={(e) => {
+                console.error('Failed to load tutorial image:', e);
+                e.currentTarget.style.display = 'none';
+              }}
             />
           </div>
         </div>
