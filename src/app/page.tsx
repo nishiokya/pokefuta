@@ -12,6 +12,7 @@ type FeedVisit = {
   manhole_id: number | null;
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
   shot_at: string;
+  created_at: string;
   shot_location?: string | null;
   photos: Array<{
     id: string;
@@ -61,7 +62,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}`,
+        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -105,9 +106,9 @@ export default function HomePage() {
     }
   };
 
-  const formatShotAt = (shotAt: string) => {
+  const formatDateJa = (value: string) => {
     try {
-      return new Date(shotAt).toLocaleDateString('ja-JP');
+      return new Date(value).toLocaleDateString('ja-JP');
     } catch {
       return '';
     }
@@ -177,7 +178,7 @@ export default function HomePage() {
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} ${formatShotAt(visit.shot_at)} いいね${visit.likes_count} コメント${visit.comments_count}`;
+                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} 撮影${formatDateJa(visit.shot_at)} 投稿${formatDateJa(visit.created_at)} いいね${visit.likes_count} コメント${visit.comments_count}`;
 
                     if (!canNavigate) {
                       if (process.env.NODE_ENV !== 'production') {
@@ -212,7 +213,7 @@ export default function HomePage() {
                               {locationLabel}{idLabel ? `(${idLabel})` : ''}
                             </div>
                             <div className="font-pixelJp text-[10px] text-white/80">
-                              {formatShotAt(visit.shot_at)}
+                              撮影: {formatDateJa(visit.shot_at)} / 投稿: {formatDateJa(visit.created_at)}
                             </div>
                           </div>
 
@@ -259,7 +260,7 @@ export default function HomePage() {
                             {locationLabel}{idLabel ? `(${idLabel})` : ''}
                           </div>
                           <div className="font-pixelJp text-[10px] text-white/80">
-                            {formatShotAt(visit.shot_at)}
+                            撮影: {formatDateJa(visit.shot_at)} / 投稿: {formatDateJa(visit.created_at)}
                           </div>
                         </div>
 
