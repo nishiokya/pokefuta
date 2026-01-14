@@ -556,20 +556,21 @@ export default function ManholeDetailPage() {
                                   {getPhotoUserLabel(photo)}
                                 </span>
                               </div>
-                              {(photo.visit?.shot_at || photo.visit?.created_at) && (
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <Clock className="w-4 h-4 text-white/90" />
-                                  <span className="font-pixelJp text-xs text-white/90 drop-shadow">
-                                    {photo.visit?.shot_at
-                                      ? `撮影: ${formatDateJa(photo.visit.shot_at)}`
-                                      : ''}
-                                    {photo.visit?.shot_at && photo.visit?.created_at ? ' / ' : ''}
-                                    {photo.visit?.created_at
-                                      ? `投稿: ${formatDateJa(photo.visit.created_at)}`
-                                      : ''}
-                                  </span>
-                                </div>
-                              )}
+                              {(() => {
+                                const shotDate = photo.visit?.shot_at ? formatDateJa(photo.visit.shot_at) : '';
+                                const createdDate = photo.visit?.created_at ? formatDateJa(photo.visit.created_at) : '';
+                                const parts = [];
+                                if (shotDate) parts.push(`撮影: ${shotDate}`);
+                                if (createdDate) parts.push(`投稿: ${createdDate}`);
+                                return parts.length > 0 ? (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Clock className="w-4 h-4 text-white/90" />
+                                    <span className="font-pixelJp text-xs text-white/90 drop-shadow">
+                                      {parts.join(' / ')}
+                                    </span>
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
 
                           {/* Comment Section (上部) - Instagram style */}
