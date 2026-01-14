@@ -1,7 +1,5 @@
 export const formatDateJa = (value: string) => {
-  try {
-    return new Date(value).toLocaleDateString('ja-JP');
-  } catch {
-    return '';
-  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('ja-JP');
 };

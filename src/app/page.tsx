@@ -171,7 +171,7 @@ export default function HomePage() {
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} 撮影 ${formatDateJa(visit.shot_at)} 投稿 ${formatDateJa(visit.created_at)} いいね ${visit.likes_count} コメント ${visit.comments_count}`;
+                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''}、撮影 ${formatDateJa(visit.shot_at)}、投稿 ${formatDateJa(visit.created_at)}、いいね ${visit.likes_count}、コメント ${visit.comments_count}`;
 
                     if (!canNavigate) {
                       if (process.env.NODE_ENV !== 'production') {
