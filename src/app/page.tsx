@@ -6,6 +6,7 @@ import { Camera, ChevronLeft, ChevronRight, Heart, MapPin, MessageCircle } from 
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
+import { formatDateJa } from '@/lib/date';
 
 type FeedVisit = {
   id: string;
@@ -106,14 +107,6 @@ export default function HomePage() {
     }
   };
 
-  const formatDateJa = (value: string) => {
-    try {
-      return new Date(value).toLocaleDateString('ja-JP');
-    } catch {
-      return '';
-    }
-  };
-
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
@@ -178,7 +171,7 @@ export default function HomePage() {
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} 撮影${formatDateJa(visit.shot_at)} 投稿${formatDateJa(visit.created_at)} いいね${visit.likes_count} コメント${visit.comments_count}`;
+                    const commonAriaLabel = `${locationLabel}${idLabel ? `(${idLabel})` : ''} 撮影 ${formatDateJa(visit.shot_at)} 投稿 ${formatDateJa(visit.created_at)} いいね ${visit.likes_count} コメント ${visit.comments_count}`;
 
                     if (!canNavigate) {
                       if (process.env.NODE_ENV !== 'production') {
