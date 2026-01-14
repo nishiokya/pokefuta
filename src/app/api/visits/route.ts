@@ -118,6 +118,10 @@ export async function GET(request: NextRequest) {
     const withPhotos = searchParams.get('with_photos');
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const orderByRaw = searchParams.get('order_by');
+
+    // Default keeps existing behavior; home feed can override with order_by=created_at
+    const orderBy: 'shot_at' | 'created_at' = orderByRaw === 'created_at' ? 'created_at' : 'shot_at';
 
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
@@ -148,7 +152,7 @@ export async function GET(request: NextRequest) {
             created_at
           )
         `)
-        .order('shot_at', { ascending: false })
+        .order(orderBy, { ascending: false })
         .range(offset, offset + limit - 1)
         .eq('user_id', viewerUserId);
     } else {
@@ -182,7 +186,7 @@ export async function GET(request: NextRequest) {
             created_at
           )
         `)
-        .order('shot_at', { ascending: false })
+        .order(orderBy, { ascending: false })
         .range(offset, offset + limit - 1)
         .eq('is_public', true);
     }

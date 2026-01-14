@@ -11,6 +11,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
+import { formatDateJa } from '@/lib/date';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -36,6 +37,7 @@ interface Photo {
     user_id: string;
     display_name?: string | null;
     shot_at: string;
+    created_at?: string;
     comment?: string;  // 訪問コメント
     is_public?: boolean;
   };
@@ -554,11 +556,17 @@ export default function ManholeDetailPage() {
                                   {getPhotoUserLabel(photo)}
                                 </span>
                               </div>
-                              {photo.visit?.shot_at && (
+                              {(photo.visit?.shot_at || photo.visit?.created_at) && (
                                 <div className="flex items-center gap-1 shrink-0">
                                   <Clock className="w-4 h-4 text-white/90" />
                                   <span className="font-pixelJp text-xs text-white/90 drop-shadow">
-                                    {new Date(photo.visit.shot_at).toLocaleDateString('ja-JP')}
+                                    {photo.visit?.shot_at
+                                      ? `撮影: ${formatDateJa(photo.visit.shot_at)}`
+                                      : ''}
+                                    {photo.visit?.shot_at && photo.visit?.created_at ? ' / ' : ''}
+                                    {photo.visit?.created_at
+                                      ? `投稿: ${formatDateJa(photo.visit.created_at)}`
+                                      : ''}
                                   </span>
                                 </div>
                               )}

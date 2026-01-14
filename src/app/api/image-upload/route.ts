@@ -405,6 +405,7 @@ export async function GET(request: NextRequest) {
             id,
             user_id,
             shot_at,
+            created_at,
             manhole_id,
             comment,
             is_public
