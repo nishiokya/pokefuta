@@ -420,14 +420,6 @@ export default function UploadPage() {
             </p>
           </div>
 
-          <div className="mt-4 border-2 border-rpg-border bg-rpg-bgDark overflow-hidden max-w-md mx-auto">
-            <img
-              src="/asset/tutorial_manhole.jpg"
-              alt="マンホール撮影のチュートリアル例"
-              className="w-full h-auto"
-              loading="lazy"
-            />
-          </div>
         </div>
 
         {/* Photos List */}
