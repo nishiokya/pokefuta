@@ -97,6 +97,18 @@ export default function VisitsPage() {
     new Date(b.visited_at).getTime() - new Date(a.visited_at).getTime()
   );
 
+  const visitedManholesCount = new Set(
+    visits
+      .map((visit) => visit.manhole?.id)
+      .filter((id): id is number => typeof id === 'number')
+  ).size;
+
+  const visitedPrefecturesCount = new Set(
+    visits
+      .map((visit) => visit.manhole?.prefecture?.trim())
+      .filter((prefecture): prefecture is string => Boolean(prefecture))
+  ).size;
+
   const handleDeleteClick = (photoId: string) => {
     setSelectedPhotoId(photoId);
     setDeleteModalOpen(true);
@@ -260,6 +272,29 @@ export default function VisitsPage() {
             </p>
           </div>
         </div>
+
+        {visits.length > 0 && (
+          <div className="p-4 pb-0">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rpg-window text-center">
+                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
+                  訪れたマンホール
+                </p>
+                <p className="font-pixel text-2xl text-rpg-textDark">
+                  {visitedManholesCount}
+                </p>
+              </div>
+              <div className="rpg-window text-center">
+                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
+                  訪れた都道府県
+                </p>
+                <p className="font-pixel text-2xl text-rpg-textDark">
+                  {visitedPrefecturesCount}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {sortedVisits.length === 0 ? (
           <div className="text-center py-12 px-4">
