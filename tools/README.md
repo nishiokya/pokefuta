@@ -6,15 +6,6 @@
 
 最新のポケふたデータをGitHubから取得し、PostgreSQL INSERT文を生成するPythonスクリプト。
 
-**拡張機能（マイグレーション006対応）:**
-- prefecture_id と prefecture_code を自動生成
-- last_verified_at を NOW() に設定
-- prefecture_site_url フィールド対応
-
-### `migrate_manhole_prefecture_ids.sql`
-
-既存マンホールデータに prefecture_id と prefecture_code を埋めるヘルパースクリプト。
-
 ## 🚀 使い方
 
 ### 1. マンホールデータのSQL生成
@@ -132,61 +123,11 @@ graph LR
 CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
-## � マイグレーション006対応（manhole テーブル拡張）
-
-### 実行順序
-
-1. **マイグレーション 006 実行**
-   ```bash
-   supabase db push
-   # または
-   psql $DATABASE_URL < database/migrations/006_extend_manhole_fields.sql
-   ```
-
-2. **既存データにデータを埋める**
-   ```bash
-   # SQL Editorで実行
-   psql $DATABASE_URL < tools/migrate_manhole_prefecture_ids.sql
-   ```
-
-3. **新規マンホール追加時は自動的に prefecture_id と prefecture_code が生成される**
-   ```bash
-   python3 tools/generate_manhole_sql.py 2>/dev/null > manhole_update.sql
-   # manhole_update.sql を実行すると、prefecture_id と prefecture_code が自動設定
-   ```
-
-### 拡張されたカラム
-
-| カラム | 型 | 用途 |
-|-------|-----|------|
-| `prefecture_id` | INTEGER | 都道府県 ID（prefecture テーブル参照） |
-| `prefecture_code` | VARCHAR(2) | 都道府県コード（01-47） |
-| `region` | TEXT | 地域名（北海道、東北、関東など） |
-| `is_active` | BOOLEAN | アクティブフラグ（廃止対応） |
-| `last_verified_at` | TIMESTAMPTZ | 最後にデータを確認した日時 |
-| `data_source` | TEXT | データソース/スクレイパーバージョン |
-
-### パフォーマンス改善
-
-```sql
-# 高速化前（文字列マッチング）
-SELECT COUNT(*) FROM manhole WHERE prefecture = '東京都';
--- テーブルスキャン: ~100ms
-
-# 高速化後（インデックス使用）
-SELECT COUNT(*) FROM manhole WHERE prefecture_id = 13;
--- インデックススキャン: ~1ms ✅ 100倍高速
-```
-
----
-
 ## 💡 使用例
 
-### 全件更新（住所情報修正時）
+### 新規マンホールのみを追加する場合
 
-```bash
-# 全件の最新データを生成・更新
-python3 tools/generate_manhole_sql.py 2>/dev/null > manhole_update.sql
+データベースに既に400件のマンホールがある場合、ID 401以上のみを追加：
 
 ```bash
 # ID 401以上の新規マンホールのみ生成

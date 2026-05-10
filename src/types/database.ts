@@ -11,8 +11,6 @@ export interface Database {
           updated_at: string;
           settings: Record<string, any>;
           stats: UserStats;
-          all_prefectures_completed_at: string | null;
-          all_prefectures_outdated_at: string | null;
         };
         Insert: {
           id?: string;
@@ -21,16 +19,12 @@ export interface Database {
           avatar_url?: string | null;
           settings?: Record<string, any>;
           stats?: UserStats;
-          all_prefectures_completed_at?: string | null;
-          all_prefectures_outdated_at?: string | null;
         };
         Update: {
           display_name?: string | null;
           avatar_url?: string | null;
           settings?: Record<string, any>;
           stats?: UserStats;
-          all_prefectures_completed_at?: string | null;
-          all_prefectures_outdated_at?: string | null;
         };
       };
       manhole: {
@@ -38,18 +32,11 @@ export interface Database {
           id: number;
           title: string;
           prefecture: string;
-          prefecture_id: number | null;
-          prefecture_code: string | null;
           municipality: string | null;
-          address: string | null;
           location: string; // PostGIS geography as string
           pokemons: string[];
           detail_url: string | null;
           prefecture_site_url: string | null;
-          region: string | null;
-          is_active: boolean;
-          last_verified_at: string;
-          data_source: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -57,34 +44,20 @@ export interface Database {
           id: number;
           title: string;
           prefecture: string;
-          prefecture_id?: number | null;
-          prefecture_code?: string | null;
           municipality?: string | null;
-          address?: string | null;
           location: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
-          region?: string | null;
-          is_active?: boolean;
-          last_verified_at?: string;
-          data_source?: string | null;
         };
         Update: {
           title?: string;
           prefecture?: string;
-          prefecture_id?: number | null;
-          prefecture_code?: string | null;
           municipality?: string | null;
-          address?: string | null;
           location?: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
-          region?: string | null;
-          is_active?: boolean;
-          last_verified_at?: string;
-          data_source?: string | null;
         };
       };
       manhole_comment: {
@@ -300,61 +273,6 @@ export interface Database {
           metadata?: Record<string, any> | null;
         };
       };
-      prefecture: {
-        Row: {
-          id: number;
-          code: string;
-          name: string;
-          name_en: string | null;
-          display_order: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: number;
-          code: string;
-          name: string;
-          name_en?: string | null;
-          display_order: number;
-        };
-        Update: {
-          code?: string;
-          name?: string;
-          name_en?: string | null;
-          display_order?: number;
-        };
-      };
-      prefecture_badge: {
-        Row: {
-          id: string;
-          user_id: string;
-          prefecture_id: number;
-          status: 'active' | 'outdated' | 'completed';
-          acquired_at: string;
-          outdated_at: string | null;
-          completion_percentage: number;
-          manhole_count_at_completion: number;
-          visited_manhole_count: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          prefecture_id: number;
-          status?: 'active' | 'outdated' | 'completed';
-          acquired_at?: string;
-          outdated_at?: string | null;
-          completion_percentage?: number;
-          manhole_count_at_completion?: number;
-          visited_manhole_count?: number;
-        };
-        Update: {
-          status?: 'active' | 'outdated' | 'completed';
-          outdated_at?: string | null;
-          completion_percentage?: number;
-        };
-      };
     };
     Views: {
       user_visit_stats: {
@@ -368,27 +286,6 @@ export interface Database {
           total_photos: number;
           first_visit: string | null;
           last_visit: string | null;
-        };
-      };
-      prefecture_completion_tracker: {
-        Row: {
-          badge_id: string | null;
-          user_id: string | null;
-          prefecture_id: number;
-          code: string;
-          name: string;
-          name_en: string | null;
-          status: string | null;
-          total_manholes_now: number;
-          visited_manholes_count: number;
-          current_completion_percentage: number | null;
-          acquired_at: string | null;
-          outdated_at: string | null;
-          manhole_count_at_completion: number | null;
-          visited_manhole_count: number | null;
-          completion_percentage: number | null;
-          created_at: string | null;
-          updated_at: string | null;
         };
       };
     };
@@ -410,19 +307,6 @@ export interface Database {
           pokemons: string[];
           distance_km: number | null;
         }[];
-      };
-      create_prefecture_badge: {
-        Args: {
-          p_user_id: string;
-          p_prefecture_id: number;
-        };
-        Returns: string | null;
-      };
-      check_and_update_all_prefectures_completion: {
-        Args: {
-          p_user_id: string;
-        };
-        Returns: undefined;
       };
     };
   };
