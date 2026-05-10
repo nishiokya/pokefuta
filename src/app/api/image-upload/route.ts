@@ -230,16 +230,14 @@ export async function POST(request: NextRequest) {
     }
 
     const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
-      const distanceThreshold = MAX_DISTANCE_KM; // 50m
-
-    if (distance >= distanceThreshold) {
+    const distanceThreshold = MAX_DISTANCE_KM; // 50m
+    if (distance > distanceThreshold) {
       const distanceM = Math.round(distance * 1000);
       return NextResponse.json({
         success: false,
         error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
       }, { status: 400 });
     }
-      // Additional context lines can be added here if necessary
 
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();

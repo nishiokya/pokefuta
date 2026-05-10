@@ -8,7 +8,7 @@ import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
-import { calculateDistance, isWithinThreshold, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
+import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -16,6 +16,18 @@ interface PhotoMetadata {
   datetime?: string;
   camera?: string;
   lens?: string;
+}
+
+interface UploadedPhoto {
+  id: string;
+  file: File;
+  preview: string;
+  metadata: PhotoMetadata;
+  matchedManhole?: Manhole;
+  uploading: boolean;
+  uploaded: boolean;
+  uploadedImageId?: string;
+  error?: string;
 }
 
   id: string;
@@ -102,9 +114,9 @@ export default function UploadPage() {
     let minDistance = Infinity;
 
     manholes.forEach(manhole => {
-      if (manhole.latitude && manhole.longitude) {
+      if (manhole.latitude != null && manhole.longitude != null) {
         const distance = calculateDistance(lat, lng, manhole.latitude, manhole.longitude);
-        if (distance < minDistance && distance < 0.1) { // Within 100m
+        if (distance < minDistance && distance <= MAX_DISTANCE_KM) { // 50m以内
           minDistance = distance;
           nearest = manhole;
         }
@@ -284,10 +296,10 @@ export default function UploadPage() {
       // Add visit metadata
       formData.append('shot_at', photo.metadata.datetime || new Date().toISOString());
 
-      // Add location data if available
-      if (photo.metadata.latitude && photo.metadata.longitude) {
-        formData.append('latitude', photo.metadata.latitude.toString());
-        formData.append('longitude', photo.metadata.longitude.toString());
+      // Add location data if available (0も有効値なのでisValidCoordinatesで判定)
+      if (isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+        formData.append('latitude', String(photo.metadata.latitude));
+        formData.append('longitude', String(photo.metadata.longitude));
       }
 
       // Add note (個人メモ) if provided
