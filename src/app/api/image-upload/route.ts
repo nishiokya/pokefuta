@@ -5,6 +5,7 @@ import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { storage, generateStorageKey } from '@/lib/storage';
+import { calculateDistance, isValidCoordinates } from '@/lib/location';
 
 /**
  * @swagger
@@ -192,6 +193,45 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ✅ GPS座標の必須チェック
+    const lat = latitude ? parseFloat(latitude as string) : undefined;
+    const lng = longitude ? parseFloat(longitude as string) : undefined;
+
+    if (!isValidCoordinates(lat, lng)) {
+      return NextResponse.json({
+        success: false,
+        error: 'GPS coordinates are required - latitude and longitude must be valid numbers'
+      }, { status: 400 });
+    }
+
+    // ✅ マンホール位置情報を取得
+    const { data: manhole, error: manholeError } = await supabase
+      .from('manhole')
+      .select('id, latitude, longitude')
+      .eq('id', manholeIdInt)
+      .single();
+
+    if (manholeError || !manhole) {
+      return NextResponse.json({
+        success: false,
+        error: 'Manhole not found'
+      }, { status: 400 });
+    }
+
+    // ✅ マンホール位置との距離チェック（50m以内）
+    if (manhole.latitude && manhole.longitude) {
+      const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
+      const distanceThreshold = 0.05; // 50m
+
+      if (distance >= distanceThreshold) {
+        const distanceM = Math.round(distance * 1000);
+        return NextResponse.json({
+          success: false,
+          error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
+        }, { status: 400 });
+      }
+    }
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
@@ -232,12 +272,8 @@ export async function POST(request: NextRequest) {
 
       // Build shot_location as PostGIS POINT if coordinates are provided
       let shotLocationGeom = shotLocation as string | null;
-      if (latitude && longitude) {
-        const lat = parseFloat(latitude as string);
-        const lng = parseFloat(longitude as string);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          shotLocationGeom = `POINT(${lng} ${lat})`;
-        }
+      if (lat && lng) {
+        shotLocationGeom = `POINT(${lng} ${lat})`;
       }
 
       // Create visit record with proper Date type
