@@ -7,12 +7,14 @@ import { SupabaseClient } from '@supabase/supabase-js';
  * @param supabase - Supabase client (server or browser)
  * @param userId - Auth user ID (auth.uid())
  * @param email - Optional email for display_name fallback
+ * @param displayName - Optional display_name from user metadata (preferred over email-derived name)
  * @returns boolean - true if successful, false if error occurred
  */
 export async function ensureAppUser(
   supabase: SupabaseClient<any>,
   userId: string,
-  email?: string
+  email?: string,
+  displayName?: string
 ): Promise<boolean> {
   try {
     // UPSERT: 存在しなければ作成、存在すればスキップ（原子的な操作）
@@ -21,7 +23,7 @@ export async function ensureAppUser(
       .from('app_user')
       .upsert({
         auth_uid: userId,
-        display_name: email?.split('@')[0] || 'User',
+        display_name: displayName || email?.split('@')[0] || 'User',
         email: email || null
       }, {
         onConflict: 'auth_uid'  // auth_uid で競合判定

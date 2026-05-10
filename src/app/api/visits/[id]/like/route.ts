@@ -84,9 +84,10 @@ export async function POST(
 
     const visitId = params.id;
     const userId = session.user.id;
+    const displayName = session.user.user_metadata?.display_name;
 
     // ✅ Ensure app_user exists, auto-create if missing
-    await ensureAppUser(supabase, userId, session.user.email);
+    await ensureAppUser(supabase, userId, session.user.email, displayName);
 
     // ✅ 2. 訪問記録の存在確認
     const { data: visit, error: visitError } = await supabase

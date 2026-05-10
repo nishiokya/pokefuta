@@ -144,9 +144,10 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    const displayName = session.user.user_metadata?.display_name;
 
     // ✅ Ensure app_user exists, auto-create if missing
-    await ensureAppUser(supabase, userId, session.user.email);
+    await ensureAppUser(supabase, userId, session.user.email, displayName);
 
     // Parse multipart form data
     const formData = await request.formData();
