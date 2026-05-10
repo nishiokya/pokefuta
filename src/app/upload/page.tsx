@@ -138,6 +138,9 @@ export default function UploadPage() {
           metadata.latitude as number,
           metadata.longitude as number
         );
+        if (!matchedManhole) {
+          distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
+        }
       }
 
       newPhotos.push({
