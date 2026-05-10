@@ -59,9 +59,9 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
-        // ✅ app_user は初回ユース時に自動作成される（/api/image-upload等で）
+        // ✅ app_user は初回の関連API利用時に自動作成される（/api/image-upload、like/bookmark/comment 等で）
         // signup では auth.signUp() のみで完了
-        console.log('📝 signup完了。プロフィールは初回アップロード時に自動作成されます。');
+        console.log('📝 signup完了。プロフィールは初回の関連API利用時に自動作成されます。');
 
         setSuccess(true);
 

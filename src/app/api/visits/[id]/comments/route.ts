@@ -198,10 +198,10 @@ export async function POST(
     const { content } = body;
     const visitId = params.id;
     const userId = session.user.id;
-    const displayName = session.user.user_metadata?.display_name;
+    const metadataDisplayName = session.user.user_metadata?.display_name;
 
     // ✅ Ensure app_user exists, auto-create if missing
-    await ensureAppUser(supabase, userId, session.user.email, displayName);
+    await ensureAppUser(supabase, userId, session.user.email, metadataDisplayName);
 
     // ✅ 2. 入力検証
     if (!content || typeof content !== 'string' || content.trim() === '') {

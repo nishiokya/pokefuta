@@ -17,16 +17,16 @@ export async function ensureAppUser(
   displayName?: string
 ): Promise<boolean> {
   try {
-    // UPSERT: 存在しなければ作成、存在すればスキップ（原子的な操作）
-    // これによって race condition を回避
+    // UPSERT with ignoreDuplicates: 存在しなければ作成、存在すればスキップ（原子的な操作）
+    // これによって race condition を回避＋既存データの上書きを防ぐ
     const { error } = await supabase
       .from('app_user')
       .upsert({
         auth_uid: userId,
-        display_name: displayName || email?.split('@')[0] || 'User',
-        email: email || null
+        display_name: displayName || email?.split('@')[0] || 'User'
       }, {
-        onConflict: 'auth_uid'  // auth_uid で競合判定
+        onConflict: 'auth_uid',
+        ignoreDuplicates: true  // DO NOTHING 相当：既存データを更新しない
       });
 
     if (error) {

@@ -29,14 +29,13 @@ END $$;
 -- ステップ 2: app_user を一括作成
 -- ==========================================
 
-INSERT INTO public.app_user (auth_uid, display_name, email, created_at, updated_at)
+INSERT INTO public.app_user (auth_uid, display_name, created_at, updated_at)
 SELECT 
   au.id as auth_uid,
   COALESCE(
     au.raw_user_meta_data->>'display_name',
     SPLIT_PART(au.email, '@', 1)  -- email の @前の部分を display_name とする
   ) as display_name,
-  au.email,
   NOW() as created_at,
   NOW() as updated_at
 FROM auth.users au

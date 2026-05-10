@@ -33,11 +33,10 @@ WHERE v.user_id IS NOT NULL
 -- ステップ 2: app_user テーブルに不足ユーザーを作成
 -- ==========================================
 
-INSERT INTO public.app_user (auth_uid, display_name, email, created_at, updated_at)
+INSERT INTO public.app_user (auth_uid, display_name, created_at, updated_at)
 SELECT DISTINCT
   tou.user_id,
-  COALESCE(au.email, 'User')::TEXT as display_name,
-  au.email,
+  COALESCE(NULLIF(SPLIT_PART(au.email, '@', 1), ''), 'User')::TEXT as display_name,
   NOW(),
   NOW()
 FROM temp_orphan_users tou
