@@ -65,9 +65,9 @@ export default function SignUpPage() {
 
         setSuccess(true);
 
-        // 2秒後にログインページへリダイレクト
+        // 2秒後にログインページへリダイレクト（メール確認を促す）
         setTimeout(() => {
-          router.push('/login?redirect=/upload');
+          router.push('/login?from=register');
         }, 2000);
       }
     } catch (err: any) {
@@ -92,6 +92,11 @@ export default function SignUpPage() {
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
             登録すると訪問履歴が使えるようになります
           </p>
+          <div className="mt-3 pt-3 border-t-2 border-rpg-border">
+            <p className="font-pixelJp text-[11px] text-rpg-textDark opacity-80 leading-relaxed">
+              GPS位置情報を公開して共有するため、メール確認が必要です。
+            </p>
+          </div>
         </div>
 
         {/* Sign Up Form */}
