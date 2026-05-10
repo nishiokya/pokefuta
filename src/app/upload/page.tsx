@@ -128,12 +128,11 @@ export default function UploadPage() {
 
       let matchedManhole: Manhole | undefined;
       let distanceError: string | undefined;
-      let manholesLoading = true; // マンホール一覧のロード状態を追跡
 
       // ✅ GPS座標の必須チェック
       if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
         distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
-      } else if (!manholesLoading) { // マンホールがロード完了している場合のみ判定
+      } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
         // isValidCoordinates が true の場合、lat/lng は有効な数値
         matchedManhole = findNearestManhole(
           metadata.latitude as number,
