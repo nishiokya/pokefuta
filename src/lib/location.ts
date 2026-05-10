@@ -74,13 +74,13 @@ export function isValidCoordinates(
   longitude: number | undefined
 ): boolean {
   return (
-    latitude !== undefined &&
-    longitude !== undefined &&
-    !isNaN(latitude) &&
-    !isNaN(longitude) &&
-    latitude >= -90 &&
-    latitude <= 90 &&
-    longitude >= -180 &&
-    longitude <= 180
+      latitude != null &&
+      longitude != null &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180
   );
 }

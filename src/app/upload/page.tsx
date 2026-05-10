@@ -29,16 +29,6 @@ interface UploadedPhoto {
   uploadedImageId?: string;
   error?: string;
 }
-
-  id: string;
-  file: File;
-  preview: string;
-  metadata: PhotoMetadata;
-  matchedManhole?: Manhole;
-  uploading: boolean;
-  uploaded: boolean;
-  uploadedImageId?: string;
-  error?: string;
 }
 
 export default function UploadPage() {
