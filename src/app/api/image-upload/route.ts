@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { storage, generateStorageKey } from '@/lib/storage';
 
@@ -142,6 +143,12 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
 
+    const userId = session.user.id;
+    const displayName = session.user.user_metadata?.display_name;
+
+    // ✅ Ensure app_user exists, auto-create if missing
+    await ensureAppUser(supabase, userId, session.user.email, displayName);
+
     // Parse multipart form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -209,7 +216,6 @@ export async function POST(request: NextRequest) {
 
     try {
       // ✅ 強制的にログインユーザーのIDを使用
-      const userId = session.user.id;
       console.log('Creating visit with user_id:', userId);
 
       // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
