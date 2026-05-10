@@ -49,15 +49,18 @@ export function formatDistanceAsMeters(distanceKm: number): string {
  * @param thresholdKm 判定距離（デフォルト0.05km=50m）
  * @returns true: 50m以内, false: 50m以上
  */
+// マンホール距離判定の最大値（50m）
+export const MAX_DISTANCE_KM = 0.05;
+
 export function isWithinThreshold(
   userLat: number,
   userLng: number,
   manholeLat: number,
   manholeLng: number,
-  thresholdKm: number = 0.05
+  thresholdKm: number = MAX_DISTANCE_KM
 ): boolean {
   const distance = calculateDistance(userLat, userLng, manholeLat, manholeLng);
-  return distance < thresholdKm;
+  return distance <= thresholdKm;
 }
 
 /**

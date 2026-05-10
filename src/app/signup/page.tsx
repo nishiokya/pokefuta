@@ -67,7 +67,7 @@ export default function SignUpPage() {
 
         // 2秒後にログインページへリダイレクト（メール確認を促す）
         setTimeout(() => {
-          router.push('/login?from=register');
+          router.push('/login?from=register&redirect=/upload');
         }, 2000);
       }
     } catch (err: any) {

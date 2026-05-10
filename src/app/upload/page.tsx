@@ -8,7 +8,7 @@ import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
-import { calculateDistance, isWithinThreshold, isValidCoordinates } from '@/lib/location';
+import { calculateDistance, isWithinThreshold, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -18,7 +18,6 @@ interface PhotoMetadata {
   lens?: string;
 }
 
-interface UploadedPhoto {
   id: string;
   file: File;
   preview: string;
@@ -28,9 +27,6 @@ interface UploadedPhoto {
   uploaded: boolean;
   uploadedImageId?: string;
   error?: string;
-  selectedManhole?: Manhole; // ユーザーが選択したマンホール
-  distanceToManhole?: number; // マンホールまでの距離（km）
-  distanceError?: string; // 距離に関するエラーメッセージ
 }
 
 export default function UploadPage() {
@@ -232,10 +228,8 @@ export default function UploadPage() {
 
     // ✅ マンホール位置との距離チェック（50m以内）
     if (
-      !photo.matchedManhole.latitude ||
-      photo.matchedManhole.latitude === undefined ||
-      !photo.matchedManhole.longitude ||
-      photo.matchedManhole.longitude === undefined
+      photo.matchedManhole.latitude == null ||
+      photo.matchedManhole.longitude == null
     ) {
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
@@ -253,13 +247,7 @@ export default function UploadPage() {
       photo.matchedManhole.longitude
     );
 
-    if (!isWithinThreshold(
-      photo.metadata.latitude as number,
-      photo.metadata.longitude as number,
-      photo.matchedManhole.latitude,
-      photo.matchedManhole.longitude,
-      0.05 // 50m
-    )) {
+    if (distance > MAX_DISTANCE_KM) {
       const distanceM = Math.round(distance * 1000);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {

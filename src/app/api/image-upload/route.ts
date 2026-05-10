@@ -5,7 +5,7 @@ import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { storage, generateStorageKey } from '@/lib/storage';
-import { calculateDistance, isValidCoordinates } from '@/lib/location';
+import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 
 /**
  * @swagger
@@ -25,6 +25,8 @@ import { calculateDistance, isValidCoordinates } from '@/lib/location';
  *             required:
  *               - file
  *               - manhole_id
+ *               - latitude
+ *               - longitude
  *             properties:
  *               file:
  *                 type: string
@@ -52,11 +54,11 @@ import { calculateDistance, isValidCoordinates } from '@/lib/location';
  *               latitude:
  *                 type: number
  *                 format: float
- *                 description: 撮影位置の緯度
+ *                 description: 撮影位置の緯度（必須、マンホールから50m以内のみ登録可能）
  *               longitude:
  *                 type: number
  *                 format: float
- *                 description: 撮影位置の経度
+ *                 description: 撮影位置の経度（必須、マンホールから50m以内のみ登録可能）
  *               metadata:
  *                 type: string
  *                 description: 追加メタデータ（JSON文字列）
@@ -228,7 +230,7 @@ export async function POST(request: NextRequest) {
     }
 
     const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
-    const distanceThreshold = 0.05; // 50m
+      const distanceThreshold = MAX_DISTANCE_KM; // 50m
 
     if (distance >= distanceThreshold) {
       const distanceM = Math.round(distance * 1000);
@@ -237,6 +239,7 @@ export async function POST(request: NextRequest) {
         error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
       }, { status: 400 });
     }
+      // Additional context lines can be added here if necessary
 
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
