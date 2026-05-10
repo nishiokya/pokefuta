@@ -81,6 +81,39 @@ export default function UploadPage() {
     }
   };
 
+  // ✅ manholes ロード完了時に既存 photos の matchedManhole/error を再評価
+  useEffect(() => {
+    if (manholes.length > 0 && photos.length > 0) {
+      setPhotos(prevPhotos =>
+        prevPhotos.map(photo => {
+          // ロード中エラーの場合のみ再評価
+          if (photo.error === 'マンホール情報をロード中です。少々お待ちください。') {
+            if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+              return {
+                ...photo,
+                error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
+              };
+            }
+
+            const matchedManhole = findNearestManhole(
+              photo.metadata.latitude as number,
+              photo.metadata.longitude as number
+            );
+
+            return {
+              ...photo,
+              matchedManhole,
+              error: matchedManhole
+                ? undefined
+                : '50m以内にマンホールが見つかりません。位置情報を確認してください。'
+            };
+          }
+          return photo;
+        })
+      );
+    }
+  }, [manholes]);
+
   const extractMetadata = async (file: File): Promise<PhotoMetadata> => {
     try {
       const metadata = await exifr.parse(file);
