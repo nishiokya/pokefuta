@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
 /**
  * Ensures that an app_user record exists for the given auth user.
@@ -11,7 +12,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
  * @returns boolean - true if successful, false if error occurred
  */
 export async function ensureAppUser(
-  supabase: SupabaseClient<any>,
+  supabase: SupabaseClient<Database>,
   userId: string,
   email?: string,
   displayName?: string
@@ -19,15 +20,18 @@ export async function ensureAppUser(
   try {
     // UPSERT with ignoreDuplicates: 存在しなければ作成、存在すればスキップ（原子的な操作）
     // これによって race condition を回避＋既存データの上書きを防ぐ
-    const { error } = await supabase
+    const { error } = await (supabase
       .from('app_user')
-      .upsert({
-        auth_uid: userId,
-        display_name: displayName || email?.split('@')[0] || 'User'
-      }, {
-        onConflict: 'auth_uid',
-        ignoreDuplicates: true  // DO NOTHING 相当：既存データを更新しない
-      });
+      .upsert as any)(
+        [{
+          auth_uid: userId,
+          display_name: displayName || email?.split('@')[0] || 'User'
+        }],
+        {
+          onConflict: 'auth_uid',
+          ignoreDuplicates: true  // DO NOTHING 相当：既存データを更新しない
+        }
+      );
 
     if (error) {
       console.error('Error ensuring app_user:', error);
