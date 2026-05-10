@@ -69,7 +69,7 @@ export function isWithinThreshold(
 export function isValidCoordinates(
   latitude: number | undefined,
   longitude: number | undefined
-): latitude is number {
+): boolean {
   return (
     latitude !== undefined &&
     longitude !== undefined &&

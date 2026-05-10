@@ -219,17 +219,23 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ マンホール位置との距離チェック（50m以内）
-    if (manhole.latitude && manhole.longitude) {
-      const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
-      const distanceThreshold = 0.05; // 50m
+    // NOTE: latitude/longitude が 0 の場合も有効（赤道・本初子午線）
+    if (manhole.latitude == null || manhole.longitude == null) {
+      return NextResponse.json({
+        success: false,
+        error: 'Manhole coordinates not available'
+      }, { status: 400 });
+    }
 
-      if (distance >= distanceThreshold) {
-        const distanceM = Math.round(distance * 1000);
-        return NextResponse.json({
-          success: false,
-          error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
-        }, { status: 400 });
-      }
+    const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
+    const distanceThreshold = 0.05; // 50m
+
+    if (distance >= distanceThreshold) {
+      const distanceM = Math.round(distance * 1000);
+      return NextResponse.json({
+        success: false,
+        error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
+      }, { status: 400 });
     }
 
     // Read file as ArrayBuffer
@@ -272,7 +278,7 @@ export async function POST(request: NextRequest) {
 
       // Build shot_location as PostGIS POINT if coordinates are provided
       let shotLocationGeom = shotLocation as string | null;
-      if (lat && lng) {
+      if (lat != null && lng != null) {
         shotLocationGeom = `POINT(${lng} ${lat})`;
       }
 

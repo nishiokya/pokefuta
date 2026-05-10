@@ -8,7 +8,7 @@ import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
-import { calculateDistance, formatDistanceAsMeters, isWithinThreshold, isValidCoordinates } from '@/lib/location';
+import { calculateDistance, isWithinThreshold, isValidCoordinates } from '@/lib/location';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -134,8 +134,12 @@ export default function UploadPage() {
       // ✅ GPS座標の必須チェック
       if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
         distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
-      } else if (metadata.latitude && metadata.longitude) {
-        matchedManhole = findNearestManhole(metadata.latitude, metadata.longitude);
+      } else {
+        // isValidCoordinates が true の場合、lat/lng は有効な数値
+        matchedManhole = findNearestManhole(
+          metadata.latitude as number,
+          metadata.longitude as number
+        );
       }
 
       newPhotos.push({
@@ -146,7 +150,7 @@ export default function UploadPage() {
         matchedManhole,
         uploading: false,
         uploaded: false,
-        distanceError
+        error: distanceError
       });
 
       // 画像メタ情報からnoteのデフォルト値を生成
@@ -227,19 +231,33 @@ export default function UploadPage() {
     }
 
     // ✅ マンホール位置との距離チェック（50m以内）
-    // NOTE: isValidCoordinates ensures lat/lng are not undefined
+    if (
+      !photo.matchedManhole.latitude ||
+      photo.matchedManhole.latitude === undefined ||
+      !photo.matchedManhole.longitude ||
+      photo.matchedManhole.longitude === undefined
+    ) {
+      setPhotos(prev => prev.map(p =>
+        p.id === photoId ? {
+          ...p,
+          error: 'マンホール位置情報が見つかりません。別の写真を試してください。'
+        } : p
+      ));
+      return;
+    }
+
     const distance = calculateDistance(
       photo.metadata.latitude as number,
       photo.metadata.longitude as number,
-      photo.matchedManhole.latitude || 0,
-      photo.matchedManhole.longitude || 0
+      photo.matchedManhole.latitude,
+      photo.matchedManhole.longitude
     );
 
     if (!isWithinThreshold(
       photo.metadata.latitude as number,
       photo.metadata.longitude as number,
-      photo.matchedManhole.latitude || 0,
-      photo.matchedManhole.longitude || 0,
+      photo.matchedManhole.latitude,
+      photo.matchedManhole.longitude,
       0.05 // 50m
     )) {
       const distanceM = Math.round(distance * 1000);
@@ -452,7 +470,7 @@ export default function UploadPage() {
           </div>
 
           <p className="font-pixelJp text-[10px] text-rpg-textDark opacity-60 mt-2">
-            位置情報が入っている写真は、候補の絞り込みがスムーズになります（なくても登録できます）。
+            📍 <strong>GPS位置情報は必須です。</strong> 写真の位置情報を有効にしてアップロードしてください。マンホール位置から50m以内の写真のみ登録できます。
           </p>
 
           <div className="mt-3 space-y-1">
