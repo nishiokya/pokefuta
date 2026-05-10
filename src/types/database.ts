@@ -38,11 +38,18 @@ export interface Database {
           id: number;
           title: string;
           prefecture: string;
+          prefecture_id: number | null;
+          prefecture_code: string | null;
           municipality: string | null;
+          address: string | null;
           location: string; // PostGIS geography as string
           pokemons: string[];
           detail_url: string | null;
           prefecture_site_url: string | null;
+          region: string | null;
+          is_active: boolean;
+          last_verified_at: string;
+          data_source: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -50,20 +57,34 @@ export interface Database {
           id: number;
           title: string;
           prefecture: string;
+          prefecture_id?: number | null;
+          prefecture_code?: string | null;
           municipality?: string | null;
+          address?: string | null;
           location: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
+          region?: string | null;
+          is_active?: boolean;
+          last_verified_at?: string;
+          data_source?: string | null;
         };
         Update: {
           title?: string;
           prefecture?: string;
+          prefecture_id?: number | null;
+          prefecture_code?: string | null;
           municipality?: string | null;
+          address?: string | null;
           location?: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
+          region?: string | null;
+          is_active?: boolean;
+          last_verified_at?: string;
+          data_source?: string | null;
         };
       };
       manhole_comment: {

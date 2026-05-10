@@ -34,10 +34,7 @@ CREATE TABLE IF NOT EXISTS prefecture_badge (
   visited_manhole_count INT NOT NULL DEFAULT 0,  -- How many the user visited
   
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  -- Ensure one active badge per user per prefecture
-  CONSTRAINT unique_active_badge_per_user_prefecture UNIQUE (user_id, prefecture_id, status) WHERE status = 'active'
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 3. Create index for efficient queries
@@ -45,6 +42,9 @@ CREATE INDEX IF NOT EXISTS idx_prefecture_badge_user_id ON prefecture_badge(user
 CREATE INDEX IF NOT EXISTS idx_prefecture_badge_prefecture_id ON prefecture_badge(prefecture_id);
 CREATE INDEX IF NOT EXISTS idx_prefecture_badge_status ON prefecture_badge(status);
 CREATE INDEX IF NOT EXISTS idx_prefecture_badge_user_status ON prefecture_badge(user_id, status);
+-- Partial unique index to ensure one active badge per user per prefecture
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_badge_per_user_prefecture 
+  ON prefecture_badge(user_id, prefecture_id) WHERE status = 'active';
 
 -- 4. Create view: prefecture_completion_tracker
 -- Calculates current completion status for each user-prefecture combination
@@ -147,7 +147,7 @@ $$ LANGUAGE plpgsql;
 -- If it only has prefecture (string), we'll need to handle that differently
 
 -- First, let's create the trigger (it will be activated when manhole INSERT happens)
-DROP TRIGGER IF NOT EXISTS trigger_update_badges_on_manhole_add ON manhole;
+DROP TRIGGER IF EXISTS trigger_update_badges_on_manhole_add ON manhole;
 CREATE TRIGGER trigger_update_badges_on_manhole_add
 AFTER INSERT ON manhole
 FOR EACH ROW
