@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 
 /**
  * @swagger
@@ -197,6 +198,9 @@ export async function POST(
     const { content } = body;
     const visitId = params.id;
     const userId = session.user.id;
+
+    // ✅ Ensure app_user exists, auto-create if missing
+    await ensureAppUser(supabase, userId, session.user.email);
 
     // ✅ 2. 入力検証
     if (!content || typeof content !== 'string' || content.trim() === '') {

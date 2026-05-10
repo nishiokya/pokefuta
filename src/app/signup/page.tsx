@@ -59,46 +59,9 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
-        // app_userテーブルにプロフィール作成
-        try {
-          console.log('📝 app_userテーブルにプロフィールを作成中...', {
-            auth_uid: data.user.id,
-            email: email,
-            display_name: displayName || email.split('@')[0],
-          });
-
-          const { data: profileData, error: profileError } = await supabase
-            .from('app_user')
-            .insert({
-              auth_uid: data.user.id,
-              email: email,
-              display_name: displayName || email.split('@')[0],
-            })
-            .select()
-            .single();
-
-          if (profileError) {
-            console.error('❌ app_userテーブルへの挿入エラー:', {
-              code: profileError.code,
-              message: profileError.message,
-              details: profileError.details,
-              hint: profileError.hint,
-            });
-
-            // エラーをユーザーに表示
-            setError(
-              `プロフィール作成エラー: ${profileError.message}\n\n` +
-              `ヒント: ${profileError.hint || 'app_userテーブルが存在するか、RLSポリシーが正しく設定されているか確認してください'}`
-            );
-            return;
-          }
-
-          console.log('✅ app_userプロフィール作成成功:', profileData);
-        } catch (profileErr: any) {
-          console.error('❌ プロフィール作成で予期しないエラー:', profileErr);
-          setError(`プロフィール作成失敗: ${profileErr.message || '不明なエラー'}`);
-          return;
-        }
+        // ✅ app_user は初回ユース時に自動作成される（/api/image-upload等で）
+        // signup では auth.signUp() のみで完了
+        console.log('📝 signup完了。プロフィールは初回アップロード時に自動作成されます。');
 
         setSuccess(true);
 
