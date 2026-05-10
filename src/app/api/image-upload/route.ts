@@ -3,7 +3,6 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
-import { supabaseAdmin } from '@/lib/supabase/client';
 import { storage, generateStorageKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 
@@ -277,11 +276,8 @@ export async function POST(request: NextRequest) {
         shotAtDate = new Date();
       }
 
-      // Build shot_location as PostGIS POINT if coordinates are provided
-      let shotLocationGeom = shotLocation as string | null;
-      if (lat != null && lng != null) {
-        shotLocationGeom = `POINT(${lng} ${lat})`;
-      }
+      // Build shot_location as PostGIS POINT from GPS coordinates (lat/lng は必須バリデーション済み)
+      const shotLocationGeom = `POINT(${lng} ${lat})`;
 
       // Create visit record with proper Date type
       console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());
