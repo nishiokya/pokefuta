@@ -32,6 +32,12 @@ interface UploadedPhoto {
   photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
 }
 
+interface AlertMessage {
+  type: 'error' | 'success' | 'warning';
+  message: string;
+  id: string;
+}
+
 export default function UploadPage() {
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
@@ -39,7 +45,24 @@ export default function UploadPage() {
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
+  const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const { trackView, trackUploadStart, trackUploadSuccess, trackUploadError } = useAnalytics();
+
+  // ✅ アラートを追加する関数
+  const addAlert = useCallback((type: 'error' | 'success' | 'warning', message: string) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setAlerts(prev => [...prev, { type, message, id }]);
+    
+    // 5秒後に自動削除
+    setTimeout(() => {
+      setAlerts(prev => prev.filter(alert => alert.id !== id));
+    }, 5000);
+  }, []);
+
+  // ✅ アラートを削除する関数
+  const removeAlert = useCallback((id: string) => {
+    setAlerts(prev => prev.filter(alert => alert.id !== id));
+  }, []);
 
   useEffect(() => {
     // ページタイトル設定
@@ -269,23 +292,27 @@ export default function UploadPage() {
 
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+      const errorMsg = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
-          error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
+          error: errorMsg
         } : p
       ));
+      addAlert('error', errorMsg);
       return;
     }
 
     // ✅ マンホールが選択されているかチェック
     if (!photo.matchedManhole) {
+      const errorMsg = 'マンホールが見つかりません。別の写真を試してください。';
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
-          error: 'マンホールが見つかりません。別の写真を試してください。'
+          error: errorMsg
         } : p
       ));
+      addAlert('error', errorMsg);
       return;
     }
 
@@ -294,12 +321,14 @@ export default function UploadPage() {
       photo.matchedManhole.latitude == null ||
       photo.matchedManhole.longitude == null
     ) {
+      const errorMsg = 'マンホール位置情報が見つかりません。別の写真を試してください。';
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
-          error: 'マンホール位置情報が見つかりません。別の写真を試してください。'
+          error: errorMsg
         } : p
       ));
+      addAlert('error', errorMsg);
       return;
     }
 
@@ -312,12 +341,14 @@ export default function UploadPage() {
 
     if (distance > MAX_DISTANCE_KM) {
       const distanceM = Math.round(distance * 1000);
+      const errorMsg = `マンホール位置から${distanceM}m離れています。50m以内で撮影した写真を登録してください。`;
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
-          error: `マンホール位置から${distanceM}m離れています。50m以内で撮影した写真を登録してください。`
+          error: errorMsg
         } : p
       ));
+      addAlert('error', errorMsg);
       return;
     }
 
@@ -327,13 +358,11 @@ export default function UploadPage() {
 
     try {
       // Compress image
-      console.log('Starting image compression for:', photo.file.name, 'Size:', photo.file.size);
       const compressedFile = await imageCompression(photo.file, {
         maxSizeMB: 2,
         maxWidthOrHeight: 1920,
         useWebWorker: true
       });
-      console.log('Image compressed successfully. New size:', compressedFile.size);
 
       // ✅ GA: アップロード開始イベント追跡
       trackUploadStart(compressedFile.size, compressedFile.type);
@@ -381,15 +410,12 @@ export default function UploadPage() {
       formData.append('metadata', JSON.stringify(metadata));
 
       // Upload to binary storage API
-      console.log('Uploading to /api/image-upload...');
       const uploadResponse = await fetch('/api/image-upload', {
         method: 'POST',
         body: formData
       });
 
-      console.log('Upload response status:', uploadResponse.status);
       const uploadResult = await uploadResponse.json();
-      console.log('Upload result:', uploadResult);
 
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || 'Upload failed');
@@ -418,6 +444,7 @@ export default function UploadPage() {
           uploadedImageId: uploadResult.image.id
         } : p
       ));
+      addAlert('success', '訪問記録を登録しました！');
 
     } catch (error: any) {
       console.error('Upload failed:', error);
@@ -433,13 +460,15 @@ export default function UploadPage() {
         }
       );
 
+      const errorMsg = error?.message || 'アップロードに失敗しました';
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
           uploading: false,
-          error: error?.message || 'アップロードに失敗しました'
+          error: errorMsg
         } : p
       ));
+      addAlert('error', `登録失敗: ${errorMsg}`);
     }
   };
 
@@ -469,6 +498,37 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+      {/* ✅ アラートバナー */}
+      {alerts.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 space-y-2 p-4">
+          {alerts.map(alert => (
+            <div
+              key={alert.id}
+              className={`flex items-center justify-between gap-2 p-3 rounded-lg border-2 font-pixelJp text-sm animate-bounce ${
+                alert.type === 'error'
+                  ? 'bg-rpg-red/20 border-rpg-red text-rpg-red'
+                  : alert.type === 'success'
+                  ? 'bg-rpg-green/20 border-rpg-green text-rpg-green'
+                  : 'bg-rpg-yellow/20 border-rpg-yellow text-rpg-yellow'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {alert.type === 'error' && <AlertCircle className="w-5 h-5" />}
+                {alert.type === 'success' && <CheckCircle className="w-5 h-5" />}
+                {alert.type === 'warning' && <AlertCircle className="w-5 h-5" />}
+                <span>{alert.message}</span>
+              </div>
+              <button
+                onClick={() => removeAlert(alert.id)}
+                className="hover:opacity-70"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         <div className="rpg-window">
           <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-1">撮影のコツ</h2>
