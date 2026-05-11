@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { storage, generateStorageKey } from '@/lib/storage';
-import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
+import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 
 /**
  * @swagger
@@ -207,27 +207,56 @@ export async function POST(request: NextRequest) {
     // ✅ マンホール位置情報を取得
     const { data: manhole, error: manholeError } = await supabase
       .from('manhole')
-      .select('id, latitude, longitude')
+      .select('id, location')
       .eq('id', manholeIdInt)
       .single();
 
-    if (manholeError || !manhole) {
+    // ✅ エラー区分: 見つからない（400） vs DB/権限エラー（500）
+    if (manholeError) {
+      // PGRST116 = 0行（正常な「見つからない」）
+      if (manholeError.code === 'PGRST116') {
+        return NextResponse.json({
+          success: false,
+          error: 'Manhole not found'
+        }, { status: 400 });
+      } else {
+        // その他のエラー（権限、ネットワーク等）
+        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt}:`, {
+          code: manholeError.code,
+          message: manholeError.message
+        });
+        return NextResponse.json({
+          success: false,
+          error: 'Database error occurred'
+        }, { status: 500 });
+      }
+    }
+
+    if (!manhole) {
       return NextResponse.json({
         success: false,
         error: 'Manhole not found'
       }, { status: 400 });
     }
 
-    // ✅ マンホール位置との距離チェック（50m以内）
-    // NOTE: latitude/longitude が 0 の場合も有効（赤道・本初子午線）
-    if (manhole.latitude == null || manhole.longitude == null) {
+    // ✅ Extract coordinates from PostGIS location field
+    const manholeCoords = extractCoordinatesFromWKB(manhole.location);
+    if (!manholeCoords) {
+      console.error(`[ERROR] Failed to extract coordinates from manhole ${manholeIdInt}:`, {
+        location: manhole.location
+      });
       return NextResponse.json({
         success: false,
-        error: 'Manhole coordinates not available'
+        errorCode: 'MANHOLE_LOCATION_INVALID',
+        error: 'マンホールの位置情報が登録されていないか、不正です'
       }, { status: 400 });
     }
 
-    const distance = calculateDistance(lat!, lng!, manhole.latitude, manhole.longitude);
+    const manholeLatitude = manholeCoords.lat;
+    const manholeLongitude = manholeCoords.lng;
+
+    // ✅ マンホール位置との距離チェック（50m以内）
+    const distance = calculateDistance(lat!, lng!, manholeLatitude, manholeLongitude);
     const distanceThreshold = MAX_DISTANCE_KM; // 50m
     if (distance > distanceThreshold) {
       const distanceM = Math.round(distance * 1000);
@@ -250,8 +279,6 @@ export async function POST(request: NextRequest) {
       cacheControl: 'public, max-age=31536000, immutable',
     });
 
-    console.log(`File uploaded successfully to storage: ${storageKey}`);
-
     // Get signed URL for the uploaded file
     const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour
 
@@ -261,8 +288,6 @@ export async function POST(request: NextRequest) {
 
     try {
       // ✅ 強制的にログインユーザーのIDを使用
-      console.log('Creating visit with user_id:', userId);
-
       // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
       let shotAtDate: Date;
       if (shotAt) {
@@ -279,8 +304,6 @@ export async function POST(request: NextRequest) {
       const shotLocationGeom = `POINT(${lng} ${lat})`;
 
       // Create visit record with proper Date type
-      console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());
-
       const visitInsert: any = {
         user_id: userId,  // ✅ 必ず自分のID
         shot_at: shotAtDate, // Pass Date object, not string
@@ -310,7 +333,6 @@ export async function POST(request: NextRequest) {
 
       if (!visitError && visitData) {
         visitId = visitData.id;
-        console.log('Successfully created visit record:', visitId);
       } else {
         console.error('Failed to create visit record:', visitError?.message);
         throw new Error(`Visit creation failed: ${visitError?.message}`);
@@ -336,7 +358,6 @@ export async function POST(request: NextRequest) {
 
       if (!photoError && photoData) {
         imageId = photoData.id;
-        console.log('Successfully stored photo metadata in database:', imageId);
       } else {
         console.error('Photo insert failed:', photoError?.message);
         throw new Error(`Photo creation failed: ${photoError?.message}`);

@@ -4,6 +4,74 @@
  */
 
 /**
+ * PostGIS WKB（Well-Known Binary）フォーマットから座標を抽出
+ * エンディアン、SRID、標準WKBフォーマットに対応
+ * 
+ * ⚠️ サーバーサイドのみ（Node.js Buffer を使用）
+ * API Route からのみ呼ばれる。クライアント側では未使用。
+ * 
+ * WKBフォーマット:
+ * - バイト0: エンディアンフラグ（01=LE, 00=BE）
+ * - バイト1-4: ジオメトリ型（1=POINT）
+ * - オプション: SRID(4バイト)
+ * - 以降: 座標(X=lng, Y=lat各8バイト)
+ * 
+ * @param wkbHex HEX文字列（PostGIS location列の値）
+ * @returns { lat, lng } オブジェクト、または null
+ */
+export function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: number } | null {
+  if (!wkbHex || typeof wkbHex !== 'string') return null;
+
+  try {
+    const cleanHex = wkbHex.startsWith('0x') ? wkbHex.slice(2) : wkbHex;
+    
+    // 最小長: 01 + 01000000 + 0000000000000000 + 0000000000000000 = 42文字
+    if (cleanHex.length < 42) return null;
+
+    // バイト0: エンディアンフラグ読み込み
+    const endianByte = cleanHex.substring(0, 2);
+    const isLittleEndian = endianByte === '01';
+    const readDouble = (hex: string, offset: number): number => {
+      if (hex.length < offset + 16) return NaN;
+      const buffer = Buffer.from(hex.substring(offset, offset + 16), 'hex');
+      return isLittleEndian ? buffer.readDoubleLE(0) : buffer.readDoubleBE(0);
+    };
+
+    // バイト1-4: ジオメトリ型を読み込み
+    const typeHex = cleanHex.substring(2, 10);
+    const typeBuffer = Buffer.from(typeHex, 'hex');
+    const geomType = isLittleEndian ? typeBuffer.readUInt32LE(0) : typeBuffer.readUInt32BE(0);
+
+    // ジオメトリ型の下位2バイトから実際の型を取得（1=POINT）
+    const baseType = geomType & 0xFFFF;
+    if (baseType !== 1) return null;
+
+    // SRID有無を判定（0x20000000フラグ）
+    const hasSrid = (geomType & 0x20000000) !== 0;
+    let coordOffset = 10; // バイト5から座標開始（10文字目）
+
+    if (hasSrid) {
+      // SRID付きの場合、4バイト（8文字）スキップ
+      coordOffset = 18;
+    }
+
+    // 座標を読み込み
+    const lng = readDouble(cleanHex, coordOffset);
+    const lat = readDouble(cleanHex, coordOffset + 16);
+
+    // 座標の妥当性チェック
+    if (!isNaN(lng) && !isNaN(lat) && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
+      return { lat, lng };
+    }
+
+    return null;
+  } catch {
+    // ユーティリティ関数はログしない。呼び出し元で必要に応じてログする
+    return null;
+  }
+}
+
+/**
  * Haversine公式を使用して2つの地点間の距離を計算
  * @param lat1 地点1の緯度
  * @param lng1 地点1の経度

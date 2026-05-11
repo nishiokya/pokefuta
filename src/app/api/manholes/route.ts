@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { extractCoordinatesFromWKB, calculateDistance } from '@/lib/location';
 
 /**
  * @swagger
@@ -35,70 +36,6 @@ import { Database } from '@/types/database';
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-
-// Helper function to extract coordinates from PostGIS WKB (Well-Known Binary) format
-function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: number } | null {
-  if (!wkbHex || typeof wkbHex !== 'string') return null;
-
-  try {
-    // Remove any prefix like "0x" if present
-    const cleanHex = wkbHex.startsWith('0x') ? wkbHex.slice(2) : wkbHex;
-
-    // PostGIS WKB format varies, but we need at least 50 characters for POINT
-    if (cleanHex.length < 50) return null;
-
-    // Try different coordinate start positions for different WKB formats
-    const possibleStarts = [42, 18, 34, 50]; // Various POINT WKB formats
-
-    for (const coordStart of possibleStarts) {
-      if (coordStart + 32 <= cleanHex.length) {
-        try {
-          // Extract longitude (8 bytes = 16 hex chars)
-          const lngHex = cleanHex.substring(coordStart, coordStart + 16);
-          // Extract latitude (next 8 bytes = 16 hex chars)
-          const latHex = cleanHex.substring(coordStart + 16, coordStart + 32);
-
-          // Ensure we have valid hex strings
-          if (lngHex.length === 16 && latHex.length === 16) {
-            // Convert hex to little-endian double
-            const lngBuffer = Buffer.from(lngHex, 'hex');
-            const latBuffer = Buffer.from(latHex, 'hex');
-
-            const lng = lngBuffer.readDoubleLE(0);
-            const lat = latBuffer.readDoubleLE(0);
-
-            // Validate coordinates are reasonable
-            if (lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
-              return { lat, lng };
-            }
-          }
-        } catch (parseError) {
-          // Try next position
-          continue;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error parsing WKB:', error);
-    return null;
-  }
-}
-
-// Helper function to calculate distance between two points (Haversine formula)
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
 
 export async function GET(request: NextRequest) {
   try {
