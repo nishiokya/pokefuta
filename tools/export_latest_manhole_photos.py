@@ -27,6 +27,7 @@ from typing import Any
 
 DEFAULT_OUTPUT = "public/data/latest-manhole-photos.json"
 DEFAULT_BATCH_SIZE = 1000
+DEFAULT_TIMEOUT = 30
 
 
 def require_env(name: str) -> str:
@@ -107,7 +108,13 @@ def to_photo_entry(photo: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def supabase_get(path: str, query: dict[str, str], batch_size: int, offset: int) -> list[dict[str, Any]]:
+def supabase_get(
+    path: str,
+    query: dict[str, str],
+    batch_size: int,
+    offset: int,
+    timeout: int,
+) -> list[dict[str, Any]]:
     supabase_url = strip_trailing_slash(require_env("NEXT_PUBLIC_SUPABASE_URL"))
     service_role_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
 
@@ -125,11 +132,11 @@ def supabase_get(path: str, query: dict[str, str], batch_size: int, offset: int)
         },
     )
 
-    with urllib.request.urlopen(request) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def fetch_photos(include_private: bool, batch_size: int) -> list[dict[str, Any]]:
+def fetch_photos(include_private: bool, batch_size: int, timeout: int) -> list[dict[str, Any]]:
     select_visit = "visit(shot_at,is_public)" if include_private else "visit!inner(shot_at,is_public)"
     query = {
         "select": f"id,manhole_id,storage_key,content_type,width,height,file_size,created_at,{select_visit}",
@@ -145,7 +152,7 @@ def fetch_photos(include_private: bool, batch_size: int) -> list[dict[str, Any]]
     offset = 0
 
     while True:
-        batch = supabase_get("photo", query, batch_size, offset)
+        batch = supabase_get("photo", query, batch_size, offset, timeout)
         photos.extend(batch)
 
         if len(batch) < batch_size:
@@ -155,11 +162,11 @@ def fetch_photos(include_private: bool, batch_size: int) -> list[dict[str, Any]]
     return photos
 
 
-def build_payload(include_private: bool, batch_size: int) -> dict[str, Any]:
+def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[str, Any]:
     latest_by_manhole_id: dict[int, dict[str, Any]] = {}
     latest_dates: dict[int, datetime] = {}
 
-    for photo in fetch_photos(include_private=include_private, batch_size=batch_size):
+    for photo in fetch_photos(include_private=include_private, batch_size=batch_size, timeout=timeout):
         manhole_id = int(photo["manhole_id"])
         sort_date = photo_sort_date(photo)
 
@@ -210,12 +217,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Write compact JSON.",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=int(os.environ.get("PHOTO_EXPORT_TIMEOUT", DEFAULT_TIMEOUT)),
+        help=f"HTTP request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    payload = build_payload(include_private=args.include_private, batch_size=args.batch_size)
+    payload = build_payload(
+        include_private=args.include_private,
+        batch_size=args.batch_size,
+        timeout=args.timeout,
+    )
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

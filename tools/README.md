@@ -17,7 +17,7 @@
 
 ### `export_latest_manhole_photos.py`
 
-`photo` テーブルから、マンホールIDごとの最新公開写真URLをJSONとして出力するPythonスクリプト。Python標準ライブラリだけで動きます。
+`photo` テーブルから、マンホールIDごとの最新公開写真URLをJSONとして出力するPythonスクリプト。Python 3.9以上の標準ライブラリだけで動きます。
 
 ## 🚀 使い方
 
@@ -78,6 +78,8 @@ SUPABASE_SERVICE_ROLE_KEY=xxxxx
 R2_PUBLIC_BASE_URL=https://images.pokefuta.com
 ```
 
+`R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。
+
 ```bash
 python3 tools/export_latest_manhole_photos.py \
   --output public/data/latest-manhole-photos.json
@@ -102,7 +104,7 @@ python3 tools/export_latest_manhole_photos.py \
 }
 ```
 
-このリポジトリでは元画像URLだけを出力します。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定してください。
+このリポジトリでは元画像URLだけを出力します。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
 
 将来自動化する場合は、Amplify のビルド/バッチ用環境に同じ環境変数を置き、`python3 tools/export_latest_manhole_photos.py` を実行する方針で移行できます。R2へ直接アップロードまで自動化したい場合は、Amplify/CodeBuild側で AWS CLI 互換の `aws s3 cp --endpoint-url "$R2_ENDPOINT"`、または `boto3` を追加して `data/latest-manhole-photos.json` に配置します。
 
@@ -121,6 +123,13 @@ R2 bucket
 ```text
 https://images.pokefuta.com/photos/original/YYYY/MM/<uuid>.jpg
 https://images.pokefuta.com/data/latest-manhole-photos.json
+```
+
+R2 endpointを直接使う場合:
+
+```text
+https://<account-id>.r2.cloudflarestorage.com/<bucket>/photos/original/YYYY/MM/<uuid>.jpg
+https://<account-id>.r2.cloudflarestorage.com/<bucket>/data/latest-manhole-photos.json
 ```
 
 検索サイト側では、このJSONの `url` / `original_url` を入力として必要なサイズの画像URLへ変換します。
