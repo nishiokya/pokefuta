@@ -178,8 +178,8 @@ export function useAnalytics() {
   );
 
   const trackAppError = useCallback(
-    (errorMessage: string, errorType?: string) => {
-      errorEvents.app(errorMessage, errorType);
+    (errorCode: string, errorType?: string) => {
+      errorEvents.app(errorCode, errorType);
     },
     []
   );

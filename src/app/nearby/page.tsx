@@ -42,7 +42,7 @@ export default function NearbyPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30); // Default 30km
   const [showMap, setShowMap] = useState(false);
-  const { trackView, trackSearch } = useAnalytics();
+  const { trackSearch } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定

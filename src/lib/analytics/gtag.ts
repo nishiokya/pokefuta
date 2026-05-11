@@ -21,8 +21,8 @@ export interface GAUserProperties {
 
 declare global {
   interface Window {
-    dataLayer: unknown[];
-    gtag: (...args: any[]) => void;
+    dataLayer?: unknown[];
+    gtag?: (...args: any[]) => void;
   }
 }
 
@@ -107,6 +107,13 @@ export function trackEvent(
   // ==========================================
   // GA に送信
   // ==========================================
+  if (!window.gtag) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GA] gtag not available (GA disabled or not loaded)');
+    }
+    return;
+  }
+
   try {
     window.gtag('event', eventName, enrichedParams);
   } catch (error) {
@@ -155,7 +162,7 @@ export function setUserId(userId: string): void {
 
   try {
     // gtag('set') を使用してユーザーIDを設定
-    window.gtag('set', { 'user_id': userId });
+    window.gtag!('set', { 'user_id': userId });
     if (process.env.NODE_ENV === 'development') {
       console.log('[GA] User ID set');
     }
@@ -176,7 +183,7 @@ export function clearUserId(): void {
 
   try {
     // gtag('set') を使用してユーザーIDをクリア
-    window.gtag('set', { 'user_id': null });
+    window.gtag!('set', { 'user_id': null });
     if (process.env.NODE_ENV === 'development') {
       console.log('[GA] User ID cleared');
     }
@@ -207,7 +214,7 @@ export function setUserProperties(
   }
 
   try {
-    window.gtag('set', {
+    window.gtag!('set', {
       user_properties: properties,
     });
     if (process.env.NODE_ENV === 'development') {
@@ -323,8 +330,9 @@ export const errorEvents = {
       error_code: errorCode,
     }),
 
-  app: (_errorMessage: string, errorType: string = 'unknown') =>
+  app: (errorCode: string, errorType: string = 'unknown') =>
     trackEvent('app_error', {
+      error_code: errorCode,
       error_type: errorType,
     }),
 };

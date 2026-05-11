@@ -16,7 +16,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
   useEffect(() => {
     if (error) {
       // エラーメッセージには機微情報が含まれるため、固定のエラーコードのみ送信
-      trackAppError('supabase_error');
+      trackAppError('supabase_error', 'supabase_error');
     }
   }, [error, trackAppError]);
 
