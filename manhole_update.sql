@@ -1,7 +1,7 @@
 -- ==========================================
 -- ポケふたマンホールデータ INSERT文
 -- 生成日時: 2026-05-10T17:15:57.061346
--- データソース: https://raw.githubusercontent.com/nishiokya/pokefuta-tracker/main/apps/scraper/pokefuta.ndjson
+-- データソース: https://raw.githubusercontent.com/nishiokya/pokefuta-tracker/main/apps/web/pokefuta.ndjson
 -- ==========================================
 
 -- テーブルが存在しない場合は作成

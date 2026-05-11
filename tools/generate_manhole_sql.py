@@ -30,7 +30,7 @@ import urllib.request
 from datetime import datetime
 
 # GitHubの最新NDJSONファイルURL
-NDJSON_URL = "https://raw.githubusercontent.com/nishiokya/pokefuta-tracker/main/apps/scraper/pokefuta.ndjson"
+NDJSON_URL = "https://raw.githubusercontent.com/nishiokya/pokefuta-tracker/main/apps/web/pokefuta.ndjson"
 
 # Prefecture code mapping (都道府県コードマッピング)
 PREFECTURE_CODE_MAP = {

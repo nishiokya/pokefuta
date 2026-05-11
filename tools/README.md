@@ -104,7 +104,7 @@ graph LR
 ## 📝 データソース
 
 - **GitHub Repository**: https://github.com/nishiokya/pokefuta-tracker
-- **データファイル**: `apps/scraper/pokefuta.ndjson`
+- **データファイル**: `apps/web/pokefuta.ndjson`
 - **更新頻度**: スクレイパーにより定期的に更新
 
 ## ⚠️ 注意事項
