@@ -36,13 +36,20 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // ==========================================
+  // Google Analytics 4 ID
+  // ==========================================
+  // 環境変数から GA ID を取得
+  // フォールバック: G-K18NR4GZG2 (本番環境のID)
+  const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-K18NR4GZG2';
+
   return (
     <html lang="ja">
       <head>
         {/* Google Analytics 4 */}
         <script
           async
-          src="https://www.googletagmanager.com/gtag/js?id=G-K18NR4GZG2"
+          src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
         />
         <script
           dangerouslySetInnerHTML={{
@@ -50,7 +57,7 @@ export default function RootLayout({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'G-K18NR4GZG2');
+              gtag('config', '${gaId}');
             `,
           }}
         />

@@ -8,6 +8,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface Visit {
   id: string;
@@ -32,10 +33,14 @@ export default function VisitsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { trackView } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
     document.title = '訪問履歴 - ポケふた訪問記録';
+
+    // ✅ GA: ページビュー追跡
+    trackView('/visits', '訪問履歴', 'visits');
 
     loadVisits();
   }, []);

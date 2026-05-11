@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { Navigation, ExternalLink, Map as MapIcon, MapPin, Camera } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -41,6 +42,7 @@ export default function NearbyPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30); // Default 30km
   const [showMap, setShowMap] = useState(false);
+  const { trackView, trackSearch } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
@@ -142,6 +144,13 @@ export default function NearbyPage() {
 
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
       setNearbyManholes(manholesWithVisits);
+
+      // ✅ GA: 検索イベント追跡
+      trackSearch(`radius:${radius}km`, manholesWithVisits.length, {
+        latitude: lat,
+        longitude: lng,
+        radius_km: radius
+      });
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
       setDataError(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);

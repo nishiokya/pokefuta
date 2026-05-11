@@ -3,11 +3,17 @@
 import { useEffect } from 'react';
 import { Info, Camera, Map, Navigation, History, Shield, MessageSquare, UserPlus, Github, Twitter } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 export default function AboutPage() {
+  const { trackView } = useAnalytics();
+
   // ページタイトル設定
   useEffect(() => {
     document.title = 'このアプリについて - ポケふた訪問記録';
+
+    // ✅ GA: ページビュー追跡
+    trackView('/about', 'このアプリについて', 'about');
   }, []);
 
   return (

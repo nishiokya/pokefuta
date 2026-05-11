@@ -7,6 +7,7 @@ import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 type FeedVisit = {
   id: string;
@@ -32,10 +33,14 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const feedPerPage = 24;
+  const { trackView } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
     document.title = 'ホーム - ポケふた訪問記録';
+
+    // ✅ GA: ページビュー追跡
+    trackView('/', 'ホーム', 'home');
 
     // ログイン状態はSupabase sessionで判定（APIは常に公開フィードを使う）
     (async () => {

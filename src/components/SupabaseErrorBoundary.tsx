@@ -1,6 +1,8 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
+import { useEffect } from 'react';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface SupabaseErrorBoundaryProps {
   error?: string | null;
@@ -8,6 +10,15 @@ interface SupabaseErrorBoundaryProps {
 }
 
 export default function SupabaseErrorBoundary({ error, children }: SupabaseErrorBoundaryProps) {
+  // ✅ GA: エラー追跡
+  const { trackAppError } = useAnalytics();
+
+  useEffect(() => {
+    if (error) {
+      trackAppError(error, 'supabase_error');
+    }
+  }, [error, trackAppError]);
+
   if (error) {
     return (
       <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center p-4">
