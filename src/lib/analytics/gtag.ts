@@ -258,13 +258,12 @@ export const uploadEvents = {
 
   error: (
     errorCode: string,
-    errorMessage: string,
+    _errorMessage: string,
     fileSize?: number,
     metadata?: GAEventParams
   ) =>
     trackEvent('upload_error', {
       error_code: errorCode,
-      error_message: errorMessage,
       file_size: fileSize,
       ...metadata,
     }),
@@ -309,26 +308,23 @@ export const errorEvents = {
   api: (
     endpoint: string,
     statusCode: number,
-    errorMessage: string,
+    _errorMessage: string,
     method: string = 'GET'
   ) =>
     trackEvent('error_event', {
       error_type: 'api_error',
       endpoint,
       status_code: statusCode,
-      error_message: errorMessage,
       method,
     }),
 
-  auth: (errorCode: string, errorMessage: string) =>
+  auth: (errorCode: string, _errorMessage: string) =>
     trackEvent('auth_error', {
       error_code: errorCode,
-      error_message: errorMessage,
     }),
 
-  app: (errorMessage: string, errorType: string = 'unknown') =>
+  app: (_errorMessage: string, errorType: string = 'unknown') =>
     trackEvent('app_error', {
-      error_message: errorMessage,
       error_type: errorType,
     }),
 };

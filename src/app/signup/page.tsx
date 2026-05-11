@@ -21,7 +21,7 @@ export default function SignUpPage() {
   const [success, setSuccess] = useState(false);
 
   const supabase = createBrowserClient();
-  const { trackSignUp, trackAuthError } = useAnalytics();
+  const { trackSignUp, trackAuthError, setUser } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {

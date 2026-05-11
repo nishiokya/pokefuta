@@ -12,7 +12,6 @@ import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
-import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),

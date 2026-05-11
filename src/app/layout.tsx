@@ -40,28 +40,32 @@ export default function RootLayout({
   // Google Analytics 4 ID
   // ==========================================
   // 環境変数から GA ID を取得
-  // キー: NEXT_PUBLIC_GA_ID（Amplify 側でも同じキーで設定）
-  // フォールバック: G-K18NR4GZG2 (本番環境のID)
-  const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-K18NR4GZG2';
+  // キー: NEXT_PUBLIC_GA_ID（本番環境 (Amplify) でのみ設定）
+  // Local dev では計測しない（環境変数がない場合）
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
   return (
     <html lang="ja">
       <head>
-        {/* Google Analytics 4 */}
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${gaId}', { send_page_view: false });
-            `,
-          }}
-        />
+        {/* Google Analytics 4 - 環境変数がある場合のみ読み込み */}
+        {gaId && (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${gaId}', { send_page_view: false });
+                `,
+              }}
+            />
+          </>
+        )}
         {/* End Google Analytics 4 */}
 
         <link rel="apple-touch-icon" href="/icon-192.png" />
