@@ -265,7 +265,6 @@ export const uploadEvents = {
 
   error: (
     errorCode: string,
-    _errorMessage: string,
     fileSize?: number,
     metadata?: GAEventParams
   ) =>
@@ -315,7 +314,6 @@ export const errorEvents = {
   api: (
     endpoint: string,
     statusCode: number,
-    _errorMessage: string,
     method: string = 'GET'
   ) =>
     trackEvent('error_event', {
@@ -325,7 +323,7 @@ export const errorEvents = {
       method,
     }),
 
-  auth: (errorCode: string, _errorMessage: string) =>
+  auth: (errorCode: string) =>
     trackEvent('auth_error', {
       error_code: errorCode,
     }),

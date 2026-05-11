@@ -112,11 +112,19 @@ export function useAnalytics() {
   const trackUploadError = useCallback(
     (
       errorCode: string,
+<<<<<<< HEAD
       ignoredErrorMessage: string,
       fileSize?: number,
       metadata?: GAEventParams
     ) => {
       uploadEvents.error(errorCode, ignoredErrorMessage, fileSize, metadata);
+=======
+      errorMessage?: string,
+      fileSize?: number,
+      metadata?: GAEventParams
+    ) => {
+      uploadEvents.error(errorCode, fileSize, metadata);
+>>>>>>> ec964d0 (fix(ga): Final Copilot review - GA events ordering, next/script, and API cleanup)
     },
     []
   );
@@ -159,17 +167,17 @@ export function useAnalytics() {
     (
       endpoint: string,
       statusCode: number,
-      errorMessage: string,
+      errorMessage?: string,
       method?: string
     ) => {
-      errorEvents.api(endpoint, statusCode, errorMessage, method);
+      errorEvents.api(endpoint, statusCode, method);
     },
     []
   );
 
   const trackAuthError = useCallback(
-    (errorCode: string, errorMessage: string) => {
-      errorEvents.auth(errorCode, errorMessage);
+    (errorCode: string, errorMessage?: string) => {
+      errorEvents.auth(errorCode);
     },
     []
   );
