@@ -275,14 +275,8 @@ export async function POST(request: NextRequest) {
         shotAtDate = new Date();
       }
 
-      // Build shot_location, preferring validated GPS coordinates and falling back to raw shot_location for compatibility
-      const rawShotLocation = formData.get('shot_location');
-      const shotLocationGeom =
-        lat !== null && lng !== null
-          ? `POINT(${lng} ${lat})`
-          : typeof rawShotLocation === 'string' && rawShotLocation.trim()
-            ? rawShotLocation.trim()
-            : undefined;
+      // Build shot_location from required, validated GPS coordinates
+      const shotLocationGeom = `POINT(${lng} ${lat})`;
 
       // Create visit record with proper Date type
       console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());
