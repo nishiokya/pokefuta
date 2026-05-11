@@ -9,7 +9,7 @@
  * 
  * WKBフォーマット:
  * - バイト0: エンディアンフラグ（01=LE, 00=BE）
- * - バイト1-4: ジオメトリ型（1=POINT、0x20000000フラグ=SRID付き）
+ * - バイト1-4: ジオメトリ型（1=POINT）
  * - オプション: SRID(4バイト)
  * - 以降: 座標(X=lng, Y=lat各8バイト)
  * 
@@ -39,9 +39,9 @@ export function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: n
     const typeBuffer = Buffer.from(typeHex, 'hex');
     const geomType = isLittleEndian ? typeBuffer.readUInt32LE(0) : typeBuffer.readUInt32BE(0);
 
-    // POINT型チェック（下位28ビット）
-    const baseType = geomType & 0x0FFFFFFF;
-    if (baseType !== 1) return null; // 1 = POINT
+    // ジオメトリ型の下位2バイトから実際の型を取得（1=POINT）
+    const baseType = geomType & 0xFFFF;
+    if (baseType !== 1) return null;
 
     // SRID有無を判定（0x20000000フラグ）
     const hasSrid = (geomType & 0x20000000) !== 0;
