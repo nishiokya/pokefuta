@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
 import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History, Home } from 'lucide-react';
@@ -46,22 +46,43 @@ export default function UploadPage() {
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
+  const timerRefsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const { trackView, trackUploadStart, trackUploadSuccess, trackUploadError } = useAnalytics();
 
-  // ✅ アラートを追加する関数
+  // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
+  useEffect(() => {
+    return () => {
+      timerRefsRef.current.forEach(timerId => clearTimeout(timerId));
+      timerRefsRef.current.clear();
+    };
+  }, []);
+
+  // ✅ アラートを追加する関数（crypto.randomUUID()で衝突回避）
   const addAlert = useCallback((type: 'error' | 'success' | 'warning', message: string) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     setAlerts(prev => [...prev, { type, message, id }]);
     
-    // 5秒後に自動削除
-    setTimeout(() => {
+    // 5秒後に自動削除（タイマーID保持）
+    const timerId = setTimeout(() => {
       setAlerts(prev => prev.filter(alert => alert.id !== id));
+      timerRefsRef.current.delete(id);
     }, 5000);
+    
+    timerRefsRef.current.set(id, timerId);
   }, []);
 
   // ✅ アラートを削除する関数
   const removeAlert = useCallback((id: string) => {
     setAlerts(prev => prev.filter(alert => alert.id !== id));
+    // タイマークリア
+    const timerId = timerRefsRef.current.get(id);
+    if (timerId) {
+      clearTimeout(timerId);
+      timerRefsRef.current.delete(id);
+    }
   }, []);
 
   useEffect(() => {
@@ -500,11 +521,11 @@ export default function UploadPage() {
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 space-y-2 p-4">
+        <div className="fixed top-0 left-0 right-0 z-50 space-y-2 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
           {alerts.map(alert => (
             <div
               key={alert.id}
-              className={`flex items-center justify-between gap-2 p-3 rounded-lg border-2 font-pixelJp text-sm animate-bounce ${
+              className={`flex items-center justify-between gap-2 p-3 rounded-lg border-2 font-pixelJp text-sm animate-bounce motion-reduce:animate-none ${
                 alert.type === 'error'
                   ? 'bg-rpg-red/20 border-rpg-red text-rpg-red'
                   : alert.type === 'success'
@@ -521,6 +542,7 @@ export default function UploadPage() {
               <button
                 onClick={() => removeAlert(alert.id)}
                 className="hover:opacity-70"
+                aria-label="アラートを閉じる"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -4,47 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { storage, generateStorageKey } from '@/lib/storage';
-import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
-
-// ✅ Helper function to extract coordinates from PostGIS WKB (Well-Known Binary) format
-function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: number } | null {
-  if (!wkbHex || typeof wkbHex !== 'string') return null;
-
-  try {
-    const cleanHex = wkbHex.startsWith('0x') ? wkbHex.slice(2) : wkbHex;
-    if (cleanHex.length < 50) return null;
-
-    const possibleStarts = [42, 18, 34, 50];
-
-    for (const coordStart of possibleStarts) {
-      if (coordStart + 32 <= cleanHex.length) {
-        try {
-          const lngHex = cleanHex.substring(coordStart, coordStart + 16);
-          const latHex = cleanHex.substring(coordStart + 16, coordStart + 32);
-
-          if (lngHex.length === 16 && latHex.length === 16) {
-            const lngBuffer = Buffer.from(lngHex, 'hex');
-            const latBuffer = Buffer.from(latHex, 'hex');
-
-            const lng = lngBuffer.readDoubleLE(0);
-            const lat = latBuffer.readDoubleLE(0);
-
-            if (lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
-              return { lat, lng };
-            }
-          }
-        } catch (parseError) {
-          continue;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error parsing WKB:', error);
-    return null;
-  }
-}
+import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 
 /**
  * @swagger
@@ -269,7 +229,8 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({
         success: false,
-        error: 'Manhole coordinates not extractable'
+        errorCode: 'MANHOLE_LOCATION_INVALID',
+        error: 'マンホールの位置情報が登録されていないか、不正です'
       }, { status: 400 });
     }
 

@@ -4,6 +4,50 @@
  */
 
 /**
+ * PostGIS WKB（Well-Known Binary）フォーマットから座標を抽出
+ * @param wkbHex HEX文字列（PostGIS location列の値）
+ * @returns { lat, lng } オブジェクト、または null
+ */
+export function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: number } | null {
+  if (!wkbHex || typeof wkbHex !== 'string') return null;
+
+  try {
+    const cleanHex = wkbHex.startsWith('0x') ? wkbHex.slice(2) : wkbHex;
+    if (cleanHex.length < 50) return null;
+
+    const possibleStarts = [42, 18, 34, 50];
+
+    for (const coordStart of possibleStarts) {
+      if (coordStart + 32 <= cleanHex.length) {
+        try {
+          const lngHex = cleanHex.substring(coordStart, coordStart + 16);
+          const latHex = cleanHex.substring(coordStart + 16, coordStart + 32);
+
+          if (lngHex.length === 16 && latHex.length === 16) {
+            const lngBuffer = Buffer.from(lngHex, 'hex');
+            const latBuffer = Buffer.from(latHex, 'hex');
+
+            const lng = lngBuffer.readDoubleLE(0);
+            const lat = latBuffer.readDoubleLE(0);
+
+            if (lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
+              return { lat, lng };
+            }
+          }
+        } catch (parseError) {
+          continue;
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing WKB:', error);
+    return null;
+  }
+}
+
+/**
  * Haversine公式を使用して2つの地点間の距離を計算
  * @param lat1 地点1の緯度
  * @param lng1 地点1の経度
