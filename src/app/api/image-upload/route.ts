@@ -276,8 +276,14 @@ export async function POST(request: NextRequest) {
         shotAtDate = new Date();
       }
 
-      // Build shot_location as PostGIS POINT from GPS coordinates (lat/lng は必須バリデーション済み)
-      const shotLocationGeom = `POINT(${lng} ${lat})`;
+      // Build shot_location, preferring validated GPS coordinates and falling back to raw shot_location for compatibility
+      const rawShotLocation = formData.get('shot_location');
+      const shotLocationGeom =
+        lat !== null && lng !== null
+          ? `POINT(${lng} ${lat})`
+          : typeof rawShotLocation === 'string' && rawShotLocation.trim()
+            ? rawShotLocation.trim()
+            : undefined;
 
       // Create visit record with proper Date type
       console.log('Creating visit record. userId:', userId, 'shot_at:', shotAtDate.toISOString());

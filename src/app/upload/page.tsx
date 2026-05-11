@@ -28,6 +28,7 @@ interface UploadedPhoto {
   uploaded: boolean;
   uploadedImageId?: string;
   error?: string;
+  photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
 }
 }
 
@@ -86,11 +87,12 @@ export default function UploadPage() {
     if (manholes.length > 0 && photos.length > 0) {
       setPhotos(prevPhotos =>
         prevPhotos.map(photo => {
-          // ロード中エラーの場合のみ再評価
-          if (photo.error === 'マンホール情報をロード中です。少々お待ちください。') {
+          // ロード中ステータスの場合のみ再評価
+          if (photo.photoStatus === 'waiting_manhole') {
             if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
               return {
                 ...photo,
+                photoStatus: 'invalid_gps',
                 error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
               };
             }
@@ -100,13 +102,20 @@ export default function UploadPage() {
               photo.metadata.longitude as number
             );
 
-            return {
-              ...photo,
-              matchedManhole,
-              error: matchedManhole
-                ? undefined
-                : '50m以内にマンホールが見つかりません。位置情報を確認してください。'
-            };
+            if (matchedManhole) {
+              return {
+                ...photo,
+                photoStatus: 'valid',
+                matchedManhole,
+                error: undefined
+              };
+            } else {
+              return {
+                ...photo,
+                photoStatus: 'no_nearby_manhole',
+                error: '50m以内にマンホールが見つかりません。位置情報を確認してください。'
+              };
+            }
           }
           return photo;
         })
@@ -161,21 +170,27 @@ export default function UploadPage() {
 
       let matchedManhole: Manhole | undefined;
       let distanceError: string | undefined;
+      let photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
 
       // ✅ GPS座標の必須チェック
       if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
         distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
+        photoStatus = 'invalid_gps';
       } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
         // isValidCoordinates が true の場合、lat/lng は有効な数値
         matchedManhole = findNearestManhole(
           metadata.latitude as number,
           metadata.longitude as number
         );
-        if (!matchedManhole) {
+        if (matchedManhole) {
+          photoStatus = 'valid';
+        } else {
           distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
+          photoStatus = 'no_nearby_manhole';
         }
       } else {
         distanceError = 'マンホール情報をロード中です。少々お待ちください。';
+        photoStatus = 'waiting_manhole';
       }
 
       newPhotos.push({
@@ -186,7 +201,8 @@ export default function UploadPage() {
         matchedManhole,
         uploading: false,
         uploaded: false,
-        error: distanceError
+        error: distanceError,
+        photoStatus
       });
 
       // 画像メタ情報からnoteのデフォルト値を生成
