@@ -112,11 +112,11 @@ export function useAnalytics() {
   const trackUploadError = useCallback(
     (
       errorCode: string,
-      errorMessage: string,
+      ignoredErrorMessage: string,
       fileSize?: number,
       metadata?: GAEventParams
     ) => {
-      uploadEvents.error(errorCode, errorMessage, fileSize, metadata);
+      uploadEvents.error(errorCode, ignoredErrorMessage, fileSize, metadata);
     },
     []
   );
