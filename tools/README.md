@@ -15,6 +15,10 @@
 
 既存マンホールデータに prefecture_id と prefecture_code を埋めるヘルパースクリプト。
 
+### `export_latest_manhole_photos.py`
+
+`photo` テーブルから、マンホールIDごとの最新公開写真URLをJSONとして出力するPythonスクリプト。Python標準ライブラリだけで動きます。
+
 ## 🚀 使い方
 
 ### 1. マンホールデータのSQL生成
@@ -63,6 +67,63 @@ export DATABASE_URL="postgresql://user:password@host:port/database"
 # SQLを適用
 python tools/generate_manhole_sql.py 2>/dev/null | psql $DATABASE_URL
 ```
+
+### 3. 最新写真JSONの生成
+
+ローカルで以下の環境変数を設定します。
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=xxxxx
+R2_PUBLIC_BASE_URL=https://images.pokefuta.com
+```
+
+```bash
+python3 tools/export_latest_manhole_photos.py \
+  --output public/data/latest-manhole-photos.json
+```
+
+出力JSONは `photos` オブジェクトのキーがマンホールIDです。最新判定は `visit.shot_at` があればそれを優先し、なければ `photo.created_at` を使います。
+
+```json
+{
+  "generated_at": "2026-05-12T00:00:00.000Z",
+  "count": 1,
+  "photos": {
+    "279": {
+      "manhole_id": 279,
+      "photo_id": "uuid",
+      "url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
+      "original_url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
+      "created_at": "2026-05-12T00:00:00.000Z",
+      "shot_at": "2026-05-12T00:00:00.000Z"
+    }
+  }
+}
+```
+
+このリポジトリでは元画像URLだけを出力します。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定してください。
+
+将来自動化する場合は、Amplify のビルド/バッチ用環境に同じ環境変数を置き、`python3 tools/export_latest_manhole_photos.py` を実行する方針で移行できます。R2へ直接アップロードまで自動化したい場合は、Amplify/CodeBuild側で AWS CLI 互換の `aws s3 cp --endpoint-url "$R2_ENDPOINT"`、または `boto3` を追加して `data/latest-manhole-photos.json` に配置します。
+
+#### Cloudflare / R2 パス設計
+
+推奨構成:
+
+```text
+R2 bucket
+├── photos/original/YYYY/MM/<uuid>.jpg
+└── data/latest-manhole-photos.json
+```
+
+公開ドメイン:
+
+```text
+https://images.pokefuta.com/photos/original/YYYY/MM/<uuid>.jpg
+https://images.pokefuta.com/data/latest-manhole-photos.json
+```
+
+検索サイト側では、このJSONの `url` / `original_url` を入力として必要なサイズの画像URLへ変換します。
 
 ## 📊 出力形式
 
