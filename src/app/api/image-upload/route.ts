@@ -159,7 +159,6 @@ export async function POST(request: NextRequest) {
     const note = formData.get('note');
     const comment = formData.get('comment');  // 訪問コメント
     const isPublic = formData.get('is_public');  // 公開設定
-    const shotLocation = formData.get('shot_location');
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
 

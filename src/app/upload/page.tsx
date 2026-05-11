@@ -139,7 +139,7 @@ export default function UploadPage() {
     }
   };
 
-  const findNearestManhole = (lat: number, lng: number): Manhole | undefined => {
+  const findNearestManhole = useCallback((lat: number, lng: number): Manhole | undefined => {
     if (!manholes.length) return undefined;
 
     let nearest: Manhole | undefined;
@@ -156,7 +156,7 @@ export default function UploadPage() {
     });
 
     return nearest;
-  };
+  }, [manholes]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setLoading(true);
