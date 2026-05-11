@@ -12,6 +12,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
+  const fromRegister = searchParams.get('from') === 'register';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -103,6 +104,23 @@ function LoginForm() {
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
             アカウント作成済みの方はこちら
           </p>
+          {fromRegister && (
+            <div className="mt-3 pt-3 border-t-2 border-rpg-border">
+              <div className="bg-rpg-yellow/20 border-2 border-rpg-yellow p-2 rounded">
+                <div className="flex items-start gap-2">
+                  <Mail className="w-4 h-4 text-rpg-yellow flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-pixelJp text-xs font-bold text-rpg-textDark mb-1">
+                      登録完了！
+                    </p>
+                    <p className="font-pixelJp text-[11px] text-rpg-textDark leading-relaxed">
+                      登録したメールアドレスに確認メールが送信されました。メール内のリンクをクリックして確認を完了してください。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Login Form */}
