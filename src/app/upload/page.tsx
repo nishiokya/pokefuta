@@ -264,7 +264,7 @@ export default function UploadPage() {
     const photo = photos.find(p => p.id === photoId);
     if (!photo) return;
 
-    // ✅ GA: アップロード開始時刻を記録
+    // ✅ GA: 検証・圧縮・アップロードを含む全体処理の開始時刻を記録
     const uploadStartTime = Date.now();
 
     // ✅ GPS座標の必須チェック

@@ -107,15 +107,9 @@ export function trackEvent(
   // ==========================================
   // GA に送信
   // ==========================================
-  if (!window.gtag) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[GA] gtag not available (GA disabled or not loaded)');
-    }
-    return;
-  }
 
   try {
-    window.gtag('event', eventName, enrichedParams);
+    window.gtag!('event', eventName, enrichedParams);
   } catch (error) {
     console.error('[GA] Failed to track event:', eventName, error);
   }
@@ -126,8 +120,8 @@ export function trackEvent(
 // ==========================================
 
 /**
- * ページビューイベント（自動）
- * Next.js Router による遷移で自動的に送信される
+ * ページビューイベントを送信
+ * 必要な箇所で明示的に呼び出して使用する
  */
 export function trackPageView(
   pagePath: string,
@@ -156,7 +150,9 @@ export function trackPageView(
  */
 export function setUserId(userId: string): void {
   if (!isGtagAvailable()) {
-    console.warn('[GA] gtag not available. User ID not set.');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[GA] gtag not available. User ID not set.');
+    }
     return;
   }
 
@@ -177,7 +173,9 @@ export function setUserId(userId: string): void {
  */
 export function clearUserId(): void {
   if (!isGtagAvailable()) {
-    console.warn('[GA] gtag not available. User ID not cleared.');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[GA] gtag not available. User ID not cleared.');
+    }
     return;
   }
 
@@ -209,7 +207,9 @@ export function setUserProperties(
   properties: GAUserProperties
 ): void {
   if (!isGtagAvailable()) {
-    console.warn('[GA] gtag not available. User properties not set.');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[GA] gtag not available. User properties not set.');
+    }
     return;
   }
 

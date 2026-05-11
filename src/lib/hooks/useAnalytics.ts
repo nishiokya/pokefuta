@@ -23,7 +23,7 @@ import {
  * Google Analytics カスタム Hook
  *
  * @example
- * const { track, trackView, trackSignIn } = useAnalytics();
+ * const { track, trackView, trackSignIn, trackUploadStart } = useAnalytics();
  *
  * // 基本的なイベント
  * track('custom_event', { custom_field: 'value' });
@@ -32,11 +32,8 @@ import {
  * trackSignIn();
  *
  * // ファイルアップロード
- * track('upload.success', {
- *   file_size: 1024000,
- *   file_type: 'image/jpeg',
- *   duration_ms: 2000
- * });
+ * trackUploadStart(1024000, 'image/jpeg');
+ * // 後でアップロード完了時に trackUploadSuccess を呼び出す
  */
 export function useAnalytics() {
   // ==========================================
