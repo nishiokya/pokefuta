@@ -40,6 +40,7 @@ export default function RootLayout({
   // Google Analytics 4 ID
   // ==========================================
   // 環境変数から GA ID を取得
+  // キー: NEXT_PUBLIC_GA_ID（Amplify 側でも同じキーで設定）
   // フォールバック: G-K18NR4GZG2 (本番環境のID)
   const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-K18NR4GZG2';
 

@@ -173,6 +173,39 @@ npm run dev
    R2_BUCKET=pokefuta-photos
    ```
 
+## 📊 Google Analytics 4 設定
+
+アプリの利用分析とユーザー行動追跡を行います。
+
+### セットアップ手順
+
+1. **Google Analytics 4 プロパティの作成**
+   - [Google Analytics](https://analytics.google.com) にアクセス
+   - 新しいプロパティを作成（ウェブサイト）
+   - 測定 ID を取得（形式: `G-XXXXXXXXXX`）
+
+2. **環境変数の設定**
+   ```bash
+   NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+   ```
+
+3. **AWS Amplify での設定**
+   - Amplify Console → App settings → Environment variables
+   - `NEXT_PUBLIC_GA_ID` に測定 ID を設定
+
+### 計測内容
+
+- ページビュー（自動計測、重複なし）
+- ユーザー認証イベント（サインアップ/ログイン）
+- ファイルアップロード完了/エラー
+- 検索・フィルタリング操作
+- エラー追跡（固定値のみ、詳細情報非送信）
+
+**プライバシーポリシー**:
+- ユーザーメールアドレスなどの PII は送信しない
+- 緯度/経度などの位置情報は送信しない
+- エラーメッセージなど機微情報はマスキング
+
 ### 署名付きURL
 
 写真アクセスは署名付きURL（5分間有効）で提供されます：

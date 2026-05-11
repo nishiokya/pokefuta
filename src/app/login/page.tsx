@@ -66,10 +66,12 @@ function LoginForm() {
           redirectTo,
         });
 
-        // ✅ GA: ログインイベント追跡（PIIは送信しない）
-        trackSignIn({});
-        // ✅ GA: ユーザーID設定
-        setUser(data.user?.id || '');
+        // ✅ GA: ログインイベント追跡
+        trackSignIn();
+        // ✅ GA: ユーザーID設定（ユーザーIDが取得できた時のみ）
+        if (data.user?.id) {
+          setUser(data.user.id);
+        }
 
         // app_userレコードの存在確認
         const { data: appUser, error: appUserError } = await supabase

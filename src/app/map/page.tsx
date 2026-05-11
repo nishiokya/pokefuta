@@ -111,7 +111,7 @@ export default function MapPage() {
   const [prefectureCounts, setPrefectureCounts] = useState<PrefectureCount[]>([]);
   const [showPrefectureList, setShowPrefectureList] = useState(true);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
-  const { trackView } = useAnalytics();
+  const { trackFilterApply } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
@@ -271,7 +271,6 @@ export default function MapPage() {
     setMapZoom(prefecture.zoom);
 
     // ✅ GA: 都道府県フィルタリングイベント追跡
-    const { trackFilterApply } = useAnalytics();
     trackFilterApply('prefecture', prefecture.name, prefecture.count);
   };
 

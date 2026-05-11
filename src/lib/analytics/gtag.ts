@@ -21,7 +21,7 @@ export interface GAUserProperties {
 
 declare global {
   interface Window {
-    dataLayer: Record<string, unknown>[];
+    dataLayer: unknown[];
     gtag: (...args: any[]) => void;
   }
 }
@@ -65,10 +65,12 @@ function isGtagAvailable(): boolean {
 export function trackEvent(
   eventName: string,
   eventParams?: GAEventParams,
-  context?: Record<string, unknown>
+  context?: GAEventParams
 ): void {
   if (!isGtagAvailable()) {
-    console.warn('[GA] gtag not available. Event not tracked:', eventName);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[GA] gtag not available. Event not tracked:', eventName);
+    }
     return;
   }
 

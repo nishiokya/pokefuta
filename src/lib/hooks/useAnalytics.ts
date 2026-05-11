@@ -23,13 +23,13 @@ import {
  * Google Analytics カスタム Hook
  *
  * @example
- * const { track, trackView } = useAnalytics();
+ * const { track, trackView, trackSignIn } = useAnalytics();
  *
  * // 基本的なイベント
  * track('custom_event', { custom_field: 'value' });
  *
  * // 認証イベント
- * track('auth.signIn');
+ * trackSignIn();
  *
  * // ファイルアップロード
  * track('upload.success', {
