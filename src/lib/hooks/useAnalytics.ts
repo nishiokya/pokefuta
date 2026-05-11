@@ -23,7 +23,7 @@ import {
  * Google Analytics カスタム Hook
  *
  * @example
- * const { track, trackPageView } = useAnalytics();
+ * const { track, trackView } = useAnalytics();
  *
  * // 基本的なイベント
  * track('custom_event', { custom_field: 'value' });
@@ -226,21 +226,4 @@ export function useAnalytics() {
     trackAuthError,
     trackAppError,
   };
-}
-
-/**
- * ページ遷移を自動追跡する Hook（useEffect内で使用）
- *
- * @example
- * useEffect(() => {
- *   useAnalyticsPageEffect('/', 'ホーム', 'home');
- * }, []);
- */
-export function useAnalyticsPageEffect(
-  pagePath: string,
-  pageTitle: string,
-  pageType?: string
-): void {
-  const { trackView } = useAnalytics();
-  trackView(pagePath, pageTitle, pageType);
 }

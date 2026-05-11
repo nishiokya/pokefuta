@@ -90,7 +90,6 @@ export default function ManholeDetailPage() {
   const [commentsSubmitting, setCommentsSubmitting] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newManholeComment, setNewManholeComment] = useState('');
-  const { trackView } = useAnalytics();
 
   useEffect(() => {
     const manholeId = params.id;

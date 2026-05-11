@@ -76,8 +76,7 @@ export function trackEvent(
   // 共通属性の自動付与
   // ==========================================
   const enrichedParams: GAEventParams = {
-    ...eventParams,
-    // ページ情報
+    // ページ情報（デフォルト値）
     page_path: isClientSide() ? window.location.pathname : undefined,
     page_title: isClientSide() ? document.title : undefined,
     // タイムスタンプ
@@ -88,6 +87,8 @@ export function trackEvent(
     app_version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
     // カスタムコンテキスト
     ...context,
+    // eventParams で明示指定された値を優先
+    ...eventParams,
   };
 
   // ==========================================
@@ -151,10 +152,11 @@ export function setUserId(userId: string): void {
   }
 
   try {
-    window.gtag('config', {
-      user_id: userId,
-    });
-    console.log('[GA] User ID set:', userId);
+    // gtag('set') を使用してユーザーIDを設定
+    window.gtag('set', { 'user_id': userId });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GA] User ID set');
+    }
   } catch (error) {
     console.error('[GA] Failed to set user ID:', error);
   }
@@ -171,10 +173,11 @@ export function clearUserId(): void {
   }
 
   try {
-    window.gtag('config', {
-      user_id: null,
-    });
-    console.log('[GA] User ID cleared');
+    // gtag('set') を使用してユーザーIDをクリア
+    window.gtag('set', { 'user_id': null });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GA] User ID cleared');
+    }
   } catch (error) {
     console.error('[GA] Failed to clear user ID:', error);
   }

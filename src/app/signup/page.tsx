@@ -61,8 +61,8 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
-        // ✅ GA: サインアップイベント追跡
-        trackSignUp({ email: data.user.email, display_name: displayName });
+        // ✅ GA: サインアップイベント追跡（PIIは送信しない）
+        trackSignUp({ user_id: data.user.id });
 
         // ✅ app_user は初回の関連API利用時に自動作成される（/api/image-upload、like/bookmark/comment 等で）
         // signup では auth.signUp() のみで完了

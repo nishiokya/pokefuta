@@ -146,11 +146,7 @@ export default function NearbyPage() {
       setNearbyManholes(manholesWithVisits);
 
       // ✅ GA: 検索イベント追跡
-      trackSearch(`radius:${radius}km`, manholesWithVisits.length, {
-        latitude: lat,
-        longitude: lng,
-        radius_km: radius
-      });
+      trackSearch(`radius:${radius}km`, manholesWithVisits.length);
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
       setDataError(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);

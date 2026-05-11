@@ -66,8 +66,8 @@ function LoginForm() {
           redirectTo,
         });
 
-        // ✅ GA: ログインイベント追跡
-        trackSignIn({ email: data.user?.email });
+        // ✅ GA: ログインイベント追跡（PIIは送信しない）
+        trackSignIn({});
         // ✅ GA: ユーザーID設定
         setUser(data.user?.id || '');
 
