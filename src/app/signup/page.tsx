@@ -61,10 +61,10 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
-        // ✅ GA: サインアップイベント追跡
-        trackSignUp();
         // ✅ GA: ユーザーID設定（GA4では user_id は gtag('set') で設定）
         setUser(data.user.id);
+        // ✅ GA: サインアップイベント追跡
+        trackSignUp();
 
         // ✅ app_user は初回の関連API利用時に自動作成される（/api/image-upload、like/bookmark/comment 等で）
         // signup では auth.signUp() のみで完了
