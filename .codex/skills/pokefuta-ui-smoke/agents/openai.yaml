@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pokefuta UI Smoke"
+  short_description: "トップページとマップページの表示崩れを確認する丁寧な手順"
+  default_prompt: "Use $pokefuta-ui-smoke to check the top page and map page for visual regressions."
