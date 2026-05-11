@@ -61,7 +61,7 @@ export default function UploadPage() {
   const addAlert = useCallback((type: 'error' | 'success' | 'warning', message: string) => {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     
     setAlerts(prev => [...prev, { type, message, id }]);
     
