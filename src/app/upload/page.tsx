@@ -46,7 +46,7 @@ export default function UploadPage() {
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
-  const timerRefsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const { trackView, trackUploadStart, trackUploadSuccess, trackUploadError } = useAnalytics();
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -525,6 +525,9 @@ export default function UploadPage() {
           {alerts.map(alert => (
             <div
               key={alert.id}
+              role={alert.type === 'success' ? 'status' : 'alert'}
+              aria-live={alert.type === 'success' ? 'polite' : 'assertive'}
+              aria-atomic="true"
               className={`flex items-center justify-between gap-2 p-3 rounded-lg border-2 font-pixelJp text-sm animate-bounce motion-reduce:animate-none ${
                 alert.type === 'error'
                   ? 'bg-rpg-red/20 border-rpg-red text-rpg-red'
