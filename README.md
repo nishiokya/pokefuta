@@ -173,6 +173,53 @@ npm run dev
    R2_BUCKET=pokefuta-photos
    ```
 
+## 📊 Google Analytics 4 設定
+
+アプリの利用分析とユーザー行動追跡を行います。
+
+### セットアップ手順
+
+1. **Google Analytics 4 プロパティの作成**
+   - [Google Analytics](https://analytics.google.com) にアクセス
+   - 新しいプロパティを作成（ウェブサイト）
+   - 測定 ID を取得（形式: `G-XXXXXXXXXX`）
+
+2. **環境変数の設定**
+   ```bash
+   NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+   ```
+
+3. **AWS Amplify での設定**
+   - Amplify Console → App settings → Environment variables
+   - `NEXT_PUBLIC_GA_ID` に測定 ID を設定
+
+### 計測内容
+
+- ページビュー（各ページで `trackView(...)` を呼ぶか、共通のルート監視で送信。重複なし）
+- ユーザー認証イベント（サインアップ/ログイン）
+- ファイルアップロード完了/エラー
+- 検索・フィルタリング操作
+- エラー追跡（エラーコード・種別のみ、メッセージなど詳細情報は非送信）
+
+### 実装された計測ポイント
+
+| 画面/機能 | イベント | 送信内容 |
+|---------|---------|--------|
+| ページ遷移 | `page_view` | ページパス・タイトル・タイプ |
+| サインアップ | `sign_up` | ユーザーID |
+| ログイン | `sign_in` | ユーザーID |
+| ファイルアップロード | `upload_start` / `file_upload` / `upload_error` | ファイルサイズ・タイプ・処理時間・エラーコード |
+| マンホール検索 | `search` | 検索クエリ・結果件数 |
+| フィルタリング | `filter_apply` | フィルタ種別・条件・結果件数 |
+| API/認証エラー | `error_event` / `auth_error` / `app_error` | エラーコード・種別（メッセージなし） |
+
+⚠️ **注意**: ページビューは `send_page_view: false` のため、自動送信ではなく各ページ側で明示的に `trackView(...)` を呼び出すか、ルーター変更を監視して送信する必要があります。
+
+**プライバシーポリシー**:
+- ユーザーメールアドレスなどの PII は送信しない
+- 緯度/経度などの位置情報は送信しない
+- エラーメッセージなど機微情報は一切送信しない
+
 ### 署名付きURL
 
 写真アクセスは署名付きURL（5分間有効）で提供されます：

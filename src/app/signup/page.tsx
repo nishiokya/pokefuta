@@ -7,6 +7,7 @@ import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-rea
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
 import BottomNav from '@/components/BottomNav';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function SignUpPage() {
   const [success, setSuccess] = useState(false);
 
   const supabase = createBrowserClient();
+  const { trackSignUp, trackAuthError, setUser } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
@@ -59,6 +61,11 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
+        // ✅ GA: ユーザーID設定（GA4では user_id は gtag('set') で設定）
+        setUser(data.user.id);
+        // ✅ GA: サインアップイベント追跡
+        trackSignUp();
+
         // ✅ app_user は初回の関連API利用時に自動作成される（/api/image-upload、like/bookmark/comment 等で）
         // signup では auth.signUp() のみで完了
         console.log('📝 signup完了。プロフィールは初回の関連API利用時に自動作成されます。');
@@ -72,6 +79,8 @@ export default function SignUpPage() {
       }
     } catch (err: any) {
       console.error('Sign up error:', err);
+      // ✅ GA: 認証エラー追跡
+      trackAuthError(err.name || 'signup_error', err.message);
       setError(err.message || '登録に失敗しました');
     } finally {
       setLoading(false);

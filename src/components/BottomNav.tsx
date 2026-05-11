@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Home, Navigation, Camera, Menu, History, MapPin } from 'lucide-react';
 import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 function isActivePath(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
@@ -16,6 +17,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { trackNavClick } = useAnalytics();
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +70,7 @@ export default function BottomNav() {
                   href={item.href}
                   className={`nav-rpg-item ${active ? 'active' : ''}`}
                   aria-label="アカウント作成"
+                  onClick={() => trackNavClick(item.label)}
                 >
                   {item.icon}
                   <span>{item.label}</span>
@@ -80,6 +83,7 @@ export default function BottomNav() {
                 key={item.href}
                 href={item.href}
                 className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+                onClick={() => trackNavClick(item.label)}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -89,7 +93,11 @@ export default function BottomNav() {
 
           <button
             type="button"
-            onClick={() => setMenuOpen(true)}
+            onClick={() => {
+              // ✅ GA: メニューボタンクリック追跡
+              trackNavClick('メニュー');
+              setMenuOpen(true);
+            }}
             className="nav-rpg-item"
             aria-label="メニュー"
           >

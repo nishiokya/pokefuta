@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
@@ -36,24 +37,38 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // ==========================================
+  // Google Analytics 4 ID
+  // ==========================================
+  // 環境変数から GA ID を取得
+  // キー: NEXT_PUBLIC_GA_ID（本番環境 (Amplify) でのみ設定）
+  // Local dev では計測しない（環境変数がない場合）
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
   return (
     <html lang="ja">
       <head>
-        {/* Google Analytics 4 */}
-        <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-K18NR4GZG2"
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-K18NR4GZG2');
-            `,
-          }}
-        />
+        {/* Google Analytics 4 - 環境変数がある場合のみ読み込み */}
+        {gaId && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script
+              id="google-analytics"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', ${JSON.stringify(gaId)}, { send_page_view: false });
+                `,
+              }}
+            />
+          </>
+        )}
         {/* End Google Analytics 4 */}
 
         <link rel="apple-touch-icon" href="/icon-192.png" />

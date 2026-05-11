@@ -7,6 +7,7 @@ import BottomNav from '@/components/BottomNav';
 import { LogIn, Mail, Lock, AlertCircle, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 function LoginForm() {
   const router = useRouter();
@@ -21,6 +22,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient();
+  const { trackSignIn, setUser, trackAuthError } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
@@ -52,6 +54,8 @@ function LoginForm() {
           status: error.status,
           name: error.name,
         });
+        // ✅ GA: 認証エラー追跡
+        trackAuthError(error.name || 'login_error', error.message);
         throw error;
       }
 
@@ -61,6 +65,13 @@ function LoginForm() {
           email: data.user?.email,
           redirectTo,
         });
+
+        // ✅ GA: ユーザーID設定（ユーザーIDが取得できた時のみ）
+        if (data.user?.id) {
+          setUser(data.user.id);
+        }
+        // ✅ GA: ログインイベント追跡
+        trackSignIn();
 
         // app_userレコードの存在確認
         const { data: appUser, error: appUserError } = await supabase

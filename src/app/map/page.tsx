@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -110,6 +111,7 @@ export default function MapPage() {
   const [prefectureCounts, setPrefectureCounts] = useState<PrefectureCount[]>([]);
   const [showPrefectureList, setShowPrefectureList] = useState(true);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
+  const { trackFilterApply } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
@@ -267,6 +269,9 @@ export default function MapPage() {
   const handlePrefectureClick = (prefecture: PrefectureCount) => {
     setMapCenter({ lat: prefecture.lat, lng: prefecture.lng });
     setMapZoom(prefecture.zoom);
+
+    // ✅ GA: 都道府県フィルタリングイベント追跡
+    trackFilterApply('prefecture', prefecture.name, prefecture.count);
   };
 
   const handleManholeClick = (manhole: Manhole) => {

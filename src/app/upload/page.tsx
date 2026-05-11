@@ -9,6 +9,7 @@ import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -30,7 +31,6 @@ interface UploadedPhoto {
   error?: string;
   photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
 }
-}
 
 export default function UploadPage() {
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
@@ -39,10 +39,14 @@ export default function UploadPage() {
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
+  const { trackView, trackUploadStart, trackUploadSuccess, trackUploadError } = useAnalytics();
 
   useEffect(() => {
     // ページタイトル設定
     document.title = '写真登録 - ポケふた訪問記録';
+
+    // ✅ GA: ページビュー追跡
+    trackView('/upload', '写真登録', 'upload');
 
     loadManholes();
     // Cookieから公開設定を読み込み
@@ -260,6 +264,9 @@ export default function UploadPage() {
     const photo = photos.find(p => p.id === photoId);
     if (!photo) return;
 
+    // ✅ GA: 検証・圧縮・アップロードを含む全体処理の開始時刻を記録
+    const uploadStartTime = Date.now();
+
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
       setPhotos(prev => prev.map(p =>
@@ -328,6 +335,9 @@ export default function UploadPage() {
       });
       console.log('Image compressed successfully. New size:', compressedFile.size);
 
+      // ✅ GA: アップロード開始イベント追跡
+      trackUploadStart(compressedFile.size, compressedFile.type);
+
       // Prepare form data for upload
       const formData = new FormData();
       formData.append('file', compressedFile);
@@ -385,6 +395,21 @@ export default function UploadPage() {
         throw new Error(uploadResult.error || 'Upload failed');
       }
 
+      // ✅ GA: アップロード成功イベント追跡
+      const uploadEndTime = Date.now();
+      const uploadDuration = uploadEndTime - uploadStartTime;
+      trackUploadSuccess(
+        compressedFile.size,
+        compressedFile.type,
+        uploadDuration,
+        {
+          manhole_id: photo.matchedManhole?.id,
+          has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
+          has_note: !!visitNote.trim(),
+          is_public: isPublic
+        }
+      );
+
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -396,6 +421,18 @@ export default function UploadPage() {
 
     } catch (error: any) {
       console.error('Upload failed:', error);
+
+      // ✅ GA: アップロードエラーイベント追跡
+      trackUploadError(
+        'upload_error',
+        error?.message || 'Unknown error',
+        photo.file.size,
+        {
+          file_type: photo.file.type,
+          manhole_id: photo.matchedManhole?.id
+        }
+      );
+
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
