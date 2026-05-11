@@ -85,8 +85,6 @@ export function trackEvent(
     event_timestamp: new Date().toISOString(),
     // ユーザーロケール
     user_locale: navigator.language || 'ja-JP',
-    // アプリバージョン
-    app_version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
     // カスタムコンテキスト
     ...context,
     // eventParams で明示指定された値を優先
