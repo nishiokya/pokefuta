@@ -7,6 +7,9 @@
  * PostGIS WKB（Well-Known Binary）フォーマットから座標を抽出
  * エンディアン、SRID、標準WKBフォーマットに対応
  * 
+ * ⚠️ サーバーサイドのみ（Node.js Buffer を使用）
+ * API Route からのみ呼ばれる。クライアント側では未使用。
+ * 
  * WKBフォーマット:
  * - バイト0: エンディアンフラグ（01=LE, 00=BE）
  * - バイト1-4: ジオメトリ型（1=POINT）
@@ -62,8 +65,8 @@ export function extractCoordinatesFromWKB(wkbHex: string): { lat: number; lng: n
     }
 
     return null;
-  } catch (error) {
-    console.error('Error parsing WKB:', error);
+  } catch {
+    // ユーティリティ関数はログしない。呼び出し元で必要に応じてログする
     return null;
   }
 }

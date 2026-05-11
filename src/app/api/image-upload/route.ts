@@ -211,10 +211,28 @@ export async function POST(request: NextRequest) {
       .eq('id', manholeIdInt)
       .single();
 
-    if (manholeError || !manhole) {
-      console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt}:`, {
-        error: manholeError?.message
-      });
+    // ✅ エラー区分: 見つからない（400） vs DB/権限エラー（500）
+    if (manholeError) {
+      // PGRST116 = 0行（正常な「見つからない」）
+      if (manholeError.code === 'PGRST116') {
+        return NextResponse.json({
+          success: false,
+          error: 'Manhole not found'
+        }, { status: 400 });
+      } else {
+        // その他のエラー（権限、ネットワーク等）
+        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt}:`, {
+          code: manholeError.code,
+          message: manholeError.message
+        });
+        return NextResponse.json({
+          success: false,
+          error: 'Database error occurred'
+        }, { status: 500 });
+      }
+    }
+
+    if (!manhole) {
       return NextResponse.json({
         success: false,
         error: 'Manhole not found'
