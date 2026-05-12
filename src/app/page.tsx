@@ -32,6 +32,7 @@ export default function HomePage() {
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
@@ -55,9 +56,7 @@ export default function HomePage() {
       }
     })();
 
-    loadFeed();
     loadSiteStats();
-    loadManholeStats();
   }, []);
 
   useEffect(() => {
@@ -85,19 +84,6 @@ export default function HomePage() {
     }
   };
 
-  const loadManholeStats = async () => {
-    try {
-      const response = await fetch('/api/manholes?limit=1');
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data?.success) {
-        if (typeof data.total === 'number') setTotalManholes(data.total);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   const loadSiteStats = async () => {
     try {
       const response = await fetch('/api/site-stats');
@@ -107,6 +93,10 @@ export default function HomePage() {
       // トップからユーザ数は基本的に外す（必要なら後で小さく出す）
       setTotalUsers(typeof data.users === 'number' ? data.users : null);
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
+      if (typeof data.manholes === 'number') setTotalManholes(data.manholes);
+      setManholesWithPhotos(
+        typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null
+      );
     } catch {
       // ignore
     }
@@ -285,10 +275,14 @@ export default function HomePage() {
             {/* Sub info */}
             <div className="rpg-window">
               <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-3">サブ情報</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="text-center">
                   <div className="font-pixel text-xl text-rpg-yellow">{totalManholes || '—'}</div>
                   <div className="font-pixelJp text-xs text-rpg-textDark">全ポケふた</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-pixel text-xl text-rpg-green">{manholesWithPhotos ?? '—'}</div>
+                  <div className="font-pixelJp text-xs text-rpg-textDark">写真あり</div>
                 </div>
                 <div className="text-center">
                   <div className="font-pixel text-xl text-rpg-blue">{totalPosts ?? '—'}</div>
