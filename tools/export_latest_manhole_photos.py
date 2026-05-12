@@ -22,7 +22,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator, Optional
 
 
 DEFAULT_OUTPUT = "public/data/latest-manhole-photos.json"
@@ -63,7 +63,7 @@ def build_original_url(storage_key: str) -> str:
     return f"{base_url}/{encoded_key}"
 
 
-def parse_datetime(value: str | None) -> datetime:
+def parse_datetime(value: Optional[str]) -> datetime:
     if not value:
         return datetime.min.replace(tzinfo=timezone.utc)
 
@@ -136,7 +136,7 @@ def supabase_get(
         return json.loads(response.read().decode("utf-8"))
 
 
-def fetch_photos(include_private: bool, batch_size: int, timeout: int) -> list[dict[str, Any]]:
+def iter_photos(include_private: bool, batch_size: int, timeout: int) -> Iterator[dict[str, Any]]:
     select_visit = "visit(shot_at,is_public)" if include_private else "visit!inner(shot_at,is_public)"
     query = {
         "select": f"id,manhole_id,storage_key,content_type,width,height,file_size,created_at,{select_visit}",
@@ -148,25 +148,22 @@ def fetch_photos(include_private: bool, batch_size: int, timeout: int) -> list[d
     if not include_private:
         query["visit.is_public"] = "eq.true"
 
-    photos: list[dict[str, Any]] = []
     offset = 0
 
     while True:
         batch = supabase_get("photo", query, batch_size, offset, timeout)
-        photos.extend(batch)
+        yield from batch
 
         if len(batch) < batch_size:
             break
         offset += batch_size
-
-    return photos
 
 
 def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[str, Any]:
     latest_by_manhole_id: dict[int, dict[str, Any]] = {}
     latest_dates: dict[int, datetime] = {}
 
-    for photo in fetch_photos(include_private=include_private, batch_size=batch_size, timeout=timeout):
+    for photo in iter_photos(include_private=include_private, batch_size=batch_size, timeout=timeout):
         manhole_id = int(photo["manhole_id"])
         sort_date = photo_sort_date(photo)
 

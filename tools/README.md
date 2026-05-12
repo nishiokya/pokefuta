@@ -78,6 +78,8 @@ SUPABASE_SERVICE_ROLE_KEY=xxxxx
 R2_PUBLIC_BASE_URL=https://images.pokefuta.com
 ```
 
+`SUPABASE_SERVICE_ROLE_KEY` はRLSをバイパスできる強い権限の鍵です。コミット・共有せず、信頼できるローカル/管理環境でのみ使ってください。公開データだけで実行できる環境では、必要なSELECT権限に絞ったキーを使うのがおすすめです。
+
 `R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。
 
 ```bash
@@ -90,6 +92,10 @@ python3 tools/export_latest_manhole_photos.py \
 ```json
 {
   "generated_at": "2026-05-12T00:00:00.000Z",
+  "source": "pokefuta photo table",
+  "image": {
+    "r2_public_base_url": "https://images.pokefuta.com"
+  },
   "count": 1,
   "photos": {
     "279": {
@@ -97,6 +103,11 @@ python3 tools/export_latest_manhole_photos.py \
       "photo_id": "uuid",
       "url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
       "original_url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
+      "storage_key": "photos/original/2026/05/uuid.jpg",
+      "content_type": "image/jpeg",
+      "width": null,
+      "height": null,
+      "file_size": 123456,
       "created_at": "2026-05-12T00:00:00.000Z",
       "shot_at": "2026-05-12T00:00:00.000Z"
     }
@@ -104,7 +115,7 @@ python3 tools/export_latest_manhole_photos.py \
 }
 ```
 
-このリポジトリでは元画像URLだけを出力します。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
+このリポジトリでは画像URLとして元画像URLだけを出力します。あわせて検索サイト側で使えるように、storage keyやcontent typeなどの写真メタデータも含めます。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
 
 将来自動化する場合は、Amplify のビルド/バッチ用環境に同じ環境変数を置き、`python3 tools/export_latest_manhole_photos.py` を実行する方針で移行できます。R2へ直接アップロードまで自動化したい場合は、Amplify/CodeBuild側で AWS CLI 互換の `aws s3 cp --endpoint-url "$R2_ENDPOINT"`、または `boto3` を追加して `data/latest-manhole-photos.json` に配置します。
 
@@ -133,6 +144,8 @@ https://<account-id>.r2.cloudflarestorage.com/<bucket>/data/latest-manhole-photo
 ```
 
 検索サイト側では、このJSONの `url` / `original_url` を入力として必要なサイズの画像URLへ変換します。
+
+写真が大きく増えた場合は、PostgreSQL側に `DISTINCT ON (manhole_id)` などで最新写真だけを返すview/RPCを作り、このスクリプトの取得元を置き換えると転送量を抑えられます。
 
 ## 📊 出力形式
 
