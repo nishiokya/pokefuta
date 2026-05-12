@@ -52,14 +52,22 @@ def get_r2_public_base_url() -> str:
     return strip_trailing_slash(value)
 
 
-def build_original_url(storage_key: str) -> str:
+def get_effective_r2_public_base_url() -> str:
     base_url = get_r2_public_base_url()
+    if "r2.cloudflarestorage.com" not in base_url:
+        return base_url
+
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.path and parsed.path != "/":
+        return base_url
+
+    bucket = require_env("R2_BUCKET")
+    return f"{base_url}/{urllib.parse.quote(bucket)}"
+
+
+def build_original_url(storage_key: str) -> str:
+    base_url = get_effective_r2_public_base_url()
     encoded_key = encode_storage_key(storage_key)
-
-    if "r2.cloudflarestorage.com" in base_url:
-        bucket = require_env("R2_BUCKET")
-        return f"{base_url}/{bucket}/{encoded_key}"
-
     return f"{base_url}/{encoded_key}"
 
 
@@ -142,7 +150,7 @@ def iter_photos(include_private: bool, batch_size: int, timeout: int) -> Iterato
         "select": f"id,manhole_id,storage_key,content_type,width,height,file_size,created_at,{select_visit}",
         "manhole_id": "not.is.null",
         "storage_key": "not.is.null",
-        "order": "created_at.desc",
+        "order": "created_at.desc,id.desc",
     }
 
     if not include_private:
@@ -180,7 +188,7 @@ def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": "pokefuta photo table",
         "image": {
-            "r2_public_base_url": get_r2_public_base_url(),
+            "r2_public_base_url": get_effective_r2_public_base_url(),
         },
         "count": len(photos),
         "photos": photos,

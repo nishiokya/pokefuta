@@ -80,14 +80,14 @@ R2_PUBLIC_BASE_URL=https://images.pokefuta.com
 
 `SUPABASE_SERVICE_ROLE_KEY` はRLSをバイパスできる強い権限の鍵です。コミット・共有せず、信頼できるローカル/管理環境でのみ使ってください。公開データだけで実行できる環境では、必要なSELECT権限に絞ったキーを使うのがおすすめです。
 
-`R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。
+`R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。`R2_PUBLIC_BASE_URL` にすでにbucket pathが含まれている場合、スクリプトはそのURLをそのまま使います。
 
 ```bash
 python3 tools/export_latest_manhole_photos.py \
   --output public/data/latest-manhole-photos.json
 ```
 
-出力JSONは `photos` オブジェクトのキーがマンホールIDです。最新判定は `visit.shot_at` があればそれを優先し、なければ `photo.created_at` を使います。
+出力JSONは `photos` オブジェクトのキーがマンホールIDです。最新判定は `visit.shot_at` があればそれを優先し、なければ `photo.created_at` を使います。実際の出力スキーマは以下の形です。
 
 ```json
 {
