@@ -100,10 +100,10 @@ python3 tools/export_latest_manhole_photos.py \
   "photos": {
     "279": {
       "manhole_id": 279,
-      "photo_id": "uuid",
-      "url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
-      "original_url": "https://images.pokefuta.com/photos/original/2026/05/uuid.jpg",
-      "storage_key": "photos/original/2026/05/uuid.jpg",
+      "photo_id": "photo-record-uuid",
+      "url": "https://images.pokefuta.com/photos/original/2026/05/storage-object-uuid.jpg",
+      "original_url": "https://images.pokefuta.com/photos/original/2026/05/storage-object-uuid.jpg",
+      "storage_key": "photos/original/2026/05/storage-object-uuid.jpg",
       "content_type": "image/jpeg",
       "width": null,
       "height": null,
@@ -114,6 +114,8 @@ python3 tools/export_latest_manhole_photos.py \
   }
 }
 ```
+
+`photo_id` はDB上の `photo.id`、`storage_key` はR2 object keyです。通常は別の識別子になります。
 
 このリポジトリでは画像URLとして元画像URLだけを出力します。あわせて検索サイト側で使えるように、storage keyやcontent typeなどの写真メタデータも含めます。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
 

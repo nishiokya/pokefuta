@@ -48,7 +48,7 @@ def encode_storage_key(storage_key: str) -> str:
 def get_r2_public_base_url() -> str:
     value = os.environ.get("R2_PUBLIC_BASE_URL") or os.environ.get("R2_PUBLIC_URL")
     if not value:
-        raise RuntimeError("R2_PUBLIC_BASE_URL is required")
+        raise RuntimeError("R2_PUBLIC_BASE_URL or R2_PUBLIC_URL is required")
     return strip_trailing_slash(value)
 
 
@@ -65,8 +65,7 @@ def get_effective_r2_public_base_url() -> str:
     return f"{base_url}/{urllib.parse.quote(bucket)}"
 
 
-def build_original_url(storage_key: str) -> str:
-    base_url = get_effective_r2_public_base_url()
+def build_original_url(storage_key: str, base_url: str) -> str:
     encoded_key = encode_storage_key(storage_key)
     return f"{base_url}/{encoded_key}"
 
@@ -97,15 +96,16 @@ def photo_sort_date(photo: dict[str, Any]) -> datetime:
     return parse_datetime(visit.get("shot_at") or photo.get("created_at"))
 
 
-def to_photo_entry(photo: dict[str, Any]) -> dict[str, Any]:
+def to_photo_entry(photo: dict[str, Any], base_url: str) -> dict[str, Any]:
     visit = normalize_visit(photo.get("visit"))
     storage_key = photo["storage_key"]
+    original_url = build_original_url(storage_key, base_url)
 
     return {
         "manhole_id": photo["manhole_id"],
         "photo_id": photo["id"],
-        "url": build_original_url(storage_key),
-        "original_url": build_original_url(storage_key),
+        "url": original_url,
+        "original_url": original_url,
         "storage_key": storage_key,
         "content_type": photo.get("content_type"),
         "width": photo.get("width"),
@@ -168,6 +168,7 @@ def iter_photos(include_private: bool, batch_size: int, timeout: int) -> Iterato
 
 
 def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[str, Any]:
+    base_url = get_effective_r2_public_base_url()
     latest_by_manhole_id: dict[int, dict[str, Any]] = {}
     latest_dates: dict[int, datetime] = {}
 
@@ -177,7 +178,7 @@ def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[
 
         if manhole_id not in latest_dates or sort_date > latest_dates[manhole_id]:
             latest_dates[manhole_id] = sort_date
-            latest_by_manhole_id[manhole_id] = to_photo_entry(photo)
+            latest_by_manhole_id[manhole_id] = to_photo_entry(photo, base_url)
 
     photos = {
         str(manhole_id): latest_by_manhole_id[manhole_id]
@@ -188,7 +189,7 @@ def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": "pokefuta photo table",
         "image": {
-            "r2_public_base_url": get_effective_r2_public_base_url(),
+            "r2_public_base_url": base_url,
         },
         "count": len(photos),
         "photos": photos,
