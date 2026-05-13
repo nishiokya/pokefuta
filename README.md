@@ -133,10 +133,8 @@ NEXT_PUBLIC_MAP_DEFAULT_ZOOM=10
 
 4. **Supabaseの設定**:
 
-   `CLAUDE.md`の「データベースセットアップSQL（完全版）」を実行：
-   - Supabase SQL Editorで実行
-   - app_user, manhole, visit, photo テーブルを作成
-   - RLSポリシーを設定
+   Supabase SQL Editorで `database/migrations/` のSQLを番号順に実行します。
+   詳細は `database/README.md` を参照してください。
 
 5. **開発サーバーの起動**:
 ```bash
@@ -250,8 +248,6 @@ npm run dev
 2. **認証が必要な場合は`security: - cookieAuth: []`を追加**
 3. **Swagger UIで表示を確認**
 
-詳細は `CLAUDE.md` の「API ドキュメント管理」セクションを参照。
-
 ## 🔒 セキュリティ
 
 ### Row Level Security (RLS)
@@ -342,8 +338,11 @@ npm run build
 
 ## 📄 ドキュメント
 
-- **CLAUDE.md**: セキュリティ実装ガイド（RLS、API、Swagger）
+- **README.md**: 開発の入口
+- **database/README.md**: DBマイグレーションの実行方法
+- **tools/README.md**: 管理ツールの使い方
 - **DEPLOYMENT.md**: AWS Amplifyデプロイ手順
+- **CLOUDFLARE_R2_SETUP.md**: R2ストレージ設定
 - **.env.example**: 環境変数のサンプル
 
 ## 🛠️ 主要なページ
