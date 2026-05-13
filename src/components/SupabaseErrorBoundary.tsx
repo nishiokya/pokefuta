@@ -60,7 +60,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
 
             <div className="pt-3 border-t-2 border-rpg-border">
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
-                📚 詳細: CLAUDE.md を参照してください
+                詳細: .env.example と README.md を参照してください
               </p>
             </div>
           </div>

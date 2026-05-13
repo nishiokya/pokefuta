@@ -82,6 +82,8 @@ R2_PUBLIC_BASE_URL=https://images.pokefuta.com
 
 `R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。`R2_PUBLIC_BASE_URL` にすでにbucket pathが含まれている場合、スクリプトはそのURLをそのまま使います。
 
+マンホール口コミは、デフォルトで `display_name` が `tako` の投稿だけを `manhole_comments` に出力します。対象ユーザー名を変える場合は `MANHOLE_COMMENT_DISPLAY_NAME` または `--manhole-comment-display-name` を指定してください。
+
 ```bash
 python3 tools/export_latest_manhole_photos.py \
   --output public/data/latest-manhole-photos.json
@@ -109,13 +111,27 @@ python3 tools/export_latest_manhole_photos.py \
       "height": null,
       "file_size": 123456,
       "created_at": "2026-05-12T00:00:00.000Z",
-      "shot_at": "2026-05-12T00:00:00.000Z"
+      "shot_at": "2026-05-12T00:00:00.000Z",
+      "comment": "訪問時の口コミ",
+      "display_name": "投稿者名"
     }
+  },
+  "manhole_comments": {
+    "279": [
+      {
+        "id": "comment-record-uuid",
+        "manhole_id": 279,
+        "content": "マンホールへの口コミ",
+        "created_at": "2026-05-12T00:00:00.000Z",
+        "updated_at": "2026-05-12T00:00:00.000Z",
+        "display_name": "tako"
+      }
+    ]
   }
 }
 ```
 
-`photo_id` はDB上の `photo.id`、`storage_key` はR2 object keyです。通常は別の識別子になります。
+`photo_id` はDB上の `photo.id`、`storage_key` はR2 object keyです。通常は別の識別子になります。`comment` は写真に紐づく訪問記録の公開コメント、`display_name` は写真投稿者の `app_user.display_name` です。
 
 このリポジトリでは画像URLとして元画像URLだけを出力します。あわせて検索サイト側で使えるように、storage keyやcontent typeなどの写真メタデータも含めます。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
 

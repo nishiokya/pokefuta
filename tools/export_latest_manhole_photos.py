@@ -28,6 +28,7 @@ from typing import Any, Iterator, Optional
 DEFAULT_OUTPUT = "public/data/latest-manhole-photos.json"
 DEFAULT_BATCH_SIZE = 1000
 DEFAULT_TIMEOUT = 30
+DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME = "tako"
 
 
 def require_env(name: str) -> str:
@@ -96,10 +97,16 @@ def photo_sort_date(photo: dict[str, Any]) -> datetime:
     return parse_datetime(visit.get("shot_at") or photo.get("created_at"))
 
 
-def to_photo_entry(photo: dict[str, Any], base_url: str) -> dict[str, Any]:
+def to_photo_entry(
+    photo: dict[str, Any],
+    base_url: str,
+    display_name_by_auth_uid: dict[str, Optional[str]],
+) -> dict[str, Any]:
     visit = normalize_visit(photo.get("visit"))
     storage_key = photo["storage_key"]
     original_url = build_original_url(storage_key, base_url)
+    user_id = visit.get("user_id")
+    display_name = display_name_by_auth_uid.get(user_id) if isinstance(user_id, str) else None
 
     return {
         "manhole_id": photo["manhole_id"],
@@ -113,6 +120,8 @@ def to_photo_entry(photo: dict[str, Any], base_url: str) -> dict[str, Any]:
         "file_size": photo.get("file_size"),
         "created_at": photo.get("created_at"),
         "shot_at": visit.get("shot_at"),
+        "comment": visit.get("comment"),
+        "display_name": display_name,
     }
 
 
@@ -144,8 +153,29 @@ def supabase_get(
         return json.loads(response.read().decode("utf-8"))
 
 
+def iter_supabase_rows(
+    path: str,
+    query: dict[str, str],
+    batch_size: int,
+    timeout: int,
+) -> Iterator[dict[str, Any]]:
+    offset = 0
+
+    while True:
+        batch = supabase_get(path, query, batch_size, offset, timeout)
+        yield from batch
+
+        if len(batch) < batch_size:
+            break
+        offset += batch_size
+
+
 def iter_photos(include_private: bool, batch_size: int, timeout: int) -> Iterator[dict[str, Any]]:
-    select_visit = "visit(shot_at,is_public)" if include_private else "visit!inner(shot_at,is_public)"
+    select_visit = (
+        "visit(shot_at,is_public,user_id,comment)"
+        if include_private
+        else "visit!inner(shot_at,is_public,user_id,comment)"
+    )
     query = {
         "select": f"id,manhole_id,storage_key,content_type,width,height,file_size,created_at,{select_visit}",
         "manhole_id": "not.is.null",
@@ -156,34 +186,136 @@ def iter_photos(include_private: bool, batch_size: int, timeout: int) -> Iterato
     if not include_private:
         query["visit.is_public"] = "eq.true"
 
-    offset = 0
-
-    while True:
-        batch = supabase_get("photo", query, batch_size, offset, timeout)
-        yield from batch
-
-        if len(batch) < batch_size:
-            break
-        offset += batch_size
+    yield from iter_supabase_rows("photo", query, batch_size, timeout)
 
 
-def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[str, Any]:
+def chunked(values: list[str], size: int) -> Iterator[list[str]]:
+    for index in range(0, len(values), size):
+        yield values[index:index + size]
+
+
+def fetch_display_names(
+    auth_uids: set[str],
+    batch_size: int,
+    timeout: int,
+) -> dict[str, Optional[str]]:
+    display_name_by_auth_uid: dict[str, Optional[str]] = {}
+    ids = sorted(auth_uids)
+
+    for id_batch in chunked(ids, 100):
+        query = {
+            "select": "auth_uid,display_name",
+            "auth_uid": f"in.({','.join(id_batch)})",
+        }
+
+        for user in iter_supabase_rows("app_user", query, batch_size, timeout):
+            auth_uid = user.get("auth_uid")
+            if isinstance(auth_uid, str):
+                display_name_by_auth_uid[auth_uid] = user.get("display_name")
+
+    return display_name_by_auth_uid
+
+
+def fetch_auth_uids_by_display_name(
+    display_name: str,
+    batch_size: int,
+    timeout: int,
+) -> set[str]:
+    query = {
+        "select": "auth_uid,display_name",
+        "display_name": f"eq.{display_name}",
+    }
+
+    auth_uids: set[str] = set()
+    for user in iter_supabase_rows("app_user", query, batch_size, timeout):
+        auth_uid = user.get("auth_uid")
+        if isinstance(auth_uid, str):
+            auth_uids.add(auth_uid)
+
+    return auth_uids
+
+
+def fetch_manhole_comments_by_display_name(
+    display_name: str,
+    batch_size: int,
+    timeout: int,
+) -> dict[str, list[dict[str, Any]]]:
+    auth_uids = fetch_auth_uids_by_display_name(display_name, batch_size, timeout)
+    if not auth_uids:
+        return {}
+
+    comments_by_manhole_id: dict[str, list[dict[str, Any]]] = {}
+
+    for id_batch in chunked(sorted(auth_uids), 100):
+        query = {
+            "select": "id,manhole_id,user_id,content,created_at,updated_at",
+            "user_id": f"in.({','.join(id_batch)})",
+            "parent_comment_id": "is.null",
+            "order": "manhole_id.asc,created_at.asc,id.asc",
+        }
+
+        for comment in iter_supabase_rows("manhole_comment", query, batch_size, timeout):
+            manhole_id = comment.get("manhole_id")
+            if manhole_id is None:
+                continue
+
+            key = str(manhole_id)
+            comments_by_manhole_id.setdefault(key, []).append(
+                {
+                    "id": comment.get("id"),
+                    "manhole_id": manhole_id,
+                    "content": comment.get("content"),
+                    "created_at": comment.get("created_at"),
+                    "updated_at": comment.get("updated_at"),
+                    "display_name": display_name,
+                }
+            )
+
+    return {
+        manhole_id: comments_by_manhole_id[manhole_id]
+        for manhole_id in sorted(comments_by_manhole_id, key=lambda value: int(value))
+    }
+
+
+def build_payload(
+    include_private: bool,
+    batch_size: int,
+    timeout: int,
+    manhole_comment_display_name: str,
+) -> dict[str, Any]:
     base_url = get_effective_r2_public_base_url()
     latest_by_manhole_id: dict[int, dict[str, Any]] = {}
     latest_dates: dict[int, datetime] = {}
+    photo_user_ids: set[str] = set()
 
     for photo in iter_photos(include_private=include_private, batch_size=batch_size, timeout=timeout):
+        visit = normalize_visit(photo.get("visit"))
+        user_id = visit.get("user_id")
+        if isinstance(user_id, str):
+            photo_user_ids.add(user_id)
+
         manhole_id = int(photo["manhole_id"])
         sort_date = photo_sort_date(photo)
 
         if manhole_id not in latest_dates or sort_date > latest_dates[manhole_id]:
             latest_dates[manhole_id] = sort_date
-            latest_by_manhole_id[manhole_id] = to_photo_entry(photo, base_url)
+            latest_by_manhole_id[manhole_id] = photo
+
+    display_name_by_auth_uid = fetch_display_names(photo_user_ids, batch_size, timeout)
 
     photos = {
-        str(manhole_id): latest_by_manhole_id[manhole_id]
+        str(manhole_id): to_photo_entry(
+            latest_by_manhole_id[manhole_id],
+            base_url,
+            display_name_by_auth_uid,
+        )
         for manhole_id in sorted(latest_by_manhole_id)
     }
+    manhole_comments = fetch_manhole_comments_by_display_name(
+        manhole_comment_display_name,
+        batch_size,
+        timeout,
+    )
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -193,6 +325,7 @@ def build_payload(include_private: bool, batch_size: int, timeout: int) -> dict[
         },
         "count": len(photos),
         "photos": photos,
+        "manhole_comments": manhole_comments,
     }
 
 
@@ -229,6 +362,11 @@ def parse_args() -> argparse.Namespace:
         default=int(os.environ.get("PHOTO_EXPORT_TIMEOUT", DEFAULT_TIMEOUT)),
         help=f"HTTP request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
     )
+    parser.add_argument(
+        "--manhole-comment-display-name",
+        default=os.environ.get("MANHOLE_COMMENT_DISPLAY_NAME", DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME),
+        help=f"Include manhole comments posted by this display_name. Default: {DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME}",
+    )
     return parser.parse_args()
 
 
@@ -238,6 +376,7 @@ def main() -> None:
         include_private=args.include_private,
         batch_size=args.batch_size,
         timeout=args.timeout,
+        manhole_comment_display_name=args.manhole_comment_display_name,
     )
 
     output_path = Path(args.output)
