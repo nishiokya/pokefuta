@@ -177,11 +177,11 @@ export default function CommentModal({
                       <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">
                         {getUserLabel(comment)}
                       </span>
-                      <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
+                      <span className="font-pixelJp text-xs text-rpg-textDark opacity-60 flex-shrink-0">
                         {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
                       </span>
                     </div>
-                    <p className="font-pixelJp text-sm text-rpg-bgLight whitespace-pre-wrap break-words">
+                    <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">
                       {comment.content}
                     </p>
                   </div>

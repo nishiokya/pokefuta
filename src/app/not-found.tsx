@@ -66,9 +66,9 @@ export default function NotFound() {
               <Navigation className="w-4 h-4 text-rpg-blue" />
               <span className="font-pixelJp text-xs text-rpg-textDark">近くのポケふたを探す</span>
             </Link>
-            <Link href="/login?redirect=/upload" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
+            <Link href="/upload" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Camera className="w-4 h-4 text-rpg-green" />
-              <span className="font-pixelJp text-xs text-rpg-textDark">ログインして写真を登録する</span>
+              <span className="font-pixelJp text-xs text-rpg-textDark">写真を登録する</span>
             </Link>
             <Link href="/visits" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <History className="w-4 h-4 text-rpg-yellow" />

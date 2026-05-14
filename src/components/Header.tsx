@@ -62,7 +62,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
     { href: '/about', label: 'このアプリについて', icon: <Info className="w-5 h-5" /> },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => pathname === href.split('?')[0];
 
   const handleLogout = async () => {
     if (!supabase) return;

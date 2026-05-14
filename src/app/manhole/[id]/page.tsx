@@ -654,11 +654,11 @@ export default function ManholeDetailPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">{getCommentUserLabel(comment)}</span>
-                        <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
+                        <span className="font-pixelJp text-xs text-rpg-textDark opacity-60 flex-shrink-0">
                           {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
                         </span>
                       </div>
-                      <p className="font-pixelJp text-sm text-rpg-bgLight whitespace-pre-wrap break-words">{comment.content}</p>
+                      <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">{comment.content}</p>
                     </div>
                   </div>
                 </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -39,6 +40,7 @@ export default function NearbyPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { trackSearch } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
@@ -192,22 +194,22 @@ export default function NearbyPage() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Link
+              href="/manholes"
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="検索"
               title="検索"
             >
               <Search className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
+            </Link>
+            <Link
+              href="#nearby-controls"
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="絞り込み"
               title="絞り込み"
             >
               <SlidersHorizontal className="h-5 w-5" />
-            </button>
+            </Link>
             <Link
               href={uploadHref}
               className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
@@ -217,6 +219,7 @@ export default function NearbyPage() {
             </Link>
             <button
               type="button"
+              onClick={() => setMenuOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:hidden"
               aria-label="メニュー"
               title="メニュー"
@@ -256,7 +259,7 @@ export default function NearbyPage() {
         )}
 
         {userLocation && (
-          <section className="mt-5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-4 shadow-sm sm:p-5">
+          <section id="nearby-controls" className="mt-5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-4 shadow-sm sm:p-5">
             <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
@@ -439,6 +442,7 @@ export default function NearbyPage() {
       </Link>
 
       <BottomNav />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
     </div>
   );
 }

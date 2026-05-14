@@ -3,14 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Bookmark, Camera, Image, Menu, Search } from 'lucide-react';
+import { Camera, Image, Menu, Search } from 'lucide-react';
 import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 function isActivePath(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const hrefPath = href.split('?')[0];
+  if (hrefPath === '/') return pathname === '/';
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
 export default function BottomNav() {
@@ -49,9 +50,6 @@ export default function BottomNav() {
       isLoggedIn
         ? { href: '/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> }
         : { href: '/login?redirect=/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
-      isLoggedIn
-        ? { href: '/visits', label: 'お気に入り', icon: <Bookmark className="w-6 h-6 mb-1" /> }
-        : { href: '/login?redirect=/visits', label: 'お気に入り', icon: <Bookmark className="w-6 h-6 mb-1" /> },
     ],
     [isLoggedIn]
   );

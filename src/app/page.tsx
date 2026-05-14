@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -53,6 +54,7 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
+  const [menuOpen, setMenuOpen] = useState(false);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
@@ -128,7 +130,7 @@ export default function HomePage() {
 
   const visibleFeed =
     sortedFeed.length > 1 && sortedFeed.length % 2 === 1 ? sortedFeed.slice(0, -1) : sortedFeed;
-  const listedCount = totalPosts && totalPosts > 0 ? totalPosts : 470;
+  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上` : '集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -149,22 +151,22 @@ export default function HomePage() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Link
+              href="/manholes"
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="検索"
               title="検索"
             >
               <Search className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
+            </Link>
+            <Link
+              href="/nearby"
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="絞り込み"
               title="絞り込み"
             >
               <SlidersHorizontal className="h-5 w-5" />
-            </button>
+            </Link>
             <Link
               href={uploadHref}
               className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
@@ -174,6 +176,7 @@ export default function HomePage() {
             </Link>
             <button
               type="button"
+              onClick={() => setMenuOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:hidden"
               aria-label="メニュー"
               title="メニュー"
@@ -233,7 +236,7 @@ export default function HomePage() {
                       <Compass className="h-6 w-6" />
                     </div>
                     <div>
-                      <div className="text-xl font-extrabold leading-none">{listedCount}枚以上</div>
+                      <div className="text-xl font-extrabold leading-none">{listedCountLabel}</div>
                       <div className="mt-1 text-xs font-bold text-[#6B6B6B]">のポケふたを掲載</div>
                     </div>
                   </div>
@@ -321,7 +324,7 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {index < 3 && (
+                        {currentPage === 1 && index < 3 && (
                           <span className="absolute left-2 top-2 rounded-[6px] bg-[#7B63A8] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
                             NEW
                           </span>
@@ -432,6 +435,7 @@ export default function HomePage() {
       </Link>
 
       <BottomNav />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
     </div>
   );
 }

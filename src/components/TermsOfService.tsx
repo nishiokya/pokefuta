@@ -48,9 +48,9 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
       {/* 利用規約詳細（展開時のみ表示） */}
       {isExpanded && (
         <div className="mt-3 p-3 bg-[#F6EEDC] border border-[#7B63A8]/15 max-h-64 overflow-y-auto">
-          <div className="space-y-3 font-pixelJp text-xs text-rpg-bgLight">
+          <div className="space-y-3 font-pixelJp text-xs text-rpg-textDark">
             <div>
-              <h3 className="font-bold text-rpg-yellow mb-2">📸 写真の公開について</h3>
+              <h3 className="font-bold text-[#7B63A8] mb-2">📸 写真の公開について</h3>
               <p className="leading-relaxed opacity-90">
                 本サービスにアップロードされた写真は、サイト管理者によってSNS（Twitter/X、Instagram等）や
                 ブログ、その他のメディアで公開される場合があります。
@@ -58,7 +58,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
             </div>
 
             <div>
-              <h3 className="font-bold text-rpg-yellow mb-2">🔒 個人情報の取り扱い</h3>
+              <h3 className="font-bold text-[#7B63A8] mb-2">🔒 個人情報の取り扱い</h3>
               <p className="leading-relaxed opacity-90">
                 メールアドレス等の個人情報は、サービスの提供目的でのみ使用し、第三者に提供することはありません。
                 ただし、投稿された写真や訪問記録のデータは公開コンテンツとして扱われます。
@@ -66,7 +66,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
             </div>
 
             <div>
-              <h3 className="font-bold text-rpg-yellow mb-2">⚠️ 禁止事項</h3>
+              <h3 className="font-bold text-[#7B63A8] mb-2">⚠️ 禁止事項</h3>
               <ul className="list-disc list-inside space-y-1 opacity-90">
                 <li>他者の権利を侵害する写真の投稿</li>
                 <li>個人を特定できる情報が含まれる写真の投稿</li>
@@ -76,7 +76,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
             </div>
 
             <div>
-              <h3 className="font-bold text-rpg-yellow mb-2">📝 権利関係</h3>
+              <h3 className="font-bold text-[#7B63A8] mb-2">📝 権利関係</h3>
               <p className="leading-relaxed opacity-90">
                 アップロードされた写真の著作権は投稿者に帰属しますが、本サービスおよびサイト管理者は、
                 写真を非営利目的で使用する権利を有します。これには、SNSでの共有、ブログ記事での掲載、
@@ -85,7 +85,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
             </div>
 
             <div>
-              <h3 className="font-bold text-rpg-yellow mb-2">🗑️ 削除依頼について</h3>
+              <h3 className="font-bold text-[#7B63A8] mb-2">🗑️ 削除依頼について</h3>
               <p className="leading-relaxed opacity-90">
                 投稿した写真の削除を希望する場合は、アプリ内の削除機能をご利用ください。
                 ただし、すでにSNS等で公開された写真については、完全な削除をお約束できない場合があります。

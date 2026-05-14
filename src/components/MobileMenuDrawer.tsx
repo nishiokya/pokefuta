@@ -69,7 +69,7 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
     return () => subscription.unsubscribe();
   }, [open, supabase, supabaseError]);
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => pathname === href.split('?')[0];
 
   const menuItems: Array<{
     href: string;
