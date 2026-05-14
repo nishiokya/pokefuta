@@ -46,12 +46,12 @@ export default function DeletePhotoModal({
         {/* Content */}
         <div className="space-y-4">
           <p className="font-pixelJp text-sm text-rpg-textDark">
-            この写真を削除してもよろしいですか？
+            この写真と訪問記録を削除してもよろしいですか？
           </p>
 
           <div className="bg-rpg-red bg-opacity-10 border-2 border-rpg-red p-3">
             <p className="font-pixelJp text-xs text-rpg-textDark">
-              <span className="font-bold text-rpg-red">注意:</span> この操作は取り消せません。写真ファイルとデータベースから完全に削除されます。
+              <span className="font-bold text-rpg-red">注意:</span> この操作は取り消せません。同じ訪問記録に紐づく写真、コメント、いいね、ブックマークも削除されます。
             </p>
           </div>
 

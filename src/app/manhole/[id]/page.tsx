@@ -297,16 +297,17 @@ export default function ManholeDetailPage() {
 
       if (response.ok && data.success) {
         // 成功: 写真リストから削除
-        const updatedPhotos = photos.filter(p => p.id !== selectedPhotoId);
+        const deletedPhotoIds = new Set<string>(data.photo_ids || [selectedPhotoId]);
+        const updatedPhotos = photos.filter(p => !deletedPhotoIds.has(p.id));
         setPhotos(updatedPhotos);
         setDeleteModalOpen(false);
         setSelectedPhotoId(null);
 
         // 成功メッセージ
         if (updatedPhotos.length === 0) {
-          alert('写真を削除しました。このマンホールの写真はすべて削除されました。');
+          alert(data.visit_deleted ? '写真と訪問記録を削除しました。このマンホールの写真はすべて削除されました。' : '写真を削除しました。このマンホールの写真はすべて削除されました。');
         } else {
-          alert('写真を削除しました');
+          alert(data.visit_deleted ? '写真と訪問記録を削除しました' : '写真を削除しました');
         }
       } else {
         // エラー

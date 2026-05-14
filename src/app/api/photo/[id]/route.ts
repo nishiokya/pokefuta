@@ -159,39 +159,84 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    // ✅ 4. R2から画像ファイルを削除
-    try {
-      if (storage.delete) {
-        await storage.delete(photo.storage_key);
-        console.log(`Deleted photo from storage: ${photo.storage_key}`);
-      } else {
-        console.warn('Storage adapter does not support delete operation');
-      }
-    } catch (storageError: any) {
-      console.error('Error deleting photo from storage:', storageError);
-      // ストレージ削除に失敗してもDB削除は続行
-      // （ファイルが既に存在しない可能性もあるため）
-    }
+    const visitId = (photo.visit as any).id as string;
 
-    // ✅ 5. データベースから写真レコードを削除
-    const { error: deleteError } = await supabase
+    // ✅ 4. 同じ訪問記録に紐づく写真を取得
+    // 写真削除は「訪問記録の削除」として扱うため、同じvisitの写真もまとめて削除する。
+    const { data: visitPhotos, error: visitPhotosError } = await supabase
       .from('photo')
-      .delete()
-      .eq('id', photoId);
+      .select('id, storage_key')
+      .eq('visit_id', visitId);
 
-    if (deleteError) {
-      console.error('Error deleting photo from database:', deleteError);
+    if (visitPhotosError) {
+      console.error('Error fetching visit photos before delete:', visitPhotosError);
       return NextResponse.json({
         success: false,
-        error: 'Failed to delete photo from database',
-        details: deleteError.message
+        error: 'Failed to fetch related photos',
+        details: visitPhotosError.message
+      }, { status: 500 });
+    }
+
+    const photosToDelete = (visitPhotos && visitPhotos.length > 0)
+      ? visitPhotos
+      : [{ id: photo.id, storage_key: photo.storage_key }];
+    const deletedPhotoIds = photosToDelete.map((targetPhoto) => targetPhoto.id);
+
+    // ✅ 5. R2から画像ファイルを削除
+    for (const targetPhoto of photosToDelete) {
+      try {
+        if (storage.delete) {
+          await storage.delete(targetPhoto.storage_key);
+          console.log(`Deleted photo from storage: ${targetPhoto.storage_key}`);
+        } else {
+          console.warn('Storage adapter does not support delete operation');
+        }
+      } catch (storageError: any) {
+        console.error('Error deleting photo from storage:', storageError);
+        // ストレージ削除に失敗してもDB削除は続行
+        // （ファイルが既に存在しない可能性もあるため）
+      }
+    }
+
+    // ✅ 6. データベースから写真レコードを削除
+    const { error: deletePhotosError } = await supabase
+      .from('photo')
+      .delete()
+      .eq('visit_id', visitId);
+
+    if (deletePhotosError) {
+      console.error('Error deleting photos from database:', deletePhotosError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to delete photos from database',
+        details: deletePhotosError.message
+      }, { status: 500 });
+    }
+
+    // ✅ 7. 訪問記録も削除
+    // visit_like / visit_comment / visit_bookmark はDB側の ON DELETE CASCADE で削除される。
+    const { error: deleteVisitError } = await supabase
+      .from('visit')
+      .delete()
+      .eq('id', visitId)
+      .eq('user_id', session.user.id);
+
+    if (deleteVisitError) {
+      console.error('Error deleting visit from database:', deleteVisitError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to delete visit from database',
+        details: deleteVisitError.message
       }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Photo deleted successfully',
-      photo_id: photoId
+      message: 'Photo and visit deleted successfully',
+      photo_id: photoId,
+      photo_ids: deletedPhotoIds,
+      visit_id: visitId,
+      visit_deleted: true
     });
 
   } catch (error: any) {
