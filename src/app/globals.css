@@ -45,31 +45,33 @@
 
   /* RPG Window (ピクセルウィンドウ) */
   .rpg-window {
-    @apply bg-rpg-bgPaper;
-    @apply border-2 border-rpg-border;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    @apply p-3 rounded-lg;
+    background: #FFF8EB;
+    border: 1px solid rgba(123, 99, 168, 0.15);
+    box-shadow: 0 8px 24px rgba(123, 99, 168, 0.10);
+    @apply p-4 rounded-lg;
   }
 
   .rpg-window-title {
     @apply text-base font-bold;
-    @apply text-rpg-textGold;
+    color: #7B63A8;
     @apply mb-2;
   }
 
   /* RPG Button (モダンボタン) */
   .rpg-button {
     @apply font-medium text-sm;
-    @apply border-2 border-rpg-border;
-    @apply bg-rpg-blue text-white;
-    @apply px-4 py-2 rounded-md;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(123, 99, 168, 0.18);
+    background: #FFFFFF;
+    color: #7B63A8;
+    @apply px-4 py-2 rounded-lg;
+    box-shadow: 0 2px 8px rgba(123, 99, 168, 0.12);
     transition: all 0.2s;
   }
 
   .rpg-button:hover {
-    @apply bg-rpg-yellow text-rpg-textDark;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
+    background: rgba(255, 179, 71, 0.22);
+    color: #6A5299;
+    box-shadow: 0 4px 12px rgba(123, 99, 168, 0.18);
   }
 
   .rpg-button:active {
@@ -78,11 +80,15 @@
   }
 
   .rpg-button-primary {
-    @apply bg-rpg-red;
+    background: #7B63A8;
+    color: #FFFFFF;
+    border-color: transparent;
   }
 
   .rpg-button-success {
-    @apply bg-rpg-green;
+    background: #2D846C;
+    color: #FFFFFF;
+    border-color: transparent;
   }
 
   /* HP/MPバー風プログレスバー */
@@ -260,8 +266,9 @@
   /* Navigation - RPG Style (新デザイン) */
   .nav-rpg {
     @apply fixed bottom-0 left-0 right-0;
-    @apply bg-white/95 backdrop-blur-sm;
-    @apply border-t-2 border-gray-200;
+    background: rgba(255, 248, 235, 0.96);
+    @apply backdrop-blur-sm;
+    border-top: 1px solid rgba(123, 99, 168, 0.18);
     @apply shadow-lg;
     /* Below Header (z-50) / above page content */
     @apply z-40;
@@ -271,17 +278,18 @@
     @apply flex flex-col items-center justify-center;
     @apply py-2 px-2;
     @apply text-xs font-medium;
-    @apply text-gray-600;
+    color: #6B6B6B;
     @apply transition-colors;
   }
 
   .nav-rpg-item:hover {
-    @apply text-rpg-blue;
+    color: #7B63A8;
   }
 
   .nav-rpg-item.active {
-    @apply text-rpg-blue;
-    @apply bg-rpg-blue/10 rounded-lg;
+    color: #7B63A8;
+    background: rgba(123, 99, 168, 0.12);
+    @apply rounded-lg;
   }
 }
 

@@ -64,9 +64,9 @@ const MapComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-rpg-bgDark">
+      <div className="w-full h-full flex items-center justify-center bg-[#F6EEDC]">
         <div className="text-center">
-          <div className="font-pixelJp text-rpg-textGold">
+          <div className="font-pixelJp text-[#7B63A8]">
             読み込み中<span className="rpg-loading"></span>
           </div>
         </div>
@@ -279,12 +279,12 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="font-pixelJp text-rpg-textGold">
+              <div className="font-pixelJp text-[#7B63A8]">
                 読み込み中<span className="rpg-loading"></span>
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function MapPage() {
             {/* マップとリストのコンテナ */}
             <div className="relative">
               {/* マップ */}
-              <div className="h-[70vh] border-2 border-rpg-border overflow-hidden">
+              <div className="h-[70vh] border border-[#7B63A8]/15 overflow-hidden">
                 {mapCenter && (
                   <>
                     {console.log(`MapPage: Rendering map - isLoggedIn=${isLoggedIn}, manholes=${visitedManholes.length}`)}
@@ -324,8 +324,8 @@ export default function MapPage() {
               {prefectureCounts.length > 0 && (
                 <div className="absolute top-2 right-2 z-[1000]">
                   {showPrefectureList ? (
-                    <div className="w-32 max-h-[calc(70vh-2rem)] bg-rpg-bgLight border-2 border-rpg-border shadow-lg overflow-hidden">
-                      <div className="sticky top-0 bg-rpg-bgLight border-b-2 border-rpg-border px-1.5 py-1">
+                    <div className="w-32 max-h-[calc(70vh-2rem)] bg-white/70 border border-[#7B63A8]/15 shadow-lg overflow-hidden">
+                      <div className="sticky top-0 bg-white/70 border-b border-[#7B63A8]/15 px-1.5 py-1">
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <h3 className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
                             都道府県 ({prefectureCounts.filter(p => p.count > 0).length}/47)
@@ -407,7 +407,7 @@ export default function MapPage() {
                   ) : (
                     <button
                       onClick={() => setShowPrefectureList(true)}
-                      className="p-1.5 bg-white/90 border-2 border-rpg-border shadow-lg hover:bg-rpg-yellow transition-colors rounded"
+                      className="p-1.5 bg-white/90 border border-[#7B63A8]/15 shadow-lg hover:bg-rpg-yellow transition-colors rounded"
                       title="都道府県リストを表示"
                     >
                       <ChevronLeft className="w-3 h-3 text-rpg-textDark" />

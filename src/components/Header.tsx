@@ -57,12 +57,12 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
     { href: '/', label: 'ホーム', icon: <Home className="w-5 h-5" /> },
     { href: '/manholes', label: 'マンホール一覧', icon: <List className="w-5 h-5" /> },
     { href: '/nearby', label: '近くの未訪問', icon: <Navigation className="w-5 h-5" /> },
-    { href: '/upload', label: '写真を登録', icon: <Camera className="w-5 h-5" /> },
+    { href: user ? '/upload' : '/login?redirect=/upload', label: '写真を登録', icon: <Camera className="w-5 h-5" /> },
     { href: '/visits', label: '訪問履歴', icon: <History className="w-5 h-5" /> },
     { href: '/about', label: 'このアプリについて', icon: <Info className="w-5 h-5" /> },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => pathname === href.split('?')[0];
 
   const handleLogout = async () => {
     if (!supabase) return;
@@ -80,14 +80,12 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
 
   return (
     <>
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-3 sticky top-0 z-50">
+      <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-3 sticky top-0 z-50">
         <div className="container-pokemon">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {icon}
-              <h1 className="font-pixelJp text-lg font-bold text-white" style={{
-                textShadow: '3px 3px 0 #2C3E50, -1px -1px 0 rgba(255,255,255,0.3), 0 0 10px rgba(255,215,0,0.5)'
-              }}>{title}</h1>
+              <h1 className="font-pixelJp text-lg font-bold text-[#2A2A2A]">{title}</h1>
             </div>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -116,9 +114,9 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
 
               {/* User Info */}
               {user ? (
-                <div className="mb-3 pb-3 border-b-2 border-rpg-border">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-rpg-bgLight">
-                    <div className="w-8 h-8 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/70">
+                    <div className="w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                       <UserIcon className="w-4 h-4 text-rpg-textDark" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -132,7 +130,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
                   </div>
                 </div>
               ) : (
-                <div className="mb-3 pb-3 border-b-2 border-rpg-border">
+                <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
                   <div
                     onClick={() => {
                       setIsMenuOpen(false);
@@ -156,8 +154,8 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
                     }}
                     className={`flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer ${
                       isActive(item.href)
-                        ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border-2 border-rpg-border'
-                        : 'text-rpg-textDark hover:bg-rpg-bgLight'
+                        ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border border-[#7B63A8]/15'
+                        : 'text-rpg-textDark hover:bg-white/70'
                     }`}
                   >
                     {item.icon}
@@ -169,7 +167,7 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
                 {user && (
                   <div
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t-2 border-rpg-border mt-2 pt-2"
+                    className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t border-[#7B63A8]/15 mt-2 pt-2"
                   >
                     <LogOut className="w-5 h-5" />
                     <span>ログアウト</span>

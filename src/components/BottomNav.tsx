@@ -3,14 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Home, Navigation, Camera, Menu, History, MapPin } from 'lucide-react';
+import { Camera, Image, Menu, Search } from 'lucide-react';
 import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 function isActivePath(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const hrefPath = href.split('?')[0];
+  if (hrefPath === '/') return pathname === '/';
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
 export default function BottomNav() {
@@ -44,14 +45,11 @@ export default function BottomNav() {
 
   const items = useMemo(
     () => [
-      { href: '/', label: 'ホーム', icon: <Home className="w-6 h-6 mb-1" /> },
-      { href: '/nearby', label: '近く', icon: <Navigation className="w-6 h-6 mb-1" /> },
+      { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+      { href: '/', label: '写真館', icon: <Image className="w-6 h-6 mb-1" /> },
       isLoggedIn
-        ? { href: '/upload', label: '登録', icon: <Camera className="w-6 h-6 mb-1" /> }
-        : { href: '/signup', label: 'アカウント作成', icon: <Camera className="w-6 h-6 mb-1" /> },
-      isLoggedIn
-        ? { href: '/visits', label: '履歴', icon: <History className="w-6 h-6 mb-1" /> }
-        : { href: '/map', label: 'マップ', icon: <MapPin className="w-6 h-6 mb-1" /> },
+        ? { href: '/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> }
+        : { href: '/login?redirect=/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
     ],
     [isLoggedIn]
   );
@@ -61,23 +59,6 @@ export default function BottomNav() {
       <nav className="nav-rpg">
         <div className="flex justify-around items-center max-w-md mx-auto py-2">
           {items.map((item) => {
-            if (!isLoggedIn && item.href === '/signup') {
-              const active = isActivePath(pathname, '/signup');
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`nav-rpg-item ${active ? 'active' : ''}`}
-                  aria-label="アカウント作成"
-                  onClick={() => trackNavClick(item.label)}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
-              );
-            }
-
             return (
               <Link
                 key={item.href}

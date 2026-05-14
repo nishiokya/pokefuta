@@ -88,20 +88,20 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       <div className="w-full max-w-md mx-auto p-4">
         {/* Header */}
         <div className="rpg-window text-center mb-6">
           <div className="inline-block mb-3">
-            <div className="w-16 h-16 bg-rpg-blue border-2 border-rpg-border flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 bg-rpg-blue border border-[#7B63A8]/15 flex items-center justify-center mx-auto">
               <UserPlus className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-lg text-rpg-textGold font-bold">アカウント作成</h1>
+          <h1 className="font-pixelJp text-lg text-[#7B63A8] font-bold">アカウント作成</h1>
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
             登録すると訪問履歴が使えるようになります
           </p>
-          <div className="mt-3 pt-3 border-t-2 border-rpg-border">
+          <div className="mt-3 pt-3 border-t border-[#7B63A8]/15">
             <p className="font-pixelJp text-[11px] text-rpg-textDark opacity-80 leading-relaxed">
               GPS位置情報を公開して共有するため、メール確認が必要です。
             </p>
@@ -140,7 +140,7 @@ export default function SignUpPage() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full bg-rpg-bgLight border-2 border-rpg-border p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
+                  className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
                   placeholder="トレーナー名"
                   disabled={loading}
                 />
@@ -156,7 +156,7 @@ export default function SignUpPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-rpg-bgLight border-2 border-rpg-border p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
+                  className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
                   placeholder="your@email.com"
                   required
                   disabled={loading}
@@ -173,7 +173,7 @@ export default function SignUpPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-rpg-bgLight border-2 border-rpg-border p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
+                  className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-blue focus:outline-none"
                   placeholder="••••••••"
                   required
                   disabled={loading}
@@ -198,7 +198,7 @@ export default function SignUpPage() {
               </button>
 
               {/* Conversion helper */}
-              <div className="bg-rpg-bgLight border-2 border-rpg-border p-3">
+              <div className="bg-white/70 border border-[#7B63A8]/15 p-3">
                 <p className="font-pixelJp text-xs text-rpg-textDark font-bold mb-1">
                   登録すると使える機能（例）
                 </p>
@@ -212,7 +212,7 @@ export default function SignUpPage() {
           )}
 
           {!success && (
-            <div className="mt-6 pt-4 border-t-2 border-rpg-border text-center">
+            <div className="mt-6 pt-4 border-t border-[#7B63A8]/15 text-center">
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
                 すでにアカウントをお持ちの方
               </p>

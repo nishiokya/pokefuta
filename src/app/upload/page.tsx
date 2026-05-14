@@ -518,7 +518,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
         <div className="fixed top-0 left-0 right-0 z-50 space-y-2 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
@@ -599,7 +599,7 @@ export default function UploadPage() {
 
           {loading && (
             <div className="text-center py-4">
-              <div className="font-pixelJp text-rpg-textGold">
+              <div className="font-pixelJp text-[#7B63A8]">
                 処理中<span className="rpg-loading"></span>
               </div>
             </div>
@@ -610,7 +610,7 @@ export default function UploadPage() {
           <h3 className="font-pixelJp text-sm text-rpg-textDark font-bold mb-2">チュートリアル: OK/NG</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-            <div className="border-2 border-rpg-border bg-rpg-bgLight p-2">
+            <div className="border border-[#7B63A8]/15 bg-white/70 p-2">
               <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-green mb-1">
                 <CheckCircle className="w-3 h-3" />
                 <span>OK</span>
@@ -622,7 +622,7 @@ export default function UploadPage() {
               </ul>
             </div>
 
-            <div className="border-2 border-rpg-border bg-rpg-bgLight p-2">
+            <div className="border border-[#7B63A8]/15 bg-white/70 p-2">
               <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-red mb-1">
                 <AlertCircle className="w-3 h-3" />
                 <span>NG</span>
@@ -680,7 +680,7 @@ export default function UploadPage() {
                       <img
                         src={photo.preview}
                         alt="Preview"
-                        className="w-20 h-20 object-cover border-2 border-rpg-border"
+                        className="w-20 h-20 object-cover border border-[#7B63A8]/15"
                         style={{ imageRendering: 'pixelated' }}
                       />
                     </div>
@@ -759,7 +759,7 @@ export default function UploadPage() {
                   公開設定がONの場合、他のユーザーも閲覧できます
                 </p>
                 <textarea
-                  className="w-full p-3 border-2 border-rpg-border rounded font-pixelJp text-sm"
+                  className="w-full p-3 border border-[#7B63A8]/15 rounded font-pixelJp text-sm"
                   placeholder="このポケふたの感想を書こう！例: ピカチュウのデザインがかわいい！"
                   rows={3}
                   value={visitComment}
@@ -773,7 +773,7 @@ export default function UploadPage() {
                 </div>
 
                 {/* 公開設定 */}
-                <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+                <div className="mt-4 pt-4 border-t border-[#7B63A8]/15">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-pixelJp text-sm text-rpg-textDark mb-1">公開設定</h4>
@@ -813,7 +813,7 @@ export default function UploadPage() {
                   カメラ情報など、自分だけが見るメモです
                 </p>
                 <textarea
-                  className="w-full p-3 border-2 border-rpg-border rounded font-pixelJp text-sm"
+                  className="w-full p-3 border border-[#7B63A8]/15 rounded font-pixelJp text-sm"
                   placeholder="例: カメラ: iPhone 15 Pro&#10;レンズ: 広角&#10;撮影日時: 2025/10/20 15:30"
                   rows={4}
                   value={visitNote}
@@ -830,7 +830,7 @@ export default function UploadPage() {
                 </div>
 
                 {/* 登録ボタン */}
-                <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+                <div className="mt-4 pt-4 border-t border-[#7B63A8]/15">
                   {photos.some(p => !p.uploaded && !p.uploading) && (
                     <button
                       onClick={uploadAllPhotos}

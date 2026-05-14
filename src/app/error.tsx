@@ -18,7 +18,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Pokemon Manhole Icon - Error State */}
         <div className="text-center mb-8">
@@ -28,10 +28,10 @@ export default function Error({
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-24 h-24 rounded-full border-4 border-white bg-rpg-red relative opacity-70">
                   <div className="absolute bottom-0 left-0 right-0 h-12 bg-white"></div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-white bg-rpg-bgDark"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-white bg-[#F6EEDC]"></div>
                   {/* Crack effect */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-full h-1 bg-rpg-bgDark transform rotate-45"></div>
+                    <div className="w-full h-1 bg-[#F6EEDC] transform rotate-45"></div>
                   </div>
                 </div>
               </div>
@@ -62,7 +62,7 @@ export default function Error({
                 もう一度お試しいただくか、ホームに戻ってください。
               </p>
               {process.env.NODE_ENV === 'development' && error.message && (
-                <div className="mt-3 p-2 bg-rpg-bgDark border-2 border-rpg-border">
+                <div className="mt-3 p-2 bg-[#F6EEDC] border border-[#7B63A8]/15">
                   <p className="font-mono text-xs text-rpg-red break-all">
                     {error.message}
                   </p>
@@ -91,15 +91,15 @@ export default function Error({
             こちらもおすすめ
           </h3>
           <div className="space-y-2">
-            <Link href="/map" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/manholes" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <MapPin className="w-4 h-4 text-rpg-blue" />
-              <span className="font-pixelJp text-xs text-rpg-textDark">マップを見る</span>
+              <span className="font-pixelJp text-xs text-rpg-textDark">一覧から探す</span>
             </Link>
-            <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Navigation className="w-4 h-4 text-rpg-blue" />
               <span className="font-pixelJp text-xs text-rpg-textDark">近くのポケふたを探す</span>
             </Link>
-            <Link href="/visits" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/visits" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <History className="w-4 h-4 text-rpg-yellow" />
               <span className="font-pixelJp text-xs text-rpg-textDark">訪問履歴を見る</span>
             </Link>

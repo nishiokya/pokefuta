@@ -255,9 +255,9 @@ export default function VisitsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center">
+      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
         <div className="text-center">
-          <div className="font-pixelJp text-rpg-textGold">
+          <div className="font-pixelJp text-[#7B63A8]">
             読み込み中<span className="rpg-loading"></span>
           </div>
         </div>
@@ -266,7 +266,7 @@ export default function VisitsPage() {
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
       {/* Feed Container */}
       <div className="max-w-2xl mx-auto pb-nav-safe">
         <div className="p-4 pb-0">
@@ -312,10 +312,10 @@ export default function VisitsPage() {
                 ポケふたを見つけて、冒険を始めよう！
               </p>
               <button
-                onClick={() => window.location.href = '/'}
+                onClick={() => window.location.href = '/nearby'}
                 className="rpg-button rpg-button-primary"
               >
-                マップを見る
+                近くを探す
               </button>
             </div>
           </div>
@@ -324,8 +324,8 @@ export default function VisitsPage() {
             {sortedVisits.map((visit) => (
               <div key={visit.id} className="rpg-window">
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-3 pb-3 border-b-2 border-rpg-border">
-                  <div className="w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#7B63A8]/15">
+                  <div className="w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-rpg-textDark" />
                   </div>
                   <div className="flex-1">
@@ -345,7 +345,7 @@ export default function VisitsPage() {
                       {visit.photos.slice(0, 4).map((photo, index) => (
                         <div
                           key={photo.id}
-                          className={`relative ${visit.photos.length === 1 ? 'aspect-square' : 'aspect-square'} bg-rpg-bgDark overflow-hidden group border-2 border-rpg-border`}
+                          className={`relative ${visit.photos.length === 1 ? 'aspect-square' : 'aspect-square'} bg-[#F6EEDC] overflow-hidden group border border-[#7B63A8]/15`}
                         >
                           <img
                             src={photo.thumbnail_url}
@@ -359,7 +359,7 @@ export default function VisitsPage() {
                               const parent = target.parentElement;
                               if (parent && !parent.querySelector('.error-placeholder')) {
                                 const errorDiv = document.createElement('div');
-                                errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center';
+                                errorDiv.className = 'error-placeholder absolute inset-0 bg-[#F6EEDC] flex flex-col items-center justify-center';
                                 errorDiv.innerHTML = `
                                   <svg class="w-8 h-8 text-rpg-textDark opacity-50 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -384,7 +384,7 @@ export default function VisitsPage() {
                                 e.stopPropagation();
                                 handleDeleteClick(photo.id);
                               }}
-                              className="absolute top-2 right-2 bg-rpg-red border-2 border-rpg-border p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
+                              className="absolute top-2 right-2 bg-rpg-red border border-[#7B63A8]/15 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
                               title="写真を削除"
                             >
                               <Trash2 className="w-3 h-3 text-white" />
@@ -396,14 +396,14 @@ export default function VisitsPage() {
                   </div>
                 ) : (
                   <div className="mb-3 -mx-rpg-2">
-                    <div className="aspect-video bg-rpg-bgDark border-2 border-rpg-border flex items-center justify-center">
+                    <div className="aspect-video bg-[#F6EEDC] border border-[#7B63A8]/15 flex items-center justify-center">
                       <Camera className="w-12 h-12 text-rpg-textDark opacity-30" />
                     </div>
                   </div>
                 )}
 
                 {/* Actions (Instagram-like) */}
-                <div className="flex items-center gap-4 mb-3 pb-3 border-b-2 border-rpg-border">
+                <div className="flex items-center gap-4 mb-3 pb-3 border-b border-[#7B63A8]/15">
                   <button
                     onClick={() => handleLikeToggle(visit.id)}
                     className="flex items-center gap-1 hover:opacity-70 transition-opacity"
@@ -462,7 +462,7 @@ export default function VisitsPage() {
                       {visit.manhole.pokemons.slice(0, 5).map((pokemon, index) => (
                         <span
                           key={index}
-                          className="bg-rpg-yellow px-2 py-1 border-2 border-rpg-border font-pixelJp text-xs text-rpg-textDark"
+                          className="bg-rpg-yellow px-2 py-1 border border-[#7B63A8]/15 font-pixelJp text-xs text-rpg-textDark"
                         >
                           {pokemon}
                         </span>
