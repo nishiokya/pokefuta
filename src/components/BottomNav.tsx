@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Camera, Image, Menu, Search } from 'lucide-react';
+import { Camera, CircleDot, Home, Image, Menu, Search } from 'lucide-react';
 import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -44,13 +44,19 @@ export default function BottomNav() {
   }, []);
 
   const items = useMemo(
-    () => [
-      { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
-      { href: '/', label: '写真館', icon: <Image className="w-6 h-6 mb-1" /> },
-      isLoggedIn
-        ? { href: '/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> }
-        : { href: '/login?redirect=/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
-    ],
+    () => isLoggedIn
+      ? [
+          { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+          { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
+          { href: '/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
+          { href: '/', label: 'マイ旅', icon: <Home className="w-6 h-6 mb-1" /> },
+        ]
+      : [
+          { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+          { href: '/login?redirect=/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
+          { href: '/', label: '写真館', icon: <Image className="w-6 h-6 mb-1" /> },
+          { href: '/login?redirect=/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
+        ],
     [isLoggedIn]
   );
 
