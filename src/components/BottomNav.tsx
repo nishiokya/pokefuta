@@ -53,6 +53,7 @@ export default function BottomNav() {
         ]
       : [
           { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+          { href: '/login?redirect=/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
           { href: '/', label: '写真館', icon: <Image className="w-6 h-6 mb-1" /> },
           { href: '/login?redirect=/upload', label: '投稿', icon: <Camera className="w-6 h-6 mb-1" /> },
         ],
