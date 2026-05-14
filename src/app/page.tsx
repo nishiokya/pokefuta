@@ -390,7 +390,7 @@ export default function HomePage() {
 
             {/* Feed Pagination */}
             {showPagination && (
-              <div className="mb-32 mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mb-0">
+              <div className="mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm">
                 <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
