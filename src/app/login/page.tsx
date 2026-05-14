@@ -102,21 +102,21 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="rpg-window text-center mb-6">
           <div className="inline-block mb-3">
-            <div className="w-16 h-16 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center mx-auto">
               <LogIn className="w-8 h-8 text-rpg-textDark" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-lg text-rpg-textGold font-bold">ログイン</h1>
+          <h1 className="font-pixelJp text-lg text-[#7B63A8] font-bold">ログイン</h1>
           <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
             アカウント作成済みの方はこちら
           </p>
           {fromRegister && (
-            <div className="mt-3 pt-3 border-t-2 border-rpg-border">
+            <div className="mt-3 pt-3 border-t border-[#7B63A8]/15">
               <div className="bg-rpg-yellow/20 border-2 border-rpg-yellow p-2 rounded">
                 <div className="flex items-start gap-2">
                   <Mail className="w-4 h-4 text-rpg-yellow flex-shrink-0 mt-0.5" />
@@ -157,7 +157,7 @@ function LoginForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-rpg-bgLight border-2 border-rpg-border p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
+                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
                 placeholder="your@email.com"
                 required
                 disabled={loading}
@@ -174,7 +174,7 @@ function LoginForm() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-rpg-bgLight border-2 border-rpg-border p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
+                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
                 placeholder="••••••••"
                 required
                 disabled={loading}
@@ -216,7 +216,7 @@ function LoginForm() {
           )}
 
           {/* Sign Up Link */}
-          <div className="mt-6 pt-4 border-t-2 border-rpg-border text-center">
+          <div className="mt-6 pt-4 border-t border-[#7B63A8]/15 text-center">
             <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
               アカウントをお持ちでない方
             </p>
@@ -235,8 +235,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center">
-        <div className="font-pixelJp text-rpg-textGold">
+      <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center">
+        <div className="font-pixelJp text-[#7B63A8]">
           読み込み中<span className="rpg-loading"></span>
         </div>
       </div>

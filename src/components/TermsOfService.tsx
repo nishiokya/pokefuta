@@ -13,7 +13,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className={`bg-rpg-bgLight border-2 border-rpg-border p-3 ${className}`}>
+    <div className={`bg-white/70 border border-[#7B63A8]/15 p-3 ${className}`}>
       {/* チェックボックス */}
       <label className="flex items-start gap-2 cursor-pointer">
         <input
@@ -47,7 +47,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
 
       {/* 利用規約詳細（展開時のみ表示） */}
       {isExpanded && (
-        <div className="mt-3 p-3 bg-rpg-bgDark border-2 border-rpg-border max-h-64 overflow-y-auto">
+        <div className="mt-3 p-3 bg-[#F6EEDC] border border-[#7B63A8]/15 max-h-64 overflow-y-auto">
           <div className="space-y-3 font-pixelJp text-xs text-rpg-bgLight">
             <div>
               <h3 className="font-bold text-rpg-yellow mb-2">📸 写真の公開について</h3>
@@ -92,7 +92,7 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
               </p>
             </div>
 
-            <div className="pt-2 border-t-2 border-rpg-border">
+            <div className="pt-2 border-t border-[#7B63A8]/15">
               <p className="text-[10px] opacity-70">
                 本規約は予告なく変更される場合があります。
                 継続してサービスをご利用いただくことで、変更後の規約に同意したものとみなします。

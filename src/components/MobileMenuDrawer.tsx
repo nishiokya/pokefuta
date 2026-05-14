@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   List,
-  MapPin,
   Navigation,
   Camera,
   History,
@@ -92,12 +91,11 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
       icon: <Navigation className="w-5 h-5" />,
     },
     {
-      href: '/map',
-      label: 'マップ',
-      description: '地図で全体を見る（必要なら）',
-      icon: <MapPin className="w-5 h-5" />,
+      href: user ? '/upload' : '/login?redirect=/upload',
+      label: '写真を登録',
+      description: user ? '訪問写真を追加する' : 'ログインして訪問写真を追加する',
+      icon: <Camera className="w-5 h-5" />,
     },
-    { href: '/upload', label: '写真を登録', description: '訪問写真を追加する', icon: <Camera className="w-5 h-5" /> },
     { href: '/visits', label: '訪問履歴', description: '自分の訪問記録を見る', icon: <History className="w-5 h-5" /> },
     { href: '/about', label: 'このアプリについて', description: '使い方/注意事項', icon: <Info className="w-5 h-5" /> },
   ];
@@ -135,9 +133,9 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
 
           {/* User Info */}
           {user ? (
-            <div className="mb-3 pb-3 border-b-2 border-rpg-border">
-              <div className="flex items-center gap-2 px-3 py-2 bg-rpg-bgLight">
-                <div className="w-8 h-8 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+            <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/70">
+                <div className="w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <UserIcon className="w-4 h-4 text-rpg-textDark" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -153,7 +151,7 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
               </div>
             </div>
           ) : (
-            <div className="mb-3 pb-3 border-b-2 border-rpg-border">
+            <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
               <div className="space-y-2">
                 <div
                   onClick={() => {
@@ -190,8 +188,8 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
                 }}
                 className={`flex items-start gap-2 px-3 py-2 font-pixelJp cursor-pointer ${
                   isActive(item.href)
-                    ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border-2 border-rpg-border'
-                    : 'text-rpg-textDark hover:bg-rpg-bgLight'
+                    ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border border-[#7B63A8]/15'
+                    : 'text-rpg-textDark hover:bg-white/70'
                 }`}
               >
                 <div className="mt-0.5">{item.icon}</div>
@@ -205,7 +203,7 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
             {user && (
               <div
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t-2 border-rpg-border mt-2 pt-2"
+                className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t border-[#7B63A8]/15 mt-2 pt-2"
               >
                 <LogOut className="w-5 h-5" />
                 <span>ログアウト</span>

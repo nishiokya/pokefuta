@@ -131,17 +131,17 @@ export default function CommentModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[80vh] sm:max-h-[90vh] bg-rpg-bgLight border-4 border-rpg-border flex flex-col m-0 sm:m-4 rounded-t-lg sm:rounded-lg">
+      <div className="relative w-full max-w-2xl max-h-[80vh] sm:max-h-[90vh] bg-white/70 border-4 border-rpg-border flex flex-col m-0 sm:m-4 rounded-t-lg sm:rounded-lg">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b-2 border-rpg-border bg-rpg-bgDark">
-          <h2 className="font-pixelJp text-lg text-rpg-textGold">
+        <div className="flex items-center justify-between p-4 border-b border-[#7B63A8]/15 bg-[#F6EEDC]">
+          <h2 className="font-pixelJp text-lg text-[#7B63A8]">
             コメント
           </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-rpg-border/30 transition-colors rounded"
           >
-            <X className="w-5 h-5 text-rpg-textGold" />
+            <X className="w-5 h-5 text-[#7B63A8]" />
           </button>
         </div>
 
@@ -164,17 +164,17 @@ export default function CommentModal({
             comments.map((comment) => (
               <div
                 key={comment.id}
-                className="bg-rpg-bgDark border-2 border-rpg-border p-3 rounded"
+                className="bg-[#F6EEDC] border border-[#7B63A8]/15 p-3 rounded"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border-2 border-rpg-border rounded-full flex items-center justify-center">
+                  <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 rounded-full flex items-center justify-center">
                     <span className="font-pixelJp text-xs text-rpg-textDark">
                       {getUserInitial(comment)}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-pixelJp text-sm text-rpg-textGold font-bold truncate">
+                      <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">
                         {getUserLabel(comment)}
                       </span>
                       <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
@@ -203,13 +203,13 @@ export default function CommentModal({
         )}
 
         {/* Comment Input */}
-        <form onSubmit={handleSubmit} className="p-4 border-t-2 border-rpg-border bg-rpg-bgDark">
+        <form onSubmit={handleSubmit} className="p-4 border-t border-[#7B63A8]/15 bg-[#F6EEDC]">
           <div className="flex gap-2">
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="コメントを入力..."
-              className="flex-1 bg-rpg-bgLight border-2 border-rpg-border p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
+              className="flex-1 bg-white/70 border border-[#7B63A8]/15 p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
               rows={2}
               maxLength={1000}
               disabled={submitting}

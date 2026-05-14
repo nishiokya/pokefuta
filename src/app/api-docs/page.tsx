@@ -28,9 +28,9 @@ export default function ApiDocsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-rpg-bgDark flex items-center justify-center">
+      <div className="min-h-screen bg-[#F6EEDC] flex items-center justify-center">
         <div className="text-center">
-          <div className="font-pixelJp text-rpg-textGold">
+          <div className="font-pixelJp text-[#7B63A8]">
             読み込み中<span className="rpg-loading"></span>
           </div>
         </div>
@@ -40,7 +40,7 @@ export default function ApiDocsPage() {
 
   if (!isDevelopment) {
     return (
-      <div className="min-h-screen bg-rpg-bgDark flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F6EEDC] flex items-center justify-center p-4">
         <div className="rpg-window max-w-md text-center">
           <h1 className="rpg-window-title text-base mb-4">
             ⚠️ アクセス制限
@@ -64,14 +64,14 @@ export default function ApiDocsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4">
+      <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="font-pixelJp text-xl text-rpg-yellow" style={{
             textShadow: '2px 2px 0 #34495E'
           }}>
             📖 Pokefuta API ドキュメント
           </h1>
-          <p className="font-pixelJp text-sm text-rpg-textGold mt-2">
+          <p className="font-pixelJp text-sm text-[#7B63A8] mt-2">
             ポケふた写真管理アプリのAPI仕様書 (開発環境)
           </p>
         </div>

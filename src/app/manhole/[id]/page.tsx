@@ -18,8 +18,8 @@ const MapComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-64 bg-rpg-bgDark border-2 border-rpg-border flex items-center justify-center">
-        <div className="font-pixelJp text-rpg-textGold">
+      <div className="w-full h-64 bg-[#F6EEDC] border border-[#7B63A8]/15 flex items-center justify-center">
+        <div className="font-pixelJp text-[#7B63A8]">
           読み込み中<span className="rpg-loading"></span>
         </div>
       </div>
@@ -372,9 +372,9 @@ export default function ManholeDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center">
+      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
         <div className="text-center">
-          <div className="font-pixelJp text-rpg-textGold">
+          <div className="font-pixelJp text-[#7B63A8]">
             読み込み中<span className="rpg-loading"></span>
           </div>
         </div>
@@ -384,9 +384,9 @@ export default function ManholeDetailPage() {
 
   if (error || !manhole) {
     return (
-      <div className="min-h-screen safe-area-inset bg-rpg-bgDark">
+      <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
         {/* Header */}
-        <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4">
+        <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-3">
               <button
@@ -409,10 +409,10 @@ export default function ManholeDetailPage() {
             <h2 className="font-pixelJp text-lg text-rpg-textDark mb-2">エラー</h2>
             <p className="font-pixelJp text-sm text-rpg-textDark opacity-70 mb-4">{error}</p>
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/nearby')}
               className="rpg-button rpg-button-primary"
             >
-              <span className="font-pixelJp">マップに戻る</span>
+              <span className="font-pixelJp">近くを探す</span>
             </button>
           </div>
         </div>
@@ -421,9 +421,9 @@ export default function ManholeDetailPage() {
   }
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       {/* Header */}
-      <div className="bg-rpg-bgDark border-b-4 border-rpg-border p-4 sticky top-0 z-50">
+      <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4 sticky top-0 z-50">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             <button
@@ -455,14 +455,14 @@ export default function ManholeDetailPage() {
             </div>
 
             {manhole.description && (
-              <div className="font-pixelJp text-xs text-rpg-textDark bg-rpg-bgLight p-3 border-2 border-rpg-border">
+              <div className="font-pixelJp text-xs text-rpg-textDark bg-white/70 p-3 border border-[#7B63A8]/15">
                 {manhole.description}
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-3 border-t-2 border-rpg-border">
+            <div className="flex items-center justify-between pt-3 border-t border-[#7B63A8]/15">
               <div className="flex items-center">
-                <div className={`w-3 h-3 border-2 border-rpg-border mr-2 ${manhole.is_visited ? 'bg-rpg-red' : 'bg-rpg-blue'}`}></div>
+                <div className={`w-3 h-3 border border-[#7B63A8]/15 mr-2 ${manhole.is_visited ? 'bg-rpg-red' : 'bg-rpg-blue'}`}></div>
                 <span className="font-pixelJp text-sm text-rpg-textDark font-bold">
                   {manhole.is_visited ? '訪問済み' : '未訪問'}
                 </span>
@@ -486,7 +486,7 @@ export default function ManholeDetailPage() {
               {manhole.pokemons.map((pokemon, index) => (
                 <span
                   key={index}
-                  className="bg-rpg-yellow px-2 py-1 border-2 border-rpg-border font-pixelJp text-xs text-rpg-textDark"
+                  className="bg-rpg-yellow px-2 py-1 border border-[#7B63A8]/15 font-pixelJp text-xs text-rpg-textDark"
                 >
                   {pokemon}
                 </span>
@@ -515,10 +515,10 @@ export default function ManholeDetailPage() {
                 return (
                   <div
                     key={photo.id}
-                    className="bg-rpg-bgDark border-2 border-rpg-border"
+                    className="bg-[#F6EEDC] border border-[#7B63A8]/15"
                   >
                     {/* Photo Image */}
-                    <div className="relative aspect-square bg-rpg-bgDark overflow-hidden group">
+                    <div className="relative aspect-square bg-[#F6EEDC] overflow-hidden group">
                       <img
                         src={`/api/photo/${photo.id}?size=small`}
                         alt="ポケふた写真"
@@ -530,7 +530,7 @@ export default function ManholeDetailPage() {
                           const parent = target.parentElement;
                           if (parent && !parent.querySelector('.error-placeholder')) {
                             const errorDiv = document.createElement('div');
-                            errorDiv.className = 'error-placeholder absolute inset-0 bg-rpg-bgDark flex flex-col items-center justify-center border-2 border-rpg-border';
+                            errorDiv.className = 'error-placeholder absolute inset-0 bg-[#F6EEDC] flex flex-col items-center justify-center border border-[#7B63A8]/15';
                             errorDiv.innerHTML = `
                               <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -646,14 +646,14 @@ export default function ManholeDetailPage() {
           ) : (
             <div className="space-y-3">
               {manholeComments.map((comment) => (
-                <div key={comment.id} className="bg-rpg-bgDark border-2 border-rpg-border p-3 rounded">
+                <div key={comment.id} className="bg-[#F6EEDC] border border-[#7B63A8]/15 p-3 rounded">
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border-2 border-rpg-border rounded-full flex items-center justify-center">
+                    <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 rounded-full flex items-center justify-center">
                       <span className="font-pixelJp text-xs text-rpg-textDark">{getCommentUserInitial(comment)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-pixelJp text-sm text-rpg-textGold font-bold truncate">{getCommentUserLabel(comment)}</span>
+                        <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">{getCommentUserLabel(comment)}</span>
                         <span className="font-pixelJp text-xs text-rpg-bgLight opacity-70 flex-shrink-0">
                           {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
                         </span>
@@ -675,13 +675,13 @@ export default function ManholeDetailPage() {
           )}
 
           {currentUserId ? (
-            <form onSubmit={handleSubmitManholeComment} className="mt-4 pt-4 border-t-2 border-rpg-border">
+            <form onSubmit={handleSubmitManholeComment} className="mt-4 pt-4 border-t border-[#7B63A8]/15">
               <div className="flex gap-2">
                 <textarea
                   value={newManholeComment}
                   onChange={(e) => setNewManholeComment(e.target.value)}
                   placeholder="コメントを入力..."
-                  className="flex-1 bg-rpg-bgLight border-2 border-rpg-border p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
+                  className="flex-1 bg-white/70 border border-[#7B63A8]/15 p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
                   rows={2}
                   maxLength={1000}
                   disabled={commentsSubmitting}
@@ -699,7 +699,7 @@ export default function ManholeDetailPage() {
               </div>
             </form>
           ) : (
-            <div className="mt-4 pt-4 border-t-2 border-rpg-border">
+            <div className="mt-4 pt-4 border-t border-[#7B63A8]/15">
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">ログインするとコメントを投稿できます</p>
             </div>
           )}
@@ -708,7 +708,7 @@ export default function ManholeDetailPage() {
         {/* Map */}
         <div className="rpg-window">
           <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">地図</h3>
-          <div className="h-64 border-2 border-rpg-border overflow-hidden">
+          <div className="h-64 border border-[#7B63A8]/15 overflow-hidden">
             <MapComponent
               center={{
                 lat: manhole.latitude ?? 36.0,
@@ -731,7 +731,7 @@ export default function ManholeDetailPage() {
             <span className="font-pixelJp text-xs">経路案内</span>
           </button>
           <button
-            onClick={() => router.push('/upload')}
+            onClick={() => router.push(currentUserId ? '/upload' : '/login?redirect=/upload')}
             className="rpg-button rpg-button-primary flex items-center justify-center gap-2"
           >
             <Camera className="w-4 h-4" />

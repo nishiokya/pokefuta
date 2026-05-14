@@ -17,7 +17,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* アプリの説明 */}
         <section className="rpg-window">
@@ -37,9 +37,9 @@ export default function AboutPage() {
           <h2 className="rpg-window-title">使い方</h2>
           <div className="space-y-4">
             {/* 0. アカウント作成 */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <UserPlus className="w-5 h-5 text-rpg-textDark" />
                 </div>
                 <div className="flex-1">
@@ -54,9 +54,9 @@ export default function AboutPage() {
             </div>
 
             {/* 1. 写真を登録 */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <Camera className="w-5 h-5 text-rpg-textDark" />
                 </div>
                 <div className="flex-1">
@@ -71,9 +71,9 @@ export default function AboutPage() {
             </div>
 
             {/* 2. マンホールを探す */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <Map className="w-5 h-5 text-rpg-textDark" />
                 </div>
                 <div className="flex-1">
@@ -88,9 +88,9 @@ export default function AboutPage() {
             </div>
 
             {/* 3. 近くの未訪問を探す */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <Navigation className="w-5 h-5 text-rpg-textDark" />
                 </div>
                 <div className="flex-1">
@@ -105,9 +105,9 @@ export default function AboutPage() {
             </div>
 
             {/* 4. 訪問履歴を見る */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
                   <History className="w-5 h-5 text-rpg-textDark" />
                 </div>
                 <div className="flex-1">
@@ -184,9 +184,9 @@ export default function AboutPage() {
             </p>
 
             {/* GitHub Issues */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-textDark border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-textDark border border-[#7B63A8]/15 flex items-center justify-center">
                   <Github className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
@@ -210,9 +210,9 @@ export default function AboutPage() {
             </div>
 
             {/* X (Twitter) */}
-            <div className="bg-rpg-bgLight p-4 border-2 border-rpg-border">
+            <div className="bg-white/70 p-4 border border-[#7B63A8]/15">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-rpg-textDark border-2 border-rpg-border flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-rpg-textDark border border-[#7B63A8]/15 flex items-center justify-center">
                   <Twitter className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
@@ -238,7 +238,7 @@ export default function AboutPage() {
         </section>
 
         {/* バージョン情報 */}
-        <section className="rpg-window bg-rpg-bgLight">
+        <section className="rpg-window bg-white/70">
           <div className="text-center font-pixelJp text-xs text-rpg-textDark opacity-50">
             Version 1.0.0
           </div>

@@ -56,7 +56,7 @@ export default function DeletePhotoModal({
           </div>
 
           {/* Photo ID */}
-          <div className="bg-rpg-bgLight border-2 border-rpg-border p-2">
+          <div className="bg-white/70 border border-[#7B63A8]/15 p-2">
             <p className="font-pixel text-[10px] text-rpg-textDark opacity-70">
               Photo ID: {photoId.slice(0, 8)}...
             </p>

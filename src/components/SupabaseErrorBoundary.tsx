@@ -22,7 +22,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
 
   if (error) {
     return (
-      <div className="min-h-screen safe-area-inset bg-rpg-bgDark flex items-center justify-center p-4">
+      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center p-4">
         <div className="rpg-window max-w-2xl">
           <div className="flex items-start gap-4 mb-4">
             <AlertCircle className="w-12 h-12 text-rpg-red flex-shrink-0" />
@@ -36,7 +36,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
             </div>
           </div>
 
-          <div className="bg-rpg-bgLight border-2 border-rpg-border p-4 mb-4">
+          <div className="bg-white/70 border border-[#7B63A8]/15 p-4 mb-4">
             <pre className="font-pixelJp text-xs text-rpg-textDark whitespace-pre-wrap overflow-auto">
               {error}
             </pre>
@@ -48,7 +48,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
               <ol className="list-decimal list-inside space-y-1 ml-2">
                 <li>プロジェクトルートの <code className="bg-rpg-yellow px-1">.env.local</code> ファイルを開く</li>
                 <li>以下の環境変数を設定:
-                  <div className="bg-rpg-bgDark p-2 mt-1 border border-rpg-border text-xs">
+                  <div className="bg-[#F6EEDC] p-2 mt-1 border border-rpg-border text-xs">
                     NEXT_PUBLIC_SUPABASE_URL=your_supabase_url<br/>
                     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
                   </div>
@@ -58,7 +58,7 @@ export default function SupabaseErrorBoundary({ error, children }: SupabaseError
               </ol>
             </div>
 
-            <div className="pt-3 border-t-2 border-rpg-border">
+            <div className="pt-3 border-t border-[#7B63A8]/15">
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
                 📚 詳細: CLAUDE.md を参照してください
               </p>

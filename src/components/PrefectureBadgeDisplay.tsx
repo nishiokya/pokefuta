@@ -42,10 +42,10 @@ export function PrefectureBadgeDisplay({ badge }: PrefectureBadgeDisplayProps) {
     <div
       className={`p-3 border-2 ${
         badge.status === 'active'
-          ? 'border-rpg-yellow bg-rpg-bgLight'
+          ? 'border-rpg-yellow bg-white/70'
           : badge.status === 'outdated'
-            ? 'border-rpg-orange bg-rpg-bgDark'
-            : 'border-rpg-border bg-rpg-bgDark opacity-60'
+            ? 'border-rpg-orange bg-[#F6EEDC]'
+            : 'border-rpg-border bg-[#F6EEDC] opacity-60'
       }`}
     >
       <div className="flex items-start justify-between mb-2">
@@ -67,7 +67,7 @@ export function PrefectureBadgeDisplay({ badge }: PrefectureBadgeDisplayProps) {
             {badge.currentCompletion.toFixed(1)}%
           </span>
         </div>
-        <div className="w-full bg-rpg-bgDark border-1 border-rpg-border h-2">
+        <div className="w-full bg-[#F6EEDC] border-1 border-rpg-border h-2">
           <div
             className={`h-full ${
               badge.status === 'active'
@@ -178,7 +178,7 @@ export function GlobalBadgeDisplay({ className = '' }: GlobalBadgeDisplayProps) 
           )}
         </div>
 
-        <div className="w-full bg-rpg-bgDark border-2 border-rpg-border h-4">
+        <div className="w-full bg-[#F6EEDC] border border-[#7B63A8]/15 h-4">
           <div
             className={`h-full transition-all ${
               isComplete ? 'bg-rpg-yellow' : 'bg-rpg-cyan'

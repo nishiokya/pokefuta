@@ -77,7 +77,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="ポケふた" />
       </head>
       <body className={`${inter.className} antialiased`}>
-        <div id="app" className="min-h-screen bg-gradient-to-br from-pokemon-red via-pokemon-blue to-pokemon-yellow">
+        <div id="app" className="min-h-screen bg-[#F6EEDC]">
           {children}
           <DevDebugPanel />
         </div>

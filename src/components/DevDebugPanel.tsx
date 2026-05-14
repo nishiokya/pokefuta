@@ -108,7 +108,7 @@ export default function DevDebugPanel() {
       {/* Debug Panel */}
       {isOpen && (
         <div className="fixed bottom-32 right-4 z-50 w-96 max-h-96 overflow-auto rpg-window animate-slide-in">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-rpg-border">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#7B63A8]/15">
             <h3 className="font-pixelJp text-sm text-rpg-yellow font-bold">🐛 開発デバッグ</h3>
             <button
               onClick={() => setIsOpen(false)}
@@ -127,7 +127,7 @@ export default function DevDebugPanel() {
           )}
 
           {/* Auth Status */}
-          <div className="mb-3 p-2 bg-rpg-bgLight border-2 border-rpg-border">
+          <div className="mb-3 p-2 bg-white/70 border border-[#7B63A8]/15">
             <p className="font-pixelJp text-xs text-rpg-textDark font-bold mb-2">
               認証状態: {user ? '✅ ログイン中' : '❌ 未ログイン'}
             </p>
@@ -216,7 +216,7 @@ export default function DevDebugPanel() {
           </div>
 
           {/* Environment Variables */}
-          <div className="mb-3 p-2 bg-rpg-bgLight border-2 border-rpg-border">
+          <div className="mb-3 p-2 bg-white/70 border border-[#7B63A8]/15">
             <p className="font-pixelJp text-xs text-rpg-textDark font-bold mb-2">環境変数</p>
             <div className="space-y-1">
               {Object.entries(envVars).map(([key, value]) => (
@@ -272,7 +272,7 @@ export default function DevDebugPanel() {
             )}
           </div>
 
-          <div className="mt-3 pt-2 border-t-2 border-rpg-border">
+          <div className="mt-3 pt-2 border-t border-[#7B63A8]/15">
             <p className="font-pixelJp text-[10px] text-rpg-textDark opacity-50 text-center">
               本番環境では自動的に非表示
             </p>

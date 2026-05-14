@@ -6,7 +6,7 @@ import BottomNav from '@/components/BottomNav';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-rpg-bgDark flex items-center justify-center p-4">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Pokemon Manhole Icon */}
         <div className="text-center mb-8">
@@ -16,7 +16,7 @@ export default function NotFound() {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-24 h-24 rounded-full border-4 border-white bg-rpg-red relative">
                   <div className="absolute bottom-0 left-0 right-0 h-12 bg-white"></div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-white bg-rpg-bgDark"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-white bg-[#F6EEDC]"></div>
                 </div>
               </div>
             </div>
@@ -50,8 +50,8 @@ export default function NotFound() {
             <Link href="/" className="rpg-button rpg-button-primary w-full text-center block">
               <span className="font-pixelJp">ホームに戻る</span>
             </Link>
-            <Link href="/map" className="rpg-button w-full text-center block">
-              <span className="font-pixelJp">マップを見る</span>
+            <Link href="/nearby" className="rpg-button w-full text-center block">
+              <span className="font-pixelJp">近くを探す</span>
             </Link>
           </div>
         </div>
@@ -62,15 +62,15 @@ export default function NotFound() {
             こちらもおすすめ
           </h3>
           <div className="space-y-2">
-            <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Navigation className="w-4 h-4 text-rpg-blue" />
               <span className="font-pixelJp text-xs text-rpg-textDark">近くのポケふたを探す</span>
             </Link>
-            <Link href="/upload" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/login?redirect=/upload" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Camera className="w-4 h-4 text-rpg-green" />
-              <span className="font-pixelJp text-xs text-rpg-textDark">写真を登録する</span>
+              <span className="font-pixelJp text-xs text-rpg-textDark">ログインして写真を登録する</span>
             </Link>
-            <Link href="/visits" className="flex items-center gap-2 p-2 hover:bg-rpg-bgLight transition-colors">
+            <Link href="/visits" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <History className="w-4 h-4 text-rpg-yellow" />
               <span className="font-pixelJp text-xs text-rpg-textDark">訪問履歴を見る</span>
             </Link>
