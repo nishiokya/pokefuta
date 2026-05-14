@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Award,
@@ -80,8 +80,6 @@ const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
   { key: 'continue', label: '続き' },
 ];
 
-const FALLBACK_TOTAL_MANHOLES = 470;
-
 const getDisplayName = (session: any) => {
   const metadataName = session?.user?.user_metadata?.display_name;
   const emailName = session?.user?.email?.split('@')[0];
@@ -104,6 +102,7 @@ export default function HomePage() {
   const [journeyVisits, setJourneyVisits] = useState<JourneyVisit[]>([]);
   const [journeyManholes, setJourneyManholes] = useState<JourneyManhole[]>([]);
   const [nearbyUnvisited, setNearbyUnvisited] = useState<JourneyManhole[]>([]);
+  const [nearbyStatus, setNearbyStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
@@ -132,7 +131,6 @@ export default function HomePage() {
         if (loggedIn) {
           setUserName(getDisplayName(session));
           loadJourney();
-          loadNearbyUnvisited();
         }
       } catch {
         setIsLoggedIn(false);
@@ -215,8 +213,12 @@ export default function HomePage() {
   };
 
   const loadNearbyUnvisited = async () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setNearbyStatus('unavailable');
+      return;
+    }
 
+    setNearbyStatus('loading');
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -227,11 +229,13 @@ export default function HomePage() {
           if (!response.ok) return;
           const data = await response.json();
           setNearbyUnvisited(Array.isArray(data.manholes) ? data.manholes : []);
+          setNearbyStatus('ready');
         } catch (error) {
           console.error('Failed to load nearby unvisited:', error);
+          setNearbyStatus('unavailable');
         }
       },
-      () => undefined,
+      () => setNearbyStatus('unavailable'),
       { maximumAge: 1000 * 60 * 10, timeout: 6000 }
     );
   };
@@ -248,98 +252,119 @@ export default function HomePage() {
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
-  const knownTotalManholes = totalManholes || FALLBACK_TOTAL_MANHOLES;
+  const knownTotalManholes = totalManholes > 0 ? totalManholes : null;
 
-  const visitsByManholeId = new Map<number, JourneyVisit[]>();
-  journeyVisits.forEach((visit) => {
-    const manholeId = visit.manhole?.id ?? visit.manhole_id;
-    if (!manholeId) return;
-    const current = visitsByManholeId.get(manholeId) || [];
-    current.push(visit);
-    visitsByManholeId.set(manholeId, current);
-  });
-
-  const visitedCount = visitsByManholeId.size;
-  const completionRate = knownTotalManholes > 0 ? (visitedCount / knownTotalManholes) * 100 : 0;
-  const journeyManholesById = new Map(journeyManholes.map((manhole) => [manhole.id, manhole]));
-
-  journeyVisits.forEach((visit) => {
-    const manhole = visit.manhole;
-    const manholeId = manhole?.id ?? visit.manhole_id;
-    if (!manholeId || journeyManholesById.has(manholeId) || !manhole) return;
-    journeyManholesById.set(manholeId, {
-      id: manholeId,
-      title: manhole.title || 'ポケふた',
-      prefecture: manhole.prefecture || '',
-      municipality: manhole.municipality || null,
-      location: '',
-      pokemons: manhole.pokemons || [],
-      name: manhole.title || 'ポケふた',
-      city: manhole.municipality || '',
-      prefecture_id: null,
-      prefecture_code: null,
-      address: '',
-      detail_url: null,
-      prefecture_site_url: null,
-      region: null,
-      is_active: true,
-      last_verified_at: '',
-      data_source: null,
-      created_at: '',
-      updated_at: '',
-    });
-  });
-
-  const allJourneyManholes = Array.from(journeyManholesById.values());
-  const unvisitedManholes = allJourneyManholes
-    .filter((manhole) => !visitsByManholeId.has(manhole.id))
-    .sort((a, b) => `${a.prefecture}${getMunicipality(a)}${a.id}`.localeCompare(`${b.prefecture}${getMunicipality(b)}${b.id}`, 'ja'));
-
-  const prefectureProgress: PrefectureProgress[] = Array.from(
-    allJourneyManholes.reduce((map, manhole) => {
-      const name = manhole.prefecture || '都道府県未設定';
-      const current = map.get(name) || { totalIds: new Set<number>(), visitedIds: new Set<number>() };
-      current.totalIds.add(manhole.id);
-      if (visitsByManholeId.has(manhole.id)) current.visitedIds.add(manhole.id);
-      map.set(name, current);
-      return map;
-    }, new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>())
-  )
-    .map(([name, value]) => {
-      const total = value.totalIds.size;
-      const visited = value.visitedIds.size;
-      return {
-        name,
-        total,
-        visited,
-        remaining: Math.max(total - visited, 0),
-        rate: total > 0 ? (visited / total) * 100 : 0,
-      };
-    })
-    .sort((a, b) => {
-      const aNearComplete = a.remaining > 0 ? a.remaining : 999;
-      const bNearComplete = b.remaining > 0 ? b.remaining : 999;
-      if (aNearComplete !== bNearComplete) return aNearComplete - bNearComplete;
-      if (b.visited !== a.visited) return b.visited - a.visited;
-      return a.name.localeCompare(b.name, 'ja');
+  const journeyData = useMemo(() => {
+    const visitsByManholeId = new Map<number, JourneyVisit[]>();
+    journeyVisits.forEach((visit) => {
+      const manholeId = visit.manhole?.id ?? visit.manhole_id;
+      if (!manholeId) return;
+      const current = visitsByManholeId.get(manholeId) || [];
+      current.push(visit);
+      visitsByManholeId.set(manholeId, current);
     });
 
-  const leadingPrefectures = prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3);
-  const nextPrefecture = prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0);
-  const completedPrefecture = prefectureProgress.find((prefecture) => prefecture.total > 0 && prefecture.remaining === 0);
-  const continuedManholes = allJourneyManholes
-    .filter((manhole) => visitsByManholeId.has(manhole.id))
-    .sort((a, b) => {
-      const aVisit = visitsByManholeId.get(a.id)?.[0];
-      const bVisit = visitsByManholeId.get(b.id)?.[0];
-      return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
+    const journeyManholesById = new Map(journeyManholes.map((manhole) => [manhole.id, manhole]));
+
+    journeyVisits.forEach((visit) => {
+      const manhole = visit.manhole;
+      const manholeId = manhole?.id ?? visit.manhole_id;
+      if (!manholeId || journeyManholesById.has(manholeId) || !manhole) return;
+      journeyManholesById.set(manholeId, {
+        id: manholeId,
+        title: manhole.title || 'ポケふた',
+        prefecture: manhole.prefecture || '',
+        municipality: manhole.municipality || null,
+        location: '',
+        pokemons: manhole.pokemons || [],
+        name: manhole.title || 'ポケふた',
+        city: manhole.municipality || '',
+        prefecture_id: null,
+        prefecture_code: null,
+        address: '',
+        detail_url: null,
+        prefecture_site_url: null,
+        region: null,
+        is_active: true,
+        last_verified_at: '',
+        data_source: null,
+        created_at: '',
+        updated_at: '',
+      });
     });
-  const collectionManholes =
-    journeyTab === 'nearby'
-      ? (nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 6))
-      : journeyTab === 'continue'
-        ? [...continuedManholes.slice(0, 6), ...unvisitedManholes.slice(0, Math.max(0, 6 - continuedManholes.length))]
-        : unvisitedManholes.slice(0, 6);
+
+    const allJourneyManholes = Array.from(journeyManholesById.values());
+    const unvisitedManholes = allJourneyManholes
+      .filter((manhole) => !visitsByManholeId.has(manhole.id))
+      .sort((a, b) => `${a.prefecture}${getMunicipality(a)}${a.id}`.localeCompare(`${b.prefecture}${getMunicipality(b)}${b.id}`, 'ja'));
+
+    const prefectureProgress: PrefectureProgress[] = Array.from(
+      allJourneyManholes.reduce((map, manhole) => {
+        const name = manhole.prefecture || '都道府県未設定';
+        const current = map.get(name) || { totalIds: new Set<number>(), visitedIds: new Set<number>() };
+        current.totalIds.add(manhole.id);
+        if (visitsByManholeId.has(manhole.id)) current.visitedIds.add(manhole.id);
+        map.set(name, current);
+        return map;
+      }, new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>())
+    )
+      .map(([name, value]) => {
+        const total = value.totalIds.size;
+        const visited = value.visitedIds.size;
+        return {
+          name,
+          total,
+          visited,
+          remaining: Math.max(total - visited, 0),
+          rate: total > 0 ? (visited / total) * 100 : 0,
+        };
+      })
+      .sort((a, b) => {
+        const aNearComplete = a.remaining > 0 ? a.remaining : 999;
+        const bNearComplete = b.remaining > 0 ? b.remaining : 999;
+        if (aNearComplete !== bNearComplete) return aNearComplete - bNearComplete;
+        if (b.visited !== a.visited) return b.visited - a.visited;
+        return a.name.localeCompare(b.name, 'ja');
+      });
+
+    const continuedManholes = allJourneyManholes
+      .filter((manhole) => visitsByManholeId.has(manhole.id))
+      .sort((a, b) => {
+        const aVisit = visitsByManholeId.get(a.id)?.[0];
+        const bVisit = visitsByManholeId.get(b.id)?.[0];
+        return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
+      });
+
+    const collectionManholes =
+      journeyTab === 'nearby'
+        ? (nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 6))
+        : journeyTab === 'continue'
+          ? [...continuedManholes.slice(0, 6), ...unvisitedManholes.slice(0, Math.max(0, 6 - continuedManholes.length))]
+          : unvisitedManholes.slice(0, 6);
+
+    return {
+      visitsByManholeId,
+      visitedCount: visitsByManholeId.size,
+      unvisitedManholes,
+      prefectureProgress,
+      leadingPrefectures: prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3),
+      nextPrefecture: prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0),
+      completedPrefecture: prefectureProgress.find((prefecture) => prefecture.total > 0 && prefecture.remaining === 0),
+      collectionManholes,
+    };
+  }, [journeyVisits, journeyManholes, nearbyUnvisited, journeyTab]);
+
+  const {
+    visitsByManholeId,
+    visitedCount,
+    unvisitedManholes,
+    prefectureProgress,
+    leadingPrefectures,
+    nextPrefecture,
+    completedPrefecture,
+    collectionManholes,
+  } = journeyData;
+  const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
@@ -423,16 +448,18 @@ export default function HomePage() {
                         <div className="mb-2 flex items-end justify-between gap-3">
                           <div>
                             <p className="font-pixel text-2xl text-[#4F3828]">
-                              {visitedCount} / {knownTotalManholes} STAMPS
+                              {visitedCount} / {knownTotalManholes ?? '集計中'} STAMPS
                             </p>
                             <p className="mt-1 text-xs font-bold text-[#6A4D36]">旅の進捗</p>
                           </div>
-                          <p className="font-pixel text-xl text-[#B5483C]">{completionRate.toFixed(1)}%</p>
+                          <p className="font-pixel text-xl text-[#B5483C]">
+                            {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
+                          </p>
                         </div>
                         <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
                           <div
                             className="h-full bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]"
-                            style={{ width: `${Math.min(completionRate, 100)}%` }}
+                            style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
                           />
                         </div>
                         <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -465,6 +492,16 @@ export default function HomePage() {
                           </Link>
                         ))}
                       </div>
+                      {nearbyStatus !== 'ready' && (
+                        <button
+                          type="button"
+                          onClick={loadNearbyUnvisited}
+                          disabled={nearbyStatus === 'loading'}
+                          className="mt-3 min-h-[40px] w-full rounded-[7px] border border-[#8C6A4A]/20 bg-white px-3 text-sm font-extrabold text-[#4F3828] transition hover:bg-[#F8D9C4] disabled:opacity-60"
+                        >
+                          {nearbyStatus === 'loading' ? '現在地を確認中...' : '近くの未訪問を表示'}
+                        </button>
+                      )}
                       {completedPrefecture ? (
                         <div className="mt-4 rounded-[7px] border border-[#3F9D7D]/25 bg-[#DFF1E9] px-3 py-2">
                           <p className="flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
@@ -794,7 +831,7 @@ function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress 
   );
 }
 
-function UnauthedStampOnboarding({ totalManholes }: { totalManholes: number }) {
+function UnauthedStampOnboarding({ totalManholes }: { totalManholes: number | null }) {
   const previewPrefectures = [
     { name: '愛知県', visited: 0, total: 7 },
     { name: '岐阜県', visited: 0, total: 5 },
@@ -818,7 +855,7 @@ function UnauthedStampOnboarding({ totalManholes }: { totalManholes: number }) {
         <div className="mt-5 rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
           <div className="mb-2 flex items-end justify-between gap-3">
             <div>
-              <p className="font-pixel text-2xl text-[#4F3828]">0 / {totalManholes} STAMPS</p>
+              <p className="font-pixel text-2xl text-[#4F3828]">0 / {totalManholes ?? '集計中'} STAMPS</p>
               <p className="mt-1 text-xs font-bold text-[#6A4D36]">あなたの旅はここから</p>
             </div>
             <p className="font-pixel text-xl text-[#B5483C]">0%</p>

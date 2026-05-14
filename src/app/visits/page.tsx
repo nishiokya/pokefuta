@@ -55,8 +55,6 @@ type PrefectureProgress = {
   rate: number;
 };
 
-const FALLBACK_TOTAL_MANHOLES = 470;
-
 const tabs: { id: PassportTab; label: string }[] = [
   { id: 'stamps', label: 'スタンプ帳' },
   { id: 'prefectures', label: '都道府県' },
@@ -76,11 +74,12 @@ const getMunicipality = (manhole: Manhole) => manhole.city || manhole.municipali
 export default function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
-  const [totalManholes, setTotalManholes] = useState(FALLBACK_TOTAL_MANHOLES);
+  const [totalManholes, setTotalManholes] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<PassportTab>('stamps');
   const [loading, setLoading] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { trackView } = useAnalytics();
 
@@ -149,7 +148,7 @@ export default function VisitsPage() {
           : [];
 
         setManholes(apiManholes);
-        setTotalManholes(data.total || apiManholes.length || FALLBACK_TOTAL_MANHOLES);
+        setTotalManholes(typeof data.total === 'number' ? data.total : apiManholes.length || null);
       }
     } catch (error) {
       console.error('Failed to load passport:', error);
@@ -182,7 +181,7 @@ export default function VisitsPage() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
-  const completionRate = totalManholes > 0 ? (visitedManholesCount / totalManholes) * 100 : 0;
+  const completionRate = totalManholes ? (visitedManholesCount / totalManholes) * 100 : null;
 
   const visitedMunicipalityCount = useMemo(() => {
     return new Set(
@@ -262,17 +261,18 @@ export default function VisitsPage() {
   const unvisitedManholes = passportManholes.filter((manhole) => !visitSummaryByManholeId.has(manhole.id));
   const recentMilestone = Math.floor(visitedManholesCount / 10) * 10;
 
-  const handleDeleteClick = (photoId: string) => {
+  const handleDeleteClick = (photoId: string, visitId: string) => {
     setSelectedPhotoId(photoId);
+    setSelectedVisitId(visitId);
     setDeleteModalOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedPhotoId) return;
+    if (!selectedPhotoId || !selectedVisitId) return;
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/photo/${selectedPhotoId}`, {
+      const response = await fetch(`/api/visits/${selectedVisitId}`, {
         method: 'DELETE',
       });
 
@@ -291,6 +291,7 @@ export default function VisitsPage() {
         setVisits(updatedVisits);
         setDeleteModalOpen(false);
         setSelectedPhotoId(null);
+        setSelectedVisitId(null);
         alert(data.visit_deleted ? '写真と訪問記録を削除しました' : '写真を削除しました');
       } else {
         console.error('Failed to delete photo:', data);
@@ -307,6 +308,7 @@ export default function VisitsPage() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSelectedPhotoId(null);
+    setSelectedVisitId(null);
   };
 
   const handleLikeToggle = async (visitId: string) => {
@@ -419,22 +421,24 @@ export default function VisitsPage() {
                 <div className="mb-2 flex items-end justify-between">
                   <div>
                     <p className="font-pixel text-2xl text-[#4F3828]">
-                      {visitedManholesCount} / {totalManholes}
+                      {visitedManholesCount} / {totalManholes ?? '集計中'}
                     </p>
                     <p className="font-pixelJp text-xs text-[#6A4D36]">訪問済みスタンプ</p>
                   </div>
-                  <p className="font-pixel text-xl text-[#B5483C]">{completionRate.toFixed(1)}%</p>
+                  <p className="font-pixel text-xl text-[#B5483C]">
+                    {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
+                  </p>
                 </div>
                 <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
                   <div
                     className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
-                    style={{ width: `${Math.min(completionRate, 100)}%` }}
+                    style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
                   />
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryStat label="達成率" value={`${completionRate.toFixed(1)}%`} />
+                <SummaryStat label="達成率" value={completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`} />
                 <SummaryStat label="訪問自治体" value={`${visitedMunicipalityCount}`} />
                 <SummaryStat label="写真つき" value={`${visits.filter((visit) => visit.photos.length > 0).length}`} />
                 <SummaryStat
@@ -708,7 +712,7 @@ function RecentVisitCard({
   onBookmarkToggle,
 }: {
   visit: Visit;
-  onDeleteClick: (photoId: string) => void;
+  onDeleteClick: (photoId: string, visitId: string) => void;
   onLikeToggle: (visitId: string) => void;
   onBookmarkToggle: (visitId: string) => void;
 }) {
@@ -748,7 +752,7 @@ function RecentVisitCard({
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  onDeleteClick(photo.id);
+                  onDeleteClick(photo.id, visit.id);
                 }}
                 className="absolute right-2 top-2 z-20 rounded-md bg-[#B5483C] p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
                 title="写真を削除"

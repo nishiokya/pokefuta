@@ -80,6 +80,7 @@ export default function ManholeDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoSocial>>(new Map());
@@ -279,17 +280,18 @@ export default function ManholeDetailPage() {
     }
   };
 
-  const handleDeleteClick = (photoId: string) => {
+  const handleDeleteClick = (photoId: string, visitId?: string) => {
     setSelectedPhotoId(photoId);
+    setSelectedVisitId(visitId || null);
     setDeleteModalOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedPhotoId) return;
+    if (!selectedPhotoId || !selectedVisitId) return;
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/photo/${selectedPhotoId}`, {
+      const response = await fetch(`/api/visits/${selectedVisitId}`, {
         method: 'DELETE',
       });
 
@@ -302,6 +304,7 @@ export default function ManholeDetailPage() {
         setPhotos(updatedPhotos);
         setDeleteModalOpen(false);
         setSelectedPhotoId(null);
+        setSelectedVisitId(null);
 
         // 成功メッセージ
         if (updatedPhotos.length === 0) {
@@ -325,6 +328,7 @@ export default function ManholeDetailPage() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSelectedPhotoId(null);
+    setSelectedVisitId(null);
   };
 
   const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {
@@ -611,7 +615,7 @@ export default function ManholeDetailPage() {
                             {/* Right: Delete Button (only for owner) */}
                             {isOwner && (
                               <button
-                                onClick={() => handleDeleteClick(photo.id)}
+                                onClick={() => handleDeleteClick(photo.id, photo.visit?.id)}
                                 className="bg-rpg-red/80 backdrop-blur-sm border border-white/30 p-1.5 hover:bg-rpg-red transition-colors"
                                 title="写真を削除"
                               >
