@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bookmark,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -37,12 +36,10 @@ type FeedVisit = {
   comments_count: number;
 };
 
-type GalleryTab = 'latest' | 'popular' | 'favorites';
+type GalleryTab = 'latest';
 
 const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobileLabel: string }> = [
   { key: 'latest', label: '最新', mobileLabel: '最新' },
-  { key: 'popular', label: '人気', mobileLabel: '人気' },
-  { key: 'favorites', label: 'お気に入り', mobileLabel: 'お気に入り' },
   { key: 'prefectures', label: '都道府県から探す', mobileLabel: '探す' },
 ];
 
@@ -125,18 +122,17 @@ export default function HomePage() {
     }
   };
 
-  const sortedFeed = [...feed].sort((a, b) => {
-    if (activeTab === 'popular') {
-      const aScore = a.likes_count * 3 + a.comments_count;
-      const bScore = b.likes_count * 3 + b.comments_count;
-      return bScore - aScore;
-    }
+  const sortedFeed = [...feed].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  const visibleFeed = activeTab === 'favorites' ? [] : sortedFeed;
+  const visibleFeed =
+    sortedFeed.length > 1 && sortedFeed.length % 2 === 1 ? sortedFeed.slice(0, -1) : sortedFeed;
   const listedCount = totalPosts && totalPosts > 0 ? totalPosts : 470;
+  const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
+  const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
+  const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
+  const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   return (
@@ -287,9 +283,7 @@ export default function HomePage() {
               {visibleFeed.length === 0 ? (
                 <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                   <p className="text-sm font-bold text-[#6B6B6B]">
-                    {activeTab === 'favorites'
-                      ? 'お気に入りに入れた写真はここに表示されます'
-                      : 'まだ投稿がありません'}
+                    まだ投稿がありません
                   </p>
                   <Link
                     href={uploadHref}
@@ -332,10 +326,6 @@ export default function HomePage() {
                             NEW
                           </span>
                         )}
-                        <span className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-[7px] bg-white/90 text-[#2A2A2A] shadow-sm">
-                          <Bookmark className="h-5 w-5" />
-                        </span>
-
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
@@ -366,7 +356,7 @@ export default function HomePage() {
                       return (
                         <div
                           key={visit.id}
-                          className="group relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15"
+                          className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15"
                           aria-label={commonAriaLabel}
                         >
                           {cardContent}
@@ -378,7 +368,7 @@ export default function HomePage() {
                       <Link
                         key={visit.id}
                         href={to}
-                        className="group relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
+                        className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
                         aria-label={commonAriaLabel}
                       >
                         {cardContent}
@@ -399,26 +389,30 @@ export default function HomePage() {
             </div>
 
             {/* Feed Pagination */}
-            {(currentPage > 1 || feed.length === feedPerPage) && (
-              <div className="mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm">
-                <div className="flex items-center justify-center gap-2">
+            {showPagination && (
+              <div className="mb-32 mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mb-0">
+                <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#7B63A8] shadow-sm transition hover:bg-[#FFB347]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex min-h-11 items-center gap-1 rounded-lg bg-white px-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#FFB347]/20 disabled:cursor-not-allowed disabled:opacity-50"
                     title="前のページ"
                   >
                     <ChevronLeft className="w-4 h-4" />
+                    前へ
                   </button>
 
-                  <div className="min-w-10 text-center text-sm font-bold text-[#6B6B6B]">{currentPage}</div>
+                  <div className="min-w-16 text-center text-sm font-bold text-[#6B6B6B]">
+                    {totalPages ? `${currentPage} / ${totalPages}` : currentPage}
+                  </div>
 
                   <button
                     onClick={() => setCurrentPage((prev) => prev + 1)}
-                    disabled={feed.length < feedPerPage}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#7B63A8] shadow-sm transition hover:bg-[#FFB347]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!canGoNext}
+                    className="flex min-h-11 items-center gap-1 rounded-lg bg-white px-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#FFB347]/20 disabled:cursor-not-allowed disabled:opacity-50"
                     title="次のページ"
                   >
+                    次へ
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
