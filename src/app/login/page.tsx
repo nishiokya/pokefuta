@@ -7,6 +7,7 @@ import BottomNav from '@/components/BottomNav';
 import { LogIn, Mail, Lock, AlertCircle, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
+import PassportPreview from '@/components/PassportPreview';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 function LoginForm() {
@@ -14,10 +15,12 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
   const fromRegister = searchParams.get('from') === 'register';
+  const isFromStampRally = redirectTo === '/visits';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showTerms, setShowTerms] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(!isFromStampRally);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,29 +105,37 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center p-4">
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F3E7CC] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* スタンプ帳専用オンボーディング */}
+        {isFromStampRally && !showLoginForm && (
+          <PassportPreview onLoginClick={() => setShowLoginForm(true)} />
+        )}
+
+        {/* 通常のログインフォーム */}
+        {showLoginForm && (
+          <>
         {/* Header */}
-        <div className="rpg-window text-center mb-6">
+        <div className="rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)] text-center mb-6">
           <div className="inline-block mb-3">
-            <div className="w-16 h-16 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center mx-auto">
-              <LogIn className="w-8 h-8 text-rpg-textDark" />
+            <div className="w-16 h-16 bg-[#F8D9C4] border-2 border-[#B5483C]/30 rounded-lg flex items-center justify-center mx-auto">
+              <LogIn className="w-8 h-8 text-[#B5483C]" />
             </div>
           </div>
-          <h1 className="font-pixelJp text-lg text-[#7B63A8] font-bold">ログイン</h1>
-          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
+          <h1 className="font-pixelJp text-xl font-bold text-[#4F3828]">ログイン</h1>
+          <p className="font-pixelJp text-sm text-[#6A4D36] mt-2">
             アカウント作成済みの方はこちら
           </p>
           {fromRegister && (
-            <div className="mt-3 pt-3 border-t border-[#7B63A8]/15">
-              <div className="bg-rpg-yellow/20 border-2 border-rpg-yellow p-2 rounded">
+            <div className="mt-4 pt-4 border-t border-[#8C6A4A]/15">
+              <div className="bg-[#DFF1E9] border-2 border-[#3F9D7D] p-3 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <Mail className="w-4 h-4 text-rpg-yellow flex-shrink-0 mt-0.5" />
+                  <Mail className="w-5 h-5 text-[#2C765E] flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-pixelJp text-xs font-bold text-rpg-textDark mb-1">
+                    <p className="font-pixelJp text-sm font-bold text-[#2C765E] mb-1">
                       登録完了！
                     </p>
-                    <p className="font-pixelJp text-[11px] text-rpg-textDark leading-relaxed">
+                    <p className="font-pixelJp text-xs text-[#2C765E] leading-relaxed">
                       登録したメールアドレスに確認メールが送信されました。メール内のリンクをクリックして確認を完了してください。
                     </p>
                   </div>
@@ -135,29 +146,29 @@ function LoginForm() {
         </div>
 
         {/* Login Form */}
-        <div className="rpg-window">
+        <div className="rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
           <form onSubmit={handleLogin} className="space-y-4">
             {/* Error Message */}
             {error && (
-              <div className="bg-rpg-red/20 border-2 border-rpg-red p-3">
-                <div className="flex items-center gap-2 text-rpg-red">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="font-pixelJp text-xs">{error}</span>
+              <div className="bg-[#F8D9C4] border-2 border-[#B5483C] p-3 rounded-lg">
+                <div className="flex items-center gap-2 text-[#B5483C]">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-pixelJp text-sm">{error}</span>
                 </div>
               </div>
             )}
 
             {/* Email Input */}
             <div>
-              <label className="flex items-center gap-2 font-pixelJp text-sm text-rpg-textDark mb-2">
-                <Mail className="w-4 h-4" />
+              <label className="flex items-center gap-2 font-pixelJp text-sm font-bold text-[#4F3828] mb-2">
+                <Mail className="w-4 h-4 text-[#6A4D36]" />
                 メールアドレス
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
+                className="w-full bg-white border border-[#8C6A4A]/25 rounded-md p-3 font-pixelJp text-sm text-[#4F3828] focus:border-[#B5483C] focus:ring-2 focus:ring-[#B5483C]/20 focus:outline-none transition-colors"
                 placeholder="your@email.com"
                 required
                 disabled={loading}
@@ -166,15 +177,15 @@ function LoginForm() {
 
             {/* Password Input */}
             <div>
-              <label className="flex items-center gap-2 font-pixelJp text-sm text-rpg-textDark mb-2">
-                <Lock className="w-4 h-4" />
+              <label className="flex items-center gap-2 font-pixelJp text-sm font-bold text-[#4F3828] mb-2">
+                <Lock className="w-4 h-4 text-[#6A4D36]" />
                 パスワード
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
+                className="w-full bg-white border border-[#8C6A4A]/25 rounded-md p-3 font-pixelJp text-sm text-[#4F3828] focus:border-[#B5483C] focus:ring-2 focus:ring-[#B5483C]/20 focus:outline-none transition-colors"
                 placeholder="••••••••"
                 required
                 disabled={loading}
@@ -184,12 +195,10 @@ function LoginForm() {
             {/* Login Button */}
             <button
               type="submit"
-              className="w-full rpg-button rpg-button-primary py-3"
+              className="w-full bg-[#B5483C] hover:bg-[#9B3D2F] active:bg-[#8B2D1F] text-white font-pixelJp font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
-              <span className="font-pixelJp">
-                {loading ? 'ログイン中...' : 'ログイン'}
-              </span>
+              {loading ? 'ログイン中...' : 'ログイン'}
             </button>
           </form>
 
@@ -198,7 +207,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowTerms(!showTerms)}
-              className="flex items-center gap-1 font-pixelJp text-xs text-rpg-blue hover:opacity-70 transition-opacity mx-auto"
+              className="flex items-center gap-1 font-pixelJp text-xs text-[#3F9D7D] hover:text-[#2C765E] transition-colors mx-auto"
             >
               <Info className="w-3 h-3" />
               <span>利用規約を確認</span>
@@ -210,21 +219,36 @@ function LoginForm() {
               <TermsOfService
                 isChecked={false}
                 onCheckChange={() => {}}
-                className="border-rpg-yellow"
+                className="border-[#8C6A4A]/25"
               />
             </div>
           )}
 
           {/* Sign Up Link */}
-          <div className="mt-6 pt-4 border-t border-[#7B63A8]/15 text-center">
-            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
+          <div className="mt-6 pt-4 border-t border-[#8C6A4A]/15 text-center">
+            <p className="font-pixelJp text-sm text-[#6A4D36] mb-3">
               アカウントをお持ちでない方
             </p>
-            <Link href="/signup" className="rpg-button text-xs">
-              <span className="font-pixelJp">新規登録</span>
+            <Link href="/signup" className="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-white border-2 border-[#8C6A4A]/25 hover:border-[#8C6A4A]/40 rounded-lg font-pixelJp text-sm font-bold text-[#4F3828] transition-colors">
+              新規登録
             </Link>
           </div>
         </div>
+          </>
+        )}
+
+        {/* スタンプ帳からのアクセス時、戻るリンク */}
+        {isFromStampRally && showLoginForm && (
+          <div className="text-center mt-4">
+            <button
+              onClick={() => setShowLoginForm(false)}
+              className="font-pixelJp text-sm text-[#3F9D7D] hover:text-[#2C765E] transition-colors flex items-center gap-1 mx-auto"
+            >
+              <span>←</span>
+              <span>プレビューに戻る</span>
+            </button>
+          </div>
+        )}
       </div>
 
         <BottomNav />
@@ -235,8 +259,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center">
-        <div className="font-pixelJp text-[#7B63A8]">
+      <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F3E7CC] flex items-center justify-center">
+        <div className="font-pixelJp text-[#4F3828] text-lg">
           読み込み中<span className="rpg-loading"></span>
         </div>
       </div>

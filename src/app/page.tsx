@@ -43,7 +43,7 @@ type FeedVisit = {
 };
 
 type GalleryTab = 'latest';
-type JourneyTab = 'unvisited' | 'nearby' | 'continue';
+type JourneyTab = 'unvisited' | 'nearby' | 'visited';
 
 type JourneyVisit = {
   id: string;
@@ -75,9 +75,9 @@ const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobil
 ];
 
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
+  { key: 'visited', label: '訪問済み' },
   { key: 'unvisited', label: '未訪問' },
   { key: 'nearby', label: '近く' },
-  { key: 'continue', label: '続き' },
 ];
 
 const getDisplayName = (session: any) => {
@@ -94,6 +94,7 @@ const getManholeTitle = (manhole?: Pick<Manhole, 'title' | 'municipality'> & { n
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [userName, setUserName] = useState('タコさん');
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
@@ -107,7 +108,7 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
-  const [journeyTab, setJourneyTab] = useState<JourneyTab>('unvisited');
+  const [journeyTab, setJourneyTab] = useState<JourneyTab>('visited');
   const [menuOpen, setMenuOpen] = useState(false);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
@@ -120,24 +121,51 @@ export default function HomePage() {
     trackView('/', 'ホーム', 'home');
 
     // ログイン状態はSupabase sessionで判定（APIは常に公開フィードを使う）
-    (async () => {
+    const supabase = createBrowserClient();
+    let cancelled = false;
+
+    const loadSession = async () => {
       try {
-        const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
+        if (cancelled) return;
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
+        setAuthChecked(true);
         if (loggedIn) {
           setUserName(getDisplayName(session));
-          loadJourney();
+          await loadJourney();
         }
       } catch {
+        if (cancelled) return;
         setIsLoggedIn(false);
+        setAuthChecked(true);
       }
-    })();
+    };
+
+    // 初回読み込み（認証状態を確認してからloadingをfalseにする）
+    loadSession();
+
+    // 認証状態の変更を監視
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      const loggedIn = Boolean(session?.user);
+      setIsLoggedIn(loggedIn);
+      if (loggedIn) {
+        setUserName(getDisplayName(session));
+        loadJourney();
+      }
+    });
 
     loadSiteStats();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -336,10 +364,10 @@ export default function HomePage() {
       });
 
     const collectionManholes =
-      journeyTab === 'nearby'
-        ? (nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 6))
-        : journeyTab === 'continue'
-          ? [...continuedManholes.slice(0, 6), ...unvisitedManholes.slice(0, Math.max(0, 6 - continuedManholes.length))]
+      journeyTab === 'visited'
+        ? continuedManholes.slice(0, 6)
+        : journeyTab === 'nearby'
+          ? (nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 6))
           : unvisitedManholes.slice(0, 6);
 
     return {
@@ -418,7 +446,7 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Loading State */}
-        {loading && (
+        {(loading || !authChecked) && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="font-bold text-[#7B63A8]">
@@ -428,7 +456,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {!loading && (
+        {!loading && authChecked && (
           <>
             {isLoggedIn ? (
               <>
@@ -520,8 +548,6 @@ export default function HomePage() {
                     </div>
                   </div>
                 </section>
-
-                <UnauthedStampOnboarding totalManholes={knownTotalManholes} />
 
                 <section className="mt-6">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
@@ -621,6 +647,8 @@ export default function HomePage() {
                     </div>
                   </div>
                 </section>
+
+                <UnauthedStampOnboarding totalManholes={knownTotalManholes} />
 
                 <section className="mt-6">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">

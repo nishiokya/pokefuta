@@ -17,29 +17,47 @@ function isActivePath(pathname: string, href: string) {
 export default function BottomNav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // 認証が必要なページにいる場合、初期状態をtrueにする（middlewareで保護されているため）
+  const protectedPaths = ['/upload', '/visits'];
+  const isProtectedPage = protectedPaths.some(path => pathname.startsWith(path));
+  const [isLoggedIn, setIsLoggedIn] = useState(isProtectedPage);
+  const [authLoading, setAuthLoading] = useState(true);
   const { trackNavClick } = useAnalytics();
 
   useEffect(() => {
     let cancelled = false;
+    const supabase = createBrowserClient();
 
     const loadSession = async () => {
       try {
-        const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
         if (cancelled) return;
         setIsLoggedIn(Boolean(session?.user));
+        setAuthLoading(false);
       } catch {
         if (cancelled) return;
         setIsLoggedIn(false);
+        setAuthLoading(false);
       }
     };
 
+    // 初回読み込み
     loadSession();
+
+    // 認証状態の変更を監視
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      setIsLoggedIn(Boolean(session?.user));
+    });
+
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
