@@ -114,15 +114,21 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
     }
   };
 
-  if (!open) return null;
+  // 明示的に false の場合は何もレンダリングしない
+  if (open !== true) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      {/* Backdrop - z-50でページ全体を覆う */}
+      <div
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+        role="button"
+        aria-label="メニューを閉じる"
+      />
 
-      {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 w-72 z-[60] animate-slide-in">
+      {/* Drawer - バックドロップの上に表示 */}
+      <div className="fixed inset-y-0 right-0 w-72 z-[51] animate-slide-in">
         <div className="rpg-window m-2 h-[calc(100vh-1rem)] overflow-auto safe-area-inset">
           <div className="flex items-center justify-between mb-2">
             <h3 className="rpg-window-title text-sm">MENU</h3>

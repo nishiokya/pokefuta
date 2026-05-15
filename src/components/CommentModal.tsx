@@ -120,7 +120,8 @@ export default function CommentModal({
     }
   };
 
-  if (!isOpen) return null;
+  // 明示的に true の場合のみレンダリング
+  if (isOpen !== true) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -128,6 +129,8 @@ export default function CommentModal({
       <div
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
+        role="button"
+        aria-label="モーダルを閉じる"
       />
 
       {/* Modal */}

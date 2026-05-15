@@ -17,7 +17,8 @@ export default function DeletePhotoModal({
   onCancel,
   isDeleting = false
 }: DeletePhotoModalProps) {
-  if (!isOpen) return null;
+  // 明示的に true の場合のみレンダリング
+  if (isOpen !== true) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-area-inset">
@@ -25,6 +26,8 @@ export default function DeletePhotoModal({
       <div
         className="absolute inset-0 bg-black bg-opacity-70"
         onClick={onCancel}
+        role="button"
+        aria-label="モーダルを閉じる"
       ></div>
 
       {/* Modal */}
