@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
-import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -108,7 +107,6 @@ export default function HomePage() {
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
   const [journeyTab, setJourneyTab] = useState<JourneyTab>('unvisited');
-  const [menuOpen, setMenuOpen] = useState(false);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
@@ -368,7 +366,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <header className="sticky top-0 z-30 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-bold" aria-label="ポケふた写真館">
             <span className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
@@ -403,15 +401,6 @@ export default function HomePage() {
               <Camera className="h-4 w-4" />
               写真を投稿
             </Link>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:hidden"
-              aria-label="メニュー"
-              title="メニュー"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
           </div>
         </div>
       </header>
@@ -810,7 +799,6 @@ export default function HomePage() {
       </Link>
 
       <BottomNav />
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
     </div>
   );
 }

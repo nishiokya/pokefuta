@@ -119,16 +119,16 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
 
   return (
     <>
-      {/* Backdrop - z-50でページ全体を覆う */}
+      {/* Backdrop - z-60でページ全体を覆う（Header z-50より上） */}
       <div
-        className="fixed inset-0 bg-black/50 z-50"
+        className="fixed inset-0 bg-black/50 z-60"
         onClick={onClose}
         role="button"
         aria-label="メニューを閉じる"
       />
 
       {/* Drawer - バックドロップの上に表示 */}
-      <div className="fixed inset-y-0 right-0 w-72 z-[51] animate-slide-in">
+      <div className="fixed inset-y-0 right-0 w-72 z-[61] animate-slide-in">
         <div className="rpg-window m-2 h-[calc(100vh-1rem)] overflow-auto safe-area-inset">
           <div className="flex items-center justify-between mb-2">
             <h3 className="rpg-window-title text-sm">MENU</h3>
