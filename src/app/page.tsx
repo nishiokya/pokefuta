@@ -11,7 +11,6 @@ import {
   CircleDot,
   Compass,
   Heart,
-  Lock,
   MapPin,
   Menu,
   MessageCircle,
@@ -510,8 +509,6 @@ export default function HomePage() {
                   </div>
                 </section>
 
-                <UnauthedStampOnboarding totalManholes={knownTotalManholes} />
-
                 <section className="mt-6">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
                     <div className="flex min-w-max gap-2 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5]/90 p-1 shadow-sm sm:min-w-0">
@@ -814,133 +811,6 @@ function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress 
       </div>
       <div className="h-2 overflow-hidden rounded-sm bg-[#E4D4B8]">
         <div className="h-full bg-[#3F9D7D]" style={{ width: `${Math.min(prefecture.rate, 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function UnauthedStampOnboarding({ totalManholes }: { totalManholes: number | null }) {
-  const previewPrefectures = [
-    { name: '愛知県', visited: 0, total: 7 },
-    { name: '岐阜県', visited: 0, total: 5 },
-    { name: '三重県', visited: 0, total: 4 },
-  ];
-
-  return (
-    <section className="mt-6 grid gap-4 rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] p-4 shadow-[0_8px_22px_rgba(95,68,42,0.10)] lg:grid-cols-[0.9fr_1.1fr]">
-      <div>
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-extrabold text-[#B5483C]">
-          <Lock className="h-3.5 w-3.5" />
-          登録すると使える
-        </div>
-        <h2 className="text-2xl font-extrabold leading-tight text-[#4F3828] sm:text-3xl">
-          自分だけのスタンプ帳を作ろう
-        </h2>
-        <p className="mt-3 text-sm font-semibold leading-6 text-[#6A4D36]">
-          訪問したポケふたがマンホール写真として埋まり、未訪問は次のスタンプ候補として残ります。
-        </p>
-
-        <div className="mt-5 rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
-          <div className="mb-2 flex items-end justify-between gap-3">
-            <div>
-              <p className="font-pixel text-2xl text-[#4F3828]">0 / {totalManholes ?? '集計中'} STAMPS</p>
-              <p className="mt-1 text-xs font-bold text-[#6A4D36]">あなたの旅はここから</p>
-            </div>
-            <p className="font-pixel text-xl text-[#B5483C]">0%</p>
-          </div>
-          <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
-            <div className="h-full w-[6%] bg-[#D5C8B3]" />
-          </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            {previewPrefectures.map((prefecture) => (
-              <div key={prefecture.name} className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
-                  <p className="font-pixel text-sm text-[#B5483C]">{prefecture.visited}/{prefecture.total}</p>
-                </div>
-                <div className="h-2 overflow-hidden rounded-sm bg-[#E4D4B8]">
-                  <div className="h-full w-[8%] bg-[#D5C8B3]" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <Link
-            href="/signup"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-[7px] bg-[#B5483C] px-5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#9F3D33]"
-          >
-            無料でスタンプ帳を始める
-          </Link>
-          <Link
-            href="/login?redirect=/visits"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-[7px] border border-[#8C6A4A]/20 bg-white px-5 text-sm font-extrabold text-[#4F3828] transition hover:bg-[#F8D9C4]"
-          >
-            ログインして続きへ
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-        <UnauthedStampPreviewCard visited municipality="刈谷市" prefecture="愛知県" date="2026/春" />
-        <UnauthedStampPreviewCard visited municipality="名古屋市" prefecture="愛知県" date="2026/夏" />
-        <UnauthedStampPreviewCard municipality="岡崎市" prefecture="愛知県" />
-        <UnauthedStampPreviewCard municipality="豊田市" prefecture="愛知県" />
-      </div>
-    </section>
-  );
-}
-
-function UnauthedStampPreviewCard({
-  visited = false,
-  municipality,
-  prefecture,
-  date,
-}: {
-  visited?: boolean;
-  municipality: string;
-  prefecture: string;
-  date?: string;
-}) {
-  return (
-    <div
-      className={`relative flex aspect-[4/5] flex-col justify-between rounded-[8px] border-2 p-3 ${
-        visited
-          ? 'border-[#B5483C]/40 bg-[#FFF7E5] shadow-sm'
-          : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]'
-      }`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${
-            visited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
-          }`}
-        >
-          {visited ? '見本' : '未訪問'}
-        </span>
-        {!visited && <Lock className="h-4 w-4 text-[#8C6A4A]" />}
-      </div>
-
-      <div className="flex flex-1 items-center justify-center">
-        {visited ? (
-          <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#D94D3F] bg-[radial-gradient(circle,#5EA7C7_0_18%,#F4D36F_19%_33%,#2D2D2D_34%_38%,#8ED1C6_39%_58%,#2D2D2D_59%_64%,#E9DEC9_65%)]">
-            <CircleDot className="h-8 w-8 text-white/90" />
-          </div>
-        ) : (
-          <div className="flex h-20 w-20 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-[#A39580]">
-            <div className="text-center">
-              <Stamp className="mx-auto h-6 w-6" />
-              <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <p className="line-clamp-1 text-sm font-extrabold text-[#4F3828]">{municipality}</p>
-        <p className="mt-1 text-xs font-bold text-[#6A4D36]">{prefecture}</p>
-        <p className="mt-2 font-pixel text-xs text-[#B5483C]">{visited ? date : '登録で解放'}</p>
       </div>
     </div>
   );
