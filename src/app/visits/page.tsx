@@ -12,6 +12,7 @@ import {
   MapPin,
   Navigation,
   PlusCircle,
+  Sparkles,
   Stamp,
   Trash2,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface Visit {
@@ -80,13 +82,58 @@ export default function VisitsPage() {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { trackView } = useAnalytics();
 
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
     trackView('/visits', 'ポケふた訪問パスポート', 'visits');
-    loadPassport();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const supabase = createBrowserClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const loggedIn = Boolean(session?.user);
+      setIsLoggedIn(loggedIn);
+
+      if (loggedIn) {
+        loadPassport();
+      } else {
+        // Load only basic manhole data for preview
+        loadManholesOnly();
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+      setIsLoggedIn(false);
+      loadManholesOnly();
+    }
+  };
+
+  const loadManholesOnly = async () => {
+    try {
+      const response = await fetch('/api/manholes?limit=1000');
+      if (response.ok) {
+        const data = await response.json();
+        const apiManholes: Manhole[] = Array.isArray(data.manholes)
+          ? data.manholes.map((manhole: any) => ({
+              ...manhole,
+              name: manhole.name || manhole.title,
+              city: manhole.city || manhole.municipality,
+            }))
+          : [];
+        setManholes(apiManholes);
+        setTotalManholes(typeof data.total === 'number' ? data.total : apiManholes.length || null);
+      }
+    } catch (error) {
+      console.error('Failed to load manholes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadPassport = async () => {
     try {
@@ -392,6 +439,163 @@ export default function VisitsPage() {
             パスポート準備中<span className="rpg-loading"></span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Unauthenticated preview mode
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
+        <div className="max-w-3xl mx-auto p-4 space-y-4">
+          {/* Preview Header */}
+          <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+            <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+            <div className="relative text-center">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1.5 text-xs font-bold text-[#7B63A8]">
+                <Sparkles className="h-3.5 w-3.5" />
+                スタンプ帳機能のプレビュー
+              </div>
+              <h1 className="font-pixelJp text-2xl font-bold text-[#4F3828]">
+                ポケふた訪問パスポート
+              </h1>
+              <p className="mt-3 text-sm font-medium text-[#6A4D36]">
+                ログインすると、全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
+              </p>
+
+              {/* Sample Progress Bar */}
+              <div className="mt-6 max-w-md mx-auto">
+                <div className="mb-2 flex items-end justify-between">
+                  <div>
+                    <p className="font-pixel text-xl text-[#4F3828]">0 / {totalManholes ?? '470'}</p>
+                    <p className="font-pixelJp text-xs text-[#6A4D36]">訪問済みスタンプ</p>
+                  </div>
+                  <p className="font-pixel text-lg text-[#B5483C]">0.0%</p>
+                </div>
+                <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
+                  <div className="h-full w-0 rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]" />
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                >
+                  <Stamp className="h-4 w-4" />
+                  無料でスタンプ帳をはじめる
+                </Link>
+                <Link
+                  href="/login?redirect=/visits"
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
+                >
+                  ログイン
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* Feature Showcase */}
+          <section className="space-y-3">
+            <h2 className="font-pixelJp text-lg font-bold text-[#4F3828]">スタンプ帳でできること</h2>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
+                  <Stamp className="h-5 w-5 text-[#7B63A8]" />
+                </div>
+                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">訪問記録を保存</h3>
+                <p className="mt-1 text-xs text-[#6A4D36]">
+                  見つけたポケふたを記録して、あなただけのコレクションを作れます
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
+                  <Camera className="h-5 w-5 text-[#7B63A8]" />
+                </div>
+                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">写真を投稿</h3>
+                <p className="mt-1 text-xs text-[#6A4D36]">
+                  撮影した写真をアップロードして、旅の思い出を残せます
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
+                  <MapPin className="h-5 w-5 text-[#7B63A8]" />
+                </div>
+                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">都道府県別の進捗</h3>
+                <p className="mt-1 text-xs text-[#6A4D36]">
+                  47都道府県の制覇状況を確認できます
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
+                  <CheckCircle2 className="h-5 w-5 text-[#7B63A8]" />
+                </div>
+                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">全国制覇を目指す</h3>
+                <p className="mt-1 text-xs text-[#6A4D36]">
+                  達成率を見ながら、全国のポケふたを巡る旅を楽しめます
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Sample Preview Images */}
+          <section className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
+            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">全国{totalManholes || '470'}箇所以上のコレクション</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {manholes.slice(0, 6).map((manhole) => (
+                <Link
+                  key={manhole.id}
+                  href={`/manhole/${manhole.id}`}
+                  className="group relative aspect-square overflow-hidden rounded-lg border-2 border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9] p-2 transition hover:border-[#7B63A8]"
+                >
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <Stamp className="h-6 w-6 text-[#B8AB96]" />
+                    <p className="mt-1 line-clamp-2 text-[10px] font-bold text-[#6A4D36]">
+                      {getMunicipality(manhole)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-xs text-[#6A4D36]">
+              ログインして、あなたの旅を記録しましょう
+            </p>
+          </section>
+
+          {/* Bottom CTA */}
+          <section className="rounded-lg border border-[#FFB347]/30 bg-gradient-to-br from-[#FFF8EB] to-[#FFEDD5] p-6 text-center">
+            <Sparkles className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]" />
+            <h3 className="font-pixelJp text-xl font-bold text-[#4F3828]">
+              旅の記録を保存しませんか？
+            </h3>
+            <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
+              ログインすると、訪問済みや行きたい場所を記録できます。<br />
+              全国制覇率や都道府県別の進捗も見られます。
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+              >
+                <Camera className="h-4 w-4" />
+                無料で新規登録
+              </Link>
+              <Link
+                href="/login?redirect=/visits"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
+              >
+                ログイン
+              </Link>
+            </div>
+          </section>
+        </div>
+
+        <BottomNav />
       </div>
     );
   }

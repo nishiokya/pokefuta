@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { CircleDot, Home, Menu, Search } from 'lucide-react';
+import { CircleDot, Home, Menu, Search, TrendingUp } from 'lucide-react';
 import MobileMenuDrawer from '@/components/MobileMenuDrawer';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -52,8 +52,8 @@ export default function BottomNav() {
         ]
       : [
           { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+          { href: '/popular', label: '人気', icon: <TrendingUp className="w-6 h-6 mb-1" /> },
           { href: '/login?redirect=/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
-          { href: '/', label: 'マイ旅', icon: <Home className="w-6 h-6 mb-1" /> },
         ],
     [isLoggedIn]
   );
