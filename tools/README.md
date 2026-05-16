@@ -2,6 +2,12 @@
 
 ## 📁 ファイル一覧
 
+### `capture/`
+
+ローカルで実行中のアプリの画面キャプチャを自動取得するツール。Claudeがデザインを把握して改善提案を行いやすくするために使用します。
+
+詳細は [capture/README.md](./capture/README.md) を参照してください。
+
 ### `generate_manhole_sql.py`
 
 最新のポケふたデータをGitHubから取得し、PostgreSQL INSERT文を生成するPythonスクリプト。
