@@ -44,6 +44,7 @@ export default function NearbyPage() {
   const [allManholes, setAllManholes] = useState<ManholeWithDistance[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allLoading, setAllLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
@@ -71,16 +72,19 @@ export default function NearbyPage() {
 
   const loadAllManholes = async () => {
     try {
+      setAllLoading(true);
       const manholesResponse = await fetch('/api/manholes?limit=1000');
       if (!manholesResponse.ok) {
         console.error('Failed to load all manholes');
+        setAllLoading(false);
         return;
       }
 
       const manholesData = await manholesResponse.json();
       const manholes = manholesData.manholes || [];
 
-      const visitsResponse = await fetch('/api/visits');
+      // Fetch all visits with a high limit to ensure we get all visits
+      const visitsResponse = await fetch('/api/visits?limit=10000');
       const visitsByManholeId = new Map<number, any>();
 
       if (visitsResponse.ok) {
@@ -99,13 +103,15 @@ export default function NearbyPage() {
 
       const manholesWithVisits = manholes.map((manhole: any) => ({
         ...manhole,
-        distance: 0,
+        distance: undefined, // Don't show distance for "all" tab
         visit: visitsByManholeId.get(manhole.id)
       }));
 
       setAllManholes(manholesWithVisits);
     } catch (error) {
       console.error('Failed to load all manholes:', error);
+    } finally {
+      setAllLoading(false);
     }
   };
 
@@ -357,16 +363,6 @@ export default function NearbyPage() {
           </section>
         )}
 
-        {loading && (
-          <div className="flex items-center justify-center py-10">
-            <div className="text-center">
-              <div className="font-bold text-[#7B63A8]">
-                検索中<span className="rpg-loading"></span>
-              </div>
-            </div>
-          </div>
-        )}
-
         <section className="mt-5">
           <div className="-mx-4 overflow-x-auto px-4 pb-1">
             <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
@@ -391,7 +387,17 @@ export default function NearbyPage() {
           </div>
         </section>
 
-        {!loading && (
+        {((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
+          <div className="flex items-center justify-center py-10">
+            <div className="text-center">
+              <div className="font-bold text-[#7B63A8]">
+                {activeTab === 'all' ? '全ポケふたを読み込み中' : '検索中'}<span className="rpg-loading"></span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-5">
             {(() => {
               const displayManholes =
@@ -450,12 +456,14 @@ export default function NearbyPage() {
                             ポケふた #{manhole.id}
                           </div>
                         </div>
-                        <div className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-right shadow-sm ring-1 ring-[#7B63A8]/15">
-                          <div className="text-base font-extrabold leading-none text-[#7B63A8]">
-                            {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
+                        {activeTab !== 'all' && (
+                          <div className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-right shadow-sm ring-1 ring-[#7B63A8]/15">
+                            <div className="text-base font-extrabold leading-none text-[#7B63A8]">
+                              {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
+                            </div>
+                            <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
                           </div>
-                          <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
-                        </div>
+                        )}
                       </div>
 
                       {manhole.visit && (
