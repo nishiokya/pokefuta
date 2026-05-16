@@ -19,8 +19,9 @@ export async function middleware(req: NextRequest) {
     } = await supabase.auth.getSession();
 
     // 認証が必要なページへのアクセス
-    // upload, visits ページは認証必須
-    const protectedPaths = ['/upload', '/visits'];
+    // upload ページは認証必須
+    // visits ページはプレビューモードがあるため未認証でもアクセス可能
+    const protectedPaths = ['/upload'];
     const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname.startsWith(path));
 
     if (!session && isProtectedPath) {
@@ -37,5 +38,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/upload/:path*', '/visits/:path*', '/api/:path*'],
+  matcher: ['/upload/:path*', '/api/:path*'],
 };

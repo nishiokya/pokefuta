@@ -730,7 +730,7 @@ export default function ManholeDetailPage() {
                   </button>
                 </div>
               ) : (
-                // Unvisited: Directions + Record visit + Share
+                // Unvisited: Directions + Record visit/Login CTA + Share
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={openInMaps}
@@ -739,13 +739,23 @@ export default function ManholeDetailPage() {
                     <Navigation className="w-4 h-4" />
                     <span className="font-pixelJp text-xs">経路案内</span>
                   </button>
-                  <button
-                    onClick={() => router.push(currentUserId ? '/upload' : '/login?redirect=/upload')}
-                    className="rpg-button rpg-button-primary flex items-center justify-center gap-1 px-2"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">訪問記録</span>
-                  </button>
+                  {currentUserId ? (
+                    <button
+                      onClick={() => router.push('/upload')}
+                      className="rpg-button rpg-button-primary flex items-center justify-center gap-1 px-2"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span className="font-pixelJp text-xs">訪問記録</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/login?redirect=/upload')}
+                      className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#7B63A8] hover:bg-[#7B63A8]/5"
+                    >
+                      <Camera className="w-4 h-4 text-[#7B63A8]" />
+                      <span className="font-pixelJp text-xs text-[#7B63A8]">ログインして記録</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleShare}
                     className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#8C6A4A]/25 hover:bg-[#8C6A4A]/10"
