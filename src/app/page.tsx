@@ -790,15 +790,15 @@ export default function HomePage() {
         )}
       </main>
 
-      <Link
-        href={uploadHref}
-        className={`fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-4 z-40 inline-flex items-center gap-2 rounded-full px-5 py-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition sm:bottom-6 sm:right-6 ${
-          isLoggedIn ? 'bg-[#B5483C] hover:bg-[#9F3D33]' : 'bg-[#7B63A8] hover:bg-[#6A5299]'
-        }`}
-      >
-        <Camera className="h-5 w-5" />
-        {isLoggedIn ? '訪問を記録' : '写真を投稿'}
-      </Link>
+      {isLoggedIn && (
+        <Link
+          href={uploadHref}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#B5483C] px-5 py-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#9F3D33] sm:bottom-6 sm:right-6"
+        >
+          <Camera className="h-5 w-5" />
+          訪問を記録
+        </Link>
+      )}
 
       <BottomNav />
     </div>
