@@ -119,26 +119,21 @@ export default function HomePage() {
     // ログイン状態はSupabase sessionで判定（APIは常に公開フィードを使う）
     (async () => {
       try {
-        console.log('[HomePage] Checking session...');
         const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
-        console.log('[HomePage] Session check complete:', { loggedIn, user: session?.user?.email });
         setIsLoggedIn(loggedIn);
         if (loggedIn) {
           setUserName(getDisplayName(session));
           // ログイン済みユーザーの場合、loadingをfalseに設定
-          console.log('[HomePage] Setting loading=false for logged-in user');
           setLoading(false);
           loadJourney();
-        } else {
-          console.log('[HomePage] User not logged in, loadFeed will set loading=false');
         }
         // 未ログインユーザーの場合はloadFeed()でloadingがfalseになる
       } catch (error) {
-        console.error('[HomePage] Session check error:', error);
+        console.error('Session check error:', error);
         setIsLoggedIn(false);
         // エラー時もloadingをfalseに
         setLoading(false);
@@ -149,16 +144,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    console.log('[HomePage] Current state:', { loading, isLoggedIn, currentPage });
-  }, [loading, isLoggedIn]);
-
-  useEffect(() => {
     loadFeed();
   }, [currentPage]);
 
   const loadFeed = async () => {
     try {
-      console.log('[HomePage] loadFeed: Starting...');
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
         `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at`,
@@ -170,12 +160,10 @@ export default function HomePage() {
 
       const visits: FeedVisit[] = Array.isArray(data.visits) ? data.visits : [];
       setFeed(visits);
-      console.log('[HomePage] loadFeed: Success, loaded', visits.length, 'visits');
     } catch (error) {
-      console.error('[HomePage] loadFeed: Error:', error);
+      console.error('Failed to load feed:', error);
       setFeed([]);
     } finally {
-      console.log('[HomePage] loadFeed: Setting loading=false');
       setLoading(false);
     }
   };
@@ -200,7 +188,6 @@ export default function HomePage() {
 
   const loadJourney = async () => {
     try {
-      console.log('[HomePage] loadJourney: Starting...');
       const [visitsResponse, manholesResponse] = await Promise.all([
         fetch('/api/visits?limit=1000'),
         fetch('/api/manholes?limit=1000'),
@@ -209,7 +196,6 @@ export default function HomePage() {
       if (visitsResponse.ok) {
         const data = await visitsResponse.json();
         setJourneyVisits(Array.isArray(data.visits) ? data.visits : []);
-        console.log('[HomePage] loadJourney: Loaded', data.visits?.length || 0, 'visits');
       }
 
       if (manholesResponse.ok) {
@@ -223,11 +209,9 @@ export default function HomePage() {
           : [];
         setJourneyManholes(manholes);
         if (typeof data.total === 'number') setTotalManholes(data.total);
-        console.log('[HomePage] loadJourney: Loaded', manholes.length, 'manholes');
       }
-      console.log('[HomePage] loadJourney: Complete');
     } catch (error) {
-      console.error('[HomePage] loadJourney: Error:', error);
+      console.error('Failed to load journey:', error);
     }
   };
 
