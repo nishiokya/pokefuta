@@ -4,10 +4,6 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
-  List,
-  Navigation,
-  Camera,
-  History,
   Info,
   LogOut,
   User as UserIcon,
@@ -78,25 +74,6 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
     icon: React.ReactNode;
   }> = [
     { href: '/', label: 'ホーム', description: '最近の投稿や入口', icon: <Home className="w-5 h-5" /> },
-    {
-      href: '/manholes',
-      label: 'マンホール一覧',
-      description: 'ポケふたを検索/一覧で見る',
-      icon: <List className="w-5 h-5" />,
-    },
-    {
-      href: '/nearby',
-      label: '近くの未訪問',
-      description: '今いる場所の近くを探す',
-      icon: <Navigation className="w-5 h-5" />,
-    },
-    {
-      href: user ? '/upload' : '/login?redirect=/upload',
-      label: '写真を登録',
-      description: user ? '訪問写真を追加する' : 'ログインして訪問写真を追加する',
-      icon: <Camera className="w-5 h-5" />,
-    },
-    { href: '/visits', label: '訪問履歴', description: '自分の訪問記録を見る', icon: <History className="w-5 h-5" /> },
     { href: '/about', label: 'このアプリについて', description: '使い方/注意事項', icon: <Info className="w-5 h-5" /> },
   ];
 
