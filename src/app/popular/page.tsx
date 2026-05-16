@@ -103,9 +103,6 @@ export default function PopularPage() {
   const sortedFeed = [...feed].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
-
-  const visibleFeed =
-    sortedFeed.length > 1 && sortedFeed.length % 2 === 1 ? sortedFeed.slice(0, -1) : sortedFeed;
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -209,13 +206,13 @@ export default function PopularPage() {
                 )}
               </div>
 
-              {visibleFeed.length === 0 ? (
+              {sortedFeed.length === 0 ? (
                 <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                   <p className="text-sm font-bold text-[#6B6B6B]">まだ投稿がありません</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
-                  {visibleFeed.map((visit, index) => {
+                  {sortedFeed.map((visit, index) => {
                     const photo = visit.photos?.[0];
                     const title = [visit.manhole?.prefecture, visit.manhole?.municipality]
                       .filter(Boolean)
@@ -324,7 +321,7 @@ export default function PopularPage() {
             )}
 
             {/* Login CTA - shown after scrolling through some photos */}
-            {!isLoggedIn && visibleFeed.length > 0 && (
+            {!isLoggedIn && sortedFeed.length > 0 && (
               <section className="mt-8 rounded-[8px] border border-[#FFB347]/30 bg-gradient-to-br from-[#FFF8EB] to-[#FFEDD5] px-6 py-8 text-center shadow-sm">
                 <Sparkles className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]" />
                 <h3 className="text-xl font-extrabold">この旅を自分のスタンプ帳に保存しませんか？</h3>
