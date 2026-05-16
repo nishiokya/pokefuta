@@ -785,59 +785,93 @@ export default function ManholeDetailPage() {
                 旅の写真 ({othersPhotos.length}枚)
               </h2>
               <div className="grid grid-cols-2 gap-3">
-                {othersPhotos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    className="bg-[#F6EEDC] border border-[#7B63A8]/15 rounded-lg overflow-hidden"
-                  >
-                    {/* Photo Image */}
-                    <div className="relative aspect-square bg-[#F6EEDC] overflow-hidden">
-                      <img
-                        src={`/api/photo/${photo.id}?size=small`}
-                        alt="ポケふた写真"
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent && !parent.querySelector('.error-placeholder')) {
-                            const errorDiv = document.createElement('div');
-                            errorDiv.className = 'error-placeholder absolute inset-0 bg-[#F6EEDC] flex flex-col items-center justify-center border border-[#7B63A8]/15';
-                            errorDiv.innerHTML = `
-                              <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                              </svg>
-                              <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
-                            `;
-                            parent.appendChild(errorDiv);
-                          }
-                        }}
-                      />
+                {othersPhotos.map((photo) => {
+                  const reactions = photoReactions.get(photo.id) || {
+                    likes: 0,
+                    bookmarks: 0,
+                    comments: 0,
+                    userLiked: false,
+                    userBookmarked: false
+                  };
 
-                      {/* Subtle overlay with user and date */}
-                      <div className="absolute bottom-0 left-0 right-0 z-10">
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none"></div>
-                        <div className="relative p-2">
-                          <div className="flex items-center gap-1 mb-1">
-                            <UserIcon className="w-3 h-3 text-white/80" />
-                            <span className="font-pixelJp text-[10px] text-white/80 truncate drop-shadow">
-                              {getPhotoUserLabel(photo)}
-                            </span>
-                          </div>
-                          {photo.visit?.shot_at && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-white/80" />
-                              <span className="font-pixelJp text-[10px] text-white/80 drop-shadow">
-                                {formatDateJa(photo.visit.shot_at)}
+                  return (
+                    <div
+                      key={photo.id}
+                      className="bg-[#F6EEDC] border border-[#7B63A8]/15 rounded-lg overflow-hidden"
+                    >
+                      {/* Photo Image */}
+                      <div className="relative aspect-square bg-[#F6EEDC] overflow-hidden">
+                        <img
+                          src={`/api/photo/${photo.id}?size=small`}
+                          alt="ポケふた写真"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.error-placeholder')) {
+                              const errorDiv = document.createElement('div');
+                              errorDiv.className = 'error-placeholder absolute inset-0 bg-[#F6EEDC] flex flex-col items-center justify-center border border-[#7B63A8]/15';
+                              errorDiv.innerHTML = `
+                                <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
+                              `;
+                              parent.appendChild(errorDiv);
+                            }
+                          }}
+                        />
+
+                        {/* Subtle overlay with user, date, and reactions */}
+                        <div className="absolute bottom-0 left-0 right-0 z-10">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pointer-events-none"></div>
+                          <div className="relative p-2">
+                            {/* User and date info */}
+                            <div className="flex items-center gap-1 mb-1">
+                              <UserIcon className="w-3 h-3 text-white/80" />
+                              <span className="font-pixelJp text-[10px] text-white/80 truncate drop-shadow">
+                                {getPhotoUserLabel(photo)}
                               </span>
                             </div>
-                          )}
+                            {photo.visit?.shot_at && (
+                              <div className="flex items-center gap-1 mb-2">
+                                <Clock className="w-3 h-3 text-white/80" />
+                                <span className="font-pixelJp text-[10px] text-white/80 drop-shadow">
+                                  {formatDateJa(photo.visit.shot_at)}
+                                </span>
+                              </div>
+                            )}
+                            {/* Like and Bookmark buttons */}
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleReaction(photo, 'like')}
+                                className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-1.5 py-0.5 rounded transition-colors ${
+                                  reactions.userLiked ? 'bg-rpg-red/80' : 'hover:bg-rpg-red/80'
+                                }`}
+                                title={reactions.userLiked ? 'いいね解除' : 'いいね'}
+                              >
+                                <Heart className={`w-3 h-3 ${reactions.userLiked ? 'fill-white' : ''} text-white`} />
+                                <span className="font-pixel text-[9px] text-white">{reactions.likes}</span>
+                              </button>
+                              <button
+                                onClick={() => handleReaction(photo, 'bookmark')}
+                                className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-1.5 py-0.5 rounded transition-colors ${
+                                  reactions.userBookmarked ? 'bg-rpg-blue/80' : 'hover:bg-rpg-blue/80'
+                                }`}
+                                title={reactions.userBookmarked ? 'ブックマーク解除' : 'ブックマーク'}
+                              >
+                                <Bookmark className={`w-3 h-3 ${reactions.userBookmarked ? 'fill-white' : ''} text-white`} />
+                                <span className="font-pixel text-[9px] text-white">{reactions.bookmarks}</span>
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : null;
