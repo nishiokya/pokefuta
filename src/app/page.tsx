@@ -74,7 +74,7 @@ const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobil
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
   { key: 'unvisited', label: '未訪問' },
   { key: 'nearby', label: '近く' },
-  { key: 'continue', label: '続き' },
+  { key: 'continue', label: '訪問履歴' },
 ];
 
 const getDisplayName = (session: any) => {

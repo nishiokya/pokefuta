@@ -39,7 +39,7 @@ interface Visit {
   is_bookmarked: boolean;
 }
 
-type PassportTab = 'stamps' | 'prefectures' | 'recent' | 'unvisited';
+type PassportTab = 'stamps' | 'prefectures' | 'unvisited';
 
 type VisitSummary = {
   count: number;
@@ -58,7 +58,6 @@ type PrefectureProgress = {
 const tabs: { id: PassportTab; label: string }[] = [
   { id: 'stamps', label: 'スタンプ帳' },
   { id: 'prefectures', label: '都道府県' },
-  { id: 'recent', label: '最近' },
   { id: 'unvisited', label: '未訪問' },
 ];
 
@@ -509,20 +508,6 @@ export default function VisitsPage() {
                 <section className="grid gap-3 sm:grid-cols-2">
                   {prefectureProgress.map((prefecture) => (
                     <PrefectureProgressCard key={prefecture.name} prefecture={prefecture} />
-                  ))}
-                </section>
-              )}
-
-              {activeTab === 'recent' && (
-                <section className="space-y-4">
-                  {sortedVisits.map((visit) => (
-                    <RecentVisitCard
-                      key={visit.id}
-                      visit={visit}
-                      onDeleteClick={handleDeleteClick}
-                      onLikeToggle={handleLikeToggle}
-                      onBookmarkToggle={handleBookmarkToggle}
-                    />
                   ))}
                 </section>
               )}
