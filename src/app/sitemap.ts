@@ -86,7 +86,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .order('id', { ascending: true });
 
       if (manholes && manholes.length > 0) {
-        dynamicPages = manholes.map((manhole) => ({
+        dynamicPages = manholes.map((manhole: { id: number; updated_at: string; created_at: string }) => ({
           url: `${baseUrl}/manhole/${manhole.id}`,
           lastModified: new Date(manhole.updated_at || manhole.created_at),
           changeFrequency: 'weekly' as const,

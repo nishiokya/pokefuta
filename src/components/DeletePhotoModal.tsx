@@ -17,14 +17,24 @@ export default function DeletePhotoModal({
   onCancel,
   isDeleting = false
 }: DeletePhotoModalProps) {
-  if (!isOpen) return null;
+  // 明示的に true の場合のみレンダリング
+  if (isOpen !== true) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-area-inset">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 safe-area-inset">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black bg-opacity-70"
         onClick={onCancel}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        aria-label="モーダルを閉じる"
       ></div>
 
       {/* Modal */}

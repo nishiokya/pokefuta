@@ -120,14 +120,24 @@ export default function CommentModal({
     }
   };
 
-  if (!isOpen) return null;
+  // 明示的に true の場合のみレンダリング
+  if (isOpen !== true) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClose();
+          }
+        }}
+        aria-label="モーダルを閉じる"
       />
 
       {/* Modal */}
