@@ -127,10 +127,15 @@ export default function HomePage() {
         setIsLoggedIn(loggedIn);
         if (loggedIn) {
           setUserName(getDisplayName(session));
+          // ログイン済みユーザーの場合、loadingをfalseに設定
+          setLoading(false);
           loadJourney();
         }
+        // 未ログインユーザーの場合はloadFeed()でloadingがfalseになる
       } catch {
         setIsLoggedIn(false);
+        // エラー時もloadingをfalseに
+        setLoading(false);
       }
     })();
 
