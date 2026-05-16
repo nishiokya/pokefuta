@@ -27,6 +27,13 @@ export default function DeletePhotoModal({
         className="absolute inset-0 bg-black bg-opacity-70"
         onClick={onCancel}
         role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
         aria-label="モーダルを閉じる"
       ></div>
 

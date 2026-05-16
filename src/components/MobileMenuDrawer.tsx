@@ -124,6 +124,13 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
         className="fixed inset-0 bg-black/50 z-60"
         onClick={onClose}
         role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClose();
+          }
+        }}
         aria-label="メニューを閉じる"
       />
 

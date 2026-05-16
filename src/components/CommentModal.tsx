@@ -130,6 +130,13 @@ export default function CommentModal({
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
         role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClose();
+          }
+        }}
         aria-label="モーダルを閉じる"
       />
 

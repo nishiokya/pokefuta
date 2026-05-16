@@ -12,7 +12,6 @@ import {
   Compass,
   Heart,
   MapPin,
-  Menu,
   MessageCircle,
   Search,
   SlidersHorizontal,
