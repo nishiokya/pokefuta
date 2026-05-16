@@ -31,14 +31,25 @@ interface ManholeWithDistance extends Manhole {
   };
 }
 
+type SearchTab = 'nearby' | 'all' | 'unvisited';
+
+const searchTabs: Array<{ key: SearchTab; label: string }> = [
+  { key: 'nearby', label: '近く' },
+  { key: 'all', label: '一覧' },
+  { key: 'unvisited', label: '未訪問' },
+];
+
 export default function NearbyPage() {
   const [nearbyManholes, setNearbyManholes] = useState<ManholeWithDistance[]>([]);
+  const [allManholes, setAllManholes] = useState<ManholeWithDistance[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allLoading, setAllLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
   const { trackSearch } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
@@ -56,7 +67,53 @@ export default function NearbyPage() {
       }
     })();
     getCurrentLocationAndLoadManholes();
+    loadAllManholes();
   }, [radius]);
+
+  const loadAllManholes = async () => {
+    try {
+      setAllLoading(true);
+      const manholesResponse = await fetch('/api/manholes?limit=1000');
+      if (!manholesResponse.ok) {
+        console.error('Failed to load all manholes');
+        setAllLoading(false);
+        return;
+      }
+
+      const manholesData = await manholesResponse.json();
+      const manholes = manholesData.manholes || [];
+
+      // Fetch all visits with a high limit to ensure we get all visits
+      const visitsResponse = await fetch('/api/visits?limit=10000');
+      const visitsByManholeId = new Map<number, any>();
+
+      if (visitsResponse.ok) {
+        const visitsData = await visitsResponse.json();
+        if (visitsData.success && visitsData.visits) {
+          visitsData.visits.forEach((visit: any) => {
+            if (visit.manhole_id) {
+              const existing = visitsByManholeId.get(visit.manhole_id);
+              if (!existing || new Date(visit.shot_at) > new Date(existing.shot_at)) {
+                visitsByManholeId.set(visit.manhole_id, visit);
+              }
+            }
+          });
+        }
+      }
+
+      const manholesWithVisits = manholes.map((manhole: any) => ({
+        ...manhole,
+        distance: undefined, // Don't show distance for "all" tab
+        visit: visitsByManholeId.get(manhole.id)
+      }));
+
+      setAllManholes(manholesWithVisits);
+    } catch (error) {
+      console.error('Failed to load all manholes:', error);
+    } finally {
+      setAllLoading(false);
+    }
+  };
 
   const getCurrentLocationAndLoadManholes = () => {
     if (navigator.geolocation) {
@@ -306,31 +363,65 @@ export default function NearbyPage() {
           </section>
         )}
 
-        {loading && (
+        <section className="mt-5">
+          <div className="-mx-4 overflow-x-auto px-4 pb-1">
+            <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
+              {searchTabs.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
+                      isActive
+                        ? 'bg-[#7B63A8] text-white shadow-sm'
+                        : 'text-[#2A2A2A] hover:bg-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
           <div className="flex items-center justify-center py-10">
             <div className="text-center">
               <div className="font-bold text-[#7B63A8]">
-                検索中<span className="rpg-loading"></span>
+                {activeTab === 'all' ? '全ポケふたを読み込み中' : '検索中'}<span className="rpg-loading"></span>
               </div>
             </div>
           </div>
         )}
 
-        {!loading && (
+        {!((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-5">
-            {nearbyManholes.length === 0 ? (
-              <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
-                <MapPin className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]/60" />
-                <p className="text-sm font-bold text-[#2A2A2A]">
-                  近くにポケふたが見つかりませんでした
-                </p>
-                <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
-                  検索範囲を広げてみてください
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {nearbyManholes.map((manhole) => (
+            {(() => {
+              const displayManholes =
+                activeTab === 'all' ? allManholes :
+                activeTab === 'unvisited' ? nearbyManholes.filter(m => !m.visit) :
+                nearbyManholes;
+
+              return displayManholes.length === 0 ? (
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                  <MapPin className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]/60" />
+                  <p className="text-sm font-bold text-[#2A2A2A]">
+                    {activeTab === 'unvisited'
+                      ? '近くに未訪問のポケふたが見つかりませんでした'
+                      : activeTab === 'all'
+                      ? 'ポケふたが見つかりませんでした'
+                      : '近くにポケふたが見つかりませんでした'}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
+                    {activeTab === 'nearby' && '検索範囲を広げてみてください'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {displayManholes.map((manhole) => (
                   <article
                     key={manhole.id}
                     className="cursor-pointer overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
@@ -365,12 +456,14 @@ export default function NearbyPage() {
                             ポケふた #{manhole.id}
                           </div>
                         </div>
-                        <div className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-right shadow-sm ring-1 ring-[#7B63A8]/15">
-                          <div className="text-base font-extrabold leading-none text-[#7B63A8]">
-                            {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
+                        {activeTab !== 'all' && (
+                          <div className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-right shadow-sm ring-1 ring-[#7B63A8]/15">
+                            <div className="text-base font-extrabold leading-none text-[#7B63A8]">
+                              {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
+                            </div>
+                            <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
                           </div>
-                          <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
-                        </div>
+                        )}
                       </div>
 
                       {manhole.visit && (
@@ -415,9 +508,10 @@ export default function NearbyPage() {
                       )}
                     </div>
                   </article>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </section>
         )}
       </main>
