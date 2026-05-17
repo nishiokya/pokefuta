@@ -213,14 +213,15 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
               href="https://x.com/pokemonmanhole"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 font-pixelJp text-xs text-rpg-textDark opacity-60 hover:opacity-100 hover:bg-white/70 transition-opacity"
-              onClick={() =>
+              className="flex items-center gap-2 px-3 py-2 font-pixelJp text-xs text-rpg-textDark opacity-60 hover:opacity-100 hover:bg-white/70 transition-all"
+              onClick={() => {
                 trackFooterXClick({
                   location: 'footer',
                   source_app: 'tracker',
                   is_logged_in: Boolean(user),
-                })
-              }
+                });
+                onClose();
+              }}
             >
               <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
               <span>公式X @pokemonmanhole</span>
