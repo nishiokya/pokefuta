@@ -53,9 +53,13 @@ export default function NearbyPage() {
   const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
+  // ページ初回マウント時のみ発火
+  useEffect(() => {
+    trackNearbyOpen();
+  }, []);
+
   useEffect(() => {
     document.title = '近くのポケふた - ポケふた訪問記録';
-    trackNearbyOpen();
     (async () => {
       try {
         const supabase = createBrowserClient();

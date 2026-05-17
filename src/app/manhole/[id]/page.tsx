@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, Heart, Bookmark, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2 } from 'lucide-react';
@@ -102,6 +102,14 @@ export default function ManholeDetailPage() {
     trackShareLine,
     trackCopyLink,
   } = useAnalytics();
+
+  // 共有パネルのクリーンアップ（コンポーネントアンマウント時）
+  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      sharePanelCleanupRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     const manholeId = params.id;
@@ -478,24 +486,26 @@ export default function ManholeDetailPage() {
     shareUrl: string,
     trackParams: { manhole_id: number | string; prefecture?: string }
   ) => {
-    // 既存パネルがあれば削除
-    const existing = document.getElementById('pokefuta-share-panel');
-    if (existing) existing.remove();
+    // 既存パネルがあればクリーンアップ
+    sharePanelCleanupRef.current?.();
 
     const panel = document.createElement('div');
     panel.id = 'pokefuta-share-panel';
     panel.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white rounded-lg shadow-xl font-pixelJp text-sm z-50 p-4 flex flex-col gap-2 min-w-[200px]';
 
-    const title = document.createElement('p');
-    title.className = 'text-xs text-center opacity-70 mb-1';
-    title.textContent = '共有する';
-    panel.appendChild(title);
+    const titleEl = document.createElement('p');
+    titleEl.className = 'text-xs text-center opacity-70 mb-1';
+    titleEl.textContent = '共有する';
+    panel.appendChild(titleEl);
+
+    // cleanup を先に宣言し、各ボタンから参照させる
+    let cleanup: () => void;
 
     const makeBtn = (label: string, onClick: () => void) => {
       const btn = document.createElement('button');
       btn.className = 'w-full text-left px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition-colors text-sm';
       btn.textContent = label;
-      btn.addEventListener('click', () => { onClick(); panel.remove(); });
+      btn.addEventListener('click', () => { onClick(); cleanup(); });
       return btn;
     };
 
@@ -522,16 +532,21 @@ export default function ManholeDetailPage() {
 
     document.body.appendChild(panel);
 
-    // パネル外クリックで閉じる
-    setTimeout(() => {
-      const closePanel = (e: MouseEvent) => {
-        if (!panel.contains(e.target as Node)) {
-          panel.remove();
-          document.removeEventListener('click', closePanel);
-        }
-      };
-      document.addEventListener('click', closePanel);
-    }, 0);
+    const closeOnOutside = (e: MouseEvent) => {
+      if (!panel.contains(e.target as Node)) cleanup();
+    };
+
+    cleanup = () => {
+      panel.remove();
+      document.removeEventListener('click', closeOnOutside);
+      sharePanelCleanupRef.current = null;
+    };
+
+    // アンマウント時用にrefへ登録
+    sharePanelCleanupRef.current = cleanup;
+
+    // トリガーとなったクリックイベントを捕捉しないよう次のticksで登録
+    setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
   };
 
   const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {

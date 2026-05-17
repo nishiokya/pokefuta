@@ -378,6 +378,8 @@ export default function UploadPage() {
     ));
 
     try {
+      const uploadStartTime = Date.now();
+
       // Compress image
       const compressedFile = await imageCompression(photo.file, {
         maxSizeMB: 2,
@@ -445,6 +447,10 @@ export default function UploadPage() {
         manhole_id: photo.matchedManhole?.id,
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
+        upload_duration_ms: Date.now() - uploadStartTime,
+        has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
+        has_note: !!visitNote.trim(),
+        is_public: isPublic,
       };
       trackPhotoUploadComplete(manholeParams);
       trackVisitRegister(manholeParams);
