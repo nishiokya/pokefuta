@@ -1,3 +1,4 @@
+.DS_Store
 manhole_images/*
 *.raw.ndjson
 *.log

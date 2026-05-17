@@ -201,6 +201,9 @@ export const pokefutaEvents = {
   nearbyOpen:          (p?: PokefutaEventParams) => trackEvent('p_nearby_open', p),
   geolocationEnable:   (p?: PokefutaEventParams) => trackEvent('p_geolocation_enable', p),
   routeOpen:           (p?: PokefutaEventParams) => trackEvent('p_route_open', p),
+
+  // --- SNS導線系 ---
+  footerXClick:        (p?: PokefutaEventParams) => trackEvent('p_footer_x_click', p),
 };
 
 // ==========================================

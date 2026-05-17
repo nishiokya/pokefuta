@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  ExternalLink,
   Home,
   Info,
   LogOut,
@@ -26,7 +27,7 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  const { trackLogout, clearUser } = useAnalytics();
+  const { trackLogout, clearUser, trackFooterXClick } = useAnalytics();
 
   useEffect(() => {
     if (!open) return;
@@ -205,6 +206,27 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
               </div>
             )}
           </nav>
+
+          {/* 公式X リンク */}
+          <div className="mt-4 pt-3 border-t border-[#7B63A8]/15">
+            <a
+              href="https://x.com/pokemonmanhole"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 font-pixelJp text-xs text-rpg-textDark opacity-60 hover:opacity-100 hover:bg-white/70 transition-all"
+              onClick={() => {
+                trackFooterXClick({
+                  location: 'footer',
+                  source_app: 'tracker',
+                  is_logged_in: Boolean(user),
+                });
+                onClose();
+              }}
+            >
+              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>公式X @pokemonmanhole</span>
+            </a>
+          </div>
 
           {supabaseError && (
             <div className="mt-3 p-2 bg-rpg-red/20 border-2 border-rpg-red">
