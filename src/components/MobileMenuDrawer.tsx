@@ -84,10 +84,10 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
     if (!supabase) return;
 
     try {
-      trackLogout();
-      clearUser();
       await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
+      trackLogout();
+      clearUser();
       onClose();
       router.push('/');
       router.refresh();

@@ -71,10 +71,10 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
     if (!supabase) return;
 
     try {
-      trackLogout();
-      clearUser();
       await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
+      trackLogout();
+      clearUser();
       setIsMenuOpen(false);
       router.push('/');
       router.refresh();

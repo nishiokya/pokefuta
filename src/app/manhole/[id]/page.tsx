@@ -521,13 +521,21 @@ export default function ManholeDetailPage() {
     }));
 
     panel.appendChild(makeBtn('リンクをコピー', async () => {
-      await navigator.clipboard.writeText(shareUrl);
-      trackCopyLink(trackParams);
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
-      toast.textContent = 'リンクをコピーしました';
-      document.body.appendChild(toast);
-      setTimeout(() => document.body.removeChild(toast), 2000);
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        trackCopyLink(trackParams);
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+        toast.textContent = 'リンクをコピーしました';
+        document.body.appendChild(toast);
+        setTimeout(() => document.body.removeChild(toast), 2000);
+      } catch {
+        const errToast = document.createElement('div');
+        errToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-rpg-red text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+        errToast.textContent = 'コピーに失敗しました';
+        document.body.appendChild(errToast);
+        setTimeout(() => document.body.removeChild(errToast), 2000);
+      }
     }));
 
     document.body.appendChild(panel);

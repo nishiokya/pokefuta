@@ -468,7 +468,14 @@ export default function UploadPage() {
     } catch (error: any) {
       console.error('Upload failed:', error);
 
-      trackAppError('upload_error', error?.message || 'Unknown error');
+      const errorType = (() => {
+        if (error?.status === 401 || error?.message?.includes('Unauthorized')) return 'unauthorized';
+        if (error?.name === 'TypeError' || error?.message?.includes('network')) return 'network';
+        if (error?.message?.includes('size') || error?.message?.includes('large')) return 'file_size';
+        if (error?.message?.includes('GPS') || error?.message?.includes('location')) return 'gps_validation';
+        return 'unknown';
+      })();
+      trackAppError('upload_error', errorType);
 
       const errorMsg = error?.message || 'アップロードに失敗しました';
       setPhotos(prev => prev.map(p =>
