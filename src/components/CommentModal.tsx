@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Send, Loader } from 'lucide-react';
+import { X, Send, Loader, Trash2 } from 'lucide-react';
+import { createBrowserClient } from '@/lib/supabase/client';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -46,6 +47,18 @@ export default function CommentModal({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      const supabase = createBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      setCurrentUserId(session?.user?.id || null);
+    };
+    loadCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -120,6 +133,34 @@ export default function CommentModal({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    setDeletingCommentId(commentId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/visits/${visitId}/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setComments(comments.filter(c => c.id !== commentId));
+        setConfirmDeleteId(null);
+        if (onCommentAdded) {
+          onCommentAdded();
+        }
+      } else {
+        setError(data.error || 'コメントの削除に失敗しました');
+      }
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      setError('コメントの削除中にエラーが発生しました');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   // 明示的に true の場合のみレンダリング
   if (isOpen !== true) return null;
 
@@ -171,33 +212,68 @@ export default function CommentModal({
               </p>
             </div>
           ) : (
-            comments.map((comment) => (
-              <div
-                key={comment.id}
-                className="bg-[#F6EEDC] border border-[#7B63A8]/15 p-3 rounded"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 rounded-full flex items-center justify-center">
-                    <span className="font-pixelJp text-xs text-rpg-textDark">
-                      {getUserInitial(comment)}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">
-                        {getUserLabel(comment)}
-                      </span>
-                      <span className="font-pixelJp text-xs text-rpg-textDark opacity-60 flex-shrink-0">
-                        {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
+            comments.map((comment) => {
+              const isOwnComment = currentUserId && comment.user.id === currentUserId;
+              const isDeleting = deletingCommentId === comment.id;
+              const showConfirm = confirmDeleteId === comment.id;
+
+              return (
+                <div
+                  key={comment.id}
+                  className="bg-[#F6EEDC] border border-[#7B63A8]/15 p-3 rounded"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 rounded-full flex items-center justify-center">
+                      <span className="font-pixelJp text-xs text-rpg-textDark">
+                        {getUserInitial(comment)}
                       </span>
                     </div>
-                    <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">
-                      {comment.content}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">
+                          {getUserLabel(comment)}
+                        </span>
+                        <span className="font-pixelJp text-xs text-rpg-textDark opacity-60 flex-shrink-0">
+                          {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
+                        </span>
+                      </div>
+                      <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">
+                        {comment.content}
+                      </p>
+                      {showConfirm && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="font-pixelJp text-xs text-rpg-textDark">削除しますか？</span>
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={isDeleting}
+                            className="rpg-button rpg-button-danger text-xs px-2 py-1 disabled:opacity-50"
+                          >
+                            {isDeleting ? '削除中...' : '削除'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            disabled={isDeleting}
+                            className="rpg-button text-xs px-2 py-1 disabled:opacity-50"
+                          >
+                            キャンセル
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {isOwnComment && !showConfirm && (
+                      <button
+                        onClick={() => setConfirmDeleteId(comment.id)}
+                        disabled={isDeleting}
+                        className="flex-shrink-0 p-2 hover:bg-rpg-red/20 rounded transition-colors disabled:opacity-50"
+                        title="削除"
+                      >
+                        <Trash2 className="w-4 h-4 text-rpg-red" />
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
