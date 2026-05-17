@@ -83,6 +83,9 @@ export function useAnalytics() {
   const trackGeolocationEnable= useCallback((p?: PokefutaEventParams) => pokefutaEvents.geolocationEnable(p), []);
   const trackRouteOpen        = useCallback((p?: PokefutaEventParams) => pokefutaEvents.routeOpen(p), []);
 
+  // --- SNS導線系 ---
+  const trackFooterXClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.footerXClick(p), []);
+
   // --- 後方互換用 ---
   const trackSearch = useCallback(
     (query: string, resultCount: number, metadata?: GAEventParams) =>
@@ -153,6 +156,9 @@ export function useAnalytics() {
     trackNearbyOpen,
     trackGeolocationEnable,
     trackRouteOpen,
+
+    // SNS導線系
+    trackFooterXClick,
 
     // 内部エラー追跡
     trackApiError,
