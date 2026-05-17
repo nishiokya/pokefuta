@@ -15,6 +15,15 @@ export interface GAUserProperties {
   [key: string]: string | number | boolean | undefined;
 }
 
+/** pokefuta.com 共通イベントパラメータ */
+export interface PokefutaEventParams extends GAEventParams {
+  manhole_id?: string | number;
+  prefecture?: string;
+  pokemon_ids?: string;    // カンマ区切り文字列 (GA4は配列非対応)
+  is_logged_in?: boolean;
+  source_app?: 'tracker' | 'map';
+}
+
 // ==========================================
 // グローバル型拡張
 // ==========================================
@@ -30,16 +39,10 @@ declare global {
 // ヘルパー関数: SSR チェック
 // ==========================================
 
-/**
- * クライアント側でのみ実行されるかをチェック
- */
 function isClientSide(): boolean {
   return typeof window !== 'undefined';
 }
 
-/**
- * gtag が利用可能かをチェック
- */
 function isGtagAvailable(): boolean {
   return isClientSide() && typeof window.gtag === 'function';
 }
@@ -48,20 +51,6 @@ function isGtagAvailable(): boolean {
 // コア関数: イベント送信
 // ==========================================
 
-/**
- * GA4 イベントを送信
- *
- * @param eventName - イベント名 (例: 'file_upload', 'sign_in')
- * @param eventParams - イベントパラメータ
- * @param context - 追加コンテキスト情報
- *
- * @example
- * trackEvent('file_upload', {
- *   file_size: 1024000,
- *   file_type: 'image/jpeg',
- *   manhole_id: 123
- * });
- */
 export function trackEvent(
   eventName: string,
   eventParams?: GAEventParams,
@@ -74,26 +63,15 @@ export function trackEvent(
     return;
   }
 
-  // ==========================================
-  // 共通属性の自動付与
-  // ==========================================
   const enrichedParams: GAEventParams = {
-    // ページ情報（デフォルト値）
     page_path: isClientSide() ? window.location.pathname : undefined,
     page_title: isClientSide() ? document.title : undefined,
-    // タイムスタンプ
     event_timestamp: new Date().toISOString(),
-    // ユーザーロケール
     user_locale: navigator.language || 'ja-JP',
-    // カスタムコンテキスト
     ...context,
-    // eventParams で明示指定された値を優先
     ...eventParams,
   };
 
-  // ==========================================
-  // 開発環境でのログ出力
-  // ==========================================
   if (process.env.NODE_ENV === 'development') {
     console.log('[GA Event]', {
       event: eventName,
@@ -101,10 +79,6 @@ export function trackEvent(
       timestamp: new Date().toISOString(),
     });
   }
-
-  // ==========================================
-  // GA に送信
-  // ==========================================
 
   try {
     window.gtag!('event', eventName, enrichedParams);
@@ -117,10 +91,6 @@ export function trackEvent(
 // ページビュー関数
 // ==========================================
 
-/**
- * ページビューイベントを送信
- * 必要な箇所で明示的に呼び出して使用する
- */
 export function trackPageView(
   pagePath: string,
   pageTitle: string,
@@ -137,15 +107,6 @@ export function trackPageView(
 // ユーザー設定関数
 // ==========================================
 
-/**
- * ユーザー ID を GA に設定
- * ログイン時に呼び出す
- *
- * @param userId - Supabase auth.user.id
- *
- * @example
- * setUserId(session.user.id);
- */
 export function setUserId(userId: string): void {
   if (!isGtagAvailable()) {
     if (process.env.NODE_ENV === 'development') {
@@ -155,7 +116,6 @@ export function setUserId(userId: string): void {
   }
 
   try {
-    // gtag('set') を使用してユーザーIDを設定
     window.gtag!('set', { 'user_id': userId });
     if (process.env.NODE_ENV === 'development') {
       console.log('[GA] User ID set');
@@ -165,10 +125,6 @@ export function setUserId(userId: string): void {
   }
 }
 
-/**
- * ユーザー ID をクリア
- * ログアウト時に呼び出す
- */
 export function clearUserId(): void {
   if (!isGtagAvailable()) {
     if (process.env.NODE_ENV === 'development') {
@@ -178,7 +134,6 @@ export function clearUserId(): void {
   }
 
   try {
-    // gtag('set') を使用してユーザーIDをクリア
     window.gtag!('set', { 'user_id': null });
     if (process.env.NODE_ENV === 'development') {
       console.log('[GA] User ID cleared');
@@ -188,22 +143,7 @@ export function clearUserId(): void {
   }
 }
 
-/**
- * ユーザープロパティを設定
- * ユーザーの属性情報（ロール、プラン等）を設定
- *
- * @param properties - ユーザープロパティ
- *
- * @example
- * setUserProperties({
- *   user_tier: 'free',
- *   is_beta_tester: false,
- *   registration_source: 'organic'
- * });
- */
-export function setUserProperties(
-  properties: GAUserProperties
-): void {
+export function setUserProperties(properties: GAUserProperties): void {
   if (!isGtagAvailable()) {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[GA] gtag not available. User properties not set.');
@@ -212,9 +152,7 @@ export function setUserProperties(
   }
 
   try {
-    window.gtag!('set', {
-      user_properties: properties,
-    });
+    window.gtag!('set', { user_properties: properties });
     if (process.env.NODE_ENV === 'development') {
       console.log('[GA] User properties set:', properties);
     }
@@ -224,96 +162,53 @@ export function setUserProperties(
 }
 
 // ==========================================
-// カテゴリ別追跡関数
+// pokefuta.com イベント (p_ prefix)
 // ==========================================
 
-/**
- * 認証イベント
- */
-export const authEvents = {
-  signIn: (metadata?: GAEventParams) =>
-    trackEvent('sign_in', metadata),
+export const pokefutaEvents = {
+  // --- 認証系 ---
+  loginStart:          (p?: PokefutaEventParams) => trackEvent('p_login_start', p),
+  loginSuccess:        (p?: PokefutaEventParams) => trackEvent('p_login_success', p),
+  signupStart:         (p?: PokefutaEventParams) => trackEvent('p_signup_start', p),
+  signupComplete:      (p?: PokefutaEventParams) => trackEvent('p_signup_complete', p),
+  logout:              (p?: PokefutaEventParams) => trackEvent('p_logout', p),
 
-  signUp: (metadata?: GAEventParams) =>
-    trackEvent('sign_up', metadata),
+  // --- 訪問記録系 ---
+  visitRegister:       (p?: PokefutaEventParams) => trackEvent('p_visit_register', p),
+  visitDelete:         (p?: PokefutaEventParams) => trackEvent('p_visit_delete', p),
+  passportOpen:        (p?: PokefutaEventParams) => trackEvent('p_passport_open', p),
+  collectionOpen:      (p?: PokefutaEventParams) => trackEvent('p_collection_open', p),
 
-  signOut: (metadata?: GAEventParams) =>
-    trackEvent('sign_out', metadata),
+  // --- 写真投稿系 ---
+  photoUploadStart:    (p?: PokefutaEventParams) => trackEvent('p_photo_upload_start', p),
+  photoUploadComplete: (p?: PokefutaEventParams) => trackEvent('p_photo_upload_complete', p),
+  photoView:           (p?: PokefutaEventParams) => trackEvent('p_photo_view', p),
+  photoExpand:         (p?: PokefutaEventParams) => trackEvent('p_photo_expand', p),
+
+  // --- 回遊系 ---
+  manholeDetailOpen:   (p?: PokefutaEventParams) => trackEvent('p_manhole_detail_open', p),
+  prefectureOpen:      (p?: PokefutaEventParams) => trackEvent('p_prefecture_open', p),
+  userProfileOpen:     (p?: PokefutaEventParams) => trackEvent('p_user_profile_open', p),
+  mapReturn:           (p?: PokefutaEventParams) => trackEvent('p_map_return', p),
+
+  // --- ソーシャル共有系 ---
+  shareClick:          (p?: PokefutaEventParams) => trackEvent('p_share_click', p),
+  shareX:              (p?: PokefutaEventParams) => trackEvent('p_share_x', p),
+  shareLine:           (p?: PokefutaEventParams) => trackEvent('p_share_line', p),
+  copyLink:            (p?: PokefutaEventParams) => trackEvent('p_copy_link', p),
+
+  // --- 旅・位置情報系 ---
+  nearbyOpen:          (p?: PokefutaEventParams) => trackEvent('p_nearby_open', p),
+  geolocationEnable:   (p?: PokefutaEventParams) => trackEvent('p_geolocation_enable', p),
+  routeOpen:           (p?: PokefutaEventParams) => trackEvent('p_route_open', p),
 };
 
-/**
- * ファイルアップロードイベント
- */
-export const uploadEvents = {
-  start: (fileSize: number, fileType: string) =>
-    trackEvent('upload_start', { file_size: fileSize, file_type: fileType }),
+// ==========================================
+// 内部エラー追跡 (prefix なし、内部用)
+// ==========================================
 
-  success: (
-    fileSize: number,
-    fileType: string,
-    durationMs: number,
-    metadata?: GAEventParams
-  ) =>
-    trackEvent('file_upload', {
-      file_size: fileSize,
-      file_type: fileType,
-      upload_duration_ms: durationMs,
-      ...metadata,
-    }),
-
-  error: (
-    errorCode: string,
-    fileSize?: number,
-    metadata?: GAEventParams
-  ) =>
-    trackEvent('upload_error', {
-      error_code: errorCode,
-      file_size: fileSize,
-      ...metadata,
-    }),
-};
-
-/**
- * 検索イベント
- */
-export const searchEvents = {
-  search: (query: string, resultCount: number, metadata?: GAEventParams) =>
-    trackEvent('search', {
-      search_term: query,
-      result_count: resultCount,
-      ...metadata,
-    }),
-
-  filterApply: (filterType: string, filterValue: string, resultCount: number) =>
-    trackEvent('filter_apply', {
-      filter_type: filterType,
-      filter_value: filterValue,
-      result_count: resultCount,
-    }),
-};
-
-/**
- * ナビゲーション・クリックイベント
- */
-export const navigationEvents = {
-  click: (navItem: string) =>
-    trackEvent('navigation_click', {
-      nav_item: navItem,
-    }),
-
-  back: () =>
-    trackEvent('navigation_back'),
-};
-
-/**
- * エラーイベント
- */
 export const errorEvents = {
-  api: (
-    endpoint: string,
-    statusCode: number,
-    method: string = 'GET'
-  ) =>
+  api: (endpoint: string, statusCode: number, method: string = 'GET') =>
     trackEvent('error_event', {
       error_type: 'api_error',
       endpoint,
@@ -322,57 +217,20 @@ export const errorEvents = {
     }),
 
   auth: (errorCode: string) =>
-    trackEvent('auth_error', {
-      error_code: errorCode,
-    }),
+    trackEvent('auth_error', { error_code: errorCode }),
 
   app: (errorCode: string, errorType: string = 'unknown') =>
-    trackEvent('app_error', {
-      error_code: errorCode,
-      error_type: errorType,
-    }),
-};
-
-/**
- * エンゲージメントイベント（将来用）
- */
-export const engagementEvents = {
-  like: (targetType: string, targetId: string) =>
-    trackEvent('engagement_click', {
-      engagement_type: 'like',
-      target_type: targetType,
-      target_id: targetId,
-    }),
-
-  bookmark: (targetType: string, targetId: string) =>
-    trackEvent('bookmark_click', {
-      engagement_type: 'bookmark',
-      target_type: targetType,
-      target_id: targetId,
-    }),
-
-  comment: (targetType: string, targetId: string) =>
-    trackEvent('comment_submit', {
-      engagement_type: 'comment',
-      target_type: targetType,
-      target_id: targetId,
-    }),
+    trackEvent('app_error', { error_code: errorCode, error_type: errorType }),
 };
 
 // ==========================================
 // デバッグ・初期化関数
 // ==========================================
 
-/**
- * GA の初期化状態を確認
- */
 export function isGAInitialized(): boolean {
   return isGtagAvailable();
 }
 
-/**
- * GA 初期化情報をコンソール出力（開発用）
- */
 export function debugGA(): void {
   if (!isClientSide()) {
     console.log('[GA Debug] Not on client side');
@@ -387,7 +245,6 @@ export function debugGA(): void {
     cookiesEnabled: navigator.cookieEnabled,
   });
 
-  // dataLayer の内容を表示
   if (window.dataLayer) {
     console.log('[GA dataLayer]', window.dataLayer.slice(-5));
   }

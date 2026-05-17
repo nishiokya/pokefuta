@@ -50,8 +50,13 @@ export default function NearbyPage() {
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
-  const { trackSearch } = useAnalytics();
+  const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
+
+  // ページ初回マウント時のみ発火
+  useEffect(() => {
+    trackNearbyOpen();
+  }, []);
 
   useEffect(() => {
     document.title = '近くのポケふた - ポケふた訪問記録';
@@ -120,6 +125,7 @@ export default function NearbyPage() {
       setLoading(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude

@@ -83,11 +83,12 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const { trackView } = useAnalytics();
+  const { trackView, trackPassportOpen } = useAnalytics();
 
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
     trackView('/visits', 'ポケふた訪問パスポート', 'visits');
+    trackPassportOpen();
     checkAuth();
   }, []);
 

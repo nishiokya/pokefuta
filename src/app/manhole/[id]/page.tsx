@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, Heart, Bookmark, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -92,6 +93,24 @@ export default function ManholeDetailPage() {
   const [newManholeComment, setNewManholeComment] = useState('');
   const [showDetails, setShowDetails] = useState(false);
 
+  const {
+    trackManholeDetailOpen,
+    trackRouteOpen,
+    trackVisitDelete,
+    trackShareClick,
+    trackShareX,
+    trackShareLine,
+    trackCopyLink,
+  } = useAnalytics();
+
+  // 共有パネルのクリーンアップ（コンポーネントアンマウント時）
+  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      sharePanelCleanupRef.current?.();
+    };
+  }, []);
+
   useEffect(() => {
     const manholeId = params.id;
     if (manholeId) {
@@ -101,6 +120,17 @@ export default function ManholeDetailPage() {
       loadCurrentUser();
     }
   }, [params.id]);
+
+  // マンホール詳細閲覧トラッキング
+  useEffect(() => {
+    if (manhole) {
+      trackManholeDetailOpen({
+        manhole_id: manhole.id,
+        prefecture: manhole.prefecture,
+        pokemon_ids: manhole.pokemons?.join(','),
+      });
+    }
+  }, [manhole?.id]);
 
   // Update document title and meta tags
   useEffect(() => {
@@ -362,6 +392,7 @@ export default function ManholeDetailPage() {
 
   const openInMaps = () => {
     if (manhole && manhole.latitude && manhole.longitude) {
+      trackRouteOpen({ manhole_id: manhole.id, prefecture: manhole.prefecture });
       const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
       window.open(url, '_blank');
     }
@@ -385,6 +416,7 @@ export default function ManholeDetailPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        trackVisitDelete({ manhole_id: manhole?.id });
         // 成功: 写真リストから削除
         const deletedPhotoIds = new Set<string>(data.photo_ids || [selectedPhotoId]);
         const updatedPhotos = photos.filter(p => !deletedPhotoIds.has(p.id));
@@ -431,35 +463,98 @@ export default function ManholeDetailPage() {
       ? `${manhole.prefecture}${municipality}のポケふたを見つけました！\n${pokemonList}が描かれたポケモンマンホールです。`
       : `${manhole.prefecture}${municipality}のポケふたを見つけました！`;
     const shareUrl = `https://pokefuta.com/manhole/${manhole.id}`;
+    const trackParams = { manhole_id: manhole.id, prefecture: manhole.prefecture };
+
+    trackShareClick(trackParams);
 
     try {
       if (navigator.share) {
-        // Web Share API available
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url: shareUrl
-        });
+        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
       } else {
-        // Fallback to clipboard
-        await navigator.clipboard.writeText(shareUrl);
-        // Show toast notification
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50 animate-fade-in';
-        toast.textContent = 'リンクをコピーしました';
-        document.body.appendChild(toast);
-        setTimeout(() => {
-          toast.classList.add('animate-fade-out');
-          setTimeout(() => document.body.removeChild(toast), 300);
-        }, 2000);
+        // デスクトップ: X / LINE / コピーの選択パネルを表示
+        showSharePanel(shareText, shareUrl, trackParams);
       }
     } catch (error) {
-      // User cancelled share or error occurred
-      // Don't show error for user cancellation
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error('Share failed:', error);
       }
     }
+  };
+
+  const showSharePanel = (
+    shareText: string,
+    shareUrl: string,
+    trackParams: { manhole_id: number | string; prefecture?: string }
+  ) => {
+    // 既存パネルがあればクリーンアップ
+    sharePanelCleanupRef.current?.();
+
+    const panel = document.createElement('div');
+    panel.id = 'pokefuta-share-panel';
+    panel.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white rounded-lg shadow-xl font-pixelJp text-sm z-50 p-4 flex flex-col gap-2 min-w-[200px]';
+
+    const titleEl = document.createElement('p');
+    titleEl.className = 'text-xs text-center opacity-70 mb-1';
+    titleEl.textContent = '共有する';
+    panel.appendChild(titleEl);
+
+    // cleanup を先に宣言し、各ボタンから参照させる
+    let cleanup: () => void;
+
+    const makeBtn = (label: string, onClick: () => void) => {
+      const btn = document.createElement('button');
+      btn.className = 'w-full text-left px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition-colors text-sm';
+      btn.textContent = label;
+      btn.addEventListener('click', () => { onClick(); cleanup(); });
+      return btn;
+    };
+
+    const xText = `${shareText}\n${shareUrl}`;
+    panel.appendChild(makeBtn('X でシェア', () => {
+      trackShareX(trackParams);
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(xText)}`, '_blank');
+    }));
+
+    panel.appendChild(makeBtn('LINE でシェア', () => {
+      trackShareLine(trackParams);
+      window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}`, '_blank');
+    }));
+
+    panel.appendChild(makeBtn('リンクをコピー', async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        trackCopyLink(trackParams);
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+        toast.textContent = 'リンクをコピーしました';
+        document.body.appendChild(toast);
+        setTimeout(() => document.body.removeChild(toast), 2000);
+      } catch {
+        const errToast = document.createElement('div');
+        errToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-rpg-red text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+        errToast.textContent = 'コピーに失敗しました';
+        document.body.appendChild(errToast);
+        setTimeout(() => document.body.removeChild(errToast), 2000);
+      }
+    }));
+
+    document.body.appendChild(panel);
+
+    const closeOnOutside = (e: MouseEvent) => {
+      if (!panel.contains(e.target as Node)) cleanup();
+    };
+
+    cleanup = () => {
+      panel.remove();
+      document.removeEventListener('click', closeOnOutside);
+      sharePanelCleanupRef.current = null;
+    };
+
+    // アンマウント時用にrefへ登録
+    sharePanelCleanupRef.current = cleanup;
+
+    // トリガーとなったクリックイベントを捕捉しないよう次のticksで登録
+    setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
   };
 
   const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {
