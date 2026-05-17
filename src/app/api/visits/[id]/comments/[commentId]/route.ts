@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
 export async function DELETE(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: { id: string; commentId: string } }
 ) {
   try {
@@ -20,12 +20,13 @@ export async function DELETE(
     }
 
     const userId = session.user.id;
-    const commentId = params.commentId;
+    const { id: visitId, commentId } = params;
 
     const { data: comment, error: fetchError } = await supabase
       .from('visit_comment')
-      .select('*')
+      .select('id, user_id')
       .eq('id', commentId)
+      .eq('visit_id', visitId)
       .single();
 
     if (fetchError || !comment) {
