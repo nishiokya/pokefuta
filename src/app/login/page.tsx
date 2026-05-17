@@ -22,7 +22,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient();
-  const { trackSignIn, setUser, trackAuthError } = useAnalytics();
+  const { trackLoginStart, trackLoginSuccess, setUser, trackAuthError, updateUserProperties } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
@@ -35,6 +35,7 @@ function LoginForm() {
     setError(null);
 
     console.log('🔐 ログイン試行開始:', { email, redirectTo });
+    trackLoginStart();
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -66,12 +67,11 @@ function LoginForm() {
           redirectTo,
         });
 
-        // ✅ GA: ユーザーID設定（ユーザーIDが取得できた時のみ）
         if (data.user?.id) {
           setUser(data.user.id);
         }
-        // ✅ GA: ログインイベント追跡
-        trackSignIn();
+        trackLoginSuccess();
+        updateUserProperties({ registered_user: true });
 
         // app_userレコードの存在確認
         const { data: appUser, error: appUserError } = await supabase

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 type Props = {
   open: boolean;
@@ -24,6 +25,8 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  const { trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +84,8 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
     if (!supabase) return;
 
     try {
+      trackLogout();
+      clearUser();
       await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
       onClose();

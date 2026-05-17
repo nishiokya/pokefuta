@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon, Info } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { User, SupabaseClient } from '@supabase/supabase-js';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface HeaderProps {
   title?: string;
@@ -18,6 +19,8 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  const { trackLogout, clearUser } = useAnalytics();
 
   let supabase: SupabaseClient | undefined;
   try {
@@ -68,6 +71,8 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
     if (!supabase) return;
 
     try {
+      trackLogout();
+      clearUser();
       await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
       setIsMenuOpen(false);

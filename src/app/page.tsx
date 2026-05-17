@@ -106,16 +106,12 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
   const [journeyTab, setJourneyTab] = useState<JourneyTab>('unvisited');
   const feedPerPage = 24;
-  const { trackView } = useAnalytics();
+  const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
 
   useEffect(() => {
-    // ページタイトル設定
     document.title = 'ポケふた写真館 - ポケふた訪問記録';
-
-    // ✅ GA: ページビュー追跡
     trackView('/', 'ホーム', 'home');
 
-    // ログイン状態はSupabase sessionで判定（APIは常に公開フィードを使う）
     (async () => {
       try {
         const supabase = createBrowserClient();
@@ -124,13 +120,13 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
+        trackCollectionOpen({ is_logged_in: loggedIn });
         if (loggedIn) {
           setUserName(getDisplayName(session));
-          // ログイン済みユーザーの場合、loadingをfalseに設定
+          updateUserProperties({ registered_user: true });
           setLoading(false);
           loadJourney();
         }
-        // 未ログインユーザーの場合はloadFeed()でloadingがfalseになる
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);

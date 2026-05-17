@@ -21,7 +21,7 @@ export default function SignUpPage() {
   const [success, setSuccess] = useState(false);
 
   const supabase = createBrowserClient();
-  const { trackSignUp, trackAuthError, setUser } = useAnalytics();
+  const { trackSignupStart, trackSignupComplete, trackAuthError, setUser } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
@@ -33,6 +33,7 @@ export default function SignUpPage() {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    trackSignupStart();
 
     try {
       // パスワード検証
@@ -61,10 +62,8 @@ export default function SignUpPage() {
           email: data.user.email,
         });
 
-        // ✅ GA: ユーザーID設定（GA4では user_id は gtag('set') で設定）
         setUser(data.user.id);
-        // ✅ GA: サインアップイベント追跡
-        trackSignUp();
+        trackSignupComplete();
 
         // ✅ app_user は初回の関連API利用時に自動作成される（/api/image-upload、like/bookmark/comment 等で）
         // signup では auth.signUp() のみで完了

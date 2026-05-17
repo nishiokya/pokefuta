@@ -47,7 +47,7 @@ export default function UploadPage() {
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const { trackView, trackUploadStart, trackUploadSuccess, trackUploadError } = useAnalytics();
+  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister } = useAnalytics();
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
   useEffect(() => {
@@ -385,8 +385,7 @@ export default function UploadPage() {
         useWebWorker: true
       });
 
-      // ✅ GA: アップロード開始イベント追跡
-      trackUploadStart(compressedFile.size, compressedFile.type);
+      trackPhotoUploadStart({ is_logged_in: true });
 
       // Prepare form data for upload
       const formData = new FormData();
@@ -442,20 +441,13 @@ export default function UploadPage() {
         throw new Error(uploadResult.error || 'Upload failed');
       }
 
-      // ✅ GA: アップロード成功イベント追跡
-      const uploadEndTime = Date.now();
-      const uploadDuration = uploadEndTime - uploadStartTime;
-      trackUploadSuccess(
-        compressedFile.size,
-        compressedFile.type,
-        uploadDuration,
-        {
-          manhole_id: photo.matchedManhole?.id,
-          has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
-          has_note: !!visitNote.trim(),
-          is_public: isPublic
-        }
-      );
+      const manholeParams = {
+        manhole_id: photo.matchedManhole?.id,
+        prefecture: photo.matchedManhole?.prefecture,
+        is_logged_in: true,
+      };
+      trackPhotoUploadComplete(manholeParams);
+      trackVisitRegister(manholeParams);
 
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
@@ -470,16 +462,7 @@ export default function UploadPage() {
     } catch (error: any) {
       console.error('Upload failed:', error);
 
-      // ✅ GA: アップロードエラーイベント追跡
-      trackUploadError(
-        'upload_error',
-        error?.message || 'Unknown error',
-        photo.file.size,
-        {
-          file_type: photo.file.type,
-          manhole_id: photo.matchedManhole?.id
-        }
-      );
+      trackAppError('upload_error', error?.message || 'Unknown error');
 
       const errorMsg = error?.message || 'アップロードに失敗しました';
       setPhotos(prev => prev.map(p =>

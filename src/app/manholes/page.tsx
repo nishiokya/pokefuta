@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Camera, MapPin, Search } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 export default function ManholesPage() {
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [query, setQuery] = useState('');
+  const { trackPrefectureOpen } = useAnalytics();
+  const lastTrackedPrefecture = useRef<string | null>(null);
 
   useEffect(() => {
     document.title = 'ポケふた一覧 - ポケふた訪問記録';
@@ -63,6 +66,19 @@ export default function ManholesPage() {
       return target.includes(normalized);
     });
   }, [manholes, query]);
+
+  // クエリが都道府県に絞り込まれた場合にトラッキング
+  useEffect(() => {
+    if (filteredManholes.length === 0 || !query.trim()) return;
+    const prefectures = new Set(filteredManholes.map((m) => m.prefecture).filter(Boolean));
+    if (prefectures.size === 1) {
+      const prefecture = [...prefectures][0] as string;
+      if (prefecture !== lastTrackedPrefecture.current) {
+        lastTrackedPrefecture.current = prefecture;
+        trackPrefectureOpen({ prefecture });
+      }
+    }
+  }, [filteredManholes, query]);
 
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
   const prefectureCount = new Set(manholes.map((manhole) => manhole.prefecture).filter(Boolean)).size;
