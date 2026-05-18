@@ -13,7 +13,8 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { buildXShareUrl, buildLineShareUrl, manholeShareText } from '@/lib/share';
+import { openSharePanel, manholeShareText } from '@/lib/share';
+import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -160,12 +161,12 @@ export default function ManholeDetailPage() {
       }
       metaDesc.setAttribute('content', descriptionText);
 
-      // Update OG tags
-      const updateMetaTag = (property: string, content: string) => {
-        let meta = document.querySelector(`meta[property="${property}"]`);
+      // Update OG / Twitter Card tags
+      const updateMeta = (attr: 'property' | 'name', key: string, content: string) => {
+        let meta = document.querySelector(`meta[${attr}="${key}"]`);
         if (!meta) {
           meta = document.createElement('meta');
-          meta.setAttribute('property', property);
+          meta.setAttribute(attr, key);
           document.head.appendChild(meta);
         }
         meta.setAttribute('content', content);
@@ -179,26 +180,16 @@ export default function ManholeDetailPage() {
         ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール。場所・写真・訪問記録を確認できます。`
         : `${manhole.prefecture}${municipality}にあるポケモンマンホール。場所・写真・訪問記録を確認できます。`;
 
-      updateMetaTag('og:title', ogTitle);
-      updateMetaTag('og:description', ogDescription);
-      updateMetaTag('og:url', `https://pokefuta.com/manhole/${manhole.id}`);
-      updateMetaTag('og:type', 'website');
-      updateMetaTag('og:site_name', 'ポケふたスタンプ帳');
-      updateMetaTag('og:image', 'https://pokefuta.com/opengraph-image');
-
-      const updateNameTag = (name: string, content: string) => {
-        let meta = document.querySelector(`meta[name="${name}"]`);
-        if (!meta) {
-          meta = document.createElement('meta');
-          meta.setAttribute('name', name);
-          document.head.appendChild(meta);
-        }
-        meta.setAttribute('content', content);
-      };
-      updateNameTag('twitter:card', 'summary_large_image');
-      updateNameTag('twitter:title', ogTitle);
-      updateNameTag('twitter:description', ogDescription);
-      updateNameTag('twitter:image', 'https://pokefuta.com/opengraph-image');
+      updateMeta('property', 'og:title', ogTitle);
+      updateMeta('property', 'og:description', ogDescription);
+      updateMeta('property', 'og:url', `https://pokefuta.com/manhole/${manhole.id}`);
+      updateMeta('property', 'og:type', 'website');
+      updateMeta('property', 'og:site_name', SITE_NAME);
+      updateMeta('property', 'og:image', OGP_IMAGE_URL);
+      updateMeta('name', 'twitter:card', 'summary_large_image');
+      updateMeta('name', 'twitter:title', ogTitle);
+      updateMeta('name', 'twitter:description', ogDescription);
+      updateMeta('name', 'twitter:image', OGP_IMAGE_URL);
 
       // Add canonical link
       let canonical = document.querySelector('link[rel="canonical"]');
@@ -471,10 +462,6 @@ export default function ManholeDetailPage() {
     if (!manhole) return;
 
     const municipality = manhole.city || manhole.municipality || '場所未設定';
-    const pokemonList = manhole.pokemons && manhole.pokemons.length > 0
-      ? manhole.pokemons.join('・')
-      : '';
-
     const shareTitle = `${manhole.prefecture}${municipality}のポケふた`;
     const shareText = manholeShareText(`${manhole.prefecture}${municipality}`);
     const shareUrl = `https://pokefuta.com/manhole/${manhole.id}`;
@@ -486,89 +473,18 @@ export default function ManholeDetailPage() {
       if (navigator.share) {
         await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
       } else {
-        // デスクトップ: X / LINE / コピーの選択パネルを表示
-        showSharePanel(shareText, shareUrl, trackParams);
+        sharePanelCleanupRef.current?.();
+        sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
+          onShareX: () => trackShareX(trackParams),
+          onShareLine: () => trackShareLine(trackParams),
+          onCopyLink: () => trackCopyLink(trackParams),
+        });
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error('Share failed:', error);
       }
     }
-  };
-
-  const showSharePanel = (
-    shareText: string,
-    shareUrl: string,
-    trackParams: { manhole_id: number | string; prefecture?: string }
-  ) => {
-    // 既存パネルがあればクリーンアップ
-    sharePanelCleanupRef.current?.();
-
-    const panel = document.createElement('div');
-    panel.id = 'pokefuta-share-panel';
-    panel.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white rounded-lg shadow-xl font-pixelJp text-sm z-50 p-4 flex flex-col gap-2 min-w-[200px]';
-
-    const titleEl = document.createElement('p');
-    titleEl.className = 'text-xs text-center opacity-70 mb-1';
-    titleEl.textContent = '共有する';
-    panel.appendChild(titleEl);
-
-    // cleanup を先に宣言し、各ボタンから参照させる
-    let cleanup: () => void;
-
-    const makeBtn = (label: string, onClick: () => void) => {
-      const btn = document.createElement('button');
-      btn.className = 'w-full text-left px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition-colors text-sm';
-      btn.textContent = label;
-      btn.addEventListener('click', () => { onClick(); cleanup(); });
-      return btn;
-    };
-
-    panel.appendChild(makeBtn('X でシェア', () => {
-      trackShareX(trackParams);
-      window.open(buildXShareUrl(shareText, shareUrl), '_blank');
-    }));
-
-    panel.appendChild(makeBtn('LINE でシェア', () => {
-      trackShareLine(trackParams);
-      window.open(buildLineShareUrl(shareUrl), '_blank');
-    }));
-
-    panel.appendChild(makeBtn('リンクをコピー', async () => {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        trackCopyLink(trackParams);
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
-        toast.textContent = 'リンクをコピーしました';
-        document.body.appendChild(toast);
-        setTimeout(() => document.body.removeChild(toast), 2000);
-      } catch {
-        const errToast = document.createElement('div');
-        errToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-rpg-red text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
-        errToast.textContent = 'コピーに失敗しました';
-        document.body.appendChild(errToast);
-        setTimeout(() => document.body.removeChild(errToast), 2000);
-      }
-    }));
-
-    document.body.appendChild(panel);
-
-    const closeOnOutside = (e: MouseEvent) => {
-      if (!panel.contains(e.target as Node)) cleanup();
-    };
-
-    cleanup = () => {
-      panel.remove();
-      document.removeEventListener('click', closeOnOutside);
-      sharePanelCleanupRef.current = null;
-    };
-
-    // アンマウント時用にrefへ登録
-    sharePanelCleanupRef.current = cleanup;
-
-    // トリガーとなったクリックイベントを捕捉しないよう次のticksで登録
-    setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
   };
 
   const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {

@@ -5,7 +5,23 @@ export const alt = 'ポケふたスタンプ帳';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export default function Image() {
+async function loadNotoSansJP(): Promise<ArrayBuffer | null> {
+  try {
+    const css = await fetch(
+      'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    ).then((r) => r.text());
+    const url = css.match(/url\(([^)]+\.woff2)\)/)?.[1];
+    if (!url) return null;
+    return fetch(url).then((r) => r.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+export default async function Image() {
+  const fontData = await loadNotoSansJP();
+
   return new ImageResponse(
     (
       <div
@@ -17,7 +33,7 @@ export default function Image() {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'linear-gradient(135deg, #4a7c59 0%, #2d5a3d 40%, #1a3a28 100%)',
-          fontFamily: 'sans-serif',
+          fontFamily: 'NotoSansJP, sans-serif',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -77,28 +93,11 @@ export default function Image() {
             zIndex: 1,
           }}
         >
-          {/* アイコン（スタンプ風） */}
-          <div
-            style={{
-              width: 100,
-              height: 100,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)',
-              border: '4px solid rgba(255,255,255,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 48,
-            }}
-          >
-            📍
-          </div>
-
           {/* タイトル */}
           <div
             style={{
               fontSize: 72,
-              fontWeight: 800,
+              fontWeight: 700,
               color: '#ffffff',
               letterSpacing: '-2px',
               textShadow: '0 4px 20px rgba(0,0,0,0.4)',
@@ -113,6 +112,7 @@ export default function Image() {
           <div
             style={{
               fontSize: 32,
+              fontWeight: 700,
               color: 'rgba(255,255,255,0.85)',
               textAlign: 'center',
               letterSpacing: '1px',
@@ -140,6 +140,7 @@ export default function Image() {
                   border: '1px solid rgba(255,255,255,0.35)',
                   color: '#ffffff',
                   fontSize: 22,
+                  fontWeight: 700,
                   letterSpacing: '1px',
                 }}
               >
@@ -163,6 +164,11 @@ export default function Image() {
         </div>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+      fonts: fontData
+        ? [{ name: 'NotoSansJP', data: fontData, weight: 700, style: 'normal' }]
+        : [],
+    }
   );
 }

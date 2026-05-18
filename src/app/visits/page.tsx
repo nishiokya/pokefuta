@@ -24,7 +24,8 @@ import BottomNav from '@/components/BottomNav';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { buildXShareUrl, buildLineShareUrl, visitsShareText } from '@/lib/share';
+import { openSharePanel, visitsShareText } from '@/lib/share';
+import { SITE_NAME } from '@/lib/constants';
 
 interface Visit {
   id: string;
@@ -102,58 +103,14 @@ export default function VisitsPage() {
     trackShareClick();
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'ポケふたスタンプ帳', text: shareText, url: shareUrl });
+        await navigator.share({ title: SITE_NAME, text: shareText, url: shareUrl });
       } else {
         sharePanelCleanupRef.current?.();
-        const panel = document.createElement('div');
-        panel.id = 'pokefuta-share-panel';
-        panel.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white rounded-lg shadow-xl font-pixelJp text-sm z-50 p-4 flex flex-col gap-2 min-w-[200px]';
-        const titleEl = document.createElement('p');
-        titleEl.className = 'text-xs text-center opacity-70 mb-1';
-        titleEl.textContent = '共有する';
-        panel.appendChild(titleEl);
-        let cleanup: () => void;
-        const makeBtn = (label: string, onClick: () => void) => {
-          const btn = document.createElement('button');
-          btn.className = 'w-full text-left px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition-colors text-sm';
-          btn.textContent = label;
-          btn.addEventListener('click', () => { onClick(); cleanup(); });
-          return btn;
-        };
-        panel.appendChild(makeBtn('X でシェア', () => {
-          trackShareX();
-          window.open(buildXShareUrl(shareText, shareUrl), '_blank');
-        }));
-        panel.appendChild(makeBtn('LINE でシェア', () => {
-          trackShareLine();
-          window.open(buildLineShareUrl(shareUrl), '_blank');
-        }));
-        panel.appendChild(makeBtn('リンクをコピー', async () => {
-          try {
-            await navigator.clipboard.writeText(shareUrl);
-            trackCopyLink();
-            const toast = document.createElement('div');
-            toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
-            toast.textContent = 'リンクをコピーしました';
-            document.body.appendChild(toast);
-            setTimeout(() => document.body.removeChild(toast), 2000);
-          } catch {
-            const errToast = document.createElement('div');
-            errToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-rpg-red text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
-            errToast.textContent = 'コピーに失敗しました';
-            document.body.appendChild(errToast);
-            setTimeout(() => document.body.removeChild(errToast), 2000);
-          }
-        }));
-        document.body.appendChild(panel);
-        const closeOnOutside = (e: MouseEvent) => { if (!panel.contains(e.target as Node)) cleanup(); };
-        cleanup = () => {
-          panel.remove();
-          document.removeEventListener('click', closeOnOutside);
-          sharePanelCleanupRef.current = null;
-        };
-        sharePanelCleanupRef.current = cleanup;
-        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+        sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
+          onShareX: () => trackShareX(),
+          onShareLine: () => trackShareLine(),
+          onCopyLink: () => trackCopyLink(),
+        });
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {

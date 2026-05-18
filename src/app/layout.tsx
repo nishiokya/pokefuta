@@ -4,10 +4,10 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
 
+import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
+
 const inter = Inter({ subsets: ['latin'] });
 
-const OGP_IMAGE_URL = 'https://pokefuta.com/opengraph-image';
-const SITE_NAME = 'ポケふたスタンプ帳';
 const SITE_DESCRIPTION = '旅先で見つけたポケふたを記録しよう。訪問記録・写真投稿・スタンプ帳サービスです。';
 
 export const metadata: Metadata = {
