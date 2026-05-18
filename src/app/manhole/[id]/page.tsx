@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, Heart, Bookmark, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2 } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -54,14 +54,6 @@ const getPhotoUserLabel = (photo: Photo) => {
   return '名無しのトレーナー';
 };
 
-interface PhotoSocial {
-  likes: number;
-  bookmarks: number;
-  comments: number;
-  userLiked: boolean;
-  userBookmarked: boolean;
-}
-
 interface ManholeComment {
   id: string;
   content: string;
@@ -86,7 +78,6 @@ export default function ManholeDetailPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [photoReactions, setPhotoReactions] = useState<Map<string, PhotoSocial>>(new Map());
 
   const [manholeComments, setManholeComments] = useState<ManholeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -283,8 +274,6 @@ export default function ManholeDetailPage() {
         const data = await response.json();
         if (data.success && data.images) {
           setPhotos(data.images);
-          // 各写真のソーシャル情報を読み込む（visitに集約）
-          loadSocialForPhotos(data.images);
         }
       }
     } catch (err) {
@@ -354,43 +343,6 @@ export default function ManholeDetailPage() {
     } finally {
       setCommentsSubmitting(false);
     }
-  };
-
-  const loadSocialForPhotos = async (photos: Photo[]) => {
-    const reactionsMap = new Map<string, PhotoSocial>();
-
-    for (const photo of photos) {
-      const visitId = photo.visit?.id;
-      if (!visitId) {
-        reactionsMap.set(photo.id, {
-          likes: 0,
-          bookmarks: 0,
-          comments: 0,
-          userLiked: false,
-          userBookmarked: false
-        });
-        continue;
-      }
-      try {
-        const response = await fetch(`/api/visits/${visitId}/social`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            reactionsMap.set(photo.id, {
-              likes: data.likes,
-              bookmarks: data.bookmarks,
-              comments: data.comments,
-              userLiked: data.userLiked,
-              userBookmarked: data.userBookmarked
-            });
-          }
-        }
-      } catch (err) {
-        console.error(`Failed to load reactions for photo ${photo.id}:`, err);
-      }
-    }
-
-    setPhotoReactions(reactionsMap);
   };
 
   const handleManholeClick = (clickedManhole: Manhole) => {
@@ -484,50 +436,6 @@ export default function ManholeDetailPage() {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error('Share failed:', error);
       }
-    }
-  };
-
-  const handleReaction = async (photo: Photo, reactionType: 'like' | 'bookmark') => {
-    const visitId = photo.visit?.id;
-    if (!visitId) return;
-
-    try {
-      const current = photoReactions.get(photo.id);
-      const isOn = reactionType === 'like' ? !!current?.userLiked : !!current?.userBookmarked;
-      const endpoint = reactionType === 'like'
-        ? `/api/visits/${visitId}/like`
-        : `/api/visits/${visitId}/bookmark`;
-
-      const response = await fetch(endpoint, {
-        method: isOn ? 'DELETE' : 'POST'
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // ソーシャル情報を再読み込み
-        const socialResponse = await fetch(`/api/visits/${visitId}/social`);
-        if (!socialResponse.ok) return;
-        const socialData = await socialResponse.json();
-        if (!socialData.success) return;
-        setPhotoReactions(prev => {
-          const newMap = new Map(prev);
-          newMap.set(photo.id, {
-            likes: socialData.likes,
-            bookmarks: socialData.bookmarks,
-            comments: socialData.comments,
-            userLiked: socialData.userLiked,
-            userBookmarked: socialData.userBookmarked
-          });
-          return newMap;
-        });
-      } else if (response.status === 401) {
-        alert('ログインが必要です');
-      } else {
-        console.error('Social action failed:', data);
-      }
-    } catch (error) {
-      console.error('Error handling social action:', error);
     }
   };
 
@@ -821,13 +729,7 @@ export default function ManholeDetailPage() {
               </h2>
               <div className="grid grid-cols-2 gap-3">
                 {othersPhotos.map((photo) => {
-                  const reactions = photoReactions.get(photo.id) || {
-                    likes: 0,
-                    bookmarks: 0,
-                    comments: 0,
-                    userLiked: false,
-                    userBookmarked: false
-                  };
+                  const visitComment = photo.visit?.comment?.trim();
 
                   return (
                     <div
@@ -859,11 +761,10 @@ export default function ManholeDetailPage() {
                           }}
                         />
 
-                        {/* Subtle overlay with user, date, and reactions */}
+                        {/* Subtle overlay with user, date, and visit comment */}
                         <div className="absolute bottom-0 left-0 right-0 z-10">
                           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pointer-events-none"></div>
                           <div className="relative p-2">
-                            {/* User and date info */}
                             <div className="flex items-center gap-1 mb-1">
                               <UserIcon className="w-3 h-3 text-white/80" />
                               <span className="font-pixelJp text-[10px] text-white/80 truncate drop-shadow">
@@ -878,29 +779,11 @@ export default function ManholeDetailPage() {
                                 </span>
                               </div>
                             )}
-                            {/* Like and Bookmark buttons */}
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => handleReaction(photo, 'like')}
-                                className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-1.5 py-0.5 rounded transition-colors ${
-                                  reactions.userLiked ? 'bg-rpg-red/80' : 'hover:bg-rpg-red/80'
-                                }`}
-                                title={reactions.userLiked ? 'いいね解除' : 'いいね'}
-                              >
-                                <Heart className={`w-3 h-3 ${reactions.userLiked ? 'fill-white' : ''} text-white`} />
-                                <span className="font-pixel text-[9px] text-white">{reactions.likes}</span>
-                              </button>
-                              <button
-                                onClick={() => handleReaction(photo, 'bookmark')}
-                                className={`flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-white/30 px-1.5 py-0.5 rounded transition-colors ${
-                                  reactions.userBookmarked ? 'bg-rpg-blue/80' : 'hover:bg-rpg-blue/80'
-                                }`}
-                                title={reactions.userBookmarked ? 'ブックマーク解除' : 'ブックマーク'}
-                              >
-                                <Bookmark className={`w-3 h-3 ${reactions.userBookmarked ? 'fill-white' : ''} text-white`} />
-                                <span className="font-pixel text-[9px] text-white">{reactions.bookmarks}</span>
-                              </button>
-                            </div>
+                            {visitComment && (
+                              <p className="mt-2 max-h-16 overflow-hidden whitespace-pre-wrap break-words rounded bg-black/35 px-2 py-1 font-pixelJp text-[10px] leading-relaxed text-white/90 drop-shadow">
+                                {visitComment}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
