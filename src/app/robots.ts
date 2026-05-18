@@ -14,6 +14,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: [
           '/api/',           // APIエンドポイント
+          '/api-docs',       // 開発環境向けAPIドキュメント
           '/login',          // 認証ページ
           '/signup',         // 認証ページ
           '/upload',         // アップロードページ（認証が必要）

@@ -51,12 +51,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.7,
     },
-    {
-      url: `${baseUrl}/api-docs`,
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.4,
-    },
   ];
 
   let dynamicPages: MetadataRoute.Sitemap = [];
@@ -71,6 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { data: manholes, error } = await supabase
         .from('manhole')
         .select('id, created_at')
+        .eq('is_active', true)
         .order('id', { ascending: true });
 
       if (error) {
