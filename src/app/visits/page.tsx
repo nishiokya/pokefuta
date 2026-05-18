@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Bookmark,
@@ -12,6 +12,7 @@ import {
   MapPin,
   Navigation,
   PlusCircle,
+  Share2,
   Sparkles,
   Stamp,
   Trash2,
@@ -23,6 +24,7 @@ import BottomNav from '@/components/BottomNav';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { buildXShareUrl, buildLineShareUrl, visitsShareText } from '@/lib/share';
 
 interface Visit {
   id: string;
@@ -83,7 +85,9 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const { trackView, trackPassportOpen } = useAnalytics();
+  const { trackView, trackPassportOpen, trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
+  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => { return () => { sharePanelCleanupRef.current?.(); }; }, []);
 
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
@@ -91,6 +95,72 @@ export default function VisitsPage() {
     trackPassportOpen();
     checkAuth();
   }, []);
+
+  const handleShare = async () => {
+    const shareText = visitsShareText();
+    const shareUrl = 'https://pokefuta.com/visits';
+    trackShareClick();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'ポケふたスタンプ帳', text: shareText, url: shareUrl });
+      } else {
+        sharePanelCleanupRef.current?.();
+        const panel = document.createElement('div');
+        panel.id = 'pokefuta-share-panel';
+        panel.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white rounded-lg shadow-xl font-pixelJp text-sm z-50 p-4 flex flex-col gap-2 min-w-[200px]';
+        const titleEl = document.createElement('p');
+        titleEl.className = 'text-xs text-center opacity-70 mb-1';
+        titleEl.textContent = '共有する';
+        panel.appendChild(titleEl);
+        let cleanup: () => void;
+        const makeBtn = (label: string, onClick: () => void) => {
+          const btn = document.createElement('button');
+          btn.className = 'w-full text-left px-3 py-2 rounded bg-white/10 hover:bg-white/20 transition-colors text-sm';
+          btn.textContent = label;
+          btn.addEventListener('click', () => { onClick(); cleanup(); });
+          return btn;
+        };
+        panel.appendChild(makeBtn('X でシェア', () => {
+          trackShareX();
+          window.open(buildXShareUrl(shareText, shareUrl), '_blank');
+        }));
+        panel.appendChild(makeBtn('LINE でシェア', () => {
+          trackShareLine();
+          window.open(buildLineShareUrl(shareUrl), '_blank');
+        }));
+        panel.appendChild(makeBtn('リンクをコピー', async () => {
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            trackCopyLink();
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#4F3828] text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+            toast.textContent = 'リンクをコピーしました';
+            document.body.appendChild(toast);
+            setTimeout(() => document.body.removeChild(toast), 2000);
+          } catch {
+            const errToast = document.createElement('div');
+            errToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-rpg-red text-white px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50';
+            errToast.textContent = 'コピーに失敗しました';
+            document.body.appendChild(errToast);
+            setTimeout(() => document.body.removeChild(errToast), 2000);
+          }
+        }));
+        document.body.appendChild(panel);
+        const closeOnOutside = (e: MouseEvent) => { if (!panel.contains(e.target as Node)) cleanup(); };
+        cleanup = () => {
+          panel.remove();
+          document.removeEventListener('click', closeOnOutside);
+          sharePanelCleanupRef.current = null;
+        };
+        sharePanelCleanupRef.current = cleanup;
+        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Share failed:', error);
+      }
+    }
+  };
 
   const checkAuth = async () => {
     try {
@@ -615,9 +685,18 @@ export default function VisitsPage() {
                     ポケふた訪問パスポート
                   </h1>
                 </div>
-                <div className="shrink-0 rounded-lg border border-[#B65A4B]/30 bg-[#F8D9C4] px-3 py-2 text-center">
-                  <p className="font-pixel text-2xl leading-none text-[#B5483C]">{visitedManholesCount}</p>
-                  <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">STAMPS</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={handleShare}
+                    className="rounded-lg border border-[#8C6A4A]/30 bg-[#F6EEDC] p-2 text-[#6A4D36] transition-colors hover:bg-[#EDD9BC]"
+                    aria-label="スタンプ帳を共有"
+                  >
+                    <Share2 size={18} />
+                  </button>
+                  <div className="rounded-lg border border-[#B65A4B]/30 bg-[#F8D9C4] px-3 py-2 text-center">
+                    <p className="font-pixel text-2xl leading-none text-[#B5483C]">{visitedManholesCount}</p>
+                    <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">STAMPS</p>
+                  </div>
                 </div>
               </div>
 

@@ -13,6 +13,7 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { buildXShareUrl, buildLineShareUrl, manholeShareText } from '@/lib/share';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -182,6 +183,22 @@ export default function ManholeDetailPage() {
       updateMetaTag('og:description', ogDescription);
       updateMetaTag('og:url', `https://pokefuta.com/manhole/${manhole.id}`);
       updateMetaTag('og:type', 'website');
+      updateMetaTag('og:site_name', 'ポケふたスタンプ帳');
+      updateMetaTag('og:image', 'https://pokefuta.com/opengraph-image');
+
+      const updateNameTag = (name: string, content: string) => {
+        let meta = document.querySelector(`meta[name="${name}"]`);
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', name);
+          document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', content);
+      };
+      updateNameTag('twitter:card', 'summary_large_image');
+      updateNameTag('twitter:title', ogTitle);
+      updateNameTag('twitter:description', ogDescription);
+      updateNameTag('twitter:image', 'https://pokefuta.com/opengraph-image');
 
       // Add canonical link
       let canonical = document.querySelector('link[rel="canonical"]');
@@ -459,9 +476,7 @@ export default function ManholeDetailPage() {
       : '';
 
     const shareTitle = `${manhole.prefecture}${municipality}のポケふた`;
-    const shareText = pokemonList
-      ? `${manhole.prefecture}${municipality}のポケふたを見つけました！\n${pokemonList}が描かれたポケモンマンホールです。`
-      : `${manhole.prefecture}${municipality}のポケふたを見つけました！`;
+    const shareText = manholeShareText(`${manhole.prefecture}${municipality}`);
     const shareUrl = `https://pokefuta.com/manhole/${manhole.id}`;
     const trackParams = { manhole_id: manhole.id, prefecture: manhole.prefecture };
 
@@ -509,15 +524,14 @@ export default function ManholeDetailPage() {
       return btn;
     };
 
-    const xText = `${shareText}\n${shareUrl}`;
     panel.appendChild(makeBtn('X でシェア', () => {
       trackShareX(trackParams);
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(xText)}`, '_blank');
+      window.open(buildXShareUrl(shareText, shareUrl), '_blank');
     }));
 
     panel.appendChild(makeBtn('LINE でシェア', () => {
       trackShareLine(trackParams);
-      window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}`, '_blank');
+      window.open(buildLineShareUrl(shareUrl), '_blank');
     }));
 
     panel.appendChild(makeBtn('リンクをコピー', async () => {
