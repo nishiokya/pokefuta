@@ -4,23 +4,41 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
 
+import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
+
 const inter = Inter({ subsets: ['latin'] });
 
+const SITE_DESCRIPTION = '旅先で見つけたポケふたを記録しよう。訪問記録・写真投稿・スタンプ帳サービスです。';
+
 export const metadata: Metadata = {
-  title: 'ポケふた訪問記録',
-  description: 'ポケモンマンホール（ポケふた）の訪問記録と写真を管理するアプリ',
+  title: SITE_NAME,
+  description: SITE_DESCRIPTION,
   manifest: '/manifest.json',
   icons: {
     apple: '/icon-192.png',
   },
-  keywords: ['ポケモン', 'ポケふた', 'マンホール', '訪問記録', '写真'],
-  authors: [{ name: 'ポケふた訪問記録 開発チーム' }],
-  creator: 'ポケふた訪問記録',
-  publisher: 'ポケふた訪問記録',
+  keywords: ['ポケモン', 'ポケふた', 'マンホール', '訪問記録', '写真', 'スタンプ帳'],
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: 'https://pokefuta.com',
+    images: [{ url: OGP_IMAGE_URL, width: 1200, height: 630, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [OGP_IMAGE_URL],
   },
 };
 
