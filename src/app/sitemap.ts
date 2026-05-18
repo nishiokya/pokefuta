@@ -2,74 +2,57 @@ import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pokefuta.example.com';
+const baseUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'https://pokefuta.com'
+).replace(/\/$/, '');
+
+export const revalidate = 86400;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // 静的ページ
+  const lastModified = new Date();
+
+  // Public pages suitable for search indexing.
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
       url: `${baseUrl}/about`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
       url: `${baseUrl}/map`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: 'weekly',
       priority: 0.9,
     },
     {
       url: `${baseUrl}/manholes`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
       url: `${baseUrl}/nearby`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: 'weekly',
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/signup`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/upload`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/visits`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
+      url: `${baseUrl}/popular`,
+      lastModified,
+      changeFrequency: 'daily',
       priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/api-docs`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.4,
     },
   ];
 
-  // 動的ページ（マンホール詳細ページ）
   let dynamicPages: MetadataRoute.Sitemap = [];
 
   try {
@@ -79,16 +62,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (supabaseUrl && supabaseKey && !supabaseUrl.includes('dummy')) {
       const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
-      // 全マンホールのIDと更新日時を取得
-      const { data: manholes } = await supabase
+      const { data: manholes, error } = await supabase
         .from('manhole')
-        .select('id, updated_at, created_at')
+        .select('id, created_at')
+        .eq('is_active', true)
         .order('id', { ascending: true });
 
+      if (error) {
+        throw error;
+      }
+
       if (manholes && manholes.length > 0) {
-        dynamicPages = manholes.map((manhole: { id: number; updated_at: string; created_at: string }) => ({
+        dynamicPages = manholes.map((manhole: { id: number; created_at: string }) => ({
           url: `${baseUrl}/manhole/${manhole.id}`,
-          lastModified: new Date(manhole.updated_at || manhole.created_at),
+          lastModified: new Date(manhole.created_at),
           changeFrequency: 'weekly' as const,
           priority: 0.8,
         }));
@@ -96,7 +83,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch (error) {
     console.error('Error fetching manholes for sitemap:', error);
-    // エラーが発生しても静的ページのサイトマップは返す
   }
 
   return [...staticPages, ...dynamicPages];
