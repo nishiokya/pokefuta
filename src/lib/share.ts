@@ -56,12 +56,12 @@ export function openSharePanel(
 
   panel.appendChild(makeBtn('X でシェア', () => {
     callbacks.onShareX();
-    window.open(buildXShareUrl(shareText, shareUrl), '_blank');
+    window.open(buildXShareUrl(shareText, shareUrl), '_blank', 'noopener,noreferrer');
   }));
 
   panel.appendChild(makeBtn('LINE でシェア', () => {
     callbacks.onShareLine();
-    window.open(buildLineShareUrl(shareUrl), '_blank');
+    window.open(buildLineShareUrl(shareUrl), '_blank', 'noopener,noreferrer');
   }));
 
   panel.appendChild(makeBtn('リンクをコピー', async () => {
