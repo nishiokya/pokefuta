@@ -393,6 +393,20 @@ export interface Database {
       };
     };
     Functions: {
+      get_manhole_photo_summaries: {
+        Args: {
+          p_manhole_ids: number[];
+        };
+        Returns: {
+          manhole_id: number;
+          photo_count: number;
+          latest_photo_id: string;
+          latest_storage_key: string;
+          latest_thumbnail_320: string | null;
+          latest_thumbnail_800: string | null;
+          latest_thumbnail_1600: string | null;
+        }[];
+      };
       get_unvisited_manholes: {
         Args: {
           user_uuid: string;
@@ -522,4 +536,5 @@ export type Manhole = Database['public']['Tables']['manhole']['Row'] & {
   is_visited?: boolean;
   last_visit?: string | null;
   photo_count?: number;
+  latest_photo_url?: string | null;
 };

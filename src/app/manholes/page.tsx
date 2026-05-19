@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Camera, MapPin, Search } from 'lucide-react';
+import Image from 'next/image';
+import { Camera, Image as ImageIcon, MapPin, Search } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -81,7 +82,16 @@ export default function ManholesPage() {
   }, [filteredManholes, query]);
 
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
-  const prefectureCount = new Set(manholes.map((manhole) => manhole.prefecture).filter(Boolean)).size;
+  const visibleManholeCount = filteredManholes.length;
+  const visiblePrefectureCount = new Set(filteredManholes.map((manhole) => manhole.prefecture).filter(Boolean)).size;
+  const visibleMunicipalityCount = new Set(
+    filteredManholes
+      .map((manhole) => manhole.municipality || manhole.city)
+      .filter(Boolean)
+  ).size;
+  const visiblePokemonCount = new Set(
+    filteredManholes.flatMap((manhole) => manhole.pokemons || []).filter(Boolean)
+  ).size;
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
@@ -121,18 +131,22 @@ export default function ManholesPage() {
             </Link>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-              <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{manholes.length}</div>
+              <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{visibleManholeCount}</div>
               <div className="mt-1 text-xs font-bold text-[#6B6B6B]">総数</div>
             </div>
             <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-              <div className="text-xl font-extrabold leading-none text-[#FF8F1F]">{prefectureCount}</div>
+              <div className="text-xl font-extrabold leading-none text-[#FF8F1F]">{visiblePrefectureCount}</div>
               <div className="mt-1 text-xs font-bold text-[#6B6B6B]">都道府県</div>
             </div>
             <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-              <div className="text-xl font-extrabold leading-none text-[#2D846C]">{filteredManholes.length}</div>
-              <div className="mt-1 text-xs font-bold text-[#6B6B6B]">表示中</div>
+              <div className="text-xl font-extrabold leading-none text-[#2D846C]">{visibleMunicipalityCount}</div>
+              <div className="mt-1 text-xs font-bold text-[#6B6B6B]">市町村</div>
+            </div>
+            <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
+              <div className="text-xl font-extrabold leading-none text-[#D94F70]">{visiblePokemonCount}</div>
+              <div className="mt-1 text-xs font-bold text-[#6B6B6B]">ポケモン種類</div>
             </div>
           </div>
         </section>
@@ -152,39 +166,63 @@ export default function ManholesPage() {
                 <Link
                   key={manhole.id}
                   href={`/manhole/${manhole.id}`}
-                  className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                  className="overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
-                        {manhole.title || `${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}`}
-                      </h2>
-                      <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
-                        {manhole.prefecture} {manhole.municipality || manhole.city || ''}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-sm font-extrabold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15">
-                      #{manhole.id}
+                  <div className="relative aspect-[16/9] bg-[#F6EEDC]">
+                    {manhole.latest_photo_url ? (
+                      <Image
+                        src={manhole.latest_photo_url}
+                        alt={`${manhole.title || manhole.municipality || manhole.city || 'ポケふた'}の写真`}
+                        fill
+                        sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        className="object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#FFF8EB_0%,#F6EEDC_52%,#E7F1EC_100%)]">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#7B63A8]/15 bg-white/70 text-[#7B63A8] shadow-sm">
+                          <ImageIcon className="h-7 w-7" />
+                        </div>
+                      </div>
+                    )}
+                    <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 text-xs font-extrabold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15">
+                      写真 {manhole.photo_count || 0}枚
                     </span>
                   </div>
 
-                  {manhole.pokemons && manhole.pokemons.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {manhole.pokemons.slice(0, 4).map((pokemon, index) => (
-                        <span
-                          key={`${manhole.id}-${pokemon}-${index}`}
-                          className="rounded-full bg-[#FFB347]/25 px-2.5 py-1 text-xs font-bold text-[#2A2A2A]"
-                        >
-                          {pokemon}
-                        </span>
-                      ))}
-                      {manhole.pokemons.length > 4 && (
-                        <span className="px-1 py-1 text-xs font-bold text-[#6B6B6B]">
-                          +{manhole.pokemons.length - 4}
-                        </span>
-                      )}
+                  <div className="p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
+                          {manhole.title || `${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}`}
+                        </h2>
+                        <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
+                          {manhole.prefecture} {manhole.municipality || manhole.city || ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-sm font-extrabold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15">
+                        #{manhole.id}
+                      </span>
                     </div>
-                  )}
+
+                    {manhole.pokemons && manhole.pokemons.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {manhole.pokemons.slice(0, 4).map((pokemon, index) => (
+                          <span
+                            key={`${manhole.id}-${pokemon}-${index}`}
+                            className="rounded-full bg-[#FFB347]/25 px-2.5 py-1 text-xs font-bold text-[#2A2A2A]"
+                          >
+                            {pokemon}
+                          </span>
+                        ))}
+                        {manhole.pokemons.length > 4 && (
+                          <span className="px-1 py-1 text-xs font-bold text-[#6B6B6B]">
+                            +{manhole.pokemons.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </Link>
               ))}
             </div>
