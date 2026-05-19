@@ -450,6 +450,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    const viewerUserId = session?.user?.id ?? null;
     const { searchParams } = new URL(request.url);
     const storageKey = searchParams.get('key');
     const manholeId = searchParams.get('manhole_id');
@@ -457,6 +459,35 @@ export async function GET(request: NextRequest) {
     const offsetParam = searchParams.get('offset');
 
     if (storageKey) {
+      const { data: photo, error: photoError } = await supabase
+        .from('photo')
+        .select(`
+          storage_key,
+          visit:visit_id!inner (
+            user_id,
+            is_public
+          )
+        `)
+        .eq('storage_key', storageKey)
+        .single();
+
+      if (photoError || !photo) {
+        return NextResponse.json({
+          success: false,
+          error: 'Image not found'
+        }, { status: 404 });
+      }
+
+      const visit = Array.isArray((photo as any).visit) ? (photo as any).visit[0] : (photo as any).visit;
+      const canView = visit?.is_public === true || (viewerUserId && visit?.user_id === viewerUserId);
+
+      if (!canView) {
+        return NextResponse.json({
+          success: false,
+          error: 'Image not found'
+        }, { status: 404 });
+      }
+
       // Redirect to signed URL for the specific image
       const signedUrl = await storage.getSignedUrl(storageKey, 3600);
       return NextResponse.redirect(signedUrl.url);
@@ -466,7 +497,7 @@ export async function GET(request: NextRequest) {
         .from('photo')
         .select(`
           *,
-          visit(
+          visit:visit_id!inner (
             id,
             user_id,
             shot_at,
@@ -477,6 +508,12 @@ export async function GET(request: NextRequest) {
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (viewerUserId) {
+        query = query.or(`is_public.eq.true,user_id.eq.${viewerUserId}`, { foreignTable: 'visit' });
+      } else {
+        query = query.eq('visit.is_public', true);
+      }
 
       // Filter by manhole_id if provided
       if (manholeId) {

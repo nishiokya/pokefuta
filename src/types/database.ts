@@ -1,3 +1,11 @@
+export interface ManholeTitle {
+  key: string;
+  label: string;
+  hashtag?: string;
+  emoji?: string;
+  priority?: number;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -42,10 +50,16 @@ export interface Database {
           prefecture_code: string | null;
           municipality: string | null;
           address: string | null;
+          address_norm: string | null;
+          building: string | null;
           location: string; // PostGIS geography as string
           pokemons: string[];
           detail_url: string | null;
           prefecture_site_url: string | null;
+          official_url: string | null;
+          titles: ManholeTitle[];
+          hashtags: string[];
+          title_tags: string[];
           region: string | null;
           is_active: boolean;
           last_verified_at: string;
@@ -61,10 +75,16 @@ export interface Database {
           prefecture_code?: string | null;
           municipality?: string | null;
           address?: string | null;
+          address_norm?: string | null;
+          building?: string | null;
           location: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
+          official_url?: string | null;
+          titles?: ManholeTitle[];
+          hashtags?: string[];
+          title_tags?: string[];
           region?: string | null;
           is_active?: boolean;
           last_verified_at?: string;
@@ -77,10 +97,16 @@ export interface Database {
           prefecture_code?: string | null;
           municipality?: string | null;
           address?: string | null;
+          address_norm?: string | null;
+          building?: string | null;
           location?: string;
           pokemons?: string[];
           detail_url?: string | null;
           prefecture_site_url?: string | null;
+          official_url?: string | null;
+          titles?: ManholeTitle[];
+          hashtags?: string[];
+          title_tags?: string[];
           region?: string | null;
           is_active?: boolean;
           last_verified_at?: string;
@@ -522,4 +548,5 @@ export type Manhole = Database['public']['Tables']['manhole']['Row'] & {
   is_visited?: boolean;
   last_visit?: string | null;
   photo_count?: number;
+  latest_photo_url?: string | null;
 };
