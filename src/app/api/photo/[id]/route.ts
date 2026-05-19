@@ -75,15 +75,33 @@ export async function GET(
     const photoId = params.id;
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size'); // 'small', 'medium', 'large', or null for original
+    const { data: { session } } = await supabase.auth.getSession();
+    const viewerUserId = session?.user?.id ?? null;
 
     // Fetch photo metadata from database
     const { data: photo, error } = await supabase
       .from('photo')
-      .select('*')
+      .select(`
+        *,
+        visit:visit_id (
+          user_id,
+          is_public
+        )
+      `)
       .eq('id', photoId)
       .single();
 
     if (error || !photo) {
+      return NextResponse.json({
+        success: false,
+        error: 'Photo not found'
+      }, { status: 404 });
+    }
+
+    const visit = Array.isArray((photo as any).visit) ? (photo as any).visit[0] : (photo as any).visit;
+    const canView = visit?.is_public === true || (viewerUserId && visit?.user_id === viewerUserId);
+
+    if (!canView) {
       return NextResponse.json({
         success: false,
         error: 'Photo not found'

@@ -1,7 +1,15 @@
-const HASHTAGS = 'ポケふた,ポケモンマンホール';
+const DEFAULT_HASHTAGS = ['ポケふた', 'ポケモンマンホール'];
 
-export function buildXShareUrl(text: string, pageUrl: string): string {
-  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}&hashtags=${encodeURIComponent(HASHTAGS)}`;
+function normalizeHashtag(tag: string): string {
+  return tag.replace(/^#+/, '').trim();
+}
+
+export function buildXShareUrl(text: string, pageUrl: string, hashtags: string[] = []): string {
+  const mergedHashtags = [...hashtags, ...DEFAULT_HASHTAGS]
+    .map(normalizeHashtag)
+    .filter(Boolean);
+
+  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}&hashtags=${encodeURIComponent(mergedHashtags.join(','))}`;
 }
 
 export function buildLineShareUrl(pageUrl: string): string {
@@ -10,6 +18,15 @@ export function buildLineShareUrl(pageUrl: string): string {
 
 export function manholeShareText(municipality: string): string {
   return `${municipality}のポケふたを見つけました。\n訪問記録や写真を残せるポケふた用スタンプ帳です。`;
+}
+
+export function photoShareText(municipality: string, hashtags: string[] = []): string {
+  const titleTags = hashtags.slice(0, 2).join(' ');
+  return [
+    `${municipality}のポケふたを見つけました。`,
+    titleTags,
+    '訪問記録や写真を残せるポケふた用スタンプ帳です。',
+  ].filter(Boolean).join('\n');
 }
 
 export function visitsShareText(): string {
@@ -33,7 +50,8 @@ function showToast(message: string, isError: boolean) {
 export function openSharePanel(
   shareText: string,
   shareUrl: string,
-  callbacks: SharePanelCallbacks
+  callbacks: SharePanelCallbacks,
+  hashtags: string[] = []
 ): () => void {
   const panel = document.createElement('div');
   panel.id = 'pokefuta-share-panel';
@@ -56,7 +74,7 @@ export function openSharePanel(
 
   panel.appendChild(makeBtn('X でシェア', () => {
     callbacks.onShareX();
-    window.open(buildXShareUrl(shareText, shareUrl), '_blank', 'noopener,noreferrer');
+    window.open(buildXShareUrl(shareText, shareUrl, hashtags), '_blank', 'noopener,noreferrer');
   }));
 
   panel.appendChild(makeBtn('LINE でシェア', () => {

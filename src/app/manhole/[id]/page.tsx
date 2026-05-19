@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2 } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2, Copy, MessageCircle, Building2, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -13,8 +13,9 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { openSharePanel, manholeShareText } from '@/lib/share';
-import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
+import { buildLineShareUrl, buildXShareUrl, manholeShareText, photoShareText } from '@/lib/share';
+import { SITE_NAME, SITE_URL, OGP_IMAGE_URL } from '@/lib/constants';
+import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -52,6 +53,24 @@ const getPhotoUserLabel = (photo: Photo) => {
   const uid = photo.visit?.user_id;
   if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
   return '名無しのトレーナー';
+};
+
+const getSortedTitles = (titles?: ManholeTitle[] | null) =>
+  [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+const getTopTitleHashtags = (titles?: ManholeTitle[] | null) =>
+  getSortedTitles(titles)
+    .slice(0, 2)
+    .map((title) => title.hashtag)
+    .filter((hashtag): hashtag is string => Boolean(hashtag));
+
+const getTitleAccentClass = (index: number) => {
+  const classes = [
+    'border-[#D94D3F]/40 bg-[#F8D9C4] text-[#9F392F]',
+    'border-[#7B63A8]/35 bg-[#EFE7FF] text-[#604895]',
+    'border-[#2E8B74]/35 bg-[#DFF4EA] text-[#236B59]',
+  ];
+  return classes[index] || classes[0];
 };
 
 interface ManholeComment {
@@ -95,14 +114,6 @@ export default function ManholeDetailPage() {
     trackShareLine,
     trackCopyLink,
   } = useAnalytics();
-
-  // 共有パネルのクリーンアップ（コンポーネントアンマウント時）
-  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    return () => {
-      sharePanelCleanupRef.current?.();
-    };
-  }, []);
 
   useEffect(() => {
     const manholeId = params.id;
@@ -410,14 +421,30 @@ export default function ManholeDetailPage() {
     setSelectedVisitId(null);
   };
 
-  const handleShare = async () => {
+  const buildSharePayload = () => {
     if (!manhole) return;
 
     const municipality = manhole.city || manhole.municipality || '場所未設定';
     const shareTitle = `${manhole.prefecture}${municipality}のポケふた`;
-    const shareText = manholeShareText(`${manhole.prefecture}${municipality}`);
-    const shareUrl = `https://pokefuta.com/manhole/${manhole.id}`;
+    const titleHashtags = getTopTitleHashtags(manhole.titles);
+    const shareablePhoto = photos.find(
+      (photo) => currentUserId && photo.visit?.user_id === currentUserId && photo.visit?.is_public === true
+    );
+    const shareText = shareablePhoto
+      ? photoShareText(`${manhole.prefecture}${municipality}`, titleHashtags)
+      : manholeShareText(`${manhole.prefecture}${municipality}`);
+    const shareUrl = shareablePhoto
+      ? `${SITE_URL}/share/photo/${shareablePhoto.id}`
+      : `${SITE_URL}/manhole/${manhole.id}`;
     const trackParams = { manhole_id: manhole.id, prefecture: manhole.prefecture };
+
+    return { shareTitle, shareText, shareUrl, titleHashtags, trackParams };
+  };
+
+  const handleShare = async () => {
+    const payload = buildSharePayload();
+    if (!payload) return;
+    const { shareTitle, shareText, shareUrl, trackParams } = payload;
 
     trackShareClick(trackParams);
 
@@ -425,17 +452,43 @@ export default function ManholeDetailPage() {
       if (navigator.share) {
         await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
       } else {
-        sharePanelCleanupRef.current?.();
-        sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
-          onShareX: () => trackShareX(trackParams),
-          onShareLine: () => trackShareLine(trackParams),
-          onCopyLink: () => trackCopyLink(trackParams),
-        });
+        await navigator.clipboard.writeText(shareUrl);
+        trackCopyLink(trackParams);
+        alert('リンクをコピーしました');
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error('Share failed:', error);
       }
+    }
+  };
+
+  const handleShareX = () => {
+    const payload = buildSharePayload();
+    if (!payload) return;
+    trackShareClick(payload.trackParams);
+    trackShareX(payload.trackParams);
+    window.open(buildXShareUrl(payload.shareText, payload.shareUrl, payload.titleHashtags), '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareLine = () => {
+    const payload = buildSharePayload();
+    if (!payload) return;
+    trackShareClick(payload.trackParams);
+    trackShareLine(payload.trackParams);
+    window.open(buildLineShareUrl(payload.shareUrl), '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyShareUrl = async () => {
+    const payload = buildSharePayload();
+    if (!payload) return;
+    try {
+      await navigator.clipboard.writeText(payload.shareUrl);
+      trackShareClick(payload.trackParams);
+      trackCopyLink(payload.trackParams);
+      alert('リンクをコピーしました');
+    } catch {
+      alert('コピーに失敗しました');
     }
   };
 
@@ -489,6 +542,8 @@ export default function ManholeDetailPage() {
     );
   }
 
+  const titleBadges = getSortedTitles(manhole.titles).slice(0, 3);
+
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
       {/* Header */}
@@ -533,11 +588,13 @@ export default function ManholeDetailPage() {
 
             {/* Hero Photo Section */}
             {(() => {
-              const userPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
-              const mainPhoto = manhole.is_visited ? (userPhoto || photos[0]) : photos[0];
+              const userPublicPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId && p.visit?.is_public === true);
+              const userPrivatePhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId && p.visit?.is_public !== true);
+              const publicPhoto = photos.find(p => p.visit?.is_public === true);
+              const mainPhoto = userPublicPhoto || userPrivatePhoto || publicPhoto;
 
-              return manhole.is_visited && mainPhoto ? (
-                // Visited with photo - Large hero image
+              return mainPhoto ? (
+                // Photo hero - prefer own public photo, then own private photo, then public community photo.
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img
                     src={`/api/photo/${mainPhoto.id}?size=small`}
@@ -587,6 +644,28 @@ export default function ManholeDetailPage() {
 
             {/* Info Section */}
             <div className="p-5">
+              {titleBadges.length > 0 && (
+                <div className="mb-5 rounded-[8px] border-2 border-[#D94D3F]/25 bg-[#FFF0E2] p-3 shadow-[0_8px_18px_rgba(181,72,60,0.12)]">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#9F392F]">
+                    <Sparkles className="h-4 w-4" />
+                    このポケふたの注目タグ
+                  </div>
+                  <div className="grid gap-2">
+                    {titleBadges.map((title, index) => (
+                      <div
+                        key={title.key}
+                        className={`flex items-center gap-2 rounded-[8px] border px-3 py-2 text-sm font-extrabold shadow-sm ${getTitleAccentClass(index)}`}
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/75 text-base shadow-sm">
+                          {title.emoji || '★'}
+                        </span>
+                        <span className="leading-tight">{title.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Location & Title */}
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -602,6 +681,17 @@ export default function ManholeDetailPage() {
                   <p className="font-pixelJp text-sm text-[#6A4D36]">
                     {manhole.pokemons.join('・')}が描かれたポケモンマンホール
                   </p>
+                )}
+                {manhole.building && (
+                  <div className="mt-3 flex items-start gap-2 rounded-md border border-[#8C6A4A]/15 bg-white/60 p-3">
+                    <Building2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#B5483C]" />
+                    <div>
+                      <p className="font-pixelJp text-[11px] font-bold text-[#8C6A4A]">建物・目印</p>
+                      <p className="mt-1 font-pixelJp text-sm font-bold leading-relaxed text-[#4F3828]">
+                        {manhole.building}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -698,6 +788,30 @@ export default function ManholeDetailPage() {
                   </button>
                 </div>
               )}
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button
+                  onClick={handleShareX}
+                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#2A2A2A]/20 bg-[#2A2A2A] px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-black"
+                >
+                  <span className="font-pixel text-sm">X</span>
+                  で共有
+                </button>
+                <button
+                  onClick={handleShareLine}
+                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#06C755]/30 bg-[#06C755] px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#05B34C]"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  LINE
+                </button>
+                <button
+                  onClick={handleCopyShareUrl}
+                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#7B63A8]/25 bg-white px-3 py-2 text-xs font-extrabold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
+                >
+                  <Copy className="h-4 w-4" />
+                  コピー
+                </button>
+              </div>
             </div>
           </div>
         </div>
