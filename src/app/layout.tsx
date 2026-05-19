@@ -3,6 +3,7 @@ import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
+import ApiErrorAnalytics from '@/components/ApiErrorAnalytics';
 
 import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
 
@@ -96,6 +97,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <div id="app" className="min-h-screen bg-[#F6EEDC]">
+          <ApiErrorAnalytics />
           {children}
           <DevDebugPanel />
         </div>

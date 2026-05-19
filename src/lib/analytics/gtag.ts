@@ -24,6 +24,14 @@ export interface PokefutaEventParams extends GAEventParams {
   source_app?: 'tracker' | 'map';
 }
 
+export interface ApiErrorEventParams extends GAEventParams {
+  api_path: string;
+  endpoint?: string;
+  status_code: number;
+  method: string;
+  error_message?: string;
+}
+
 // ==========================================
 // グローバル型拡張
 // ==========================================
@@ -211,13 +219,20 @@ export const pokefutaEvents = {
 // ==========================================
 
 export const errorEvents = {
-  api: (endpoint: string, statusCode: number, method: string = 'GET') =>
+  api: (
+    endpoint: string,
+    statusCode: number,
+    method: string = 'GET',
+    errorMessage?: string
+  ) =>
     trackEvent('error_event', {
       error_type: 'api_error',
+      api_path: endpoint,
       endpoint,
       status_code: statusCode,
       method,
-    }),
+      error_message: errorMessage?.slice(0, 100),
+    } satisfies ApiErrorEventParams),
 
   auth: (errorCode: string) =>
     trackEvent('auth_error', { error_code: errorCode }),
