@@ -542,7 +542,7 @@ export default function ManholeDetailPage() {
     );
   }
 
-  const titleBadges = getSortedTitles(manhole.titles).slice(0, 3);
+  const titleBadges = getSortedTitles(manhole.titles);
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">

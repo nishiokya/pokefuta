@@ -65,7 +65,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
   if (!photo) notFound();
 
-  const titles = getSortedTitles(photo.manhole.titles).slice(0, 3);
+  const titles = getSortedTitles(photo.manhole.titles);
   const locationLabel = getManholeLocationLabel(photo.manhole);
 
   return (
