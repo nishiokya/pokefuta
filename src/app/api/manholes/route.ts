@@ -4,6 +4,60 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { extractCoordinatesFromWKB, calculateDistance } from '@/lib/location';
 
+type ManholePhotoSummary = {
+  count: number;
+  latestPhotoId: string | null;
+};
+
+const PHOTO_SUMMARY_BATCH_SIZE = 1000;
+
+async function loadPhotoSummaries(
+  supabase: ReturnType<typeof createRouteHandlerClient<Database>>,
+  manholeIds: number[]
+) {
+  const summaries = new Map<number, ManholePhotoSummary>();
+  let offset = 0;
+
+  while (true) {
+    const { data: photosData, error } = await supabase
+      .from('photo')
+      .select('id, manhole_id, created_at')
+      .in('manhole_id', manholeIds)
+      .not('manhole_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PHOTO_SUMMARY_BATCH_SIZE - 1);
+
+    if (error) {
+      console.error('Photo summary query error:', error);
+      throw new Error(`Photo summary query failed: ${error.message}`);
+    }
+
+    if (!photosData || photosData.length === 0) {
+      break;
+    }
+
+    photosData.forEach(photo => {
+      const current = summaries.get(photo.manhole_id) || {
+        count: 0,
+        latestPhotoId: null,
+      };
+      current.count += 1;
+      if (!current.latestPhotoId) {
+        current.latestPhotoId = photo.id;
+      }
+      summaries.set(photo.manhole_id, current);
+    });
+
+    if (photosData.length < PHOTO_SUMMARY_BATCH_SIZE) {
+      break;
+    }
+
+    offset += PHOTO_SUMMARY_BATCH_SIZE;
+  }
+
+  return summaries;
+}
+
 /**
  * @swagger
  * /api/manholes:
@@ -158,17 +212,8 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // 取得したマンホールの写真有無を確認
       const manholeIds = allManholes.map(m => m.id);
-      const { data: photosData } = await supabase
-        .from('photo')
-        .select('manhole_id')
-        .in('manhole_id', manholeIds)
-        .not('manhole_id', 'is', null);
-
-      const manholesWithPhotosSet = new Set(
-        photosData?.map(p => p.manhole_id) || []
-      );
+      const photoSummaryByManholeId = await loadPhotoSummaries(supabase, manholeIds);
 
       if (isNearbySearch) {
         console.log(`Searching for manholes within ${radius}km of ${lat}, ${lng}`);
@@ -184,7 +229,7 @@ export async function GET(request: NextRequest) {
 
             const distance = calculateDistance(lat!, lng!, realCoords.lat, realCoords.lng);
 
-            const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+            const photoSummary = photoSummaryByManholeId.get(manhole.id);
             const isVisited = visitedManholeIds.has(manhole.id);
             const visitData = visitedManholeData.get(manhole.id);
 
@@ -196,7 +241,10 @@ export async function GET(request: NextRequest) {
               longitude: realCoords.lng,
               is_visited: isVisited,
               last_visit: visitData?.last_visit || null,
-              photo_count: hasPhotos ? 1 : 0,
+              photo_count: photoSummary?.count || 0,
+              latest_photo_url: photoSummary?.latestPhotoId
+                ? `/api/photo/${photoSummary.latestPhotoId}?size=small`
+                : null,
               distance: distance
             };
           })
@@ -230,7 +278,7 @@ export async function GET(request: NextRequest) {
             return null; // Skip manholes without extractable coordinates
           }
 
-          const hasPhotos = manholesWithPhotosSet.has(manhole.id);
+          const photoSummary = photoSummaryByManholeId.get(manhole.id);
           const isVisited = visitedManholeIds.has(manhole.id);
           const visitData = visitedManholeData.get(manhole.id);
 
@@ -242,7 +290,10 @@ export async function GET(request: NextRequest) {
             longitude: realCoords.lng,
             is_visited: isVisited,
             last_visit: visitData?.last_visit || null,
-            photo_count: hasPhotos ? 1 : 0
+            photo_count: photoSummary?.count || 0,
+            latest_photo_url: photoSummary?.latestPhotoId
+              ? `/api/photo/${photoSummary.latestPhotoId}?size=small`
+              : null
           };
         })
         .filter(manhole => manhole !== null)

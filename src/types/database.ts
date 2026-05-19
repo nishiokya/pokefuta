@@ -522,4 +522,5 @@ export type Manhole = Database['public']['Tables']['manhole']['Row'] & {
   is_visited?: boolean;
   last_visit?: string | null;
   photo_count?: number;
+  latest_photo_url?: string | null;
 };
