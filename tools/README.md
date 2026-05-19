@@ -10,12 +10,14 @@
 
 ### `generate_manhole_sql.py`
 
-最新のポケふたデータをGitHubから取得し、PostgreSQL INSERT文を生成するPythonスクリプト。
+最新のポケふたデータを公開NDJSONから取得し、PostgreSQL INSERT/UPDATE文を生成するPythonスクリプト。
 
-**拡張機能（マイグレーション006対応）:**
+**拡張機能:**
 - prefecture_id と prefecture_code を自動生成
 - last_verified_at を NOW() に設定
 - prefecture_site_url フィールド対応
+- address_norm / building / official_url / titles / hashtags / title_tags フィールド対応
+- Supabase SQL Editor で手動実行しやすい UPDATE only 出力対応
 
 ### `migrate_manhole_prefecture_ids.sql`
 
@@ -40,6 +42,27 @@ python3 tools/generate_manhole_sql.py 2>/dev/null > manhole_data.sql
 
 # ヘルプを表示
 python3 tools/generate_manhole_sql.py --help
+```
+
+#### Supabase SQL Editorで既存データだけを手動更新する
+
+新規INSERTを避け、既存の `manhole` 行だけ更新したい場合は `--update-only` を使います。生成されるSQLには不足カラム追加、`BEGIN` / `COMMIT`、各IDの `UPDATE` が含まれます。`updated_at` はこのDBに存在しないため出力しません。
+
+```bash
+python3 tools/generate_manhole_sql.py --update-only 2>/dev/null > manhole_titles_update.sql
+```
+
+実行手順:
+
+1. `manhole_titles_update.sql` を開く
+2. Supabase Dashboard > SQL Editor を開く
+3. SQLを貼り付けて実行
+4. 例として `id = 217` の `building` / `titles` / `hashtags` が入っていることを確認
+
+一部IDだけ確認したい場合:
+
+```bash
+python3 tools/generate_manhole_sql.py --update-only --min-id 217 --max-id 217 2>/dev/null > manhole_217_update.sql
 ```
 
 #### ID範囲を指定して生成
@@ -196,28 +219,28 @@ CREATE TABLE IF NOT EXISTS public.manhole (
 - **ON CONFLICT DO UPDATE**: 既存データは自動更新
 - **PostGIS POINT**: 位置情報は `ST_GeogFromText` で正確に格納
 - **配列型**: ポケモン名は `TEXT[]` 配列で格納
-- **タイムスタンプ**: `updated_at` は自動更新
+- **タイムスタンプ**: `last_verified_at` は実行時に `NOW()` で更新
 
 ## 🔄 データ更新の流れ
 
 ```mermaid
 graph LR
-    A[GitHub pokefuta.ndjson] --> B[Python Script]
-    B --> C[SQL INSERT文生成]
+    A[data.pokefuta.com pokefuta.ndjson] --> B[Python Script]
+    B --> C[SQL INSERT/UPDATE文生成]
     C --> D[Supabase SQL Editor]
     D --> E[PostgreSQL Database]
 ```
 
 ## 📝 データソース
 
+- **公開NDJSON**: https://data.pokefuta.com/pokefuta.ndjson
 - **GitHub Repository**: https://github.com/nishiokya/pokefuta-tracker
-- **データファイル**: `apps/scraper/pokefuta.ndjson`
 - **更新頻度**: スクレイパーにより定期的に更新
 
 ## ⚠️ 注意事項
 
 1. **Python 3.6以上が必要**
-2. **インターネット接続が必要**（GitHubからデータ取得）
+2. **インターネット接続が必要**（公開NDJSONからデータ取得）
 3. **既存データは更新される**（ON CONFLICT DO UPDATE）
 4. **PostGIS拡張が必要**（Supabaseでは標準で有効）
 
@@ -262,6 +285,12 @@ CREATE EXTENSION IF NOT EXISTS postgis;
    # manhole_update.sql を実行すると、prefecture_id と prefecture_code が自動設定
    ```
 
+既存行だけを手動更新する場合は、INSERT/UPSERTではなく `--update-only` を使います。
+
+```bash
+python3 tools/generate_manhole_sql.py --update-only 2>/dev/null > manhole_titles_update.sql
+```
+
 ### 拡張されたカラム
 
 | カラム | 型 | 用途 |
@@ -272,6 +301,12 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 | `is_active` | BOOLEAN | アクティブフラグ（廃止対応） |
 | `last_verified_at` | TIMESTAMPTZ | 最後にデータを確認した日時 |
 | `data_source` | TEXT | データソース/スクレイパーバージョン |
+| `address_norm` | TEXT | 正規化住所 |
+| `building` | TEXT | 建物・目印 |
+| `official_url` | TEXT | 公式系URL |
+| `titles` | JSONB | 称号タグ |
+| `hashtags` | TEXT[] | 共有用ハッシュタグ |
+| `title_tags` | TEXT[] | 称号キー |
 
 ### パフォーマンス改善
 
@@ -292,8 +327,14 @@ SELECT COUNT(*) FROM manhole WHERE prefecture_id = 13;
 ### 全件更新（住所情報修正時）
 
 ```bash
-# 全件の最新データを生成・更新
+# INSERT/UPSERT込みで全件の最新データを生成
 python3 tools/generate_manhole_sql.py 2>/dev/null > manhole_update.sql
+```
+
+```bash
+# Supabase SQL Editorで既存行だけ手動更新
+python3 tools/generate_manhole_sql.py --update-only 2>/dev/null > manhole_titles_update.sql
+```
 
 ```bash
 # ID 401以上の新規マンホールのみ生成
