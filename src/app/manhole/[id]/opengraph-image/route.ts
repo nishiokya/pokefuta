@@ -71,8 +71,7 @@ function buildCardSvg(input: {
   ${hasBadge ? `<rect x="590" y="278" width="440" height="64" rx="32" fill="#FFFFFF" opacity="0.92"/>
   <text x="622" y="320" font-size="30" font-weight="800" fill="#2F6F5E" font-family="Noto Sans JP, Hiragino Sans, sans-serif">${safeBadgeEmoji} ${safeBadgeLabel}</text>` : ''}
 
-  <text x="590" y="420" font-size="28" font-weight="700" fill="#25332F" font-family="Noto Sans JP, Hiragino Sans, sans-serif">旅先で見つける、全国のポケふたマップ</text>
-  <text x="590" y="462" font-size="24" fill="#5D6E68" font-family="Noto Sans JP, Hiragino Sans, sans-serif">全国470枚・387自治体</text>
+  <text x="590" y="440" font-size="28" font-weight="700" fill="#25332F" font-family="Noto Sans JP, Hiragino Sans, sans-serif">旅先で見つける全国のポケふたマップ</text>
 
   <rect x="590" y="505" width="250" height="54" rx="27" fill="#25332F"/>
   <text x="715" y="541" text-anchor="middle" font-size="26" font-weight="800" fill="#FFFFFF" font-family="Noto Sans JP, Hiragino Sans, sans-serif">pokefuta.com</text>

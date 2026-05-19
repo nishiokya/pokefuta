@@ -82,8 +82,10 @@ export async function GET(
     const { data: photo, error } = await supabase
       .from('photo')
       .select(`
-        *,
-        visit:visit_id (
+        id,
+        storage_key,
+        content_type,
+        visit:visit_id!inner (
           user_id,
           is_public
         )

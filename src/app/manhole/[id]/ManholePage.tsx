@@ -14,7 +14,7 @@ import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { buildLineShareUrl, buildXShareUrl, manholeShareText, photoShareText } from '@/lib/share';
-import { SITE_NAME, SITE_URL, OGP_IMAGE_URL } from '@/lib/constants';
+import { SITE_NAME, SITE_URL } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
@@ -162,45 +162,6 @@ export default function ManholeDetailPage() {
         document.head.appendChild(metaDesc);
       }
       metaDesc.setAttribute('content', descriptionText);
-
-      // Update OG / Twitter Card tags
-      const updateMeta = (attr: 'property' | 'name', key: string, content: string) => {
-        let meta = document.querySelector(`meta[${attr}="${key}"]`);
-        if (!meta) {
-          meta = document.createElement('meta');
-          meta.setAttribute(attr, key);
-          document.head.appendChild(meta);
-        }
-        meta.setAttribute('content', content);
-      };
-
-      const ogTitle = pokemonList
-        ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}`
-        : `${manhole.prefecture}${municipality}のポケふた`;
-
-      const ogDescription = pokemonList
-        ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール。場所・写真・訪問記録を確認できます。`
-        : `${manhole.prefecture}${municipality}にあるポケモンマンホール。場所・写真・訪問記録を確認できます。`;
-
-      updateMeta('property', 'og:title', ogTitle);
-      updateMeta('property', 'og:description', ogDescription);
-      updateMeta('property', 'og:url', `https://pokefuta.com/manhole/${manhole.id}`);
-      updateMeta('property', 'og:type', 'website');
-      updateMeta('property', 'og:site_name', SITE_NAME);
-      updateMeta('property', 'og:image', OGP_IMAGE_URL);
-      updateMeta('name', 'twitter:card', 'summary_large_image');
-      updateMeta('name', 'twitter:title', ogTitle);
-      updateMeta('name', 'twitter:description', ogDescription);
-      updateMeta('name', 'twitter:image', OGP_IMAGE_URL);
-
-      // Add canonical link
-      let canonical = document.querySelector('link[rel="canonical"]');
-      if (!canonical) {
-        canonical = document.createElement('link');
-        canonical.setAttribute('rel', 'canonical');
-        document.head.appendChild(canonical);
-      }
-      canonical.setAttribute('href', `https://pokefuta.com/manhole/${manhole.id}`);
 
       // Add JSON-LD structured data
       const structuredData = {

@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { storage } from '@/lib/storage';
 import type { Database, ManholeTitle } from '@/types/database';

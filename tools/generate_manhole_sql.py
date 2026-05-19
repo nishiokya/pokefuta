@@ -470,7 +470,8 @@ WHERE id = {manhole_id};
                 ['official_url', 'city_official_url', 'prefecture_site_url', 'detail_url'],
                 None
             )
-            titles = normalize_titles(data.get('titles')) or compute_auto_titles(data, title_context)
+            raw_titles = data.get('titles')
+            titles = normalize_titles(raw_titles) if raw_titles is not None else compute_auto_titles(data, title_context)
             hashtags = hashtags_from_titles(titles)
             title_tags = title_tags_from_titles(titles)
 
