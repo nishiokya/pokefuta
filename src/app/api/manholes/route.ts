@@ -6,54 +6,64 @@ import { extractCoordinatesFromWKB, calculateDistance } from '@/lib/location';
 
 type ManholePhotoSummary = {
   count: number;
-  latestPhotoId: string | null;
+  latestPhotoUrl: string | null;
 };
 
-const PHOTO_SUMMARY_BATCH_SIZE = 1000;
+type ManholePhotoSummaryRow =
+  Database['public']['Functions']['get_manhole_photo_summaries']['Returns'][number];
+
+function encodeStorageKey(key: string) {
+  return key.split('/').map(part => encodeURIComponent(part)).join('/');
+}
+
+function buildPublicStorageUrl(key: string | null) {
+  if (!key) return null;
+
+  const publicUrl = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT;
+  const bucket = process.env.R2_BUCKET || 'image';
+
+  if (!publicUrl) return null;
+
+  const baseUrl = publicUrl.replace(/\/$/, '');
+  const encodedKey = encodeStorageKey(key);
+
+  if (baseUrl.includes('r2.cloudflarestorage.com')) {
+    return `${baseUrl}/${bucket}/${encodedKey}`;
+  }
+
+  return `${baseUrl}/${encodedKey}`;
+}
 
 async function loadPhotoSummaries(
   supabase: ReturnType<typeof createRouteHandlerClient<Database>>,
   manholeIds: number[]
 ) {
-  const summaries = new Map<number, ManholePhotoSummary>();
-  let offset = 0;
-
-  while (true) {
-    const { data: photosData, error } = await supabase
-      .from('photo')
-      .select('id, manhole_id, created_at')
-      .in('manhole_id', manholeIds)
-      .not('manhole_id', 'is', null)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + PHOTO_SUMMARY_BATCH_SIZE - 1);
-
-    if (error) {
-      console.error('Photo summary query error:', error);
-      throw new Error(`Photo summary query failed: ${error.message}`);
-    }
-
-    if (!photosData || photosData.length === 0) {
-      break;
-    }
-
-    photosData.forEach(photo => {
-      const current = summaries.get(photo.manhole_id) || {
-        count: 0,
-        latestPhotoId: null,
-      };
-      current.count += 1;
-      if (!current.latestPhotoId) {
-        current.latestPhotoId = photo.id;
-      }
-      summaries.set(photo.manhole_id, current);
-    });
-
-    if (photosData.length < PHOTO_SUMMARY_BATCH_SIZE) {
-      break;
-    }
-
-    offset += PHOTO_SUMMARY_BATCH_SIZE;
+  if (manholeIds.length === 0) {
+    return new Map<number, ManholePhotoSummary>();
   }
+
+  const { data, error } = await supabase.rpc('get_manhole_photo_summaries', {
+    p_manhole_ids: manholeIds,
+  });
+
+  if (error) {
+    console.error('Photo summary RPC error:', error);
+    throw new Error(`Photo summary RPC failed: ${error.message}`);
+  }
+
+  const summaries = new Map<number, ManholePhotoSummary>();
+  ((data || []) as ManholePhotoSummaryRow[]).forEach(summary => {
+    const latestStorageKey =
+      summary.latest_thumbnail_320 ||
+      summary.latest_thumbnail_800 ||
+      summary.latest_thumbnail_1600 ||
+      summary.latest_storage_key;
+
+    summaries.set(summary.manhole_id, {
+      count: Number(summary.photo_count || 0),
+      latestPhotoUrl: buildPublicStorageUrl(latestStorageKey),
+    });
+  });
 
   return summaries;
 }
@@ -242,9 +252,7 @@ export async function GET(request: NextRequest) {
               is_visited: isVisited,
               last_visit: visitData?.last_visit || null,
               photo_count: photoSummary?.count || 0,
-              latest_photo_url: photoSummary?.latestPhotoId
-                ? `/api/photo/${photoSummary.latestPhotoId}?size=small`
-                : null,
+              latest_photo_url: photoSummary?.latestPhotoUrl || null,
               distance: distance
             };
           })
@@ -291,9 +299,7 @@ export async function GET(request: NextRequest) {
             is_visited: isVisited,
             last_visit: visitData?.last_visit || null,
             photo_count: photoSummary?.count || 0,
-            latest_photo_url: photoSummary?.latestPhotoId
-              ? `/api/photo/${photoSummary.latestPhotoId}?size=small`
-              : null
+            latest_photo_url: photoSummary?.latestPhotoUrl || null
           };
         })
         .filter(manhole => manhole !== null)

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Camera, Image as ImageIcon, MapPin, Search } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
@@ -81,6 +82,7 @@ export default function ManholesPage() {
   }, [filteredManholes, query]);
 
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
+  const visibleManholeCount = filteredManholes.length;
   const visiblePrefectureCount = new Set(filteredManholes.map((manhole) => manhole.prefecture).filter(Boolean)).size;
   const visibleMunicipalityCount = new Set(
     filteredManholes
@@ -131,7 +133,7 @@ export default function ManholesPage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-              <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{manholes.length}</div>
+              <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{visibleManholeCount}</div>
               <div className="mt-1 text-xs font-bold text-[#6B6B6B]">総数</div>
             </div>
             <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
@@ -168,10 +170,12 @@ export default function ManholesPage() {
                 >
                   <div className="relative aspect-[16/9] bg-[#F6EEDC]">
                     {manhole.latest_photo_url ? (
-                      <img
+                      <Image
                         src={manhole.latest_photo_url}
                         alt={`${manhole.title || manhole.municipality || manhole.city || 'ポケふた'}の写真`}
-                        className="h-full w-full object-cover"
+                        fill
+                        sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        className="object-cover"
                         loading="lazy"
                       />
                     ) : (
