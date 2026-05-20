@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "smoke:ui": "node tools/smoke/ui-smoke.js",
+    "smoke:ui:ci": "PORT=3100 NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-anon-key NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT=36.0 NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG=138.0 NEXT_PUBLIC_MAP_DEFAULT_ZOOM=10 npm run build && PORT=3100 NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 npm run smoke:ui",
     "capture": "node tools/capture/capture.js"
   },
   "dependencies": {

@@ -35,5 +35,6 @@ public/worker-*.js.map
 database/mirgrations/*
 
 tools/capture/output/*
+test-results/
 
 design/*
