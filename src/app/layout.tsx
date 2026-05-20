@@ -5,13 +5,14 @@ import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
 import ApiErrorAnalytics from '@/components/ApiErrorAnalytics';
 
-import { SITE_NAME, OGP_IMAGE_URL } from '@/lib/constants';
+import { SITE_NAME, SITE_URL, OGP_IMAGE_URL } from '@/lib/constants';
 
 const inter = Inter({ subsets: ['latin'] });
 
 const SITE_DESCRIPTION = '旅先で見つけたポケふたを記録しよう。訪問記録・写真投稿・スタンプ帳サービスです。';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
   manifest: '/manifest.json',
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
-    url: 'https://pokefuta.com',
+    url: SITE_URL,
     images: [{ url: OGP_IMAGE_URL, width: 1200, height: 630, alt: SITE_NAME }],
   },
   twitter: {

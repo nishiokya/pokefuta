@@ -9,6 +9,8 @@ type Props = {
   searchParams: { photo?: string };
 };
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const manholeId = Number(params.id);
   if (isNaN(manholeId)) {
