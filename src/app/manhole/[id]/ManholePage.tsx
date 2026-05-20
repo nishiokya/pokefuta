@@ -395,7 +395,7 @@ export default function ManholeDetailPage() {
       ? photoShareText(`${manhole.prefecture}${municipality}`, titleHashtags)
       : manholeShareText(`${manhole.prefecture}${municipality}`);
     const shareUrl = shareablePhoto
-      ? `${SITE_URL}/share/photo/${shareablePhoto.id}`
+      ? `${SITE_URL}/p/${shareablePhoto.id}`
       : `${SITE_URL}/manhole/${manhole.id}`;
     const trackParams = { manhole_id: manhole.id, prefecture: manhole.prefecture };
 

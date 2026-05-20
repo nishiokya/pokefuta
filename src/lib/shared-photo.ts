@@ -27,18 +27,20 @@ export type SharedPhoto = {
   };
 };
 
-function createShareSupabase() {
+function createShareSupabaseClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const keys = [serviceRoleKey, anonKey].filter((key): key is string => Boolean(key));
 
-  if (!url || !serviceRoleKey) return null;
+  if (!url || keys.length === 0) return [];
 
-  return createClient<Database>(url, serviceRoleKey, {
+  return keys.map((key) => createClient<Database>(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  });
+  }));
 }
 
 export function getSortedTitles(titles?: ManholeTitle[] | null): ManholeTitle[] {
@@ -55,75 +57,78 @@ export async function loadPublicSharedPhoto(
   photoId: string,
   options: { includeSignedUrl?: boolean } = {}
 ): Promise<SharedPhoto | null> {
-  const supabase = createShareSupabase();
-  if (!supabase) return null;
+  const clients = createShareSupabaseClients();
 
-  const { data, error } = await supabase
-    .from('photo')
-    .select(`
-      id,
-      storage_key,
-      content_type,
-      created_at,
-      visit:visit_id (
+  for (const supabase of clients) {
+    const { data, error } = await supabase
+      .from('photo')
+      .select(`
         id,
-        user_id,
-        shot_at,
-        comment,
-        is_public
-      ),
-      manhole:manhole_id (
-        id,
-        title,
-        prefecture,
-        municipality,
-        pokemons,
-        titles,
-        hashtags
-      )
-    `)
-    .eq('id', photoId)
-    .single();
+        storage_key,
+        content_type,
+        created_at,
+        visit:visit_id (
+          id,
+          user_id,
+          shot_at,
+          comment,
+          is_public
+        ),
+        manhole:manhole_id (
+          id,
+          title,
+          prefecture,
+          municipality,
+          pokemons,
+          titles,
+          hashtags
+        )
+      `)
+      .eq('id', photoId)
+      .single();
 
-  if (error || !data) return null;
+    if (error || !data) continue;
 
-  const row = data as any;
-  const visit = Array.isArray(row.visit) ? row.visit[0] : row.visit;
-  const manhole = Array.isArray(row.manhole) ? row.manhole[0] : row.manhole;
+    const row = data as any;
+    const visit = Array.isArray(row.visit) ? row.visit[0] : row.visit;
+    const manhole = Array.isArray(row.manhole) ? row.manhole[0] : row.manhole;
 
-  if (!visit?.is_public || !manhole) return null;
+    if (!visit?.is_public || !manhole) continue;
 
-  const sharedPhoto: SharedPhoto = {
-    id: row.id,
-    storage_key: row.storage_key,
-    content_type: row.content_type,
-    created_at: row.created_at,
-    visit: {
-      id: visit.id,
-      user_id: visit.user_id,
-      shot_at: visit.shot_at,
-      comment: visit.comment ?? null,
-      is_public: visit.is_public,
-    },
-    manhole: {
-      id: manhole.id,
-      title: manhole.title,
-      prefecture: manhole.prefecture,
-      municipality: manhole.municipality,
-      pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
-      titles: getSortedTitles(manhole.titles),
-      hashtags: Array.isArray(manhole.hashtags) ? manhole.hashtags : [],
-    },
-  };
+    const sharedPhoto: SharedPhoto = {
+      id: row.id,
+      storage_key: row.storage_key,
+      content_type: row.content_type,
+      created_at: row.created_at,
+      visit: {
+        id: visit.id,
+        user_id: visit.user_id,
+        shot_at: visit.shot_at,
+        comment: visit.comment ?? null,
+        is_public: visit.is_public,
+      },
+      manhole: {
+        id: manhole.id,
+        title: manhole.title,
+        prefecture: manhole.prefecture,
+        municipality: manhole.municipality,
+        pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
+        titles: getSortedTitles(manhole.titles),
+        hashtags: Array.isArray(manhole.hashtags) ? manhole.hashtags : [],
+      },
+    };
 
-  if (options.includeSignedUrl) {
-    try {
-      const signed = await storage.getSignedUrl(sharedPhoto.storage_key, 3600);
-      sharedPhoto.signed_url = signed.url;
-    } catch (error) {
-      console.error('Failed to sign shared photo URL:', error);
+    if (options.includeSignedUrl) {
+      try {
+        const signed = await storage.getSignedUrl(sharedPhoto.storage_key, 3600);
+        sharedPhoto.signed_url = signed.url;
+      } catch (error) {
+        console.error('Failed to sign shared photo URL:', error);
+      }
     }
+
+    return sharedPhoto;
   }
 
-  return sharedPhoto;
+  return null;
 }
