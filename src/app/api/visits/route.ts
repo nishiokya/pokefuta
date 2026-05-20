@@ -119,6 +119,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
     const orderByRaw = searchParams.get('order_by');
+    const includeManholeTags = searchParams.get('include_manhole_tags') === 'true';
+    const manholeTagFields = includeManholeTags
+      ? `,
+            titles,
+            hashtags,
+            title_tags`
+      : '';
 
     // Default keeps existing behavior; home feed can override with order_by=created_at
     const orderBy: 'shot_at' | 'created_at' = orderByRaw === 'created_at' ? 'created_at' : 'shot_at';
@@ -140,7 +147,7 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
-            pokemons
+            pokemons${manholeTagFields}
           ),
           photos:photo (
             id,
@@ -174,7 +181,7 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
-            pokemons
+            pokemons${manholeTagFields}
           ),
           photos:photo (
             id,
@@ -363,5 +370,3 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
-
