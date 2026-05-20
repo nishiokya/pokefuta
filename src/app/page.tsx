@@ -48,7 +48,7 @@ type JourneyVisit = {
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at?: string;
-  photos: Array<{ id: string; thumbnail_url?: string }>;
+  photos: Array<{ id: string; thumbnail_url?: string; created_at?: string }>;
 };
 
 type JourneyManhole = Manhole & {
@@ -90,8 +90,17 @@ const getMunicipality = (manhole?: Pick<Manhole, 'municipality'> & { city?: stri
 const getManholeTitle = (manhole?: Pick<Manhole, 'title' | 'municipality'> & { name?: string; city?: string }) =>
   manhole?.name || manhole?.title || getMunicipality(manhole);
 
-const getLatestVisit = (visits?: JourneyVisit[]) =>
-  visits?.slice().sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime())[0];
+const getLatestVisit = (visits?: JourneyVisit[]) => visits?.[0];
+
+const getLatestPhoto = (visits?: JourneyVisit[]) =>
+  visits
+    ?.flatMap((visit) =>
+      visit.photos.map((photo) => ({
+        ...photo,
+        sortAt: photo.created_at || visit.shot_at,
+      }))
+    )
+    .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime())[0];
 
 const getManholeTags = (
   manhole?: Pick<Manhole, 'titles' | 'hashtags' | 'title_tags' | 'pokemons'> | null,
@@ -216,7 +225,7 @@ export default function HomePage() {
   const loadJourney = async () => {
     try {
       const [visitsResponse, manholesResponse] = await Promise.all([
-        fetch('/api/visits?limit=1000'),
+        fetch('/api/visits?limit=1000&include_manhole_tags=true'),
         fetch('/api/manholes?limit=1000'),
       ]);
 
@@ -294,10 +303,10 @@ export default function HomePage() {
       if (!manholeId) return;
       const current = visitsByManholeId.get(manholeId) || [];
       current.push(visit);
-      visitsByManholeId.set(
-        manholeId,
-        current.sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime())
-      );
+      visitsByManholeId.set(manholeId, current);
+    });
+    visitsByManholeId.forEach((visits) => {
+      visits.sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime());
     });
 
     const journeyManholesById = new Map(journeyManholes.map((manhole) => [manhole.id, manhole]));
@@ -882,7 +891,7 @@ function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress 
 
 function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visits?: JourneyVisit[] }) {
   const latestVisit = getLatestVisit(visits);
-  const latestPhoto = latestVisit?.photos?.[0];
+  const latestPhoto = getLatestPhoto(visits);
   const visitCount = visits?.length ?? 0;
   const photoCount = visits?.reduce((count, visit) => count + visit.photos.length, 0) ?? 0;
   const tags = getManholeTags(manhole, 4);
