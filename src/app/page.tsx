@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import {
   Award,
   Camera,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   CircleDot,
   Compass,
   Heart,
@@ -40,13 +40,14 @@ type FeedVisit = {
 };
 
 type GalleryTab = 'latest';
-type JourneyTab = 'unvisited' | 'nearby' | 'continue';
+type JourneyTab = 'history' | 'unvisited';
 
 type JourneyVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
+  created_at?: string;
   photos: Array<{ id: string; thumbnail_url?: string }>;
 };
 
@@ -56,6 +57,7 @@ type JourneyManhole = Manhole & {
   distance?: number;
   is_visited?: boolean;
   last_visit?: string | null;
+  photo_count?: number;
 };
 
 type PrefectureProgress = {
@@ -72,9 +74,8 @@ const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobil
 ];
 
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
+  { key: 'history', label: '訪問履歴' },
   { key: 'unvisited', label: '未訪問' },
-  { key: 'nearby', label: '近く' },
-  { key: 'continue', label: '訪問履歴' },
 ];
 
 const getDisplayName = (session: any) => {
@@ -88,6 +89,37 @@ const getMunicipality = (manhole?: Pick<Manhole, 'municipality'> & { city?: stri
 
 const getManholeTitle = (manhole?: Pick<Manhole, 'title' | 'municipality'> & { name?: string; city?: string }) =>
   manhole?.name || manhole?.title || getMunicipality(manhole);
+
+const getLatestVisit = (visits?: JourneyVisit[]) =>
+  visits?.slice().sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime())[0];
+
+const getManholeTags = (
+  manhole?: Pick<Manhole, 'titles' | 'hashtags' | 'title_tags' | 'pokemons'> | null,
+  max = 4
+) => {
+  const tags: string[] = [];
+  const pushTag = (tag?: string | null) => {
+    const normalized = tag?.replace(/^#/, '').trim();
+    if (normalized && !tags.includes(normalized)) tags.push(normalized);
+  };
+
+  [...(Array.isArray(manhole?.titles) ? manhole!.titles : [])]
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+    .forEach((title) => pushTag(`${title.emoji || ''}${title.label}`));
+  (Array.isArray(manhole?.title_tags) ? manhole!.title_tags : []).forEach(pushTag);
+  (Array.isArray(manhole?.hashtags) ? manhole!.hashtags : []).forEach(pushTag);
+  (Array.isArray(manhole?.pokemons) ? manhole!.pokemons : []).forEach(pushTag);
+
+  return tags.slice(0, max);
+};
+
+const stableHash = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+};
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -104,7 +136,7 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
-  const [journeyTab, setJourneyTab] = useState<JourneyTab>('unvisited');
+  const [journeyTab, setJourneyTab] = useState<JourneyTab>('history');
   const feedPerPage = 24;
   const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
 
@@ -222,9 +254,12 @@ export default function HomePage() {
         try {
           const { latitude, longitude } = position.coords;
           const response = await fetch(
-            `/api/manholes?lat=${latitude}&lng=${longitude}&radius=30&visited=false&limit=3`
+            `/api/manholes?lat=${latitude}&lng=${longitude}&radius=30&visited=false&limit=4`
           );
-          if (!response.ok) return;
+          if (!response.ok) {
+            setNearbyStatus('unavailable');
+            return;
+          }
           const data = await response.json();
           setNearbyUnvisited(Array.isArray(data.manholes) ? data.manholes : []);
           setNearbyStatus('ready');
@@ -259,7 +294,10 @@ export default function HomePage() {
       if (!manholeId) return;
       const current = visitsByManholeId.get(manholeId) || [];
       current.push(visit);
-      visitsByManholeId.set(manholeId, current);
+      visitsByManholeId.set(
+        manholeId,
+        current.sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime())
+      );
     });
 
     const journeyManholesById = new Map(journeyManholes.map((manhole) => [manhole.id, manhole]));
@@ -285,9 +323,9 @@ export default function HomePage() {
         detail_url: null,
         prefecture_site_url: null,
         official_url: null,
-        titles: [],
-        hashtags: [],
-        title_tags: [],
+        titles: manhole.titles || [],
+        hashtags: manhole.hashtags || [],
+        title_tags: manhole.title_tags || [],
         region: null,
         is_active: true,
         last_verified_at: '',
@@ -301,6 +339,13 @@ export default function HomePage() {
     const unvisitedManholes = allJourneyManholes
       .filter((manhole) => !visitsByManholeId.has(manhole.id))
       .sort((a, b) => `${a.prefecture}${getMunicipality(a)}${a.id}`.localeCompare(`${b.prefecture}${getMunicipality(b)}${b.id}`, 'ja'));
+    const visitedManholes = allJourneyManholes
+      .filter((manhole) => visitsByManholeId.has(manhole.id))
+      .sort((a, b) => {
+        const aVisit = getLatestVisit(visitsByManholeId.get(a.id));
+        const bVisit = getLatestVisit(visitsByManholeId.get(b.id));
+        return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
+      });
 
     const prefectureProgress: PrefectureProgress[] = Array.from(
       allJourneyManholes.reduce((map, manhole) => {
@@ -331,42 +376,58 @@ export default function HomePage() {
         return a.name.localeCompare(b.name, 'ja');
       });
 
-    const continuedManholes = allJourneyManholes
-      .filter((manhole) => visitsByManholeId.has(manhole.id))
-      .sort((a, b) => {
-        const aVisit = visitsByManholeId.get(a.id)?.[0];
-        const bVisit = visitsByManholeId.get(b.id)?.[0];
-        return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
+    const nearbyIds = new Set<number>();
+    const nearbyCandidates = nearbyUnvisited
+      .filter((manhole) => !visitsByManholeId.has(manhole.id))
+      .slice(0, 4)
+      .map((manhole) => {
+        nearbyIds.add(manhole.id);
+        return manhole;
       });
-
-    const collectionManholes =
-      journeyTab === 'nearby'
-        ? (nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 6))
-        : journeyTab === 'continue'
-          ? [...continuedManholes.slice(0, 6), ...unvisitedManholes.slice(0, Math.max(0, 6 - continuedManholes.length))]
-          : unvisitedManholes.slice(0, 6);
+    const recentCandidates = unvisitedManholes
+      .filter((manhole) => !nearbyIds.has(manhole.id))
+      .sort((a, b) => {
+        const dateDiff = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        return dateDiff !== 0 ? dateDiff : b.id - a.id;
+      })
+      .slice(0, 4);
+    const usedCandidateIds = new Set([...nearbyCandidates, ...recentCandidates].map((manhole) => manhole.id));
+    const todaySeed = new Date().toISOString().slice(0, 10);
+    const interestingCandidates = unvisitedManholes
+      .filter((manhole) => !usedCandidateIds.has(manhole.id))
+      .filter((manhole) => (manhole.photo_count ?? 0) === 0)
+      .filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
+      .sort((a, b) => {
+        const aPriority = Math.max(...a.titles.map((title) => title.priority ?? 0), 0);
+        const bPriority = Math.max(...b.titles.map((title) => title.priority ?? 0), 0);
+        if (bPriority !== aPriority) return bPriority - aPriority;
+        return stableHash(`${todaySeed}:${a.id}`) - stableHash(`${todaySeed}:${b.id}`);
+      })
+      .slice(0, 4);
 
     return {
       visitsByManholeId,
       visitedCount: visitsByManholeId.size,
-      unvisitedManholes,
+      visitedManholes,
       prefectureProgress,
       leadingPrefectures: prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3),
       nextPrefecture: prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0),
-      completedPrefecture: prefectureProgress.find((prefecture) => prefecture.total > 0 && prefecture.remaining === 0),
-      collectionManholes,
+      nearbyCandidates,
+      recentCandidates,
+      interestingCandidates,
     };
-  }, [journeyVisits, journeyManholes, nearbyUnvisited, journeyTab]);
+  }, [journeyVisits, journeyManholes, nearbyUnvisited]);
 
   const {
     visitsByManholeId,
     visitedCount,
-    unvisitedManholes,
     prefectureProgress,
     leadingPrefectures,
     nextPrefecture,
-    completedPrefecture,
-    collectionManholes,
+    visitedManholes,
+    nearbyCandidates,
+    recentCandidates,
+    interestingCandidates,
   } = journeyData;
   const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
@@ -429,90 +490,47 @@ export default function HomePage() {
               <>
                 <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8">
                   <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
-                  <div className="relative grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
-                    <div>
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
-                        <Stamp className="h-3.5 w-3.5" />
-                        次のスタンプを探そう
-                      </div>
-                      <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
-                        {userName}のポケふた旅
-                      </h1>
-
-                      <div className="mt-5 max-w-2xl rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
-                        <div className="mb-2 flex items-end justify-between gap-3">
-                          <div>
-                            <p className="font-pixel text-2xl text-[#4F3828]">
-                              {visitedCount} / {knownTotalManholes ?? '集計中'} STAMPS
-                            </p>
-                            <p className="mt-1 text-xs font-bold text-[#6A4D36]">旅の進捗</p>
-                          </div>
-                          <p className="font-pixel text-xl text-[#B5483C]">
-                            {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
-                          </p>
-                        </div>
-                        <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
-                          <div
-                            className="h-full bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]"
-                            style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                          />
-                        </div>
-                        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                          {(leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)).map((prefecture) => (
-                            <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
-                          ))}
-                        </div>
-                      </div>
+                  <div className="relative">
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
+                      <Stamp className="h-3.5 w-3.5" />
+                      まいたび
                     </div>
+                    <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
+                      {userName}のポケふた旅
+                    </h1>
 
-                    <div className="rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 p-4">
-                      <p className="flex items-center gap-2 text-sm font-extrabold text-[#4F3828]">
-                        <Compass className="h-4 w-4 text-[#B5483C]" />
-                        次のスタンプ候補
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {(nearbyUnvisited.length > 0 ? nearbyUnvisited : unvisitedManholes.slice(0, 3)).map((manhole) => (
-                          <Link
-                            key={manhole.id}
-                            href={`/manhole/${manhole.id}`}
-                            className="flex items-center justify-between gap-3 rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-3 py-2 transition hover:bg-[#F8D9C4]"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-bold text-[#4F3828]">{getMunicipality(manhole)}</span>
-                              <span className="block truncate text-xs font-bold text-[#6A4D36]">{manhole.prefecture}</span>
-                            </span>
-                            <span className="shrink-0 font-pixel text-xs text-[#B5483C]">
-                              {typeof manhole.distance === 'number' ? `${manhole.distance.toFixed(1)}km` : '未訪問'}
-                            </span>
-                          </Link>
+                    <div className="mt-5 max-w-3xl rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
+                      <div className="mb-2 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="font-pixel text-2xl text-[#4F3828]">
+                            {visitedCount} / {knownTotalManholes ?? '集計中'} STAMPS
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-[#6A4D36]">旅の進捗</p>
+                        </div>
+                        <p className="font-pixel text-xl text-[#B5483C]">
+                          {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
+                        </p>
+                      </div>
+                      <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
+                        <div
+                          className="h-full bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]"
+                          style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
+                        />
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        {(leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)).map((prefecture) => (
+                          <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
                         ))}
                       </div>
-                      {nearbyStatus !== 'ready' && (
-                        <button
-                          type="button"
-                          onClick={loadNearbyUnvisited}
-                          disabled={nearbyStatus === 'loading'}
-                          className="mt-3 min-h-[40px] w-full rounded-[7px] border border-[#8C6A4A]/20 bg-white px-3 text-sm font-extrabold text-[#4F3828] transition hover:bg-[#F8D9C4] disabled:opacity-60"
-                        >
-                          {nearbyStatus === 'loading' ? '現在地を確認中...' : '近くの未訪問を表示'}
-                        </button>
-                      )}
-                      {completedPrefecture ? (
-                        <div className="mt-4 rounded-[7px] border border-[#3F9D7D]/25 bg-[#DFF1E9] px-3 py-2">
-                          <p className="flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
-                            <CheckCircle2 className="h-4 w-4" />
-                            {completedPrefecture.name}コンプリート！
-                          </p>
-                        </div>
-                      ) : nextPrefecture ? (
-                        <div className="mt-4 rounded-[7px] border border-[#DDA63A]/30 bg-[#FFF0C7] px-3 py-2">
-                          <p className="flex items-center gap-2 text-xs font-extrabold text-[#8C6315]">
-                            <Award className="h-4 w-4" />
-                            あと{nextPrefecture.remaining}枚で{nextPrefecture.name}制覇
-                          </p>
-                        </div>
-                      ) : null}
                     </div>
+                    {nextPrefecture && (
+                      <div className="mt-4 inline-flex rounded-[7px] border border-[#DDA63A]/30 bg-[#FFF0C7] px-3 py-2">
+                        <p className="flex items-center gap-2 text-xs font-extrabold text-[#8C6315]">
+                          <Award className="h-4 w-4" />
+                          あと{nextPrefecture.remaining}枚で{nextPrefecture.name}制覇
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -536,39 +554,78 @@ export default function HomePage() {
                           </button>
                         );
                       })}
-                      <Link
-                        href="/visits"
-                        className="flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] px-5 text-sm font-bold text-[#4F3828] transition hover:bg-white"
-                      >
-                        スタンプ帳
-                        <Stamp className="h-4 w-4" />
-                      </Link>
                     </div>
                   </div>
                 </section>
 
-                <section className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
-                  {collectionManholes.length > 0 ? (
-                    collectionManholes.map((manhole) => (
-                      <JourneyStampCard
-                        key={manhole.id}
-                        manhole={manhole}
-                        visits={visitsByManholeId.get(manhole.id)}
+                {journeyTab === 'history' ? (
+                  <section className="mt-6">
+                    {visitedManholes.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+                        {visitedManholes.map((manhole) => (
+                          <JourneyHistoryCard
+                            key={manhole.id}
+                            manhole={manhole}
+                            visits={visitsByManholeId.get(manhole.id)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <JourneyEmptyState
+                        title="まだ訪問履歴がありません"
+                        description="最初の訪問を記録すると、ここに写真つきの旅のアルバムが育っていきます。"
+                        uploadHref={uploadHref}
                       />
-                    ))
-                  ) : (
-                    <div className="col-span-full rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-5 py-10 text-center shadow-sm">
-                      <p className="text-sm font-bold text-[#6A4D36]">次の候補を準備中です</p>
-                      <Link
-                        href="/nearby"
-                        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#B5483C] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#9F3D33]"
-                      >
-                        <MapPin className="h-4 w-4" />
-                        近くの未訪問を見る
-                      </Link>
-                    </div>
-                  )}
-                </section>
+                    )}
+                  </section>
+                ) : (
+                  <section className="mt-6 space-y-6">
+                    <JourneyCandidateSection
+                      title="近くにある未訪問"
+                      description="今いる場所から寄り道しやすい候補"
+                      action={
+                        <button
+                          type="button"
+                          onClick={loadNearbyUnvisited}
+                          disabled={nearbyStatus === 'loading'}
+                          className="min-h-[40px] rounded-[7px] border border-[#8C6A4A]/20 bg-white px-3 text-xs font-extrabold text-[#4F3828] transition hover:bg-[#F8D9C4] disabled:opacity-60"
+                        >
+                          {nearbyStatus === 'loading' ? '確認中...' : '近く候補を更新'}
+                        </button>
+                      }
+                    >
+                      {nearbyCandidates.length > 0 ? (
+                        nearbyCandidates.map((manhole) => (
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="近い" />
+                        ))
+                      ) : (
+                        <JourneyCandidateNotice
+                          text={nearbyStatus === 'unavailable' ? '位置情報が使えませんでした。最近追加と発見候補から探せます。' : '位置情報を使うと近くの未訪問を4件表示できます。'}
+                        />
+                      )}
+                    </JourneyCandidateSection>
+
+                    <JourneyCandidateSection title="最近できた未訪問" description="新しく追加されたポケふたから次の目的地を探す">
+                      {recentCandidates.length > 0 ? (
+                        recentCandidates.map((manhole) => (
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="NEW" />
+                        ))
+                      ) : (
+                        <JourneyCandidateNotice text="最近追加された未訪問候補を準備中です。" />
+                      )}
+                    </JourneyCandidateSection>
+
+                    <JourneyCandidateSection title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
+                      {interestingCandidates.length > 0 ? (
+                        interestingCandidates.map((manhole) => (
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="発見" />
+                        ))
+                      ) : (
+                        <JourneyCandidateNotice text="称号つきの未訪問候補を準備中です。" />
+                      )}
+                    </JourneyCandidateSection>
+                  </section>
+                )}
               </>
             ) : (
               <>
@@ -823,71 +880,179 @@ function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress 
   );
 }
 
-function JourneyStampCard({ manhole, visits }: { manhole: JourneyManhole; visits?: JourneyVisit[] }) {
-  const isVisited = Boolean(visits?.length);
-  const latestVisit = visits?.slice().sort((a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime())[0];
-  const hasPhoto = Boolean(latestVisit?.photos?.length);
+function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visits?: JourneyVisit[] }) {
+  const latestVisit = getLatestVisit(visits);
+  const latestPhoto = latestVisit?.photos?.[0];
+  const visitCount = visits?.length ?? 0;
+  const photoCount = visits?.reduce((count, visit) => count + visit.photos.length, 0) ?? 0;
+  const tags = getManholeTags(manhole, 4);
 
   return (
     <Link
       href={`/manhole/${manhole.id}`}
-      className={`group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-[8px] border-2 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
-        isVisited
-          ? 'border-[#B5483C]/40 bg-[#FFF7E5]'
-          : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]'
-      }`}
+      className="group overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-[#E9DEC9]">
+        {latestPhoto?.thumbnail_url ? (
+          <img
+            src={latestPhoto.thumbnail_url}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <div className="flex h-24 w-24 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#D94D3F] bg-white/60 text-center text-[#D94D3F] shadow-[inset_0_2px_8px_rgba(181,72,60,0.12)]">
+              <div>
+                <CircleDot className="mx-auto h-7 w-7" />
+                <p className="mt-1 font-pixel text-[10px] leading-none">POKEFUTA</p>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="absolute left-2 top-2 rounded-[6px] bg-[#D94D3F] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
+          訪問済み
+        </div>
+        <div className="absolute bottom-2 right-2 flex gap-1">
+          {photoCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-xs font-bold text-white">
+              <Camera className="h-3.5 w-3.5" />
+              {photoCount}
+            </span>
+          )}
+          {visitCount > 1 && (
+            <span className="rounded-full bg-[#4F3828] px-2 py-1 font-pixel text-xs text-white">
+              x{visitCount}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="line-clamp-1 text-base font-extrabold text-[#4F3828]">{getMunicipality(manhole)}</p>
+            <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.prefecture}</p>
+          </div>
+          {latestVisit && (
+            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-[#B5483C]">
+              {formatDateJa(latestVisit.shot_at)}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {tags.length > 0 ? (
+            tags.map((tag) => (
+              <span key={tag} className="rounded-full border border-[#8C6A4A]/15 bg-white/80 px-2 py-1 text-[11px] font-bold text-[#6A4D36]">
+                {tag}
+              </span>
+            ))
+          ) : (
+            <span className="rounded-full border border-[#8C6A4A]/15 bg-white/80 px-2 py-1 text-[11px] font-bold text-[#6A4D36]">
+              {getManholeTitle(manhole)}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function JourneyCandidateSection({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold text-[#4F3828]">{title}</h2>
+          <p className="mt-1 text-xs font-bold text-[#6A4D36]">{description}</p>
+        </div>
+        {action}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+    </div>
+  );
+}
+
+function JourneyUnvisitedCard({ manhole, badge }: { manhole: JourneyManhole; badge: string }) {
+  const tags = getManholeTags(manhole, 3);
+
+  return (
+    <Link
+      href={`/manhole/${manhole.id}`}
+      className="group relative flex min-h-[210px] flex-col justify-between overflow-hidden rounded-[8px] border-2 border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
     >
       <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:16px_16px]" />
       <div className="relative flex items-center justify-between gap-2">
-        <span
-          className={`rounded-full px-2 py-1 text-[11px] font-extrabold ${
-            isVisited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
-          }`}
-        >
-          {isVisited ? '訪問済み' : '未訪問'}
+        <span className="rounded-full bg-[#D5C8B3] px-2 py-1 text-[11px] font-extrabold text-[#7D715F]">
+          未訪問
         </span>
-        <span className="flex items-center gap-1">
-          {hasPhoto && <Camera className="h-4 w-4 text-[#B5483C]" />}
-          {visits && visits.length > 1 && (
-            <span className="rounded-full bg-[#4F3828] px-1.5 py-0.5 font-pixel text-[10px] text-white">
-              x{visits.length}
-            </span>
-          )}
-          {!isVisited && typeof manhole.distance === 'number' && (
-            <span className="font-pixel text-xs text-[#B5483C]">{manhole.distance.toFixed(1)}km</span>
-          )}
+        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-[#B5483C]">
+          {typeof manhole.distance === 'number' ? `${manhole.distance.toFixed(1)}km` : badge}
         </span>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center">
-        <div
-          className={`flex h-24 w-24 rotate-[-8deg] items-center justify-center rounded-full border-4 text-center ${
-            isVisited
-              ? 'border-[#D94D3F] bg-white/50 text-[#D94D3F] shadow-[inset_0_2px_8px_rgba(181,72,60,0.12)]'
-              : 'border-[#B8AB96] text-[#A39580]'
-          }`}
-        >
-          {isVisited ? (
-            <div>
-              <CircleDot className="mx-auto h-7 w-7" />
-              <p className="mt-1 font-pixel text-[10px] leading-none">POKEFUTA</p>
-            </div>
-          ) : (
-            <div>
-              <Stamp className="mx-auto h-7 w-7" />
-              <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
-            </div>
-          )}
+      <div className="relative flex flex-1 items-center justify-center py-4">
+        <div className="flex h-20 w-20 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-center text-[#A39580]">
+          <div>
+            <Stamp className="mx-auto h-6 w-6" />
+            <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
+          </div>
         </div>
       </div>
 
       <div className="relative">
         <p className="line-clamp-1 text-sm font-extrabold text-[#4F3828]">{getMunicipality(manhole)}</p>
         <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.prefecture}</p>
-        <p className="mt-2 line-clamp-1 text-xs font-bold text-[#8C6A4A]">
-          {isVisited && latestVisit ? formatDateJa(latestVisit.shot_at) : getManholeTitle(manhole)}
-        </p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(tags.length > 0 ? tags : [getManholeTitle(manhole)]).slice(0, 3).map((tag) => (
+            <span key={tag} className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-[#6A4D36]">
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
     </Link>
+  );
+}
+
+function JourneyCandidateNotice({ text }: { text: string }) {
+  return (
+    <div className="col-span-full rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-4 py-5 text-sm font-bold text-[#6A4D36] shadow-sm">
+      {text}
+    </div>
+  );
+}
+
+function JourneyEmptyState({
+  title,
+  description,
+  uploadHref,
+}: {
+  title: string;
+  description: string;
+  uploadHref: string;
+}) {
+  return (
+    <div className="rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-5 py-10 text-center shadow-sm">
+      <p className="text-base font-extrabold text-[#4F3828]">{title}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm font-bold leading-relaxed text-[#6A4D36]">{description}</p>
+      <Link
+        href={uploadHref}
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#B5483C] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#9F3D33]"
+      >
+        <Camera className="h-4 w-4" />
+        訪問を記録
+      </Link>
+    </div>
   );
 }

@@ -140,7 +140,10 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
-            pokemons
+            pokemons,
+            titles,
+            hashtags,
+            title_tags
           ),
           photos:photo (
             id,
@@ -174,7 +177,10 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
-            pokemons
+            pokemons,
+            titles,
+            hashtags,
+            title_tags
           ),
           photos:photo (
             id,
@@ -363,5 +369,4 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
 
