@@ -5,8 +5,10 @@ import sharp from 'sharp';
 
 const WIDTH = 1200;
 const HEIGHT = 630;
+const OGP_FONT_PATH = path.join(process.cwd(), 'public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf');
 const TEMPLATE_PATH = path.join(process.cwd(), 'public', 'ogp', 'pokefuta_ogp_template.svg');
 const BACKGROUND_PATH = path.join(process.cwd(), 'public', 'ogp', 'pokefuta_ogp_background_1200x630.png');
+export const OGP_FONT_FAMILY = "'Pokefuta OGP JP', sans-serif";
 
 type PokefutaOgpTemplateInput = {
   photoBuffer: Buffer;
@@ -38,16 +40,27 @@ function imageDataUri(buffer: Buffer, mimeType: string): string {
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
+function fontFaceCss(fontBuffer: Buffer): string {
+  return `@font-face{font-family:'Pokefuta OGP JP';src:url('${imageDataUri(fontBuffer, 'font/otf')}') format('opentype');font-weight:700 950;font-style:normal;font-display:block;}`;
+}
+
 const templateAssetsPromise = Promise.all([
   readFile(TEMPLATE_PATH, 'utf8'),
   readFile(BACKGROUND_PATH),
-]).then(([template, backgroundBuffer]) => ({
+  readFile(OGP_FONT_PATH),
+]).then(([template, backgroundBuffer, fontBuffer]) => ({
   template,
   backgroundDataUri: imageDataUri(backgroundBuffer, 'image/png'),
+  fontFaceCss: fontFaceCss(fontBuffer),
 }));
 
+export async function getOgpFontFaceCss(): Promise<string> {
+  const { fontFaceCss } = await templateAssetsPromise;
+  return fontFaceCss;
+}
+
 export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput): Promise<Buffer> {
-  const [{ template, backgroundDataUri }, photoBuffer] = await Promise.all([
+  const [{ template, backgroundDataUri, fontFaceCss }, photoBuffer] = await Promise.all([
     templateAssetsPromise,
     sharp(input.photoBuffer)
       .resize(820, 820, { fit: 'cover' })
@@ -59,6 +72,7 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
   const badgeLabel = input.badgeLabel ?? '見つけたポケふた';
 
   let svg = template;
+  svg = replaceAll(svg, '{{fontFaceCss}}', fontFaceCss);
   svg = replaceAll(svg, './pokefuta_ogp_background_1200x630.png', backgroundDataUri);
   svg = replaceAll(svg, '📷 MY POKEFUTA PHOTO', 'MY POKEFUTA PHOTO');
   svg = replaceAll(svg, '{{photoDataUri}}', photoDataUri);

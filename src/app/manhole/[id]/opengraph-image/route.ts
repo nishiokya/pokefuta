@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import sharp from 'sharp';
 import { SITE_NAME } from '@/lib/constants';
-import { renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
+import { OGP_FONT_FAMILY, getOgpFontFaceCss, renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
 import {
   loadManholeForOgp,
   loadPhotoForOgp,
@@ -22,24 +22,32 @@ function escapeXml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function buildFallbackSvg(locationLabel: string): Buffer {
+async function buildFallbackSvg(locationLabel: string): Promise<Buffer> {
+  const fontFaceCss = await getOgpFontFaceCss();
   const safeLabel = escapeXml(locationLabel.length > 20 ? `${locationLabel.slice(0, 19)}…` : locationLabel);
   const svg = `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <style>${fontFaceCss}</style>
+    </defs>
     <rect width="${WIDTH}" height="${HEIGHT}" fill="#F6EEDC"/>
     <rect x="40" y="40" width="1120" height="550" rx="28" fill="#FFF8EB" stroke="#7B63A8" stroke-opacity="0.22" stroke-width="4"/>
-    <text x="100" y="280" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="64" font-weight="900" fill="#4F3828">${safeLabel}のポケふた</text>
-    <text x="104" y="360" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つける全国のポケモンマンホール</text>
-    <text x="104" y="420" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="28" font-weight="700" fill="#5D6E68">pokefuta.com</text>
+    <text x="100" y="280" font-family="${OGP_FONT_FAMILY}" font-size="64" font-weight="900" fill="#4F3828">${safeLabel}のポケふた</text>
+    <text x="104" y="360" font-family="${OGP_FONT_FAMILY}" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つける全国のポケモンマンホール</text>
+    <text x="104" y="420" font-family="${OGP_FONT_FAMILY}" font-size="28" font-weight="700" fill="#5D6E68">pokefuta.com</text>
   </svg>`;
   return Buffer.from(svg);
 }
 
-function buildDefaultFallback(): Buffer {
+async function buildDefaultFallback(): Promise<Buffer> {
+  const fontFaceCss = await getOgpFontFaceCss();
   const svg = `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <style>${fontFaceCss}</style>
+    </defs>
     <rect width="${WIDTH}" height="${HEIGHT}" fill="#F6EEDC"/>
     <rect x="40" y="40" width="1120" height="550" rx="28" fill="#FFF8EB" stroke="#7B63A8" stroke-opacity="0.22" stroke-width="4"/>
-    <text x="100" y="300" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="72" font-weight="900" fill="#4F3828">${escapeXml(SITE_NAME)}</text>
-    <text x="104" y="370" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つけたポケふたを記録しよう</text>
+    <text x="100" y="300" font-family="${OGP_FONT_FAMILY}" font-size="72" font-weight="900" fill="#4F3828">${escapeXml(SITE_NAME)}</text>
+    <text x="104" y="370" font-family="${OGP_FONT_FAMILY}" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つけたポケふたを記録しよう</text>
   </svg>`;
   return Buffer.from(svg);
 }
@@ -54,14 +62,14 @@ export async function GET(
 ) {
   const manholeId = Number(params.id);
   if (isNaN(manholeId)) {
-    return new Response(await renderFallbackPng(buildDefaultFallback()) as unknown as BodyInit, {
+    return new Response(await renderFallbackPng(await buildDefaultFallback()) as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' },
     });
   }
 
   const manhole = await loadManholeForOgp(manholeId);
   if (!manhole) {
-    return new Response(await renderFallbackPng(buildDefaultFallback()) as unknown as BodyInit, {
+    return new Response(await renderFallbackPng(await buildDefaultFallback()) as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' },
     });
   }
@@ -78,7 +86,7 @@ export async function GET(
   }
 
   if (!photo?.signed_url) {
-    const png = await renderFallbackPng(buildFallbackSvg(locationLabel));
+    const png = await renderFallbackPng(await buildFallbackSvg(locationLabel));
     return new Response(png as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' },
     });
@@ -112,7 +120,7 @@ export async function GET(
     });
   } catch (error) {
     console.error('Failed to render manhole OGP:', error);
-    const png = await renderFallbackPng(buildFallbackSvg(locationLabel));
+    const png = await renderFallbackPng(await buildFallbackSvg(locationLabel));
     return new Response(png as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' },
     });
