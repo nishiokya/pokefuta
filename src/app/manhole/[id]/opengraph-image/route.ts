@@ -99,8 +99,8 @@ export async function GET(
       prefecture: manhole.prefecture,
       city,
       pokemonNames,
-      badgeEmoji: topTitle?.emoji ?? '',
-      badgeLabel: topTitle?.label ?? '',
+      badgeEmoji: topTitle ? topTitle.emoji : '',
+      badgeLabel: topTitle ? topTitle.label : '',
       statsLabel: '全国の旅を記録',
     });
 
