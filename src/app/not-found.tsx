@@ -1,6 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Home, List, MapPin, Navigation } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import { SITE_NAME } from '@/lib/constants';
+
+export const metadata: Metadata = {
+  title: `ページが見つかりません | ${SITE_NAME}`,
+  description: 'お探しのページは見つかりませんでした。近くのポケふたや一覧から、もう一度探せます。',
+};
 
 export default function NotFound() {
   return (
