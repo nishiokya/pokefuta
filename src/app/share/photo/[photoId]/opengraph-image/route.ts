@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import sharp from 'sharp';
 import { SITE_NAME } from '@/lib/constants';
+import { renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
 import {
-  getManholeLocationLabel,
   getSortedTitles,
   loadPublicSharedPhoto,
 } from '@/lib/shared-photo';
@@ -18,34 +18,6 @@ function escapeXml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function truncate(value: string, max: number): string {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
-}
-
-function overlaySvg(title: string, subtitle: string, badge?: string) {
-  const safeTitle = escapeXml(truncate(title, 34));
-  const safeSubtitle = escapeXml(truncate(subtitle, 58));
-  const safeBadge = badge ? escapeXml(truncate(badge, 28)) : '';
-
-  return Buffer.from(`
-    <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="rgba(0,0,0,0.05)" />
-          <stop offset="54%" stop-color="rgba(0,0,0,0.15)" />
-          <stop offset="100%" stop-color="rgba(0,0,0,0.88)" />
-        </linearGradient>
-      </defs>
-      <rect width="1200" height="630" fill="url(#shade)" />
-      ${safeBadge ? `<rect x="64" y="378" rx="24" ry="24" width="${Math.min(520, 120 + safeBadge.length * 30)}" height="54" fill="#F8D9C4" stroke="#ffffff" stroke-width="3" opacity="0.96" />
-      <text x="92" y="414" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="28" font-weight="800" fill="#B5483C">${safeBadge}</text>` : ''}
-      <text x="64" y="486" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="62" font-weight="900" fill="#ffffff">${safeTitle}</text>
-      <text x="68" y="540" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="30" font-weight="800" fill="rgba(255,255,255,0.88)">${safeSubtitle}</text>
-      <text x="68" y="588" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="24" font-weight="800" fill="rgba(255,255,255,0.68)">${escapeXml(SITE_NAME)} / pokefuta.com</text>
-    </svg>
-  `);
 }
 
 async function fallbackImage() {
@@ -82,18 +54,19 @@ export async function GET(
     if (!imageResponse.ok) throw new Error(`Photo fetch failed: ${imageResponse.status}`);
 
     const input = Buffer.from(await imageResponse.arrayBuffer());
-    const locationLabel = getManholeLocationLabel(photo.manhole);
     const pokemonText = photo.manhole.pokemons.length > 0
-      ? `${photo.manhole.pokemons.join('・')}のポケふた写真`
+      ? photo.manhole.pokemons.join('・')
       : 'ポケふた写真';
     const topTitle = getSortedTitles(photo.manhole.titles)[0];
-    const badge = topTitle ? `${topTitle.emoji || ''}${topTitle.label}` : undefined;
-
-    const png = await sharp(input)
-      .resize(WIDTH, HEIGHT, { fit: 'cover' })
-      .composite([{ input: overlaySvg(`${locationLabel}のポケふた`, pokemonText, badge) }])
-      .png()
-      .toBuffer();
+    const png = await renderPokefutaOgpTemplate({
+      photoBuffer: input,
+      prefecture: photo.manhole.prefecture,
+      city: photo.manhole.municipality || photo.manhole.prefecture,
+      pokemonNames: pokemonText,
+      badgeEmoji: topTitle?.emoji,
+      badgeLabel: topTitle?.label,
+      statsLabel: '写真で旅をシェア',
+    });
 
     return new Response(png as unknown as BodyInit, {
       headers: {
