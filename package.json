@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node tools/copy-ogp-assets-to-build.js",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "capture": "node tools/capture/capture.js"
   },
   "dependencies": {

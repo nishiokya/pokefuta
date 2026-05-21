@@ -42,6 +42,23 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ['sharp'],
+    outputFileTracingIncludes: {
+      '/manhole/[id]/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+        './public/ogp/pokefuta_ogp_template.svg',
+        './public/ogp/pokefuta_ogp_background_1200x630.png',
+      ],
+      '/share/photo/[photoId]/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+        './public/ogp/pokefuta_ogp_template.svg',
+        './public/ogp/pokefuta_ogp_background_1200x630.png',
+      ],
+      '/p/[photoId]/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+        './public/ogp/pokefuta_ogp_template.svg',
+        './public/ogp/pokefuta_ogp_background_1200x630.png',
+      ],
+    },
   },
   images: {
     remotePatterns: [
