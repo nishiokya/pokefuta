@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { formatDateJa } from '@/lib/date';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import {
   getManholeLocationLabel,
   getSortedTitles,
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ? photo.visit.comment
     : `${locationLabel}で見つけたポケふた写真です。`;
   const pageUrl = `${SITE_URL}/p/${photo.id}`;
-  const imageUrl = `${pageUrl}/opengraph-image`;
+  const imageUrl = `${pageUrl}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
   return {
     title,

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ManholePage from './ManholePage';
 import { loadManholeForOgp, loadPhotoForOgp } from '@/lib/manhole-ogp';
 import { getManholeLocationLabel, getSortedTitles } from '@/lib/shared-photo';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 
 type Props = {
   params: { id: string };
@@ -35,8 +35,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const pageUrl = `${SITE_URL}/manhole/${manholeId}`;
   const canonicalUrl = validPhotoId ? `${pageUrl}?photo=${validPhotoId}` : pageUrl;
   const ogImageUrl = validPhotoId
-    ? `${SITE_URL}/manhole/${manholeId}/opengraph-image?photo=${validPhotoId}`
-    : `${SITE_URL}/manhole/${manholeId}/opengraph-image`;
+    ? `${SITE_URL}/manhole/${manholeId}/opengraph-image?photo=${validPhotoId}&v=${OGP_IMAGE_VERSION}`
+    : `${SITE_URL}/manhole/${manholeId}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
   const title = topTitle
     ? `${topTitle.label} | ${locationLabel}のポケふた | ${SITE_NAME}`

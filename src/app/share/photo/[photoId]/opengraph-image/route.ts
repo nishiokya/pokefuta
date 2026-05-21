@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import sharp from 'sharp';
 import { SITE_NAME } from '@/lib/constants';
-import { renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
+import { OGP_FONT_FAMILY, getOgpFontFaceCss, renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
 import {
   getSortedTitles,
   loadPublicSharedPhoto,
@@ -21,12 +21,16 @@ function escapeXml(value: string): string {
 }
 
 async function fallbackImage() {
+  const fontFaceCss = await getOgpFontFaceCss();
   const svg = Buffer.from(`
     <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>${fontFaceCss}</style>
+      </defs>
       <rect width="1200" height="630" fill="#F6EEDC" />
       <rect x="40" y="40" width="1120" height="550" rx="28" fill="#FFF8EB" stroke="#7B63A8" stroke-opacity="0.22" stroke-width="4" />
-      <text x="100" y="300" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="72" font-weight="900" fill="#4F3828">${escapeXml(SITE_NAME)}</text>
-      <text x="104" y="370" font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つけたポケふたを記録しよう</text>
+      <text x="100" y="300" font-family="${OGP_FONT_FAMILY}" font-size="72" font-weight="900" fill="#4F3828">${escapeXml(SITE_NAME)}</text>
+      <text x="104" y="370" font-family="${OGP_FONT_FAMILY}" font-size="34" font-weight="800" fill="#7B63A8">旅先で見つけたポケふたを記録しよう</text>
     </svg>
   `);
   return sharp(svg).png().toBuffer();
