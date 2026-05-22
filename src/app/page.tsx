@@ -13,8 +13,6 @@ import {
   Heart,
   MapPin,
   MessageCircle,
-  Search,
-  SlidersHorizontal,
   Sparkles,
   Stamp,
 } from 'lucide-react';
@@ -443,36 +441,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header
-        title="ポケふた写真館"
-        actions={
-          <>
-            <Link
-              href="/manholes"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="検索"
-              title="検索"
-            >
-              <Search className="h-5 w-5" />
-            </Link>
-            <Link
-              href="/nearby"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="絞り込み"
-              title="絞り込み"
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </Link>
-            <Link
-              href={uploadHref}
-              className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
-            >
-              <Camera className="h-4 w-4" />
-              写真を投稿
-            </Link>
-          </>
-        }
-      />
+      <Header title="ポケふた写真館" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Loading State */}

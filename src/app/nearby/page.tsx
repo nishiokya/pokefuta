@@ -10,7 +10,6 @@ import {
   Navigation,
   RefreshCw,
   Search,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
@@ -243,36 +242,7 @@ export default function NearbyPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header
-        title="近くのポケふた"
-        actions={
-          <>
-            <Link
-              href="/manholes"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="検索"
-              title="検索"
-            >
-              <Search className="h-5 w-5" />
-            </Link>
-            <Link
-              href="#nearby-controls"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="絞り込み"
-              title="絞り込み"
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </Link>
-            <Link
-              href={uploadHref}
-              className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
-            >
-              <Camera className="h-4 w-4" />
-              写真を投稿
-            </Link>
-          </>
-        }
-      />
+      <Header title="近くのポケふた" />
 
       <main className="relative mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">

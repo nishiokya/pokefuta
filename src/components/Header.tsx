@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { ExternalLink, Info, LogOut, User as UserIcon, UserPlus } from 'lucide-react';
+import { Info, LogOut, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -120,7 +120,7 @@ export default function Header({
               href="https://x.com/pokemonmanhole"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full font-sans text-lg font-black text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="公式X @pokemonmanhole"
               title="公式X @pokemonmanhole"
               onClick={() =>
@@ -131,7 +131,7 @@ export default function Header({
                 })
               }
             >
-              <ExternalLink className="h-5 w-5" />
+              X
             </a>
           )}
 
