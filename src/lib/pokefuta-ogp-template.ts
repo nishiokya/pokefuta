@@ -2,7 +2,7 @@ import 'server-only';
 import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import * as fontkit from 'fontkit';
+import * as opentype from 'opentype.js';
 import sharp from 'sharp';
 
 const WIDTH = 1200;
@@ -13,7 +13,7 @@ const BACKGROUND_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_backgr
 const OGP_FONT_PATH = resolveOgpAssetPath(OGP_FONT_RELATIVE_PATH);
 const TEMPLATE_PATH = resolveOgpAssetPath(TEMPLATE_RELATIVE_PATH);
 const BACKGROUND_PATH = resolveOgpAssetPath(BACKGROUND_RELATIVE_PATH);
-let ogpFontPromise: Promise<fontkit.Font> | null = null;
+let ogpFontPromise: Promise<opentype.Font> | null = null;
 
 type PokefutaOgpTemplateInput = {
   photoBuffer: Buffer;
@@ -89,75 +89,40 @@ function textTopFromBaseline(baseline: number, fontSize: number): number {
   return Math.max(0, Math.round(baseline - fontSize * 0.9));
 }
 
-async function loadOgpFont(): Promise<fontkit.Font> {
+function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(arrayBuffer).set(buffer);
+  return arrayBuffer;
+}
+
+async function loadOgpFont(): Promise<opentype.Font> {
   assertOgpFontExists();
 
-  if (!ogpFontPromise) {
-    ogpFontPromise = Promise.resolve().then(() => {
-      const parsedFont = fontkit.create(readFileSync(OGP_FONT_PATH));
-      if ('fonts' in parsedFont) {
-        const firstFont = parsedFont.fonts[0];
-        if (!firstFont) {
-          throw new Error(`OGP font collection is empty: ${OGP_FONT_PATH}`);
-        }
-        return firstFont;
-      }
-
-      return parsedFont;
-    });
-  }
+  ogpFontPromise ??= Promise.resolve().then(() =>
+    opentype.parse(bufferToArrayBuffer(readFileSync(OGP_FONT_PATH)))
+  );
 
   return ogpFontPromise;
-}
-
-function escapeSvgPathData(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-function renderFontkitPathData(
-  font: fontkit.Font,
-  text: string,
-  x: number,
-  baseline: number,
-  fontSize: number
-): string {
-  const run = font.layout(text);
-  const scale = fontSize / font.unitsPerEm;
-  let cursorX = x;
-
-  return run.glyphs
-    .map((glyph, index) => {
-      const position = run.positions[index];
-      const glyphPath = glyph.path.toSVG();
-      if (!glyphPath) return '';
-
-      const glyphX = cursorX + position.xOffset * scale;
-      const glyphBaseline = baseline - position.yOffset * scale;
-      cursorX += position.xAdvance * scale;
-
-      return `<path d="${escapeSvgPathData(glyphPath)}" transform="translate(${glyphX.toFixed(2)} ${glyphBaseline.toFixed(2)}) scale(${scale.toFixed(5)} ${(-scale).toFixed(5)})"/>`;
-    })
-    .join('');
 }
 
 async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
   const font = await loadOgpFont();
   let fontSize = input.fontSize;
-  let textWidth = font.layout(input.text).advanceWidth * (fontSize / font.unitsPerEm);
+  let textWidth = font.getAdvanceWidth(input.text, fontSize, { kerning: true });
   if (textWidth > input.width) {
     fontSize = Math.max(12, Math.floor((fontSize * input.width) / textWidth));
-    textWidth = font.layout(input.text).advanceWidth * (fontSize / font.unitsPerEm);
+    textWidth = font.getAdvanceWidth(input.text, fontSize, { kerning: true });
   }
   const baseline = Math.round(fontSize * 0.9);
   const x =
     input.align === 'center'
       ? Math.max(0, (input.width - textWidth) / 2)
       : input.align === 'right'
-      ? Math.max(0, input.width - textWidth)
-      : 0;
-  const paths = renderFontkitPathData(font, input.text, x, baseline, fontSize);
+        ? Math.max(0, input.width - textWidth)
+        : 0;
+  const pathData = font.getPath(input.text, x, baseline, fontSize, { kerning: true }).toPathData(2);
   const svg = `<svg width="${input.width}" height="${input.height}" viewBox="0 0 ${input.width} ${input.height}" xmlns="http://www.w3.org/2000/svg">
-    <g fill="${escapeXmlAttribute(input.color)}">${paths}</g>
+    <path d="${escapeXmlAttribute(pathData)}" fill="${escapeXmlAttribute(input.color)}"/>
   </svg>`;
   const inputBuffer = await sharp(Buffer.from(svg))
     .png()
