@@ -1,19 +1,18 @@
 import 'server-only';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import * as opentype from 'opentype.js';
 import sharp from 'sharp';
 
 const WIDTH = 1200;
 const HEIGHT = 630;
+const OGP_FONT_NAME = 'Noto Sans CJK JP';
 const OGP_FONT_RELATIVE_PATH = path.join('public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf');
 const TEMPLATE_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_template.svg');
 const BACKGROUND_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_background_1200x630.png');
 const OGP_FONT_PATH = resolveOgpAssetPath(OGP_FONT_RELATIVE_PATH);
 const TEMPLATE_PATH = resolveOgpAssetPath(TEMPLATE_RELATIVE_PATH);
 const BACKGROUND_PATH = resolveOgpAssetPath(BACKGROUND_RELATIVE_PATH);
-let ogpFontPromise: Promise<opentype.Font> | null = null;
 
 type PokefutaOgpTemplateInput = {
   photoBuffer: Buffer;
@@ -57,7 +56,7 @@ export function assertOgpFontExists(fontPath = OGP_FONT_PATH): void {
   }
 }
 
-function escapeXmlAttribute(value: string): string {
+function escapePango(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -89,42 +88,21 @@ function textTopFromBaseline(baseline: number, fontSize: number): number {
   return Math.max(0, Math.round(baseline - fontSize * 0.9));
 }
 
-function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
-  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
-  new Uint8Array(arrayBuffer).set(buffer);
-  return arrayBuffer;
-}
-
-async function loadOgpFont(): Promise<opentype.Font> {
+async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
   assertOgpFontExists();
 
-  ogpFontPromise ??= Promise.resolve().then(() =>
-    opentype.parse(bufferToArrayBuffer(readFileSync(OGP_FONT_PATH)))
-  );
-
-  return ogpFontPromise;
-}
-
-async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
-  const font = await loadOgpFont();
-  let fontSize = input.fontSize;
-  let textWidth = font.getAdvanceWidth(input.text, fontSize, { kerning: true });
-  if (textWidth > input.width) {
-    fontSize = Math.max(12, Math.floor((fontSize * input.width) / textWidth));
-    textWidth = font.getAdvanceWidth(input.text, fontSize, { kerning: true });
-  }
-  const baseline = Math.round(fontSize * 0.9);
-  const x =
-    input.align === 'center'
-      ? Math.max(0, (input.width - textWidth) / 2)
-      : input.align === 'right'
-        ? Math.max(0, input.width - textWidth)
-        : 0;
-  const pathData = font.getPath(input.text, x, baseline, fontSize, { kerning: true }).toPathData(2);
-  const svg = `<svg width="${input.width}" height="${input.height}" viewBox="0 0 ${input.width} ${input.height}" xmlns="http://www.w3.org/2000/svg">
-    <path d="${escapeXmlAttribute(pathData)}" fill="${escapeXmlAttribute(input.color)}"/>
-  </svg>`;
-  const inputBuffer = await sharp(Buffer.from(svg))
+  const markup = `<span foreground="${input.color}" font_desc="${OGP_FONT_NAME} ${input.fontSize}">${escapePango(input.text)}</span>`;
+  const inputBuffer = await sharp({
+    text: {
+      text: markup,
+      font: OGP_FONT_NAME,
+      fontfile: OGP_FONT_PATH,
+      width: input.width,
+      height: input.height,
+      align: input.align ?? 'left',
+      rgba: true,
+    },
+  })
     .png()
     .toBuffer();
 
@@ -219,7 +197,7 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       color: '#17614F',
     },
     {
-      text: truncate(badgeLabel, 14),
+      text: `${input.badgeEmoji ?? ''} ${truncate(badgeLabel, 14)}`.trim(),
       left: 560,
       top: textTopFromBaseline(348, 29),
       width: 410,

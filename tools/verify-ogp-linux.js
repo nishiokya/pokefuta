@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const opentype = require('opentype.js');
 const sharp = require('sharp');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -50,17 +49,16 @@ function readRequired(filePath) {
 }
 
 async function verifyJapaneseTextPixels() {
-  const buffer = fs.readFileSync(FONT_PATH);
-  const font = opentype.parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
-  const pathData = font.getPath('刈谷市のポケふた', 0, 58, 64, { kerning: true }).toPathData(2);
-  if (!pathData || pathData.length < 100) {
-    fail('Japanese text did not produce usable glyph path data');
-  }
-
-  const svg = `<svg width="760" height="110" viewBox="0 0 760 110" xmlns="http://www.w3.org/2000/svg">
-    <path d="${pathData.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" fill="#3A2C22"/>
-  </svg>`;
-  const rendered = await sharp(Buffer.from(svg))
+  const rendered = await sharp({
+    text: {
+      text: '<span foreground="#3A2C22" font_desc="Noto Sans CJK JP 64">刈谷市のポケふた</span>',
+      font: 'Noto Sans CJK JP',
+      fontfile: FONT_PATH,
+      width: 760,
+      height: 110,
+      rgba: true,
+    },
+  })
     .png()
     .toBuffer();
 
@@ -77,7 +75,7 @@ async function verifyJapaneseTextPixels() {
     fail(`Japanese text appears blank; opaque pixel count was ${opaquePixels}`);
   }
 
-  pass(`Japanese text rendered on Linux via opentype SVG paths; opaque pixels=${opaquePixels}`);
+  pass(`Japanese text rendered on Linux via sharp fontfile; opaque pixels=${opaquePixels}`);
 }
 
 async function main() {
@@ -102,19 +100,13 @@ async function main() {
   pass(`Build-output runtime font path exists: ${BUILD_FONT_PATH}`);
 
   const sourceTemplate = readRequired(SOURCE_TEMPLATE_PATH);
-  if (!sourceTemplate.includes('opentype.parse')) {
-    fail('OGP rendering is not parsing the bundled font into SVG paths');
-  }
-  if (sourceTemplate.includes('fontfile:')) {
-    fail('OGP rendering still depends on sharp text overlay fontfile');
-  }
-  if (sourceTemplate.includes('sharp({')) {
-    fail('OGP rendering still uses sharp text overlay');
+  if (!sourceTemplate.includes('fontfile: OGP_FONT_PATH')) {
+    fail('sharp text overlay is not passing the absolute OGP font path as fontfile');
   }
   if (!sourceTemplate.includes('path.resolve(cwd, relativePath)')) {
     fail('OGP font path is not resolved as an absolute path from process.cwd()');
   }
-  pass('OGP text uses bundled font glyph paths instead of sharp text overlay');
+  pass('sharp text overlay uses an absolute fontfile path');
 
   const svgTemplate = readRequired(SVG_TEMPLATE_PATH);
   if (svgTemplate.includes('@font-face')) {
