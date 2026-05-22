@@ -69,7 +69,7 @@ type PrefectureProgress = {
 
 const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobileLabel: string }> = [
   { key: 'latest', label: '最新', mobileLabel: '最新' },
-  { key: 'prefectures', label: '都道府県から探す', mobileLabel: '探す' },
+  { key: 'prefectures', label: 'ポケふたを探す', mobileLabel: '探す' },
 ];
 
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
@@ -285,12 +285,14 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const visibleFeed =
-    sortedFeed.length > 1 && sortedFeed.length % 2 === 1 ? sortedFeed.slice(0, -1) : sortedFeed;
   const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上` : '集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
+  const visibleFeed =
+    canGoNext && sortedFeed.length >= 3 && sortedFeed.length % 3 !== 0
+      ? sortedFeed.slice(0, sortedFeed.length - (sortedFeed.length % 3))
+      : sortedFeed;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
   const knownTotalManholes = totalManholes > 0 ? totalManholes : null;
@@ -651,7 +653,7 @@ export default function HomePage() {
                           return (
                             <Link
                               key={tab.key}
-                              href="/manholes"
+                              href="/nearby?tab=all"
                               className="flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] px-5 text-sm font-bold text-[#2A2A2A] transition hover:bg-white"
                             >
                               <span className="hidden sm:inline">{tab.label}</span>

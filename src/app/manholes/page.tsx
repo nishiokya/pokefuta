@@ -18,7 +18,7 @@ export default function ManholesPage() {
   const lastTrackedPrefecture = useRef<string | null>(null);
 
   useEffect(() => {
-    document.title = 'ポケふた一覧 - ポケふた訪問記録';
+    document.title = '全国ポケふた一覧 - ポケふた訪問記録';
 
     (async () => {
       try {
@@ -86,20 +86,20 @@ export default function ManholesPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="ポケふた一覧" />
+      <Header title="全国ポケふた一覧" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         <section className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
               <MapPin className="h-3.5 w-3.5" />
-              都道府県から探す
+              全国一覧
             </div>
             <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              ポケふた一覧
+              全国ポケふた一覧
             </h1>
             <p className="mt-4 text-base font-medium leading-relaxed sm:text-lg">
-              地域や登場ポケモンから、旅先で見たいポケふたを探そう。
+              全国のポケふたを地域や登場ポケモンから探せる一覧ページです。
             </p>
           </div>
         </section>

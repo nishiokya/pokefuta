@@ -44,8 +44,8 @@ export default function PopularPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'みんなのポケふた旅 - ポケふた訪問記録';
-    trackView('/popular', 'みんなのポケふた旅', 'popular');
+    document.title = 'みんなのポケふた投稿 - ポケふた訪問記録';
+    trackView('/popular', 'みんなのポケふた投稿', 'popular');
 
     (async () => {
       try {
@@ -111,7 +111,7 @@ export default function PopularPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="みんなのポケふた旅" />
+      <Header title="みんなのポケふた投稿" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Hero Section */}
@@ -122,10 +122,10 @@ export default function PopularPage() {
           <div className="relative max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
               <Sparkles className="h-3.5 w-3.5" />
-              みんなのポケふた写真
+              みんなのポケふた投稿
             </div>
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              旅先で見つけたポケふたを眺めよう
+              旅先で出会ったポケふた写真を眺めよう
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-[#6B6B6B] sm:text-lg">
               全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
