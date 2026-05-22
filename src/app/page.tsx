@@ -692,7 +692,7 @@ export default function HomePage() {
                         className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                       >
                         <Camera className="w-4 h-4" />
-                        <span>ログインして投稿</span>
+                        <span>旅の続きで投稿</span>
                       </Link>
                     </div>
                   ) : (

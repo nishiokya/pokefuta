@@ -129,7 +129,7 @@ export default function PopularPage() {
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-[#6B6B6B] sm:text-lg">
               全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
-              ログインすると、あなたも旅の記録を保存できます。
+              ログインすると、あなたの旅の続きとして記録を保存できます。
             </p>
 
             {!isLoggedIn && (
@@ -297,7 +297,7 @@ export default function PopularPage() {
                 <Sparkles className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]" />
                 <h3 className="text-xl font-extrabold">この旅を自分のスタンプ帳に保存しませんか？</h3>
                 <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
-                  ログインすると、訪問済みや行きたい場所を記録できます。
+                  ログインすると、旅の続きとして訪問済みや行きたい場所を記録できます。
                   全国制覇率や都道府県別の進捗も見られます。
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -312,7 +312,7 @@ export default function PopularPage() {
                     href="/login"
                     className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
                   >
-                    ログイン
+                    旅の続きへ
                   </Link>
                 </div>
               </section>

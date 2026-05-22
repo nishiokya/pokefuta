@@ -50,7 +50,7 @@ export default function AboutPage() {
                     1. アカウント作成・ログイン
                   </h3>
                   <p className="font-pixelJp text-xs text-rpg-textDark leading-relaxed">
-                    メールアドレスまたはGoogleアカウントで無料登録できます。登録後、訪問記録の保存や写真のアップロードが可能になります。
+                    メールアドレスで無料登録できます。登録後、訪問記録の保存や写真のアップロードが可能になります。
                   </p>
                 </div>
               </div>
