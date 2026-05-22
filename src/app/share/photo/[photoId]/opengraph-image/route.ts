@@ -46,9 +46,7 @@ export async function GET(
       prefecture: photo.manhole.prefecture,
       city: photo.manhole.municipality || photo.manhole.prefecture,
       pokemonNames: pokemonText,
-      badgeEmoji: topTitle?.emoji,
       badgeLabel: topTitle?.label,
-      statsLabel: '写真で旅をシェア',
     });
 
     return new Response(png as unknown as BodyInit, {

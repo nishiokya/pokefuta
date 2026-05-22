@@ -75,9 +75,7 @@ export async function GET(
       prefecture: manhole.prefecture,
       city,
       pokemonNames,
-      badgeEmoji: topTitle ? topTitle.emoji : '',
       badgeLabel: topTitle ? topTitle.label : '',
-      statsLabel: '全国の旅を記録',
     });
 
     return new Response(png as unknown as BodyInit, {
