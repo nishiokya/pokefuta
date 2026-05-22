@@ -633,19 +633,7 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F3E7CC]">
-      <Header
-        title="スタンプ帳"
-        actions={
-          <button
-            onClick={handleShare}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-            aria-label="スタンプ帳を共有"
-            title="スタンプ帳を共有"
-          >
-            <Share2 className="h-5 w-5" />
-          </button>
-        }
-      />
+      <Header title="スタンプ帳" />
 
       <div className="max-w-3xl mx-auto pb-[10rem]">
         <div className="p-4 space-y-4">
@@ -728,7 +716,7 @@ export default function VisitsPage() {
             </section>
           )}
 
-          <nav className="sticky top-[calc(env(safe-area-inset-top)+6.5rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur">
+          <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur sm:top-[calc(env(safe-area-inset-top)+4.25rem)]">
             <div className="grid grid-cols-4 gap-1">
               {tabs.map((tab) => (
                 <button

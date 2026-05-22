@@ -37,7 +37,7 @@ export default function Header({
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const { trackLogout, clearUser, trackFooterXClick } = useAnalytics();
+  const { trackLogout, clearUser, trackXLinkClick } = useAnalytics();
 
   useEffect(() => {
     try {
@@ -101,9 +101,13 @@ export default function Header({
           <span className="truncate text-base tracking-normal sm:text-lg">{title}</span>
         </Link>
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
-          {actions && <div className="hidden items-center gap-2 sm:flex">{actions}</div>}
+        {actions && (
+          <div className="order-3 flex w-full items-center justify-end gap-2 sm:order-2 sm:w-auto">
+            {actions}
+          </div>
+        )}
 
+        <div className="order-2 flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:order-3 sm:gap-2">
           {showDescriptionLink && (
             <Link
               href="/about"
@@ -124,7 +128,7 @@ export default function Header({
               aria-label="公式X @pokemonmanhole"
               title="公式X @pokemonmanhole"
               onClick={() =>
-                trackFooterXClick({
+                trackXLinkClick({
                   location: 'header',
                   source_app: 'tracker',
                   is_logged_in: Boolean(user),
@@ -171,8 +175,6 @@ export default function Header({
             </div>
           )}
         </div>
-
-        {actions && <div className="flex w-full items-center justify-end gap-2 sm:hidden">{actions}</div>}
       </div>
     </header>
   );

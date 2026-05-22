@@ -518,7 +518,7 @@ export default function UploadPage() {
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 space-y-2 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
+        <div className="fixed left-0 right-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
           {alerts.map(alert => (
             <div
               key={alert.id}

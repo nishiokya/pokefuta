@@ -212,6 +212,7 @@ export const pokefutaEvents = {
 
   // --- SNS導線系 ---
   footerXClick:        (p?: PokefutaEventParams) => trackEvent('p_footer_x_click', p),
+  xLinkClick:          (p?: PokefutaEventParams) => trackEvent('p_x_link_click', p),
 };
 
 // ==========================================
