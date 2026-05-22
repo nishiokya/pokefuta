@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -475,6 +476,8 @@ export default function VisitsPage() {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
+        <Header title="スタンプ帳" />
+
         <div className="max-w-3xl mx-auto p-4 space-y-4">
           {/* Preview Header */}
           <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -630,6 +633,8 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F3E7CC]">
+      <Header title="スタンプ帳" />
+
       <div className="max-w-3xl mx-auto pb-[10rem]">
         <div className="p-4 space-y-4">
           <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -711,7 +716,7 @@ export default function VisitsPage() {
             </section>
           )}
 
-          <nav className="sticky top-2 z-20 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur">
+          <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur sm:top-[calc(env(safe-area-inset-top)+4.25rem)]">
             <div className="grid grid-cols-4 gap-1">
               {tabs.map((tab) => (
                 <button

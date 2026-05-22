@@ -11,6 +11,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { buildLineShareUrl, buildXShareUrl, manholeShareText, photoShareText } from '@/lib/share';
@@ -507,24 +508,19 @@ export default function ManholeDetailPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
-      {/* Header */}
-      <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4 sticky top-0 z-50">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="rpg-button p-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="font-pixelJp text-base text-rpg-yellow truncate" style={{
-              textShadow: '2px 2px 0 #34495E'
-            }}>
-              {manhole.city || manhole.municipality}のポケふた
-            </h1>
-          </div>
-        </div>
-      </div>
+      <Header
+        title={`${manhole.city || manhole.municipality}のポケふた`}
+        actions={
+          <button
+            onClick={() => router.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
+            aria-label="戻る"
+            title="戻る"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        }
+      />
 
       <div className="p-4 max-w-2xl mx-auto space-y-4 pb-32">
         {/* Visit Achievement Hero Card */}
