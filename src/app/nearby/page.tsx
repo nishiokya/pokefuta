@@ -54,44 +54,57 @@ export default function NearbyPage() {
   const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
-  // ページ初回マウント時のみ発火
-  useEffect(() => {
-    trackNearbyOpen();
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab === 'nearby' || tab === 'all' || tab === 'unvisited') {
-      setActiveTab(tab);
-    }
-  }, []);
-
   useEffect(() => {
     document.title = 'ポケふたを探す - ポケふた訪問記録';
+    trackNearbyOpen();
+
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const initialTab: SearchTab = tab === 'all' || tab === 'unvisited' ? tab : 'nearby';
+    setActiveTab(initialTab);
+    loadAllManholes();
+
     (async () => {
+      let loggedIn = false;
       try {
         const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        setIsLoggedIn(Boolean(session?.user));
+        loggedIn = Boolean(session?.user);
+        setIsLoggedIn(loggedIn);
       } catch {
         setIsLoggedIn(false);
       } finally {
         setSessionChecked(true);
       }
-    })();
-    const initialTab = new URLSearchParams(window.location.search).get('tab');
-    if (initialTab === 'all' && !userLocation) {
-      setLoading(false);
-    } else {
+
+      if (initialTab === 'all') {
+        setLoading(false);
+        return;
+      }
+
+      if (initialTab === 'unvisited' && !loggedIn) {
+        setActiveTab('all');
+        setLoading(false);
+        return;
+      }
+
       getCurrentLocationAndLoadManholes();
-    }
-    loadAllManholes();
-  }, [radius]);
+    })();
+  }, []);
 
   useEffect(() => {
     if (sessionChecked && !isLoggedIn && activeTab === 'unvisited') {
       setActiveTab('all');
     }
   }, [activeTab, isLoggedIn, sessionChecked]);
+
+  useEffect(() => {
+    if (!sessionChecked || activeTab === 'all') return;
+    if (activeTab === 'unvisited' && !isLoggedIn) return;
+    if (!userLocation) return;
+    loadNearbyManholes(userLocation.lat, userLocation.lng);
+  }, [radius]);
 
   const loadAllManholes = async () => {
     try {
@@ -403,6 +416,7 @@ export default function NearbyPage() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  aria-label="地域名・ポケモン名で検索"
                   className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/15 bg-white/80 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#7B63A8]"
                   placeholder="地域名・ポケモン名で検索"
                 />
