@@ -1,71 +1,82 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, Home, Map, Navigation, Camera, History, List, LogOut, User as UserIcon, Info } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ReactNode, useEffect, useState } from 'react';
+import { ExternalLink, Info, LogOut, User as UserIcon, UserPlus } from 'lucide-react';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
-import type { User, SupabaseClient } from '@supabase/supabase-js';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
-interface HeaderProps {
+type HeaderProps = {
   title?: string;
-  icon?: React.ReactNode;
+  actions?: ReactNode;
+  showDescriptionLink?: boolean;
+  showXLink?: boolean;
+};
+
+const getDisplayName = (user: User | null) =>
+  user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'トレーナー';
+
+function PokeballMark() {
+  return (
+    <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
+      <span className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-[#E85046]" />
+      <span className="absolute inset-x-0 top-1/2 h-[2px] bg-[#2A2A2A]" />
+      <span className="relative h-3 w-3 rounded-full border-2 border-[#2A2A2A] bg-white" />
+    </span>
+  );
 }
 
-export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [supabaseError, setSupabaseError] = useState<string | null>(null);
-  const pathname = usePathname();
+export default function Header({
+  title = 'ポケふた写真館',
+  actions,
+  showDescriptionLink = true,
+  showXLink = true,
+}: HeaderProps) {
   const router = useRouter();
-
-  const { trackLogout, clearUser } = useAnalytics();
-
-  let supabase: SupabaseClient | undefined;
-  try {
-    supabase = createBrowserClient();
-  } catch (error: any) {
-    console.error('Supabase initialization error:', error);
-    setSupabaseError(error.message);
-  }
+  const [user, setUser] = useState<User | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const { trackLogout, clearUser, trackFooterXClick } = useAnalytics();
 
   useEffect(() => {
-    // Supabaseクライアントが初期化できなかった場合はスキップ
-    if (!supabase || supabaseError) {
-      return;
+    try {
+      setSupabase(createBrowserClient());
+    } catch (error) {
+      console.error('Supabase initialization error:', error);
+      setSupabase(null);
     }
+  }, []);
 
-    // ユーザー情報取得
-    const getUser = async () => {
+  useEffect(() => {
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    const loadSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!cancelled) setUser(session?.user ?? null);
       } catch (error) {
         console.error('Failed to get user session:', error);
       }
     };
 
-    getUser();
+    loadSession();
 
-    // 認証状態の変更を監視
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
-  }, [supabase, supabaseError]);
-
-  const menuItems = [
-    { href: '/', label: 'ホーム', icon: <Home className="w-5 h-5" /> },
-    { href: '/manholes', label: 'マンホール一覧', icon: <List className="w-5 h-5" /> },
-    { href: '/nearby', label: '近くの未訪問', icon: <Navigation className="w-5 h-5" /> },
-    { href: user ? '/upload' : '/login?redirect=/upload', label: '写真を登録', icon: <Camera className="w-5 h-5" /> },
-    { href: '/visits', label: '訪問履歴', icon: <History className="w-5 h-5" /> },
-    { href: '/about', label: 'このアプリについて', icon: <Info className="w-5 h-5" /> },
-  ];
-
-  const isActive = (href: string) => pathname === href.split('?')[0];
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const handleLogout = async () => {
     if (!supabase) return;
@@ -75,7 +86,6 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
       await supabase.auth.signOut();
       trackLogout();
       clearUser();
-      setIsMenuOpen(false);
       router.push('/');
       router.refresh();
     } catch (error) {
@@ -84,120 +94,86 @@ export default function Header({ title = 'ポケふた', icon }: HeaderProps) {
   };
 
   return (
-    <>
-      <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-3 sticky top-0 z-50">
-        <div className="container-pokemon">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {icon}
-              <h1 className="font-pixelJp text-lg font-bold text-[#2A2A2A]">{title}</h1>
-            </div>
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="rpg-button p-2"
-              aria-label="メニュー"
+    <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <Link href="/" className="flex min-w-0 items-center gap-2 font-bold" aria-label="ホームに戻る">
+          <PokeballMark />
+          <span className="truncate text-base tracking-normal sm:text-lg">{title}</span>
+        </Link>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
+          {actions && <div className="hidden items-center gap-2 sm:flex">{actions}</div>}
+
+          {showDescriptionLink && (
+            <Link
+              href="/about"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
+              aria-label="このアプリについて"
+              title="このアプリについて"
             >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-      </div>
+              <Info className="h-5 w-5" />
+            </Link>
+          )}
 
-      {/* Menu Overlay */}
-      {isMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setIsMenuOpen(false)}
-          />
+          {showXLink && (
+            <a
+              href="https://x.com/pokemonmanhole"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
+              aria-label="公式X @pokemonmanhole"
+              title="公式X @pokemonmanhole"
+              onClick={() =>
+                trackFooterXClick({
+                  location: 'header',
+                  source_app: 'tracker',
+                  is_logged_in: Boolean(user),
+                })
+              }
+            >
+              <ExternalLink className="h-5 w-5" />
+            </a>
+          )}
 
-          {/* Menu Panel - RPG Style */}
-          <div className="fixed top-16 right-0 w-64 z-[60] animate-slide-in">
-            <div className="rpg-window m-2">
-              <h3 className="rpg-window-title text-sm mb-2">MENU</h3>
-
-              {/* User Info */}
-              {user ? (
-                <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/70">
-                    <div className="w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center">
-                      <UserIcon className="w-4 h-4 text-rpg-textDark" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
-                        {user.user_metadata?.display_name || user.email?.split('@')[0] || 'トレーナー'}
-                      </p>
-                      <p className="font-pixelJp text-xs text-rpg-textDark opacity-50 truncate">
-                        {user.email}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-3 pb-3 border-b border-[#7B63A8]/15">
-                  <div
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      window.location.href = '/login';
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 bg-rpg-yellow cursor-pointer hover:opacity-80"
-                  >
-                    <UserIcon className="w-4 h-4 text-rpg-textDark" />
-                    <span className="font-pixelJp text-sm text-rpg-textDark font-bold">ログイン</span>
-                  </div>
-                </div>
-              )}
-
-              <nav className="space-y-1">
-                {menuItems.map((item) => (
-                  <div
-                    key={item.href}
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      window.location.href = item.href;
-                    }}
-                    className={`flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer ${
-                      isActive(item.href)
-                        ? 'rpg-cursor bg-rpg-yellow text-rpg-textDark border border-[#7B63A8]/15'
-                        : 'text-rpg-textDark hover:bg-white/70'
-                    }`}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-
-                {/* Logout Button */}
-                {user && (
-                  <div
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2 font-pixelJp text-sm cursor-pointer text-rpg-red hover:bg-rpg-red/10 border-t border-[#7B63A8]/15 mt-2 pt-2"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span>ログアウト</span>
-                  </div>
-                )}
-              </nav>
+          {user ? (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <div className="hidden max-w-[9rem] items-center gap-1.5 truncate rounded-lg border border-[#7B63A8]/15 bg-white/70 px-2.5 py-2 text-xs font-bold text-[#2A2A2A] sm:flex">
+                <UserIcon className="h-4 w-4 flex-shrink-0 text-[#7B63A8]" />
+                <span className="truncate">{getDisplayName(user)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[#B5483C] transition hover:bg-[#B5483C]/10 sm:w-auto sm:gap-2 sm:rounded-lg sm:px-3 sm:text-sm sm:font-bold"
+                aria-label="ログアウト"
+                title="ログアウト"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="hidden sm:inline">ログアウト</span>
+              </button>
             </div>
-          </div>
-        </>
-      )}
+          ) : (
+            <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+              <Link
+                href="/login"
+                className="rounded-lg border border-[#7B63A8] px-3 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10 sm:px-4 sm:text-sm"
+              >
+                ログイン
+              </Link>
+              <Link
+                href="/signup"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8] text-white shadow-sm transition hover:bg-[#6A5299] sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:text-sm sm:font-bold"
+                aria-label="新規登録"
+              >
+                <UserPlus className="h-4 w-4 sm:hidden" />
+                <span className="hidden sm:inline">新規登録</span>
+              </Link>
+            </div>
+          )}
+        </div>
 
-      <style jsx>{`
-        @keyframes slide-in {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-
-        .animate-slide-in {
-          animation: slide-in 0.2s ease-out;
-        }
-      `}</style>
-    </>
+        {actions && <div className="flex w-full items-center justify-end gap-2 sm:hidden">{actions}</div>}
+      </div>
+    </header>
   );
 }

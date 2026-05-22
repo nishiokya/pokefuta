@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import {
@@ -72,17 +73,15 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+      <Header
+        title={SITE_NAME}
+        actions={
           <Link href={`/manhole/${photo.manhole.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[#4F3828]">
             <ArrowLeft className="h-4 w-4" />
             マンホール詳細へ
           </Link>
-          <Link href="/" className="text-sm font-extrabold text-[#7B63A8]">
-            {SITE_NAME}
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-5 sm:py-8">
         <article className="overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">

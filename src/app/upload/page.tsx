@@ -8,6 +8,7 @@ import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -549,6 +550,8 @@ export default function UploadPage() {
           ))}
         </div>
       )}
+
+      <Header title="写真を投稿" />
 
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         <div className="rpg-window">

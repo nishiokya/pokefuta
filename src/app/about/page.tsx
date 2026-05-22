@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Info, Camera, Map, Navigation, History, Shield, MessageSquare, UserPlus, Github, Twitter } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 export default function AboutPage() {
@@ -18,6 +19,8 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
+      <Header title="このアプリについて" showDescriptionLink={false} />
+
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* アプリの説明 */}
         <section className="rpg-window">

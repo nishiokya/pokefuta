@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -442,18 +443,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 font-bold" aria-label="ポケふた写真館">
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
-              <span className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-[#E85046]" />
-              <span className="absolute inset-x-0 top-1/2 h-[2px] bg-[#2A2A2A]" />
-              <span className="relative h-3 w-3 rounded-full border-2 border-[#2A2A2A] bg-white" />
-            </span>
-            <span className="text-base sm:text-lg">ポケふた写真館</span>
-          </Link>
-
-          <div className="flex items-center gap-2">
+      <Header
+        title="ポケふた写真館"
+        actions={
+          <>
             <Link
               href="/manholes"
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
@@ -477,9 +470,9 @@ export default function HomePage() {
               <Camera className="h-4 w-4" />
               写真を投稿
             </Link>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Loading State */}
