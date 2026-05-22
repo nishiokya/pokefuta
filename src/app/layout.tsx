@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   manifest: '/manifest.json',
   icons: {
-    apple: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
   },
   keywords: ['ポケモン', 'ポケふた', 'マンホール', '訪問記録', '写真', 'スタンプ帳'],
   authors: [{ name: SITE_NAME }],
@@ -91,7 +91,7 @@ export default function RootLayout({
         )}
         {/* End Google Analytics 4 */}
 
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="ポケふた" />
