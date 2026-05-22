@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
@@ -18,7 +18,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface ManholeWithDistance extends Manhole {
-  distance: number;
+  distance?: number;
   visit?: {
     id: string;
     shot_at: string;
@@ -48,30 +48,62 @@ export default function NearbyPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
+  const [query, setQuery] = useState('');
   const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
-  // ページ初回マウント時のみ発火
   useEffect(() => {
+    document.title = 'ポケふたを探す - ポケふた訪問記録';
     trackNearbyOpen();
-  }, []);
 
-  useEffect(() => {
-    document.title = '近くのポケふた - ポケふた訪問記録';
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const initialTab: SearchTab = tab === 'all' || tab === 'unvisited' ? tab : 'nearby';
+    setActiveTab(initialTab);
+    loadAllManholes();
+
     (async () => {
+      let loggedIn = false;
       try {
         const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        setIsLoggedIn(Boolean(session?.user));
+        loggedIn = Boolean(session?.user);
+        setIsLoggedIn(loggedIn);
       } catch {
         setIsLoggedIn(false);
+      } finally {
+        setSessionChecked(true);
       }
+
+      if (initialTab === 'all') {
+        setLoading(false);
+        return;
+      }
+
+      if (initialTab === 'unvisited' && !loggedIn) {
+        setActiveTab('all');
+        setLoading(false);
+        return;
+      }
+
+      getCurrentLocationAndLoadManholes();
     })();
-    getCurrentLocationAndLoadManholes();
-    loadAllManholes();
+  }, []);
+
+  useEffect(() => {
+    if (sessionChecked && !isLoggedIn && activeTab === 'unvisited') {
+      setActiveTab('all');
+    }
+  }, [activeTab, isLoggedIn, sessionChecked]);
+
+  useEffect(() => {
+    if (!sessionChecked || activeTab === 'all') return;
+    if (activeTab === 'unvisited' && !isLoggedIn) return;
+    if (!userLocation) return;
+    loadNearbyManholes(userLocation.lat, userLocation.lng);
   }, [radius]);
 
   const loadAllManholes = async () => {
@@ -240,9 +272,37 @@ export default function NearbyPage() {
     window.location.href = `/manhole/${manhole.id}`;
   };
 
+  const handleTabChange = (tab: SearchTab) => {
+    setActiveTab(tab);
+    if ((tab === 'nearby' || tab === 'unvisited') && !userLocation && nearbyManholes.length === 0) {
+      getCurrentLocationAndLoadManholes();
+    }
+  };
+
+  const visibleSearchTabs = searchTabs.filter((tab) => isLoggedIn || tab.key !== 'unvisited');
+
+  const filteredAllManholes = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return allManholes;
+
+    return allManholes.filter((manhole) => {
+      const target = [
+        manhole.title,
+        manhole.prefecture,
+        manhole.municipality,
+        manhole.city,
+        ...(manhole.pokemons || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return target.includes(normalized);
+    });
+  }, [allManholes, query]);
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="近くのポケふた" />
+      <Header title="ポケふたを探す" />
 
       <main className="relative mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
@@ -252,10 +312,10 @@ export default function NearbyPage() {
               旅先で探す
             </div>
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              近くのポケふたを見つけよう
+              ポケふたを探す
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-              現在地の周辺にあるポケふたを探して、次の寄り道先を決めよう。
+              現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。
             </p>
           </div>
         </section>
@@ -301,13 +361,6 @@ export default function NearbyPage() {
                   <RefreshCw className="h-4 w-4" />
                   現在地を更新
                 </button>
-                <Link
-                  href="/manholes"
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] lg:flex-none"
-                >
-                  <Search className="h-4 w-4" />
-                  一覧で探す
-                </Link>
               </div>
             </div>
 
@@ -334,13 +387,13 @@ export default function NearbyPage() {
         <section className="mt-5">
           <div className="-mx-4 overflow-x-auto px-4 pb-1">
             <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
-              {searchTabs.map((tab) => {
+              {visibleSearchTabs.map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => handleTabChange(tab.key)}
                     className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
                       isActive
                         ? 'bg-[#7B63A8] text-white shadow-sm'
@@ -355,7 +408,34 @@ export default function NearbyPage() {
           </div>
         </section>
 
-        {((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
+        {activeTab === 'all' && (
+          <section className="mt-5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-4 shadow-sm sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7B63A8]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="地域名・ポケモン名で検索"
+                  className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/15 bg-white/80 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#7B63A8]"
+                  placeholder="地域名・ポケモン名で検索"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3 sm:min-w-[15rem]">
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
+                  <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{allManholes.length}</div>
+                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">総数</div>
+                </div>
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
+                  <div className="text-xl font-extrabold leading-none text-[#2D846C]">{filteredAllManholes.length}</div>
+                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">表示中</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
           <div className="flex items-center justify-center py-10">
             <div className="text-center">
               <div className="font-bold text-[#7B63A8]">
@@ -365,11 +445,11 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {!((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
+        {!(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-5">
             {(() => {
               const displayManholes =
-                activeTab === 'all' ? allManholes :
+                activeTab === 'all' ? filteredAllManholes :
                 activeTab === 'unvisited' ? nearbyManholes.filter(m => !m.visit) :
                 nearbyManholes;
 
