@@ -491,7 +491,7 @@ export default function VisitsPage() {
                 ポケふた訪問パスポート
               </h1>
               <p className="mt-3 text-sm font-medium text-[#6A4D36]">
-                ログインすると、全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
+                ログインすると、あなたの旅の続きとして全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
               </p>
 
               {/* Sample Progress Bar */}
@@ -521,7 +521,7 @@ export default function VisitsPage() {
                   href="/login?redirect=/visits"
                   className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
                 >
-                  ログイン
+                  旅の続きへ
                 </Link>
               </div>
             </div>
@@ -594,7 +594,7 @@ export default function VisitsPage() {
               ))}
             </div>
             <p className="mt-3 text-center text-xs text-[#6A4D36]">
-              ログインして、あなたの旅を記録しましょう
+              ログインして、あなたの旅の続きを記録しましょう
             </p>
           </section>
 
@@ -605,7 +605,7 @@ export default function VisitsPage() {
               旅の記録を保存しませんか？
             </h3>
             <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
-              ログインすると、訪問済みや行きたい場所を記録できます。<br />
+              ログインすると、旅の続きとして訪問済みや行きたい場所を記録できます。<br />
               全国制覇率や都道府県別の進捗も見られます。
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -620,7 +620,7 @@ export default function VisitsPage() {
                 href="/login?redirect=/visits"
                 className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
               >
-                ログイン
+                旅の続きへ
               </Link>
             </div>
           </section>

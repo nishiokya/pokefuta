@@ -733,7 +733,7 @@ export default function ManholeDetailPage() {
                       className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#7B63A8] hover:bg-[#7B63A8]/5"
                     >
                       <Camera className="w-4 h-4 text-[#7B63A8]" />
-                      <span className="font-pixelJp text-xs text-[#7B63A8]">ログインして記録</span>
+                      <span className="font-pixelJp text-xs text-[#7B63A8]">旅の続きで記録</span>
                     </button>
                   )}
                   <button
@@ -936,7 +936,7 @@ export default function ManholeDetailPage() {
               </form>
             ) : (
               <div className="mt-4 pt-4 border-t border-[#7B63A8]/15">
-                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">ログインするとコメントを投稿できます</p>
+                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">ログインすると旅の記録にコメントを投稿できます</p>
               </div>
             )}
           </div>

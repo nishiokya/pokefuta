@@ -4,15 +4,21 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
-import { LogIn, Mail, Lock, AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, Camera, Info, Lock, LogIn, Mail, Map, Stamp } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
+function getSafeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  return value;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/';
+  const redirectTo = getSafeRedirectPath(searchParams.get('redirect'));
+  const hasRedirect = redirectTo !== '/';
   const fromRegister = searchParams.get('from') === 'register';
 
   const [email, setEmail] = useState('');
@@ -101,133 +107,171 @@ function LoginForm() {
     }
   };
 
+  const benefitItems = [
+    {
+      icon: <Stamp className="h-5 w-5" />,
+      title: 'スタンプ帳の続き',
+      description: '集めた訪問履歴と達成率をそのまま確認できます',
+    },
+    {
+      icon: <Camera className="h-5 w-5" />,
+      title: '写真投稿に戻る',
+      description: '旅先で撮ったポケふた写真をすぐ記録できます',
+    },
+    {
+      icon: <Map className="h-5 w-5" />,
+      title: '都道府県別の進捗',
+      description: '次に巡る場所や未訪問の候補を探せます',
+    },
+  ];
+
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="rpg-window text-center mb-6">
-          <div className="inline-block mb-3">
-            <div className="w-16 h-16 bg-rpg-yellow border border-[#7B63A8]/15 flex items-center justify-center mx-auto">
-              <LogIn className="w-8 h-8 text-rpg-textDark" />
+    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
+      <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-6 sm:py-10">
+        <section className="relative w-full overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+          <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+          <div className="relative grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="p-5 sm:p-8 lg:p-10">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                <LogIn className="h-3.5 w-3.5" />
+                旅の続き
+              </div>
+
+              <h1 className="max-w-xl text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
+                旅の続きにログイン
+              </h1>
+              <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-[#6A4D36] sm:text-base">
+                保存した訪問履歴、スタンプ帳、写真投稿画面に戻れます。次に巡るポケふたも、ここからまた探せます。
+              </p>
+
+              <div className="mt-6 grid gap-3">
+                {benefitItems.map((item) => (
+                  <div key={item.title} className="flex items-start gap-3 rounded-[8px] border border-[#8C6A4A]/15 bg-white/65 p-4">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#7B63A8]/10 text-[#7B63A8]">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-extrabold text-[#4F3828]">{item.title}</h2>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-[#6A4D36]">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <h1 className="font-pixelJp text-lg text-[#7B63A8] font-bold">ログイン</h1>
-          <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mt-1">
-            アカウント作成済みの方はこちら
-          </p>
-          {fromRegister && (
-            <div className="mt-3 pt-3 border-t border-[#7B63A8]/15">
-              <div className="bg-rpg-yellow/20 border-2 border-rpg-yellow p-2 rounded">
-                <div className="flex items-start gap-2">
-                  <Mail className="w-4 h-4 text-rpg-yellow flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-pixelJp text-xs font-bold text-rpg-textDark mb-1">
-                      登録完了！
-                    </p>
-                    <p className="font-pixelJp text-[11px] text-rpg-textDark leading-relaxed">
-                      登録したメールアドレスに確認メールが送信されました。メール内のリンクをクリックして確認を完了してください。
-                    </p>
+
+            <div className="border-t border-[#8C6A4A]/15 bg-[#FFF8EB]/80 p-5 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">
+              {fromRegister && (
+                <div className="mb-4 rounded-[8px] border border-[#FFB347]/50 bg-[#FFF0C7] p-3">
+                  <div className="flex items-start gap-2">
+                    <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#9B5C2E]" />
+                    <div>
+                      <p className="text-xs font-extrabold text-[#4F3828]">登録完了！</p>
+                      <p className="mt-1 text-[11px] font-medium leading-relaxed text-[#6A4D36]">
+                        登録したメールアドレスに確認メールが送信されました。メール内のリンクをクリックして確認を完了してください。
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
+              )}
 
-        {/* Login Form */}
-        <div className="rpg-window">
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* Error Message */}
-            {error && (
-              <div className="bg-rpg-red/20 border-2 border-rpg-red p-3">
-                <div className="flex items-center gap-2 text-rpg-red">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="font-pixelJp text-xs">{error}</span>
+              {hasRedirect && (
+                <div className="mb-4 rounded-[8px] border border-[#7B63A8]/20 bg-white/70 p-3">
+                  <p className="text-xs font-bold leading-relaxed text-[#7B63A8]">
+                    ログイン後、指定されたページに移動します。
+                  </p>
                 </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                {error && (
+                  <div className="rounded-[8px] border border-[#B5483C]/30 bg-[#F8D9C4] p-3">
+                    <div className="flex items-center gap-2 text-[#B5483C]">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-xs font-bold">{error}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-extrabold text-[#4F3828]">
+                    <Mail className="h-4 w-4" />
+                    メールアドレス
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-[8px] border border-[#8C6A4A]/20 bg-white/80 p-3 text-sm font-medium text-[#2A2A2A] outline-none transition focus:border-[#7B63A8] focus:ring-2 focus:ring-[#7B63A8]/15"
+                    placeholder="your@email.com"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-extrabold text-[#4F3828]">
+                    <Lock className="h-4 w-4" />
+                    パスワード
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-[8px] border border-[#8C6A4A]/20 bg-white/80 p-3 text-sm font-medium text-[#2A2A2A] outline-none transition focus:border-[#7B63A8] focus:ring-2 focus:ring-[#7B63A8]/15"
+                    placeholder="••••••••"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] disabled:opacity-60"
+                  disabled={loading}
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>{loading ? 'ログイン中...' : '旅の続きへ戻る'}</span>
+                </button>
+              </form>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(!showTerms)}
+                  className="mx-auto flex items-center gap-1 text-xs font-bold text-[#7B63A8] transition hover:opacity-70"
+                >
+                  <Info className="h-3 w-3" />
+                  <span>利用規約を確認</span>
+                </button>
               </div>
-            )}
 
-            {/* Email Input */}
-            <div>
-              <label className="flex items-center gap-2 font-pixelJp text-sm text-rpg-textDark mb-2">
-                <Mail className="w-4 h-4" />
-                メールアドレス
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
-                placeholder="your@email.com"
-                required
-                disabled={loading}
-              />
+              {showTerms && (
+                <div className="mt-3">
+                  <TermsOfService
+                    isChecked={false}
+                    onCheckChange={() => {}}
+                    className="border-[#FFB347]"
+                  />
+                </div>
+              )}
+
+              <div className="mt-6 border-t border-[#8C6A4A]/15 pt-4 text-center">
+                <p className="mb-2 text-xs font-medium text-[#6A4D36]">
+                  まだ記録を始めていない方
+                </p>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center rounded-lg border border-[#7B63A8] bg-white px-4 py-2 text-xs font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
+                >
+                  無料でスタンプ帳をはじめる
+                </Link>
+              </div>
             </div>
-
-            {/* Password Input */}
-            <div>
-              <label className="flex items-center gap-2 font-pixelJp text-sm text-rpg-textDark mb-2">
-                <Lock className="w-4 h-4" />
-                パスワード
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/70 border border-[#7B63A8]/15 p-3 font-pixelJp text-sm text-rpg-textDark focus:border-rpg-yellow focus:outline-none"
-                placeholder="••••••••"
-                required
-                disabled={loading}
-              />
-            </div>
-
-            {/* Login Button */}
-            <button
-              type="submit"
-              className="w-full rpg-button rpg-button-primary py-3"
-              disabled={loading}
-            >
-              <span className="font-pixelJp">
-                {loading ? 'ログイン中...' : 'ログイン'}
-              </span>
-            </button>
-          </form>
-
-          {/* Terms of Service Link */}
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setShowTerms(!showTerms)}
-              className="flex items-center gap-1 font-pixelJp text-xs text-rpg-blue hover:opacity-70 transition-opacity mx-auto"
-            >
-              <Info className="w-3 h-3" />
-              <span>利用規約を確認</span>
-            </button>
           </div>
+        </section>
+      </main>
 
-          {showTerms && (
-            <div className="mt-3">
-              <TermsOfService
-                isChecked={false}
-                onCheckChange={() => {}}
-                className="border-rpg-yellow"
-              />
-            </div>
-          )}
-
-          {/* Sign Up Link */}
-          <div className="mt-6 pt-4 border-t border-[#7B63A8]/15 text-center">
-            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-2">
-              アカウントをお持ちでない方
-            </p>
-            <Link href="/signup" className="rpg-button text-xs">
-              <span className="font-pixelJp">新規登録</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-        <BottomNav />
+      <BottomNav />
     </div>
   );
 }
