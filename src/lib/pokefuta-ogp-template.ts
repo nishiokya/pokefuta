@@ -19,9 +19,7 @@ type PokefutaOgpTemplateInput = {
   prefecture: string;
   city: string;
   pokemonNames: string;
-  badgeEmoji?: string;
   badgeLabel?: string;
-  statsLabel?: string;
 };
 
 type TextLayerInput = {
@@ -31,6 +29,7 @@ type TextLayerInput = {
   width: number;
   height: number;
   fontSize: number;
+  minFontSize?: number;
   color: string;
   align?: 'left' | 'center' | 'right';
 };
@@ -88,10 +87,37 @@ function textTopFromBaseline(baseline: number, fontSize: number): number {
   return Math.max(0, Math.round(baseline - fontSize * 0.9));
 }
 
+function estimateTextWidth(text: string, fontSize: number): number {
+  return Array.from(text).reduce((width, character) => {
+    if (/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/.test(character)) {
+      return width + fontSize;
+    }
+    if (/[A-Z0-9]/.test(character)) {
+      return width + fontSize * 0.68;
+    }
+    if (/[a-z]/.test(character)) {
+      return width + fontSize * 0.56;
+    }
+    return width + fontSize * 0.42;
+  }, 0);
+}
+
+function fitFontSizeToWidth(input: TextLayerInput): number {
+  const minFontSize = input.minFontSize ?? Math.max(12, Math.floor(input.fontSize * 0.72));
+  const estimatedWidth = estimateTextWidth(input.text, input.fontSize);
+
+  if (estimatedWidth <= input.width) {
+    return input.fontSize;
+  }
+
+  return Math.max(minFontSize, Math.floor((input.fontSize * input.width) / estimatedWidth));
+}
+
 async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
   assertOgpFontExists();
 
-  const markup = `<span foreground="${input.color}" font_desc="${OGP_FONT_NAME} ${input.fontSize}">${escapePango(input.text)}</span>`;
+  const fontSize = fitFontSizeToWidth(input);
+  const markup = `<span foreground="${input.color}" font_desc="${OGP_FONT_NAME} ${fontSize}">${escapePango(input.text)}</span>`;
   const inputBuffer = await sharp({
     text: {
       text: markup,
@@ -143,7 +169,6 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
   const photoDataUri = imageDataUri(photoBuffer, 'image/jpeg');
   const badgeLabel = input.badgeLabel ?? '見つけたポケふた';
   const cityTitle = `${truncate(input.city, 10)}のポケふた`;
-  const statsLabel = truncate(input.statsLabel ?? '全国のポケふた写真をシェア', 28);
   const base = await renderBaseSvg(template, {
     './pokefuta_ogp_background_1200x630.png': backgroundDataUri,
     '{{photoDataUri}}': photoDataUri,
@@ -175,7 +200,8 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       top: textTopFromBaseline(190, 64),
       width: 650,
       height: 90,
-      fontSize: 64,
+      fontSize: 58,
+      minFontSize: 46,
       color: '#FFFFFF',
     },
     {
@@ -184,7 +210,8 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       top: textTopFromBaseline(185, 64),
       width: 650,
       height: 90,
-      fontSize: 64,
+      fontSize: 58,
+      minFontSize: 46,
       color: '#3A2C22',
     },
     {
@@ -193,11 +220,12 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       top: textTopFromBaseline(265, 33),
       width: 610,
       height: 54,
-      fontSize: 33,
+      fontSize: 31,
+      minFontSize: 24,
       color: '#17614F',
     },
     {
-      text: `${input.badgeEmoji ?? ''} ${truncate(badgeLabel, 14)}`.trim(),
+      text: truncate(badgeLabel, 14),
       left: 560,
       top: textTopFromBaseline(348, 29),
       width: 410,
@@ -211,25 +239,18 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       top: textTopFromBaseline(440, 31),
       width: 640,
       height: 56,
-      fontSize: 31,
+      fontSize: 29,
+      minFontSize: 25,
       color: '#2F241C',
     },
     {
-      text: '旅行・お出かけ・聖地巡りのお供に！',
+      text: '旅行・お出かけのお供に！',
       left: 90,
       top: textTopFromBaseline(585, 24),
       width: 390,
       height: 44,
-      fontSize: 24,
-      color: '#FFFFFF',
-    },
-    {
-      text: statsLabel,
-      left: 520,
-      top: textTopFromBaseline(585, 25),
-      width: 370,
-      height: 44,
-      fontSize: 25,
+      fontSize: 20,
+      minFontSize: 18,
       color: '#FFFFFF',
     },
     {
@@ -238,7 +259,7 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
       top: textTopFromBaseline(586, 25),
       width: 224,
       height: 44,
-      fontSize: 25,
+      fontSize: 23,
       color: '#17614F',
       align: 'center',
     },
