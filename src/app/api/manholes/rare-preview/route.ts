@@ -24,7 +24,8 @@ export async function GET() {
     const { data, error } = await supabase
       .from('manhole')
       .select(SELECT_FIELDS)
-      .not('titles', 'is', null)
+      .not('title_tags', 'eq', '{}')
+      .order('id', { ascending: true })
       .limit(120);
 
     if (error) {

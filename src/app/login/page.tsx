@@ -98,6 +98,9 @@ function LoginForm() {
       try {
         const response = await fetch('/api/manholes/rare-preview');
         const data = await response.json();
+        if (!response.ok || data?.success === false) {
+          throw new Error(data?.details || data?.error || 'Failed to load rare manhole preview');
+        }
         const manholes: RarePreviewManhole[] = Array.isArray(data?.manholes) ? data.manholes : [];
         const previewItems = getRarePreviewItems(
           manholes.filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
