@@ -504,6 +504,17 @@ export default function HomePage() {
                         </p>
                       </div>
                     )}
+                    {interestingCandidates.length > 0 && (
+                      <div className="mt-3">
+                        <a
+                          href="#rare-unvisited"
+                          className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#B5483C]/25 bg-white/70 px-3 py-2 text-xs font-extrabold text-[#B5483C] shadow-sm transition hover:bg-[#F8D9C4] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          称号つき未訪問を探す
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -588,7 +599,7 @@ export default function HomePage() {
                       )}
                     </JourneyCandidateSection>
 
-                    <JourneyCandidateSection title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
+                    <JourneyCandidateSection id="rare-unvisited" title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
                       {interestingCandidates.length > 0 ? (
                         interestingCandidates.map((manhole) => (
                           <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="発見" />
@@ -932,18 +943,20 @@ function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visi
 }
 
 function JourneyCandidateSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div id={id}>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-[#4F3828]">{title}</h2>
