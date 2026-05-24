@@ -33,6 +33,14 @@ export function visitsShareText(): string {
   return 'ポケふた巡りのスタンプ帳を更新しました。\n訪問したポケふたを写真付きで記録しています。';
 }
 
+export function prefectureProgressShareText(
+  displayName: string,
+  completedPrefectureCount: number,
+  totalPrefectureCount: number
+): string {
+  return `${displayName}のポケふた都道府県達成状況です。\n${completedPrefectureCount}/${totalPrefectureCount}都道府県を制覇しました。`;
+}
+
 export interface SharePanelCallbacks {
   onShareX: () => void;
   onShareLine: () => void;

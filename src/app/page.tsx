@@ -150,6 +150,7 @@ const hasCoordinates = (manhole?: Pick<JourneyManhole, 'latitude' | 'longitude'>
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState('タコさん');
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
@@ -187,6 +188,7 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
+        setCurrentUserId(session?.user?.id ?? null);
         trackCollectionOpen({ is_logged_in: loggedIn });
         if (loggedIn) {
           setUserName(getDisplayName(session));
@@ -636,6 +638,7 @@ export default function HomePage() {
                           <JourneyPrefectureOverview
                             completedPrefectures={completedPrefectures}
                             continuingPrefecture={continuingPrefecture}
+                            userId={currentUserId}
                           />
                         </div>
 
@@ -654,6 +657,7 @@ export default function HomePage() {
                                   key={prefecture.name}
                                   prefecture={prefecture}
                                   label={prefecture.label}
+                                  userId={currentUserId}
                                 />
                               ))}
                             </div>
@@ -1006,9 +1010,11 @@ export default function HomePage() {
 function JourneyPrefectureOverview({
   completedPrefectures,
   continuingPrefecture,
+  userId,
 }: {
   completedPrefectures: PrefectureProgress[];
   continuingPrefecture: PrefectureProgress | null;
+  userId: string | null;
 }) {
   return (
     <div className="mt-5 space-y-4">
@@ -1024,6 +1030,7 @@ function JourneyPrefectureOverview({
                 key={prefecture.name}
                 prefecture={prefecture}
                 label="制覇済み"
+                userId={userId}
               />
             ))}
           </div>
@@ -1040,7 +1047,7 @@ function JourneyPrefectureOverview({
           旅の続き
         </div>
         {continuingPrefecture ? (
-          <JourneyPrefectureStat prefecture={continuingPrefecture} label="旅の続き" />
+          <JourneyPrefectureStat prefecture={continuingPrefecture} label="旅の続き" userId={userId} />
         ) : (
           <div className="rounded-[7px] border border-dashed border-[#8C6A4A]/25 bg-[#FFF7E5] px-3 py-3 text-xs font-bold text-[#6A4D36]">
             訪問を記録すると、続きにしたい県がここに出ます。
@@ -1054,15 +1061,16 @@ function JourneyPrefectureOverview({
 function JourneyPrefectureStat({
   prefecture,
   label,
+  userId,
 }: {
   prefecture: PrefectureProgress;
   label?: PrefectureCandidate['label'];
+  userId?: string | null;
 }) {
   const complete = prefecture.total > 0 && prefecture.remaining === 0;
   const displayLabel = label || (complete ? '制覇済み' : '旅の続き');
-
-  return (
-    <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm">
+  const content = (
+    <>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
@@ -1092,7 +1100,25 @@ function JourneyPrefectureStat({
         <span>{complete ? '制覇済み' : `あと${prefecture.remaining}枚`}</span>
         <span>{prefecture.rate.toFixed(0)}%</span>
       </div>
-    </div>
+    </>
+  );
+
+  if (!userId) {
+    return (
+      <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/users/${encodeURIComponent(userId)}/prefectures?prefecture=${encodeURIComponent(prefecture.name)}`}
+      className="block rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+      aria-label={`${prefecture.name}の達成状況を見る`}
+    >
+      {content}
+    </Link>
   );
 }
 
