@@ -14,6 +14,7 @@ Supabase SQL Editorで `database/migrations/` のSQLを番号順に実行しま�
 8. `010_add_manhole_share_metadata.sql`
 9. `011_add_public_user_info_fn.sql`
 10. `012_drop_email_from_app_user.sql`
+11. `013_add_app_user_self_select_policy.sql`
 
 ## 注意
 
