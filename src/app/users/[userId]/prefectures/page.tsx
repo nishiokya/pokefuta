@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Camera, CheckCircle2, CircleDot, Compass, MapPin, Trophy } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, CircleDot, Compass, Stamp, Trophy } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PrefectureProgressShareButton from '@/components/users/PrefectureProgressShareButton';
@@ -183,50 +183,60 @@ function PrefectureManholeCard({ manhole }: { manhole: PublicPrefectureManhole }
   const photoUrl = manhole.latestPublicPhotoId
     ? `/api/photo/${encodeURIComponent(manhole.latestPublicPhotoId)}?size=small`
     : null;
-  const pokemonLabel = manhole.pokemons.length > 0 ? manhole.pokemons.join('・') : 'ポケモン未設定';
+  const pokemonLabel = manhole.pokemons.length > 0 ? manhole.pokemons.join('・') : null;
 
   return (
     <Link
       href={`/manhole/${manhole.id}`}
-      className="group overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:border-[#DDA63A] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]/50"
+      className={`relative flex aspect-[4/5] flex-col justify-between rounded-lg border-2 p-3 shadow-sm transition-transform hover:-translate-y-0.5 ${
+        manhole.visited
+          ? 'border-[#B5483C]/45 bg-[#FFF7E5]'
+          : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]/75'
+      }`}
     >
-      <div className="aspect-[4/3] bg-[#E4D4B8]">
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={`${manhole.title}の訪問写真`}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-            loading="lazy"
-          />
+      <div className="flex items-center justify-between">
+        <span className={`rounded-full px-2 py-1 font-pixelJp text-[10px] font-bold ${
+          manhole.visited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
+        }`}>
+          {manhole.visited ? '済' : '未訪問'}
+        </span>
+        {photoUrl && <Camera className="h-4 w-4 text-[#B5483C]" />}
+      </div>
+
+      <div className="flex flex-1 items-center justify-center">
+        {manhole.visited ? (
+          <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]">
+                <CircleDot className="h-8 w-8 text-[#4F3828]/70" />
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-[#8C6A4A]">
-            <Camera className="h-8 w-8" />
-            <span className="text-xs font-extrabold">公開写真なし</span>
+          <div className="flex h-20 w-20 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-center text-[#A39580]">
+            <div>
+              <Stamp className="mx-auto h-6 w-6" />
+              <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
+            </div>
           </div>
         )}
       </div>
-      <div className="p-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded-[7px] px-2.5 py-1 text-xs font-extrabold ${
-              manhole.visited
-                ? 'bg-[#E6F4DD] text-[#2C765E]'
-                : 'bg-[#F8D9C4] text-[#B5483C]'
-            }`}
-          >
-            {manhole.visited ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Compass className="h-3.5 w-3.5" />}
-            {manhole.visited ? '訪問済み' : '未訪問'}
-          </span>
-          <span className="font-pixel text-xs text-[#8C6A4A]">#{manhole.id}</span>
-        </div>
-        <h3 className="line-clamp-2 min-h-[3rem] text-base font-extrabold leading-6 text-[#4F3828]">
-          {manhole.title}
-        </h3>
-        <p className="mt-2 flex items-center gap-1 text-xs font-bold text-[#6A4D36]">
-          <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{manhole.municipality || manhole.prefecture}</span>
+
+      <div>
+        <p className="line-clamp-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+          {manhole.municipality || manhole.prefecture}
         </p>
-        <p className="mt-2 line-clamp-1 text-xs font-bold text-[#B5483C]">{pokemonLabel}</p>
+        <p className="mt-1 truncate font-pixelJp text-[11px] text-[#6A4D36]">{manhole.title}</p>
+        {pokemonLabel && (
+          <p className="mt-1 truncate font-pixelJp text-[10px] text-[#B5483C]">{pokemonLabel}</p>
+        )}
       </div>
     </Link>
   );
