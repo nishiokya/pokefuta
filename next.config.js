@@ -58,6 +58,9 @@ const nextConfig = {
         './public/ogp/pokefuta_ogp_template.svg',
         './public/ogp/pokefuta_ogp_background_1200x630.png',
       ],
+      '/users/[userId]/prefectures/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+      ],
     },
   },
   images: {
