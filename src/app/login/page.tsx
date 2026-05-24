@@ -46,13 +46,14 @@ function getAuthErrorMessage(value: string | null) {
 }
 
 function getLoginErrorMessage(message: string): string {
-  if (message.toLowerCase().includes('rate limit')) {
+  const msg = message.toLowerCase();
+  if (msg.includes('rate limit')) {
     return 'ログイン試行回数が上限に達しました。しばらく待ってから再度お試しください。';
   }
-  if (message.toLowerCase().includes('invalid login credentials') || message.toLowerCase().includes('invalid email or password')) {
+  if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
     return 'メールアドレスまたはパスワードが正しくありません。';
   }
-  if (message.toLowerCase().includes('email not confirmed')) {
+  if (msg.includes('email not confirmed')) {
     return 'メールアドレスの確認が完了していません。確認メールのリンクをクリックしてください。';
   }
   return message || 'ログインに失敗しました';
