@@ -53,6 +53,8 @@ type JourneyVisit = {
 type JourneyManhole = Manhole & {
   name?: string;
   city?: string;
+  latitude?: number;
+  longitude?: number;
   distance?: number;
   is_visited?: boolean;
   last_visit?: string | null;
@@ -65,6 +67,13 @@ type PrefectureProgress = {
   visited: number;
   remaining: number;
   rate: number;
+  unvisitedLatitude?: number;
+  unvisitedLongitude?: number;
+  distanceFromLatestKm?: number;
+};
+
+type PrefectureCandidate = PrefectureProgress & {
+  label: '制覇済み' | '制覇目前' | '旅の続き' | '近くで行けそう';
 };
 
 const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobileLabel: string }> = [
@@ -137,12 +146,24 @@ const getManholeTags = (
   return tags.slice(0, max);
 };
 
-const stableHash = (value: string) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
+const hasCoordinates = (manhole?: Pick<JourneyManhole, 'latitude' | 'longitude'> | null) =>
+  typeof manhole?.latitude === 'number' &&
+  Number.isFinite(manhole.latitude) &&
+  typeof manhole.longitude === 'number' &&
+  Number.isFinite(manhole.longitude);
+
+const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const radiusKm = 6371;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
 export default function HomePage() {
@@ -214,8 +235,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && journeyTab === 'unvisited' && window.location.hash === '#rare-unvisited') {
-      window.requestAnimationFrame(() => document.getElementById('rare-unvisited')?.scrollIntoView());
+    if (!loading && journeyTab === 'unvisited' && window.location.hash === '#journey-unvisited') {
+      window.requestAnimationFrame(() => document.getElementById('journey-unvisited')?.scrollIntoView());
     }
   }, [journeyTab, loading]);
 
@@ -398,25 +419,62 @@ export default function HomePage() {
         return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
       });
 
+    const latestVisitedManhole = visitedManholes.find(hasCoordinates);
     const prefectureProgress: PrefectureProgress[] = Array.from(
       allJourneyManholes.reduce((map, manhole) => {
         const name = manhole.prefecture || '都道府県未設定';
-        const current = map.get(name) || { totalIds: new Set<number>(), visitedIds: new Set<number>() };
+        const current = map.get(name) || {
+          totalIds: new Set<number>(),
+          visitedIds: new Set<number>(),
+          unvisitedLatitudeSum: 0,
+          unvisitedLongitudeSum: 0,
+          unvisitedCoordinateCount: 0,
+        };
         current.totalIds.add(manhole.id);
-        if (visitsByManholeId.has(manhole.id)) current.visitedIds.add(manhole.id);
+        if (visitsByManholeId.has(manhole.id)) {
+          current.visitedIds.add(manhole.id);
+        } else if (hasCoordinates(manhole)) {
+          current.unvisitedLatitudeSum += manhole.latitude!;
+          current.unvisitedLongitudeSum += manhole.longitude!;
+          current.unvisitedCoordinateCount += 1;
+        }
         map.set(name, current);
         return map;
-      }, new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>())
+      }, new Map<string, {
+        totalIds: Set<number>;
+        visitedIds: Set<number>;
+        unvisitedLatitudeSum: number;
+        unvisitedLongitudeSum: number;
+        unvisitedCoordinateCount: number;
+      }>())
     )
       .map(([name, value]) => {
         const total = value.totalIds.size;
         const visited = value.visitedIds.size;
+        const unvisitedLatitude =
+          value.unvisitedCoordinateCount > 0 ? value.unvisitedLatitudeSum / value.unvisitedCoordinateCount : undefined;
+        const unvisitedLongitude =
+          value.unvisitedCoordinateCount > 0 ? value.unvisitedLongitudeSum / value.unvisitedCoordinateCount : undefined;
+        const distanceFromLatestKm =
+          latestVisitedManhole &&
+          typeof unvisitedLatitude === 'number' &&
+          typeof unvisitedLongitude === 'number'
+            ? calculateDistanceKm(
+                latestVisitedManhole.latitude!,
+                latestVisitedManhole.longitude!,
+                unvisitedLatitude,
+                unvisitedLongitude
+              )
+            : undefined;
         return {
           name,
           total,
           visited,
           remaining: Math.max(total - visited, 0),
           rate: total > 0 ? (visited / total) * 100 : 0,
+          unvisitedLatitude,
+          unvisitedLongitude,
+          distanceFromLatestKm,
         };
       })
       .sort((a, b) => {
@@ -442,19 +500,6 @@ export default function HomePage() {
         return dateDiff !== 0 ? dateDiff : b.id - a.id;
       })
       .slice(0, 4);
-    const usedCandidateIds = new Set([...nearbyCandidates, ...recentCandidates].map((manhole) => manhole.id));
-    const todaySeed = new Date().toISOString().slice(0, 10);
-    const interestingCandidates = unvisitedManholes
-      .filter((manhole) => !usedCandidateIds.has(manhole.id))
-      .filter((manhole) => (manhole.photo_count ?? 0) === 0)
-      .filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
-      .sort((a, b) => {
-        const aPriority = Math.max(...a.titles.map((title) => title.priority ?? 0), 0);
-        const bPriority = Math.max(...b.titles.map((title) => title.priority ?? 0), 0);
-        if (bPriority !== aPriority) return bPriority - aPriority;
-        return stableHash(`${todaySeed}:${a.id}`) - stableHash(`${todaySeed}:${b.id}`);
-      })
-      .slice(0, 4);
 
     const completedPrefectures = prefectureProgress
       .filter((prefecture) => prefecture.total > 0 && prefecture.remaining === 0)
@@ -462,42 +507,64 @@ export default function HomePage() {
         if (b.total !== a.total) return b.total - a.total;
         return a.name.localeCompare(b.name, 'ja');
       });
-    const largeUnfinishedPrefectures = prefectureProgress
-      .filter((prefecture) => prefecture.total > 0 && prefecture.remaining > 0)
+    const unfinishedPrefectures = prefectureProgress.filter(
+      (prefecture) => prefecture.total > 0 && prefecture.remaining > 0
+    );
+    const continuingPrefecture =
+      unfinishedPrefectures
+        .filter((prefecture) => prefecture.visited > 0)
+        .sort((a, b) => {
+          if (a.remaining !== b.remaining) return a.remaining - b.remaining;
+          if (b.visited !== a.visited) return b.visited - a.visited;
+          return a.name.localeCompare(b.name, 'ja');
+        })[0] || null;
+    const nextPrefectureCandidates: PrefectureCandidate[] = unfinishedPrefectures
+      .map((prefecture) => {
+        const isNearComplete = prefecture.visited > 0 && prefecture.remaining <= 3;
+        const hasNearbySignal = typeof prefecture.distanceFromLatestKm === 'number';
+        const label: PrefectureCandidate['label'] = isNearComplete
+          ? '制覇目前'
+          : hasNearbySignal
+            ? '近くで行けそう'
+            : '旅の続き';
+        return { ...prefecture, label };
+      })
       .sort((a, b) => {
-        if (b.total !== a.total) return b.total - a.total;
+        const aNearComplete = a.visited > 0 && a.remaining <= 3 ? 0 : 1;
+        const bNearComplete = b.visited > 0 && b.remaining <= 3 ? 0 : 1;
+        if (aNearComplete !== bNearComplete) return aNearComplete - bNearComplete;
+
+        const aDistance = a.distanceFromLatestKm ?? Number.POSITIVE_INFINITY;
+        const bDistance = b.distanceFromLatestKm ?? Number.POSITIVE_INFINITY;
+        if (aDistance !== bDistance) return aDistance - bDistance;
+
+        if (b.remaining !== a.remaining) return b.remaining - a.remaining;
         if (b.visited !== a.visited) return b.visited - a.visited;
         return a.name.localeCompare(b.name, 'ja');
       })
-      .slice(0, completedPrefectures.length > 0 ? 4 : 6);
+      .slice(0, 3);
 
     return {
       visitsByManholeId,
       visitedCount: visitsByManholeId.size,
       visitedManholes,
-      prefectureProgress,
-      leadingPrefectures: prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3),
       completedPrefectures,
-      largeUnfinishedPrefectures,
-      nextPrefecture: prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0),
+      continuingPrefecture,
+      nextPrefectureCandidates,
       nearbyCandidates,
       recentCandidates,
-      interestingCandidates,
     };
   }, [journeyVisits, journeyManholes, nearbyUnvisited]);
 
   const {
     visitsByManholeId,
     visitedCount,
-    prefectureProgress,
-    leadingPrefectures,
     completedPrefectures,
-    largeUnfinishedPrefectures,
-    nextPrefecture,
+    continuingPrefecture,
+    nextPrefectureCandidates,
     visitedManholes,
     nearbyCandidates,
     recentCandidates,
-    interestingCandidates,
   } = journeyData;
   const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
@@ -521,7 +588,7 @@ export default function HomePage() {
           <>
             {isLoggedIn ? (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8">
+                <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8 sm:py-8">
                   <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
                   <div className="relative">
                     <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
@@ -532,63 +599,66 @@ export default function HomePage() {
                       {userName}のポケふた旅
                     </h1>
 
-                    <div className="mt-5 max-w-3xl rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
-                      <div className="mb-2 flex items-end justify-between gap-3">
+                    <div className="mt-5 rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:p-5">
+                      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
                         <div>
-                          <p className="font-pixel text-2xl text-[#4F3828]">
-                            {visitedCount} / {knownTotalManholes ?? '集計中'} STAMPS
-                          </p>
-                          <p className="mt-1 text-xs font-bold text-[#6A4D36]">旅の進捗</p>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                              <p className="font-pixel text-3xl leading-none text-[#4F3828] sm:text-4xl">
+                                {visitedCount} / {knownTotalManholes ?? '集計中'}
+                              </p>
+                              <p className="mt-2 text-xs font-extrabold text-[#6A4D36]">STAMPS</p>
+                            </div>
+                            <div className="rounded-[7px] border border-[#B5483C]/20 bg-[#FFF7E5] px-3 py-2">
+                              <p className="text-[11px] font-extrabold text-[#6A4D36]">全国達成率</p>
+                              <p className="mt-1 font-pixel text-2xl leading-none text-[#B5483C]">
+                                {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4 h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#8C6A4A] via-[#DDA63A] to-[#2C765E]"
+                              style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
+                            />
+                          </div>
+                          <JourneyPrefectureOverview
+                            completedPrefectures={completedPrefectures}
+                            continuingPrefecture={continuingPrefecture}
+                          />
                         </div>
-                        <p className="font-pixel text-xl text-[#B5483C]">
-                          {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
-                        </p>
+
+                        <div>
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-extrabold text-[#6A4D36]">次に狙いたい県</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#8C6A4A]">旅の続きにしやすい候補</p>
+                            </div>
+                            <Compass className="h-5 w-5 text-[#B5483C]" />
+                          </div>
+                          {nextPrefectureCandidates.length > 0 ? (
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                              {nextPrefectureCandidates.map((prefecture) => (
+                                <JourneyPrefectureStat
+                                  key={prefecture.name}
+                                  prefecture={prefecture}
+                                  label={prefecture.label}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <JourneyCandidateNotice text="最初の訪問を記録すると、次の旅先候補がここに育っていきます。" />
+                          )}
+                          <Link
+                            href="/nearby?tab=unvisited"
+                            className="mt-4 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[7px] bg-[#B5483C] px-5 py-3 text-sm font-extrabold text-white shadow-[0_6px_14px_rgba(181,72,60,0.22)] transition hover:bg-[#9F3D33] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+                          >
+                            <MapPin className="h-5 w-5" />
+                            次のポケふたを探す
+                          </Link>
+                        </div>
                       </div>
-                      <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]"
-                          style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                        />
-                      </div>
-                      <JourneyPrefectureOverview
-                        completedPrefectures={completedPrefectures}
-                        largeUnfinishedPrefectures={largeUnfinishedPrefectures}
-                        fallbackPrefectures={leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)}
-                      />
                     </div>
-                    {nextPrefecture && (
-                      <div className="mt-4 inline-flex rounded-[7px] border border-[#DDA63A]/30 bg-[#FFF0C7] px-3 py-2">
-                        <p className="flex items-center gap-2 text-xs font-extrabold text-[#8C6315]">
-                          <Award className="h-4 w-4" />
-                          あと{nextPrefecture.remaining}枚で{nextPrefecture.name}制覇
-                        </p>
-                      </div>
-                    )}
-                    {interestingCandidates.length > 0 && (
-                      <div className="mt-3">
-                        <a
-                          href="/?tab=unvisited#rare-unvisited"
-                          onClick={(event) => {
-                            if (
-                              event.defaultPrevented ||
-                              event.button !== 0 ||
-                              event.metaKey ||
-                              event.ctrlKey ||
-                              event.shiftKey ||
-                              event.altKey
-                            ) {
-                              return;
-                            }
-                            event.preventDefault();
-                            selectJourneyTab('unvisited', 'rare-unvisited');
-                          }}
-                          className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#B5483C]/25 bg-white/70 px-3 py-2 text-xs font-extrabold text-[#B5483C] shadow-sm transition hover:bg-[#F8D9C4] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                          称号つき未訪問を探す
-                        </a>
-                      </div>
-                    )}
                   </div>
                 </section>
 
@@ -654,11 +724,11 @@ export default function HomePage() {
                     >
                       {nearbyCandidates.length > 0 ? (
                         nearbyCandidates.map((manhole) => (
-                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="近い" />
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="近くで行けそう" />
                         ))
                       ) : (
                         <JourneyCandidateNotice
-                          text={nearbyStatus === 'unavailable' ? '位置情報が使えませんでした。最近追加と発見候補から探せます。' : '位置情報を使うと近くの未訪問を4件表示できます。'}
+                          text={nearbyStatus === 'unavailable' ? '位置情報が使えませんでした。最近追加の候補から探せます。' : '位置情報を使うと近くの未訪問を4件表示できます。'}
                         />
                       )}
                     </JourneyCandidateSection>
@@ -673,13 +743,13 @@ export default function HomePage() {
                       )}
                     </JourneyCandidateSection>
 
-                    <JourneyCandidateSection id="rare-unvisited" title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
-                      {interestingCandidates.length > 0 ? (
-                        interestingCandidates.map((manhole) => (
-                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="発見" />
+                    <JourneyCandidateSection id="journey-unvisited" title="旅の続きを見る" description="新しい目的地を地図から探す前の候補">
+                      {recentCandidates.length > 0 ? (
+                        recentCandidates.map((manhole) => (
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="旅の続き" />
                         ))
                       ) : (
-                        <JourneyCandidateNotice text="称号つきの未訪問候補を準備中です。" />
+                        <JourneyCandidateNotice text="未訪問候補を準備中です。" />
                       )}
                     </JourneyCandidateSection>
                   </section>
@@ -924,78 +994,86 @@ export default function HomePage() {
 
 function JourneyPrefectureOverview({
   completedPrefectures,
-  largeUnfinishedPrefectures,
-  fallbackPrefectures,
+  continuingPrefecture,
 }: {
   completedPrefectures: PrefectureProgress[];
-  largeUnfinishedPrefectures: PrefectureProgress[];
-  fallbackPrefectures: PrefectureProgress[];
+  continuingPrefecture: PrefectureProgress | null;
 }) {
-  const hasPrefectureProgress = completedPrefectures.length > 0 || largeUnfinishedPrefectures.length > 0;
-
-  if (!hasPrefectureProgress) {
-    return (
-      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        {fallbackPrefectures.map((prefecture) => (
-          <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-4 space-y-4">
-      {completedPrefectures.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
-            <Award className="h-4 w-4" />
-            制覇済みの都道府県
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {completedPrefectures.map((prefecture) => (
-              <span
+    <div className="mt-5 space-y-4">
+      <div>
+        <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
+          <Award className="h-4 w-4" />
+          制覇済み
+        </div>
+        {completedPrefectures.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {completedPrefectures.slice(0, 8).map((prefecture) => (
+              <JourneyPrefectureStat
                 key={prefecture.name}
-                className="inline-flex min-h-8 items-center gap-1 rounded-full border border-[#3F9D7D]/25 bg-[#E6F4DD] px-3 text-xs font-extrabold text-[#2C765E]"
-              >
-                {prefecture.name}
-                <span className="font-pixel text-[11px]">{prefecture.total}/{prefecture.total}</span>
-              </span>
+                prefecture={prefecture}
+                label="制覇済み"
+              />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-[7px] border border-dashed border-[#8C6A4A]/25 bg-[#FFF7E5] px-3 py-3 text-xs font-bold text-[#6A4D36]">
+            はじめての県制覇まで、旅の記録を重ねていこう。
+          </div>
+        )}
+      </div>
 
-      {largeUnfinishedPrefectures.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-extrabold text-[#6A4D36]">未制覇の大きめ県</p>
-            <p className="text-[11px] font-bold text-[#8C6A4A]">母数が多い順</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {largeUnfinishedPrefectures.map((prefecture) => (
-              <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
-            ))}
-          </div>
+      <div>
+        <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#6A4D36]">
+          <Compass className="h-4 w-4 text-[#8C6A4A]" />
+          旅の続き
         </div>
-      )}
+        {continuingPrefecture ? (
+          <JourneyPrefectureStat prefecture={continuingPrefecture} label="旅の続き" />
+        ) : (
+          <div className="rounded-[7px] border border-dashed border-[#8C6A4A]/25 bg-[#FFF7E5] px-3 py-3 text-xs font-bold text-[#6A4D36]">
+            訪問を記録すると、続きにしたい県がここに出ます。
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress }) {
+function JourneyPrefectureStat({
+  prefecture,
+  label,
+}: {
+  prefecture: PrefectureProgress;
+  label?: PrefectureCandidate['label'];
+}) {
   const complete = prefecture.total > 0 && prefecture.remaining === 0;
+  const displayLabel = label || (complete ? '制覇済み' : '旅の続き');
 
   return (
-    <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
-        <p className="shrink-0 font-pixel text-sm text-[#B5483C]">
-          {prefecture.visited}/{prefecture.total}
-        </p>
+    <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
+          <p className="mt-1 font-pixel text-sm leading-none text-[#B5483C]">
+            {prefecture.visited} / {prefecture.total}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-extrabold ${
+          complete
+            ? 'bg-[#E6F4DD] text-[#2C765E]'
+            : displayLabel === '制覇目前'
+              ? 'bg-[#FFF0C7] text-[#8C6315]'
+              : displayLabel === '近くで行けそう'
+                ? 'bg-white text-[#B5483C]'
+                : 'bg-[#EFE2CE] text-[#6A4D36]'
+        }`}>
+          {displayLabel}
+        </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-sm bg-[#E4D4B8]">
+      <div className="h-2 overflow-hidden rounded-sm border border-[#8C6A4A]/10 bg-[#E4D4B8]">
         <div
-          className={`h-full ${complete ? 'bg-[#2C765E]' : 'bg-[#3F9D7D]'}`}
+          className={`h-full ${complete ? 'bg-[#2C765E]' : 'bg-[#8C6A4A]'}`}
           style={{ width: `${Math.min(prefecture.rate, 100)}%` }}
         />
       </div>
