@@ -9,6 +9,17 @@ export type PublicPrefectureProgress = {
   remaining: number;
   rate: number;
   complete: boolean;
+  manholes: PublicPrefectureManhole[];
+};
+
+export type PublicPrefectureManhole = {
+  id: number;
+  title: string;
+  prefecture: string;
+  municipality: string | null;
+  pokemons: string[];
+  visited: boolean;
+  latestPublicPhotoId: string | null;
 };
 
 export type PublicUserPrefectureProgress = {
@@ -25,14 +36,23 @@ export type PublicUserPrefectureProgress = {
 type ManholeProgressRow = {
   id: number;
   prefecture: string | null;
+  title: string | null;
+  municipality: string | null;
+  pokemons: string[] | null;
 };
 
 type VisitProgressRow = {
   manhole_id: number | null;
+  shot_at: string | null;
+  created_at: string | null;
   manhole?: {
     prefecture: string | null;
   } | Array<{
     prefecture: string | null;
+  }> | null;
+  photos?: Array<{
+    id: string;
+    created_at: string | null;
   }> | null;
 };
 
@@ -43,6 +63,9 @@ type AppUserProgressRow = {
 const FALLBACK_DISPLAY_NAME = 'トレーナー';
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
+
+const getVisitSortTime = (visit: Pick<VisitProgressRow, 'shot_at' | 'created_at'>) =>
+  new Date(visit.shot_at || visit.created_at || 0).getTime();
 
 function createPublicReadClient(): SupabaseClient<Database> | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -87,8 +110,10 @@ export async function loadPublicUserPrefectureProgress(
         .maybeSingle(),
       supabase
         .from('manhole')
-        .select('id, prefecture')
-        .order('prefecture', { ascending: true }),
+        .select('id, title, prefecture, municipality, pokemons')
+        .order('prefecture', { ascending: true })
+        .order('municipality', { ascending: true })
+        .order('id', { ascending: true }),
     ]);
 
   if (appUserError) {
@@ -119,8 +144,14 @@ export async function loadPublicUserPrefectureProgress(
     .from('visit')
     .select(`
       manhole_id,
+      shot_at,
+      created_at,
       manhole:manhole_id (
         prefecture
+      ),
+      photos:photo (
+        id,
+        created_at
       )
     `)
     .eq('user_id', trimmedUserId)
@@ -132,6 +163,7 @@ export async function loadPublicUserPrefectureProgress(
   }
 
   const visitedIdsByPrefecture = new Map<string, Set<number>>();
+  const latestPublicPhotoIdByManhole = new Map<number, { photoId: string; sortTime: number }>();
 
   ((visits || []) as unknown as VisitProgressRow[]).forEach((visit) => {
     if (typeof visit.manhole_id !== 'number') return;
@@ -140,6 +172,29 @@ export async function loadPublicUserPrefectureProgress(
     const ids = visitedIdsByPrefecture.get(prefecture) || new Set<number>();
     ids.add(visit.manhole_id);
     visitedIdsByPrefecture.set(prefecture, ids);
+
+    const photos = Array.isArray(visit.photos) ? visit.photos : [];
+    const latestPhoto = photos
+      .filter((photo) => photo.id)
+      .sort((a, b) => {
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return bTime - aTime;
+      })[0];
+
+    if (latestPhoto) {
+      const sortTime = Math.max(
+        getVisitSortTime(visit),
+        new Date(latestPhoto.created_at || 0).getTime()
+      );
+      const current = latestPublicPhotoIdByManhole.get(visit.manhole_id);
+      if (!current || sortTime > current.sortTime) {
+        latestPublicPhotoIdByManhole.set(visit.manhole_id, {
+          photoId: latestPhoto.id,
+          sortTime,
+        });
+      }
+    }
   });
 
   const prefectures = Array.from(totalIdsByPrefecture.entries())
@@ -157,6 +212,21 @@ export async function loadPublicUserPrefectureProgress(
         remaining: Math.max(total - visited, 0),
         rate,
         complete: total > 0 && visited >= total,
+        manholes: manholeRows
+          .filter((manhole) => (manhole.prefecture || '都道府県未設定') === name)
+          .map((manhole) => ({
+            id: manhole.id,
+            title: manhole.title || `${name}${manhole.municipality || ''}`,
+            prefecture: name,
+            municipality: manhole.municipality,
+            pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
+            visited: Array.from(visitedIdsByPrefecture.get(name) || []).includes(manhole.id),
+            latestPublicPhotoId: latestPublicPhotoIdByManhole.get(manhole.id)?.photoId || null,
+          }))
+          .sort((a, b) => {
+            if (Number(b.visited) !== Number(a.visited)) return Number(b.visited) - Number(a.visited);
+            return a.id - b.id;
+          }),
       };
     })
     .sort((a, b) => {
