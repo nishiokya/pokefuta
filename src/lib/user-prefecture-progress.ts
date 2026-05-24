@@ -107,8 +107,7 @@ async function loadPublicUserPrefectureProgressImpl(
 
   const [userInfoResult, { data: manholes, error: manholesError }] =
     await Promise.all([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (supabase as any).rpc('get_public_user_info', { p_user_id: trimmedUserId }),
+      supabase.rpc('get_public_user_info' as never, { p_user_id: trimmedUserId } as never),
       supabase
         .from('manhole')
         .select('id, title, prefecture, municipality, pokemons')

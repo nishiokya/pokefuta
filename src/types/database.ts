@@ -448,14 +448,6 @@ export interface Database {
   };
 }
 
-export interface UserStats {
-  total_visits: number;
-  total_photos: number;
-  prefectures_visited: string[];
-  first_visit: string | null;
-  last_visit: string | null;
-}
-
 export interface Weather {
   condition: 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'foggy' | 'windy' | 'stormy';
   temperature?: number;

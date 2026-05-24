@@ -130,7 +130,7 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
         </section>
 
         {selectedProgress && (
-          <section className="mt-5 rounded-[8px] border border-[#DDA63A]/35 bg-[#FFF8EB] p-4 shadow-sm">
+          <section id="prefecture-detail" className="mt-5 rounded-[8px] border border-[#DDA63A]/35 bg-[#FFF8EB] p-4 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-extrabold text-[#8C6A4A]">選択中の都道府県</p>
@@ -265,7 +265,7 @@ function PrefectureProgressCard({
 }) {
   const href = highlighted
     ? `/users/${encodeURIComponent(userId)}/prefectures`
-    : `?prefecture=${encodeURIComponent(prefecture.name)}`;
+    : `?prefecture=${encodeURIComponent(prefecture.name)}#prefecture-detail`;
 
   return (
     <Link

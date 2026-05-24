@@ -2,8 +2,6 @@
 -- anon ロールに直接 SELECT を許可せず、公開プロフィールページに必要な最小限の列のみを
 -- SECURITY DEFINER 関数で安全に公開する
 
-DROP FUNCTION IF EXISTS get_public_user_info(uuid);
-
 CREATE OR REPLACE FUNCTION get_public_user_info(p_user_id uuid)
 RETURNS TABLE (auth_uid uuid, display_name text)
 LANGUAGE sql
