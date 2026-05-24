@@ -15,6 +15,7 @@ Supabase SQL Editorで `database/migrations/` のSQLを番号順に実行しま�
 9. `011_add_public_user_info_fn.sql`
 10. `012_drop_email_from_app_user.sql`
 11. `013_add_app_user_self_select_policy.sql`
+12. `014_add_get_my_app_user_id_fn.sql`
 
 ## 注意
 
