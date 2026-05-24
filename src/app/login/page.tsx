@@ -45,6 +45,19 @@ function getAuthErrorMessage(value: string | null) {
   return null;
 }
 
+function getLoginErrorMessage(message: string): string {
+  if (message.toLowerCase().includes('rate limit')) {
+    return 'ログイン試行回数が上限に達しました。しばらく待ってから再度お試しください。';
+  }
+  if (message.toLowerCase().includes('invalid login credentials') || message.toLowerCase().includes('invalid email or password')) {
+    return 'メールアドレスまたはパスワードが正しくありません。';
+  }
+  if (message.toLowerCase().includes('email not confirmed')) {
+    return 'メールアドレスの確認が完了していません。確認メールのリンクをクリックしてください。';
+  }
+  return message || 'ログインに失敗しました';
+}
+
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
   [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
@@ -261,7 +274,7 @@ function LoginForm() {
       }
     } catch (err: any) {
       console.error('❌ ログイン処理でエラー発生:', err);
-      setError(err.message || 'ログインに失敗しました');
+      setError(getLoginErrorMessage(err.message));
     } finally {
       setLoading(false);
     }
