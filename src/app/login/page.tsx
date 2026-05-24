@@ -4,15 +4,70 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
-import { AlertCircle, Camera, Info, Lock, LogIn, Mail, Map, Stamp } from 'lucide-react';
+import { AlertCircle, Camera, Info, Lock, LogIn, Mail, Map, Sparkles, Stamp } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import TermsOfService from '@/components/TermsOfService';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import type { ManholeTitle } from '@/types/database';
+
+type RarePreviewManhole = {
+  id: number;
+  prefecture?: string | null;
+  municipality?: string | null;
+  city?: string | null;
+  title?: string | null;
+  pokemons?: string[] | null;
+  titles?: ManholeTitle[] | null;
+  hashtags?: string[] | null;
+  title_tags?: string[] | null;
+};
+
+type RarePreviewItem = {
+  id: number;
+  badge: string;
+  title: string;
+  location: string;
+  pokemon: string;
+};
 
 function getSafeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
 }
+
+const getSortedTitles = (titles?: ManholeTitle[] | null) =>
+  [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+const getRareBadge = (title?: ManholeTitle) => {
+  if (!title) return '称号つき';
+  if (title.key === 'unique_pokemon') return '激レア';
+  if (title.key === 'rare_pokemon') return 'レア';
+  if (['north_end', 'south_end', 'east_end', 'west_end'].includes(title.key)) return '端っこ';
+  if (title.key === 'newest') return '新作';
+  return '発見候補';
+};
+
+const getLocationLabel = (manhole: RarePreviewManhole) =>
+  [manhole.prefecture, manhole.city || manhole.municipality].filter(Boolean).join(' ') || '場所未設定';
+
+const getRarePreviewItems = (manholes: RarePreviewManhole[]): RarePreviewItem[] =>
+  manholes
+    .map((manhole) => {
+      const topTitle = getSortedTitles(manhole.titles)[0];
+      if (!topTitle) return null;
+
+      return {
+        id: manhole.id,
+        badge: getRareBadge(topTitle),
+        title: topTitle.label,
+        location: getLocationLabel(manhole),
+        pokemon: Array.isArray(manhole.pokemons) && manhole.pokemons.length > 0
+          ? manhole.pokemons.slice(0, 2).join('・')
+          : manhole.title || 'ポケふた',
+      };
+    })
+    .filter((item): item is RarePreviewItem => item !== null)
+    .slice(0, 3);
 
 function LoginForm() {
   const router = useRouter();
@@ -26,6 +81,7 @@ function LoginForm() {
   const [showTerms, setShowTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rarePreviewItems, setRarePreviewItems] = useState<RarePreviewItem[]>([]);
 
   const supabase = createBrowserClient();
   const { trackLoginStart, trackLoginSuccess, setUser, trackAuthError, updateUserProperties } = useAnalytics();
@@ -33,6 +89,36 @@ function LoginForm() {
   // ページタイトル設定
   useEffect(() => {
     document.title = 'ログイン - ポケふた訪問記録';
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRarePreview = async () => {
+      try {
+        const response = await fetch('/api/manholes/rare-preview');
+        const data = await response.json();
+        if (!response.ok || data?.success === false) {
+          throw new Error(data?.details || data?.error || 'Failed to load rare manhole preview');
+        }
+        const manholes: RarePreviewManhole[] = Array.isArray(data?.manholes) ? data.manholes : [];
+        const previewItems = getRarePreviewItems(
+          manholes.filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
+        );
+
+        if (isMounted) {
+          setRarePreviewItems(previewItems);
+        }
+      } catch (err) {
+        console.warn('レアポケふた候補の取得に失敗しました:', err);
+      }
+    };
+
+    loadRarePreview();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -157,6 +243,42 @@ function LoginForm() {
                   </div>
                 ))}
               </div>
+
+              {rarePreviewItems.length > 0 && (
+                <div className="mt-5 rounded-[8px] border border-[#DDA63A]/30 bg-[#FFF0C7]/80 p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-extrabold text-[#8C6315]">未発見のレアふたが待っています</p>
+                      <p className="mt-1 text-[11px] font-medium leading-relaxed text-[#6A4D36]">
+                        ログインすると訪問済みと照らし合わせて、称号つき候補を探せます。
+                      </p>
+                    </div>
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white text-[#B5483C]">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {rarePreviewItems.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={`/manhole/${item.id}`}
+                        className="group flex items-center gap-3 rounded-[7px] border border-[#8C6A4A]/15 bg-white/75 px-3 py-2 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+                      >
+                        <span className="w-[58px] flex-shrink-0 rounded-full bg-[#B5483C]/10 px-2 py-1 text-center text-[10px] font-extrabold text-[#B5483C]">
+                          {item.badge}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-extrabold text-[#4F3828]">{item.title}</span>
+                          <span className="mt-0.5 block truncate text-[11px] font-medium text-[#6A4D36]">
+                            {item.location} / {item.pokemon}
+                          </span>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-[#8C6A4A]/15 bg-[#FFF8EB]/80 p-5 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">

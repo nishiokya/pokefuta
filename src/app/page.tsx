@@ -77,6 +77,22 @@ const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
   { key: 'unvisited', label: '未訪問' },
 ];
 
+const getJourneyTabFromUrl = (): JourneyTab => {
+  if (typeof window === 'undefined') return 'history';
+  return new URLSearchParams(window.location.search).get('tab') === 'unvisited' ? 'unvisited' : 'history';
+};
+
+const updateJourneyTabUrl = (tab: JourneyTab, hash?: string) => {
+  const url = new URL(window.location.href);
+  if (tab === 'history') {
+    url.searchParams.delete('tab');
+  } else {
+    url.searchParams.set('tab', tab);
+  }
+  url.hash = hash ? `#${hash}` : '';
+  window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+};
+
 const getDisplayName = (session: any) => {
   const metadataName = session?.user?.user_metadata?.display_name;
   const emailName = session?.user?.email?.split('@')[0];
@@ -148,6 +164,14 @@ export default function HomePage() {
   const feedPerPage = 24;
   const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
 
+  const selectJourneyTab = (tab: JourneyTab, hash?: string) => {
+    setJourneyTab(tab);
+    updateJourneyTabUrl(tab, hash);
+    if (hash) {
+      window.requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' }));
+    }
+  };
+
   useEffect(() => {
     document.title = 'ポケふた写真館 - ポケふた訪問記録';
     trackView('/', 'ホーム', 'home');
@@ -177,6 +201,23 @@ export default function HomePage() {
 
     loadSiteStats();
   }, []);
+
+  useEffect(() => {
+    setJourneyTab(getJourneyTabFromUrl());
+
+    const handlePopState = () => {
+      setJourneyTab(getJourneyTabFromUrl());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && journeyTab === 'unvisited' && window.location.hash === '#rare-unvisited') {
+      window.requestAnimationFrame(() => document.getElementById('rare-unvisited')?.scrollIntoView());
+    }
+  }, [journeyTab, loading]);
 
   useEffect(() => {
     loadFeed();
@@ -504,6 +545,31 @@ export default function HomePage() {
                         </p>
                       </div>
                     )}
+                    {interestingCandidates.length > 0 && (
+                      <div className="mt-3">
+                        <a
+                          href="/?tab=unvisited#rare-unvisited"
+                          onClick={(event) => {
+                            if (
+                              event.defaultPrevented ||
+                              event.button !== 0 ||
+                              event.metaKey ||
+                              event.ctrlKey ||
+                              event.shiftKey ||
+                              event.altKey
+                            ) {
+                              return;
+                            }
+                            event.preventDefault();
+                            selectJourneyTab('unvisited', 'rare-unvisited');
+                          }}
+                          className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#B5483C]/25 bg-white/70 px-3 py-2 text-xs font-extrabold text-[#B5483C] shadow-sm transition hover:bg-[#F8D9C4] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          称号つき未訪問を探す
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -516,7 +582,7 @@ export default function HomePage() {
                           <button
                             key={tab.key}
                             type="button"
-                            onClick={() => setJourneyTab(tab.key)}
+                            onClick={() => selectJourneyTab(tab.key)}
                             className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
                               isActive
                                 ? 'bg-[#4F3828] text-[#FFF7E5] shadow-sm'
@@ -588,7 +654,7 @@ export default function HomePage() {
                       )}
                     </JourneyCandidateSection>
 
-                    <JourneyCandidateSection title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
+                    <JourneyCandidateSection id="rare-unvisited" title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
                       {interestingCandidates.length > 0 ? (
                         interestingCandidates.map((manhole) => (
                           <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="発見" />
@@ -932,18 +998,20 @@ function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visi
 }
 
 function JourneyCandidateSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div id={id}>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-[#4F3828]">{title}</h2>

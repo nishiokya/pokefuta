@@ -67,6 +67,25 @@ const tabs: { id: PassportTab; label: string }[] = [
   { id: 'unvisited', label: '未訪問' },
 ];
 
+const passportTabIds = new Set<PassportTab>(tabs.map((tab) => tab.id));
+
+const getPassportTabFromUrl = (): PassportTab => {
+  if (typeof window === 'undefined') return 'stamps';
+  const tab = new URLSearchParams(window.location.search).get('tab') as PassportTab | null;
+  return tab && passportTabIds.has(tab) ? tab : 'stamps';
+};
+
+const updatePassportTabUrl = (tab: PassportTab) => {
+  const url = new URL(window.location.href);
+  if (tab === 'stamps') {
+    url.searchParams.delete('tab');
+  } else {
+    url.searchParams.set('tab', tab);
+  }
+  url.hash = '';
+  window.history.pushState({}, '', `${url.pathname}${url.search}`);
+};
+
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return '日付なし';
@@ -91,11 +110,27 @@ export default function VisitsPage() {
   const sharePanelCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => { return () => { sharePanelCleanupRef.current?.(); }; }, []);
 
+  const selectPassportTab = (tab: PassportTab) => {
+    setActiveTab(tab);
+    updatePassportTabUrl(tab);
+  };
+
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
     trackView('/visits', 'ポケふた訪問パスポート', 'visits');
     trackPassportOpen();
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    setActiveTab(getPassportTabFromUrl());
+
+    const handlePopState = () => {
+      setActiveTab(getPassportTabFromUrl());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleShare = async () => {
@@ -721,7 +756,8 @@ export default function VisitsPage() {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  type="button"
+                  onClick={() => selectPassportTab(tab.id)}
                   className={`min-h-[38px] rounded-md px-2 text-center font-pixelJp text-[11px] font-bold transition-colors sm:text-xs ${
                     activeTab === tab.id
                       ? 'bg-[#4F3828] text-[#FFF7E5]'
