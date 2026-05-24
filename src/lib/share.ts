@@ -103,7 +103,7 @@ export function openSharePanel(
     window.open(buildLineShareUrl(shareUrl), '_blank', 'noopener,noreferrer');
   }));
 
-  panel.appendChild(makeBtn('通常の共有', async () => {
+  panel.appendChild(makeBtn('リンクをコピー', async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       callbacks.onCopyLink();

@@ -310,7 +310,7 @@ function PrefectureProgressCard({
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-bold text-[#6A4D36]">
+      <div className="mt-3 flex items-center justify-between gap-2 pr-9 text-[11px] font-bold text-[#6A4D36]">
         <span className="inline-flex items-center gap-1">
           <CircleDot className="h-3.5 w-3.5" />
           公開訪問ベース
