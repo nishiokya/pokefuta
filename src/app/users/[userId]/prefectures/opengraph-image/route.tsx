@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   ]);
 
   if (!progress) {
-    return new Response('Not found', { status: 404 });
+    return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, max-age=300' } });
   }
 
   const completionRate = `${progress.completionRate.toFixed(1)}%`;
@@ -110,6 +110,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
             },
           ]
         : [],
+      headers: {
+        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      },
     }
   );
 }

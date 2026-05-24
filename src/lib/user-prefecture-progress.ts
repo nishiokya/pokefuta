@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
@@ -63,6 +64,7 @@ type AppUserProgressRow = {
 };
 
 const FALLBACK_DISPLAY_NAME = 'トレーナー';
+const JAPAN_PREFECTURE_COUNT = 47;
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
 
@@ -91,7 +93,7 @@ function getProgressClient(): SupabaseClient<Database> | null {
   return hasUsableServiceRoleKey ? supabaseAdmin : createPublicReadClient();
 }
 
-export async function loadPublicUserPrefectureProgress(
+async function loadPublicUserPrefectureProgressImpl(
   userId: string
 ): Promise<PublicUserPrefectureProgress | null> {
   const supabase = getProgressClient();
@@ -134,13 +136,19 @@ export async function loadPublicUserPrefectureProgress(
 
   const manholeRows = (manholes || []) as ManholeProgressRow[];
   const totalIdsByPrefecture = new Map<string, Set<number>>();
+  const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();
 
   manholeRows.forEach((manhole) => {
     const prefecture = manhole.prefecture || '都道府県未設定';
     const ids = totalIdsByPrefecture.get(prefecture) || new Set<number>();
     ids.add(manhole.id);
     totalIdsByPrefecture.set(prefecture, ids);
+    const list = manholesByPrefecture.get(prefecture) || [];
+    list.push(manhole);
+    manholesByPrefecture.set(prefecture, list);
   });
+
+  const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
   const { data: visits, error: visitsError } = await supabase
     .from('visit')
@@ -165,7 +173,16 @@ export async function loadPublicUserPrefectureProgress(
   }
 
   if (!visits || visits.length === 0) {
-    return null;
+    return {
+      userId: trimmedUserId,
+      displayName,
+      prefectures: [],
+      completedPrefectureCount: 0,
+      totalPrefectureCount: JAPAN_PREFECTURE_COUNT,
+      visitedManholeCount: 0,
+      totalManholeCount: manholeRows.length,
+      completionRate: 0,
+    };
   }
 
   const visitedIdsByPrefecture = new Map<string, Set<number>>();
@@ -205,10 +222,14 @@ export async function loadPublicUserPrefectureProgress(
 
   const prefectures = Array.from(totalIdsByPrefecture.entries())
     .map(([name, totalIds]) => {
+      const visitedSet = visitedIdsByPrefecture.get(name);
+      let visited = 0;
+      if (visitedSet) {
+        for (const id of visitedSet) {
+          if (totalIds.has(id)) visited++;
+        }
+      }
       const total = totalIds.size;
-      const visited = Array.from(visitedIdsByPrefecture.get(name) || []).filter((id) =>
-        totalIds.has(id)
-      ).length;
       const rate = toRate(visited, total);
 
       return {
@@ -218,15 +239,14 @@ export async function loadPublicUserPrefectureProgress(
         remaining: Math.max(total - visited, 0),
         rate,
         complete: total > 0 && visited >= total,
-        manholes: manholeRows
-          .filter((manhole) => (manhole.prefecture || '都道府県未設定') === name)
+        manholes: (manholesByPrefecture.get(name) || [])
           .map((manhole) => ({
             id: manhole.id,
             title: manhole.title || `${name}${manhole.municipality || ''}`,
             prefecture: name,
             municipality: manhole.municipality,
             pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
-            visited: Array.from(visitedIdsByPrefecture.get(name) || []).includes(manhole.id),
+            visited: visitedSet?.has(manhole.id) ?? false,
             latestPublicPhotoId: latestPublicPhotoIdByManhole.get(manhole.id)?.photoId || null,
           }))
           .sort((a, b) => {
@@ -254,12 +274,14 @@ export async function loadPublicUserPrefectureProgress(
 
   return {
     userId: trimmedUserId,
-    displayName: appUserRow.display_name || FALLBACK_DISPLAY_NAME,
+    displayName,
     prefectures,
     completedPrefectureCount,
-    totalPrefectureCount: prefectures.filter((prefecture) => prefecture.total > 0).length,
+    totalPrefectureCount: JAPAN_PREFECTURE_COUNT,
     visitedManholeCount: validVisitedManholeCount,
     totalManholeCount,
     completionRate: toRate(validVisitedManholeCount, totalManholeCount),
   };
 }
+
+export const loadPublicUserPrefectureProgress = cache(loadPublicUserPrefectureProgressImpl);
