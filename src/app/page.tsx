@@ -456,12 +456,29 @@ export default function HomePage() {
       })
       .slice(0, 4);
 
+    const completedPrefectures = prefectureProgress
+      .filter((prefecture) => prefecture.total > 0 && prefecture.remaining === 0)
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        return a.name.localeCompare(b.name, 'ja');
+      });
+    const largeUnfinishedPrefectures = prefectureProgress
+      .filter((prefecture) => prefecture.total > 0 && prefecture.remaining > 0)
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        if (b.visited !== a.visited) return b.visited - a.visited;
+        return a.name.localeCompare(b.name, 'ja');
+      })
+      .slice(0, completedPrefectures.length > 0 ? 4 : 6);
+
     return {
       visitsByManholeId,
       visitedCount: visitsByManholeId.size,
       visitedManholes,
       prefectureProgress,
       leadingPrefectures: prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3),
+      completedPrefectures,
+      largeUnfinishedPrefectures,
       nextPrefecture: prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0),
       nearbyCandidates,
       recentCandidates,
@@ -474,6 +491,8 @@ export default function HomePage() {
     visitedCount,
     prefectureProgress,
     leadingPrefectures,
+    completedPrefectures,
+    largeUnfinishedPrefectures,
     nextPrefecture,
     visitedManholes,
     nearbyCandidates,
@@ -531,11 +550,11 @@ export default function HomePage() {
                           style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
                         />
                       </div>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        {(leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)).map((prefecture) => (
-                          <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
-                        ))}
-                      </div>
+                      <JourneyPrefectureOverview
+                        completedPrefectures={completedPrefectures}
+                        largeUnfinishedPrefectures={largeUnfinishedPrefectures}
+                        fallbackPrefectures={leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)}
+                      />
                     </div>
                     {nextPrefecture && (
                       <div className="mt-4 inline-flex rounded-[7px] border border-[#DDA63A]/30 bg-[#FFF0C7] px-3 py-2">
@@ -903,7 +922,69 @@ export default function HomePage() {
   );
 }
 
+function JourneyPrefectureOverview({
+  completedPrefectures,
+  largeUnfinishedPrefectures,
+  fallbackPrefectures,
+}: {
+  completedPrefectures: PrefectureProgress[];
+  largeUnfinishedPrefectures: PrefectureProgress[];
+  fallbackPrefectures: PrefectureProgress[];
+}) {
+  const hasPrefectureProgress = completedPrefectures.length > 0 || largeUnfinishedPrefectures.length > 0;
+
+  if (!hasPrefectureProgress) {
+    return (
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        {fallbackPrefectures.map((prefecture) => (
+          <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {completedPrefectures.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
+            <Award className="h-4 w-4" />
+            制覇済みの都道府県
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {completedPrefectures.map((prefecture) => (
+              <span
+                key={prefecture.name}
+                className="inline-flex min-h-8 items-center gap-1 rounded-full border border-[#3F9D7D]/25 bg-[#E6F4DD] px-3 text-xs font-extrabold text-[#2C765E]"
+              >
+                {prefecture.name}
+                <span className="font-pixel text-[11px]">{prefecture.total}/{prefecture.total}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {largeUnfinishedPrefectures.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-extrabold text-[#6A4D36]">未制覇の大きめ県</p>
+            <p className="text-[11px] font-bold text-[#8C6A4A]">母数が多い順</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {largeUnfinishedPrefectures.map((prefecture) => (
+              <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress }) {
+  const complete = prefecture.total > 0 && prefecture.remaining === 0;
+
   return (
     <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -913,7 +994,14 @@ function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress 
         </p>
       </div>
       <div className="h-2 overflow-hidden rounded-sm bg-[#E4D4B8]">
-        <div className="h-full bg-[#3F9D7D]" style={{ width: `${Math.min(prefecture.rate, 100)}%` }} />
+        <div
+          className={`h-full ${complete ? 'bg-[#2C765E]' : 'bg-[#3F9D7D]'}`}
+          style={{ width: `${Math.min(prefecture.rate, 100)}%` }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] font-bold text-[#6A4D36]">
+        <span>{complete ? '制覇済み' : `あと${prefecture.remaining}枚`}</span>
+        <span>{prefecture.rate.toFixed(0)}%</span>
       </div>
     </div>
   );
