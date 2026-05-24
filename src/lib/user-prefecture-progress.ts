@@ -105,13 +105,10 @@ async function loadPublicUserPrefectureProgressImpl(
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const [{ data: appUser, error: appUserError }, { data: manholes, error: manholesError }] =
+  const [userInfoResult, { data: manholes, error: manholesError }] =
     await Promise.all([
-      supabase
-        .from('app_user')
-        .select('auth_uid, display_name')
-        .eq('id', trimmedUserId)
-        .maybeSingle(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).rpc('get_public_user_info', { p_user_id: trimmedUserId }),
       supabase
         .from('manhole')
         .select('id, title, prefecture, municipality, pokemons')
@@ -120,15 +117,14 @@ async function loadPublicUserPrefectureProgressImpl(
         .order('id', { ascending: true }),
     ]);
 
-  if (appUserError) {
-    throw new Error(appUserError.message);
+  if (userInfoResult.error) {
+    throw new Error(userInfoResult.error.message);
   }
 
-  if (!appUser) {
+  const appUserRow = (userInfoResult.data as AppUserProgressRow[] | null)?.[0] ?? null;
+  if (!appUserRow) {
     return null;
   }
-
-  const appUserRow = appUser as unknown as AppUserProgressRow;
 
   if (manholesError) {
     throw new Error(manholesError.message);

@@ -168,6 +168,7 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
               key={prefecture.name}
               prefecture={prefecture}
               highlighted={prefecture.name === selectedPrefecture}
+              userId={progress.userId}
             />
           ))}
         </section>
@@ -256,13 +257,20 @@ function ProgressPill({ prefecture }: { prefecture: PublicPrefectureProgress }) 
 function PrefectureProgressCard({
   prefecture,
   highlighted,
+  userId,
 }: {
   prefecture: PublicPrefectureProgress;
   highlighted: boolean;
+  userId: string;
 }) {
+  const href = highlighted
+    ? `/users/${encodeURIComponent(userId)}/prefectures`
+    : `?prefecture=${encodeURIComponent(prefecture.name)}`;
+
   return (
-    <article
-      className={`rounded-[8px] border bg-[#FFF7E5] p-4 shadow-sm ${
+    <Link
+      href={href}
+      className={`block rounded-[8px] border bg-[#FFF7E5] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]/50 ${
         highlighted
           ? 'border-[#DDA63A] ring-2 ring-[#DDA63A]/30'
           : 'border-[#8C6A4A]/15'
@@ -292,6 +300,6 @@ function PrefectureProgressCard({
         </span>
         <span>{formatRate(prefecture.rate, 0)}</span>
       </div>
-    </article>
+    </Link>
   );
 }
