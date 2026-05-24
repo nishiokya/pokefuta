@@ -3,20 +3,24 @@
 import { useEffect, useRef } from 'react';
 import { Share2 } from 'lucide-react';
 import { SITE_NAME } from '@/lib/constants';
-import { openSharePanel, prefectureProgressShareText } from '@/lib/share';
+import { openSharePanel, prefectureCardShareText } from '@/lib/share';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
-type PrefectureProgressShareButtonProps = {
-  completedPrefectureCount: number;
-  totalPrefectureCount: number;
+type PrefectureCardShareButtonProps = {
+  prefectureName: string;
+  visited: number;
+  total: number;
+  complete: boolean;
   shareUrl: string;
 };
 
-export default function PrefectureProgressShareButton({
-  completedPrefectureCount,
-  totalPrefectureCount,
+export default function PrefectureCardShareButton({
+  prefectureName,
+  visited,
+  total,
+  complete,
   shareUrl,
-}: PrefectureProgressShareButtonProps) {
+}: PrefectureCardShareButtonProps) {
   const sharePanelCleanupRef = useRef<(() => void) | null>(null);
   const { trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
 
@@ -26,11 +30,11 @@ export default function PrefectureProgressShareButton({
     };
   }, []);
 
-  const handleShare = async () => {
-    const shareText = prefectureProgressShareText(
-      completedPrefectureCount,
-      totalPrefectureCount
-    );
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const shareText = prefectureCardShareText(prefectureName, visited, total, complete);
 
     trackShareClick();
 
@@ -52,7 +56,7 @@ export default function PrefectureProgressShareButton({
       });
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Prefecture progress share failed:', error);
+        console.error('Prefecture card share failed:', error);
       }
     }
   };
@@ -61,10 +65,10 @@ export default function PrefectureProgressShareButton({
     <button
       type="button"
       onClick={handleShare}
-      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] bg-[#B5483C] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_14px_rgba(181,72,60,0.22)] transition hover:bg-[#9F3D33] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+      aria-label={`${prefectureName}を共有`}
+      className="absolute bottom-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-[#6A4D36] shadow-sm transition hover:bg-white hover:text-[#4F3828] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]/50"
     >
-      <Share2 className="h-4 w-4" />
-      達成状況を共有
+      <Share2 className="h-3.5 w-3.5" />
     </button>
   );
 }

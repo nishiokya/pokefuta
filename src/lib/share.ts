@@ -16,29 +16,42 @@ export function buildLineShareUrl(pageUrl: string): string {
   return `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(pageUrl)}`;
 }
 
-export function manholeShareText(municipality: string): string {
-  return `${municipality}のポケふたを見つけました。\n訪問記録や写真を残せるポケふた用スタンプ帳です。`;
+export function manholeShareText(municipality: string, pokemons: string[] = []): string {
+  const pokemonStr = pokemons.slice(0, 3).join('・');
+  return pokemonStr
+    ? `${pokemonStr}のポケふたを${municipality}で見つけました！`
+    : `${municipality}のポケふたを見つけました！`;
 }
 
-export function photoShareText(municipality: string, hashtags: string[] = []): string {
+export function photoShareText(municipality: string, hashtags: string[] = [], pokemons: string[] = []): string {
+  const pokemonStr = pokemons.slice(0, 3).join('・');
   const titleTags = hashtags.slice(0, 2).join(' ');
-  return [
-    `${municipality}のポケふたを見つけました。`,
-    titleTags,
-    '訪問記録や写真を残せるポケふた用スタンプ帳です。',
-  ].filter(Boolean).join('\n');
+  const base = pokemonStr
+    ? `${pokemonStr}のポケふたを${municipality}で記録しました！`
+    : `${municipality}のポケふたを記録しました！`;
+  return [base, titleTags].filter(Boolean).join('\n');
 }
 
-export function visitsShareText(): string {
-  return 'ポケふた巡りのスタンプ帳を更新しました。\n訪問したポケふたを写真付きで記録しています。';
+export function visitsShareText(stampCount: number): string {
+  return `ポケふた旅を続けています！\n${stampCount}枚のポケふたを巡りました`;
 }
 
 export function prefectureProgressShareText(
-  displayName: string,
   completedPrefectureCount: number,
   totalPrefectureCount: number
 ): string {
-  return `${displayName}のポケふた都道府県達成状況です。\n${completedPrefectureCount}/${totalPrefectureCount}都道府県を制覇しました。`;
+  return `${completedPrefectureCount}/${totalPrefectureCount}都道府県のポケふたを制覇しました！`;
+}
+
+export function prefectureCardShareText(
+  prefectureName: string,
+  visited: number,
+  total: number,
+  complete: boolean
+): string {
+  return complete
+    ? `${prefectureName}のポケふたを全て制覇しました！`
+    : `${prefectureName}のポケふたを${visited}/${total}枚制覇中です！`;
 }
 
 export interface SharePanelCallbacks {
@@ -90,7 +103,7 @@ export function openSharePanel(
     window.open(buildLineShareUrl(shareUrl), '_blank', 'noopener,noreferrer');
   }));
 
-  panel.appendChild(makeBtn('リンクをコピー', async () => {
+  panel.appendChild(makeBtn('通常の共有', async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       callbacks.onCopyLink();
