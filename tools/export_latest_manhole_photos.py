@@ -125,6 +125,16 @@ def to_photo_entry(
     }
 
 
+def get_supabase_key() -> str:
+    service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if service_role_key and not service_role_key.startswith("placeholder"):
+        return service_role_key
+    anon_key = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    if anon_key:
+        return anon_key
+    raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY is required")
+
+
 def supabase_get(
     path: str,
     query: dict[str, str],
@@ -133,7 +143,7 @@ def supabase_get(
     timeout: int,
 ) -> list[dict[str, Any]]:
     supabase_url = strip_trailing_slash(require_env("NEXT_PUBLIC_SUPABASE_URL"))
-    service_role_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
+    service_role_key = get_supabase_key()
 
     params = dict(query)
     params["limit"] = str(batch_size)

@@ -274,7 +274,7 @@ function LoginForm() {
       }
     } catch (err: any) {
       console.error('❌ ログイン処理でエラー発生:', err);
-      setError(getLoginErrorMessage(err.message));
+      setError(getLoginErrorMessage(err?.message ?? ''));
     } finally {
       setLoading(false);
     }
