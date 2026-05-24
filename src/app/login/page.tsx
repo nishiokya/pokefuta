@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
@@ -33,6 +33,16 @@ type RarePreviewItem = {
 function getSafeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
+}
+
+function getAuthErrorMessage(value: string | null) {
+  if (value === 'missing_auth_code') {
+    return '確認リンクが無効です。メールのリンクをもう一度開いてください。';
+  }
+  if (value === 'email_confirm_failed') {
+    return 'メール確認に失敗しました。確認リンクの有効期限が切れている可能性があります。';
+  }
+  return null;
 }
 
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
@@ -75,6 +85,9 @@ function LoginForm() {
   const redirectTo = getSafeRedirectPath(searchParams.get('redirect'));
   const hasRedirect = redirectTo !== '/';
   const fromRegister = searchParams.get('from') === 'register';
+  const fromEmailConfirmed = searchParams.get('from') === 'email_confirmed';
+  const conversion = searchParams.get('conversion');
+  const authError = searchParams.get('auth_error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -83,13 +96,74 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [rarePreviewItems, setRarePreviewItems] = useState<RarePreviewItem[]>([]);
 
-  const supabase = createBrowserClient();
-  const { trackLoginStart, trackLoginSuccess, setUser, trackAuthError, updateUserProperties } = useAnalytics();
+  const supabase = useMemo(() => createBrowserClient(), []);
+  const {
+    trackLoginStart,
+    trackLoginSuccess,
+    trackSignupEmailConfirmed,
+    setUser,
+    trackAuthError,
+    updateUserProperties,
+  } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
     document.title = 'ログイン - ポケふた訪問記録';
   }, []);
+
+  useEffect(() => {
+    const authErrorMessage = getAuthErrorMessage(authError);
+    if (!authError || !authErrorMessage) return;
+
+    setError(authErrorMessage);
+    trackAuthError(authError, authErrorMessage);
+  }, [authError, trackAuthError]);
+
+  useEffect(() => {
+    if (!fromEmailConfirmed || conversion !== 'signup_email_confirmed') return;
+
+    let isMounted = true;
+
+    const completeEmailConfirmation = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted || !session?.user?.id) return;
+
+      const storageKey = `pokefuta:signup_email_confirmed:${session.user.id}`;
+      if (sessionStorage.getItem(storageKey) !== 'true') {
+        setUser(session.user.id);
+        trackSignupEmailConfirmed({
+          conversion_type: 'signup_email_confirmed',
+          redirect_target: redirectTo,
+          auth_flow: 'email_confirmation',
+        });
+        updateUserProperties({ registered_user: true });
+        sessionStorage.setItem(storageKey, 'true');
+      }
+
+      router.replace(redirectTo);
+      router.refresh();
+    };
+
+    completeEmailConfirmation().catch((err) => {
+      console.error('メール確認後のログイン状態確認に失敗:', err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    conversion,
+    fromEmailConfirmed,
+    redirectTo,
+    router,
+    setUser,
+    supabase,
+    trackSignupEmailConfirmed,
+    updateUserProperties,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
