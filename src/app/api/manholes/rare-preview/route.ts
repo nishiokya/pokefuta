@@ -31,39 +31,32 @@ export async function GET() {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    const results = await Promise.all(
-      PREVIEW_TITLE_KEYS.map((key) =>
-        supabase
-          .from('manhole')
-          .select(SELECT_FIELDS)
-          .contains('title_tags', [key])
-          .order('id', { ascending: true })
-          .limit(3)
-      )
-    );
-
-    const error = results.find((result) => result.error)?.error;
+    const { data, error } = await supabase
+      .from('manhole')
+      .select(SELECT_FIELDS)
+      .overlaps('title_tags', PREVIEW_TITLE_KEYS)
+      .order('id', { ascending: true });
 
     if (error) {
       throw new Error(error.message);
     }
 
-    const byId = new Map<number, RarePreviewManhole>();
-    results.forEach((result) => {
-      ((result.data ?? []) as RarePreviewManhole[]).forEach((manhole) => {
-        byId.set(manhole.id, manhole);
-      });
-    });
-
-    const manholes = Array.from(byId.values())
+    const manholes = ((data ?? []) as RarePreviewManhole[])
       .filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
       .sort((a, b) => getTopTitlePriority(b.titles) - getTopTitlePriority(a.titles))
       .slice(0, 3);
 
-    return NextResponse.json({
-      success: true,
-      manholes,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        manholes,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
+        },
+      }
+    );
   } catch (error: unknown) {
     return NextResponse.json(
       {
