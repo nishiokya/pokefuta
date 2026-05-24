@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
+  CircleDot,
   Compass,
   ExternalLink,
   MapPin,
@@ -475,23 +476,32 @@ export default function NearbyPage() {
                     className="cursor-pointer overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
                     onClick={() => viewManholeDetail(manhole)}
                   >
-                    {manhole.visit && manhole.visit.photos && manhole.visit.photos.length > 0 && (
-                      <div className="grid grid-cols-3 gap-1 bg-[#F6EEDC] p-1">
-                        {manhole.visit.photos.slice(0, 3).map((photo: any) => (
-                          <div
-                            key={photo.id}
-                            className="relative aspect-square overflow-hidden rounded-[6px] bg-white"
-                          >
-                            <img
-                              src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
-                              alt="ポケふた写真"
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
+                    <div className="bg-[#F6EEDC] p-1">
+                      {manhole.visit?.photos && manhole.visit.photos.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-1">
+                          {manhole.visit.photos.slice(0, 3).map((photo: any) => (
+                            <div
+                              key={photo.id}
+                              className="relative aspect-square overflow-hidden rounded-[6px] bg-white"
+                            >
+                              <img
+                                src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
+                                alt="ポケふた写真"
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex aspect-[3/1] items-center justify-center rounded-[6px] bg-[#E9DEC9]">
+                          <div className="flex flex-col items-center text-[#B8AB96]">
+                            <CircleDot className="h-8 w-8" />
+                            <p className="mt-1 font-pixel text-[9px] leading-none">POKEFUTA</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
 
                     <div className="p-4">
                       <div className="mb-3 flex items-start justify-between gap-3">
