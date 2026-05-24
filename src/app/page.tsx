@@ -22,6 +22,7 @@ import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { calculateDistance, isValidCoordinates } from '@/lib/location';
 
 type FeedVisit = {
   id: string;
@@ -53,8 +54,6 @@ type JourneyVisit = {
 type JourneyManhole = Manhole & {
   name?: string;
   city?: string;
-  latitude?: number;
-  longitude?: number;
   distance?: number;
   is_visited?: boolean;
   last_visit?: string | null;
@@ -147,24 +146,7 @@ const getManholeTags = (
 };
 
 const hasCoordinates = (manhole?: Pick<JourneyManhole, 'latitude' | 'longitude'> | null) =>
-  typeof manhole?.latitude === 'number' &&
-  Number.isFinite(manhole.latitude) &&
-  typeof manhole.longitude === 'number' &&
-  Number.isFinite(manhole.longitude);
-
-const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-  const radiusKm = 6371;
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
+  isValidCoordinates(manhole?.latitude, manhole?.longitude);
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -459,7 +441,7 @@ export default function HomePage() {
           latestVisitedManhole &&
           typeof unvisitedLatitude === 'number' &&
           typeof unvisitedLongitude === 'number'
-            ? calculateDistanceKm(
+            ? calculateDistance(
                 latestVisitedManhole.latitude!,
                 latestVisitedManhole.longitude!,
                 unvisitedLatitude,
@@ -543,6 +525,33 @@ export default function HomePage() {
         return a.name.localeCompare(b.name, 'ja');
       })
       .slice(0, 3);
+    const progressByPrefecture = new Map(prefectureProgress.map((prefecture) => [prefecture.name, prefecture]));
+    const usedUnvisitedCandidateIds = new Set(
+      [...nearbyCandidates, ...recentCandidates].map((manhole) => manhole.id)
+    );
+    const journeyContinuationCandidates = unvisitedManholes
+      .filter((manhole) => !usedUnvisitedCandidateIds.has(manhole.id))
+      .sort((a, b) => {
+        const aProgress = progressByPrefecture.get(a.prefecture || '都道府県未設定');
+        const bProgress = progressByPrefecture.get(b.prefecture || '都道府県未設定');
+        const aSameAsContinuing = continuingPrefecture && a.prefecture === continuingPrefecture.name ? 0 : 1;
+        const bSameAsContinuing = continuingPrefecture && b.prefecture === continuingPrefecture.name ? 0 : 1;
+        if (aSameAsContinuing !== bSameAsContinuing) return aSameAsContinuing - bSameAsContinuing;
+
+        const aVisited = aProgress?.visited ?? 0;
+        const bVisited = bProgress?.visited ?? 0;
+        if (bVisited !== aVisited) return bVisited - aVisited;
+
+        const aRemaining = aProgress?.remaining ?? Number.POSITIVE_INFINITY;
+        const bRemaining = bProgress?.remaining ?? Number.POSITIVE_INFINITY;
+        if (aRemaining !== bRemaining) return aRemaining - bRemaining;
+
+        return `${a.prefecture}${getMunicipality(a)}${a.id}`.localeCompare(
+          `${b.prefecture}${getMunicipality(b)}${b.id}`,
+          'ja'
+        );
+      })
+      .slice(0, 4);
 
     return {
       visitsByManholeId,
@@ -553,6 +562,7 @@ export default function HomePage() {
       nextPrefectureCandidates,
       nearbyCandidates,
       recentCandidates,
+      journeyContinuationCandidates,
     };
   }, [journeyVisits, journeyManholes, nearbyUnvisited]);
 
@@ -565,6 +575,7 @@ export default function HomePage() {
     visitedManholes,
     nearbyCandidates,
     recentCandidates,
+    journeyContinuationCandidates,
   } = journeyData;
   const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
@@ -744,8 +755,8 @@ export default function HomePage() {
                     </JourneyCandidateSection>
 
                     <JourneyCandidateSection id="journey-unvisited" title="旅の続きを見る" description="新しい目的地を地図から探す前の候補">
-                      {recentCandidates.length > 0 ? (
-                        recentCandidates.map((manhole) => (
+                      {journeyContinuationCandidates.length > 0 ? (
+                        journeyContinuationCandidates.map((manhole) => (
                           <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="旅の続き" />
                         ))
                       ) : (
