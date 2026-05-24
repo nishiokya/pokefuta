@@ -21,7 +21,7 @@ function normalizeBaseUrl(value: string) {
 function isLocalBaseUrl(value: string) {
   try {
     const { hostname } = new URL(value);
-    return hostname === 'localhost' || hostname === '127.0.0.1';
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
   } catch {
     return false;
   }

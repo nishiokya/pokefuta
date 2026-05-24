@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
@@ -33,6 +33,16 @@ type RarePreviewItem = {
 function getSafeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
+}
+
+function getAuthErrorMessage(value: string | null) {
+  if (value === 'missing_auth_code') {
+    return '確認リンクが無効です。メールのリンクをもう一度開いてください。';
+  }
+  if (value === 'email_confirm_failed') {
+    return 'メール確認に失敗しました。確認リンクの有効期限が切れている可能性があります。';
+  }
+  return null;
 }
 
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
@@ -77,6 +87,7 @@ function LoginForm() {
   const fromRegister = searchParams.get('from') === 'register';
   const fromEmailConfirmed = searchParams.get('from') === 'email_confirmed';
   const conversion = searchParams.get('conversion');
+  const authError = searchParams.get('auth_error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,7 +96,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [rarePreviewItems, setRarePreviewItems] = useState<RarePreviewItem[]>([]);
 
-  const supabase = createBrowserClient();
+  const supabase = useMemo(() => createBrowserClient(), []);
   const {
     trackLoginStart,
     trackLoginSuccess,
@@ -99,6 +110,14 @@ function LoginForm() {
   useEffect(() => {
     document.title = 'ログイン - ポケふた訪問記録';
   }, []);
+
+  useEffect(() => {
+    const authErrorMessage = getAuthErrorMessage(authError);
+    if (!authError || !authErrorMessage) return;
+
+    setError(authErrorMessage);
+    trackAuthError(authError, authErrorMessage);
+  }, [authError, trackAuthError]);
 
   useEffect(() => {
     if (!fromEmailConfirmed || conversion !== 'signup_email_confirmed') return;
