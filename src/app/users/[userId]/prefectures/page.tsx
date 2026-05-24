@@ -154,7 +154,7 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
                 公開訪問 {selectedProgress.visited} / {selectedProgress.total}
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
               {selectedProgress.manholes.map((manhole) => (
                 <PrefectureManholeCard key={manhole.id} manhole={manhole} />
               ))}
@@ -188,24 +188,24 @@ function PrefectureManholeCard({ manhole }: { manhole: PublicPrefectureManhole }
   return (
     <Link
       href={`/manhole/${manhole.id}`}
-      className={`relative flex aspect-[4/5] flex-col justify-between rounded-lg border-2 p-3 shadow-sm transition-transform hover:-translate-y-0.5 ${
+      className={`relative flex aspect-[4/5] flex-col justify-between rounded-md border-2 p-1.5 shadow-sm transition-transform hover:-translate-y-0.5 ${
         manhole.visited
           ? 'border-[#B5483C]/45 bg-[#FFF7E5]'
           : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]/75'
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className={`rounded-full px-2 py-1 font-pixelJp text-[10px] font-bold ${
+        <span className={`rounded-full px-1 py-0.5 font-pixelJp text-[8px] font-bold leading-none ${
           manhole.visited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
         }`}>
-          {manhole.visited ? '済' : '未訪問'}
+          {manhole.visited ? '済' : '未'}
         </span>
-        {photoUrl && <Camera className="h-4 w-4 text-[#B5483C]" />}
+        {photoUrl && <Camera className="h-3 w-3 text-[#B5483C]" />}
       </div>
 
       <div className="flex flex-1 items-center justify-center">
         {manhole.visited ? (
-          <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
+          <div className="relative aspect-square w-3/4 overflow-hidden rounded-full border-[3px] border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
             {photoUrl ? (
               <img
                 src={photoUrl}
@@ -215,27 +215,26 @@ function PrefectureManholeCard({ manhole }: { manhole: PublicPrefectureManhole }
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]">
-                <CircleDot className="h-8 w-8 text-[#4F3828]/70" />
+                <CircleDot className="h-4 w-4 text-[#4F3828]/70" />
               </div>
             )}
           </div>
         ) : (
-          <div className="flex h-20 w-20 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-center text-[#A39580]">
+          <div className="flex aspect-square w-3/4 rotate-[-8deg] items-center justify-center rounded-full border-[3px] border-[#B8AB96] text-center text-[#A39580]">
             <div>
-              <Stamp className="mx-auto h-6 w-6" />
-              <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
+              <Stamp className="mx-auto h-4 w-4" />
+              <p className="font-pixel text-[7px] leading-none">NEXT</p>
             </div>
           </div>
         )}
       </div>
 
       <div>
-        <p className="line-clamp-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+        <p className="truncate font-pixelJp text-[9px] font-bold leading-tight text-[#4F3828]">
           {manhole.municipality || manhole.prefecture}
         </p>
-        <p className="mt-1 truncate font-pixelJp text-[11px] text-[#6A4D36]">{manhole.title}</p>
         {pokemonLabel && (
-          <p className="mt-1 truncate font-pixelJp text-[10px] text-[#B5483C]">{pokemonLabel}</p>
+          <p className="truncate font-pixelJp text-[8px] text-[#B5483C]">{pokemonLabel}</p>
         )}
       </div>
     </Link>
