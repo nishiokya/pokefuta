@@ -1,4 +1,6 @@
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import type { Database } from '@/types/database';
 
 export type PublicPrefectureProgress = {
   name: string;
@@ -34,15 +36,43 @@ type VisitProgressRow = {
   }> | null;
 };
 
+type AppUserProgressRow = {
+  display_name: string | null;
+};
+
 const FALLBACK_DISPLAY_NAME = 'トレーナー';
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
 
+function createPublicReadClient(): SupabaseClient<Database> | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) return null;
+
+  return createClient<Database>(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+function getProgressClient(): SupabaseClient<Database> | null {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const hasUsableServiceRoleKey =
+    serviceRoleKey.length > 100 && !serviceRoleKey.toLowerCase().includes('placeholder');
+
+  return hasUsableServiceRoleKey ? supabaseAdmin : createPublicReadClient();
+}
+
 export async function loadPublicUserPrefectureProgress(
   userId: string
 ): Promise<PublicUserPrefectureProgress | null> {
-  if (!supabaseAdmin) {
-    throw new Error('Supabase admin client is not configured');
+  const supabase = getProgressClient();
+
+  if (!supabase) {
+    throw new Error('Supabase client is not configured');
   }
 
   const trimmedUserId = userId.trim();
@@ -50,12 +80,12 @@ export async function loadPublicUserPrefectureProgress(
 
   const [{ data: appUser, error: appUserError }, { data: manholes, error: manholesError }] =
     await Promise.all([
-      supabaseAdmin
+      supabase
         .from('app_user')
         .select('auth_uid, display_name')
         .eq('auth_uid', trimmedUserId)
         .maybeSingle(),
-      supabaseAdmin
+      supabase
         .from('manhole')
         .select('id, prefecture')
         .order('prefecture', { ascending: true }),
@@ -68,6 +98,8 @@ export async function loadPublicUserPrefectureProgress(
   if (!appUser) {
     return null;
   }
+
+  const appUserRow = appUser as unknown as AppUserProgressRow;
 
   if (manholesError) {
     throw new Error(manholesError.message);
@@ -83,7 +115,7 @@ export async function loadPublicUserPrefectureProgress(
     totalIdsByPrefecture.set(prefecture, ids);
   });
 
-  const { data: visits, error: visitsError } = await supabaseAdmin
+  const { data: visits, error: visitsError } = await supabase
     .from('visit')
     .select(`
       manhole_id,
@@ -146,7 +178,7 @@ export async function loadPublicUserPrefectureProgress(
 
   return {
     userId: trimmedUserId,
-    displayName: appUser.display_name || FALLBACK_DISPLAY_NAME,
+    displayName: appUserRow.display_name || FALLBACK_DISPLAY_NAME,
     prefectures,
     completedPrefectureCount,
     totalPrefectureCount: prefectures.filter((prefecture) => prefecture.total > 0).length,
