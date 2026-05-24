@@ -188,13 +188,18 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
-        setCurrentUserId(session?.user?.id ?? null);
         trackCollectionOpen({ is_logged_in: loggedIn });
-        if (loggedIn) {
+        if (loggedIn && session?.user?.id) {
           setUserName(getDisplayName(session));
           updateUserProperties({ registered_user: true });
           setLoading(false);
           loadJourney();
+          const { data: appUser } = await supabase
+            .from('app_user')
+            .select('id')
+            .eq('auth_uid', session.user.id)
+            .maybeSingle();
+          setCurrentUserId(appUser?.id ?? null);
         }
       } catch (error) {
         console.error('Session check error:', error);

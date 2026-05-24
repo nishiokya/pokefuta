@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
@@ -57,6 +58,7 @@ type VisitProgressRow = {
 };
 
 type AppUserProgressRow = {
+  auth_uid: string;
   display_name: string | null;
 };
 
@@ -106,7 +108,7 @@ export async function loadPublicUserPrefectureProgress(
       supabase
         .from('app_user')
         .select('auth_uid, display_name')
-        .eq('auth_uid', trimmedUserId)
+        .eq('id', trimmedUserId)
         .maybeSingle(),
       supabase
         .from('manhole')
@@ -154,12 +156,16 @@ export async function loadPublicUserPrefectureProgress(
         created_at
       )
     `)
-    .eq('user_id', trimmedUserId)
+    .eq('user_id', appUserRow.auth_uid)
     .eq('is_public', true)
     .not('manhole_id', 'is', null);
 
   if (visitsError) {
     throw new Error(visitsError.message);
+  }
+
+  if (!visits || visits.length === 0) {
+    return null;
   }
 
   const visitedIdsByPrefecture = new Map<string, Set<number>>();
