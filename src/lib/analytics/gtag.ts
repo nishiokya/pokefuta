@@ -179,6 +179,7 @@ export const pokefutaEvents = {
   loginSuccess:        (p?: PokefutaEventParams) => trackEvent('p_login_success', p),
   signupStart:         (p?: PokefutaEventParams) => trackEvent('p_signup_start', p),
   signupComplete:      (p?: PokefutaEventParams) => trackEvent('p_signup_complete', p),
+  signupEmailConfirmed:(p?: PokefutaEventParams) => trackEvent('p_signup_email_confirmed', p),
   logout:              (p?: PokefutaEventParams) => trackEvent('p_logout', p),
 
   // --- 訪問記録系 ---

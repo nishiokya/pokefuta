@@ -75,6 +75,8 @@ function LoginForm() {
   const redirectTo = getSafeRedirectPath(searchParams.get('redirect'));
   const hasRedirect = redirectTo !== '/';
   const fromRegister = searchParams.get('from') === 'register';
+  const fromEmailConfirmed = searchParams.get('from') === 'email_confirmed';
+  const conversion = searchParams.get('conversion');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,12 +86,65 @@ function LoginForm() {
   const [rarePreviewItems, setRarePreviewItems] = useState<RarePreviewItem[]>([]);
 
   const supabase = createBrowserClient();
-  const { trackLoginStart, trackLoginSuccess, setUser, trackAuthError, updateUserProperties } = useAnalytics();
+  const {
+    trackLoginStart,
+    trackLoginSuccess,
+    trackSignupEmailConfirmed,
+    setUser,
+    trackAuthError,
+    updateUserProperties,
+  } = useAnalytics();
 
   // ページタイトル設定
   useEffect(() => {
     document.title = 'ログイン - ポケふた訪問記録';
   }, []);
+
+  useEffect(() => {
+    if (!fromEmailConfirmed || conversion !== 'signup_email_confirmed') return;
+
+    let isMounted = true;
+
+    const completeEmailConfirmation = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted || !session?.user?.id) return;
+
+      const storageKey = `pokefuta:signup_email_confirmed:${session.user.id}`;
+      if (sessionStorage.getItem(storageKey) !== 'true') {
+        setUser(session.user.id);
+        trackSignupEmailConfirmed({
+          conversion_type: 'signup_email_confirmed',
+          redirect_target: redirectTo,
+          auth_flow: 'email_confirmation',
+        });
+        updateUserProperties({ registered_user: true });
+        sessionStorage.setItem(storageKey, 'true');
+      }
+
+      router.replace(redirectTo);
+      router.refresh();
+    };
+
+    completeEmailConfirmation().catch((err) => {
+      console.error('メール確認後のログイン状態確認に失敗:', err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    conversion,
+    fromEmailConfirmed,
+    redirectTo,
+    router,
+    setUser,
+    supabase,
+    trackSignupEmailConfirmed,
+    updateUserProperties,
+  ]);
 
   useEffect(() => {
     let isMounted = true;

@@ -9,6 +9,47 @@ import TermsOfService from '@/components/TermsOfService';
 import BottomNav from '@/components/BottomNav';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
+const SIGNUP_CONFIRMATION_REDIRECT_PATH = '/upload';
+const SIGNUP_CONFIRMATION_CONVERSION = 'signup_email_confirmed';
+const PRODUCTION_APP_URL = 'https://pokefuta.com';
+
+function normalizeBaseUrl(value: string) {
+  const urlWithProtocol = value.startsWith('http') ? value : `https://${value}`;
+  return urlWithProtocol.replace(/\/$/, '');
+}
+
+function isLocalBaseUrl(value: string) {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function getAppBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const normalizedConfiguredUrl = configuredUrl ? normalizeBaseUrl(configuredUrl) : null;
+
+  if (typeof window !== 'undefined') {
+    const currentOrigin = normalizeBaseUrl(window.location.origin);
+    if (isLocalBaseUrl(currentOrigin)) return currentOrigin;
+    if (normalizedConfiguredUrl && !isLocalBaseUrl(normalizedConfiguredUrl)) return normalizedConfiguredUrl;
+    return PRODUCTION_APP_URL;
+  }
+
+  if (normalizedConfiguredUrl && !isLocalBaseUrl(normalizedConfiguredUrl)) return normalizedConfiguredUrl;
+  return PRODUCTION_APP_URL;
+}
+
+function getSignupEmailRedirectUrl() {
+  const callbackUrl = new URL('/auth/callback', getAppBaseUrl());
+  callbackUrl.searchParams.set('next', SIGNUP_CONFIRMATION_REDIRECT_PATH);
+  callbackUrl.searchParams.set('conversion', SIGNUP_CONFIRMATION_CONVERSION);
+
+  return callbackUrl.toString();
+}
+
 export default function SignUpPage() {
   const router = useRouter();
 
@@ -46,6 +87,7 @@ export default function SignUpPage() {
         email,
         password,
         options: {
+          emailRedirectTo: getSignupEmailRedirectUrl(),
           data: {
             display_name: displayName || email.split('@')[0],
           },
