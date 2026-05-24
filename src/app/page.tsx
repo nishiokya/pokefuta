@@ -194,12 +194,9 @@ export default function HomePage() {
           updateUserProperties({ registered_user: true });
           setLoading(false);
           loadJourney();
-          const { data: appUser } = await supabase
-            .from('app_user')
-            .select('id')
-            .eq('auth_uid', session.user.id)
-            .maybeSingle();
-          setCurrentUserId(appUser?.id ?? null);
+          const { data: myAppUserId } = await supabase
+            .rpc('get_my_app_user_id' as never);
+          setCurrentUserId((myAppUserId as string | null) ?? null);
         }
       } catch (error) {
         console.error('Session check error:', error);
