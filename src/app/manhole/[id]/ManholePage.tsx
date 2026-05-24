@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2, Copy, MessageCircle, Building2, Sparkles } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2, MessageCircle, Building2, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -392,9 +392,10 @@ export default function ManholeDetailPage() {
     const shareablePhoto = photos.find(
       (photo) => currentUserId && photo.visit?.user_id === currentUserId && photo.visit?.is_public === true
     );
+    const pokemons = manhole.pokemons ?? [];
     const shareText = shareablePhoto
-      ? photoShareText(`${manhole.prefecture}${municipality}`, titleHashtags)
-      : manholeShareText(`${manhole.prefecture}${municipality}`);
+      ? photoShareText(`${manhole.prefecture}${municipality}`, titleHashtags, pokemons)
+      : manholeShareText(`${manhole.prefecture}${municipality}`, pokemons);
     const shareUrl = shareablePhoto
       ? `${SITE_URL}/p/${shareablePhoto.id}`
       : `${SITE_URL}/manhole/${manhole.id}`;
@@ -441,18 +442,6 @@ export default function ManholeDetailPage() {
     window.open(buildLineShareUrl(payload.shareUrl), '_blank', 'noopener,noreferrer');
   };
 
-  const handleCopyShareUrl = async () => {
-    const payload = buildSharePayload();
-    if (!payload) return;
-    try {
-      await navigator.clipboard.writeText(payload.shareUrl);
-      trackShareClick(payload.trackParams);
-      trackCopyLink(payload.trackParams);
-      alert('リンクをコピーしました');
-    } catch {
-      alert('コピーに失敗しました');
-    }
-  };
 
   if (loading) {
     return (
@@ -762,11 +751,11 @@ export default function ManholeDetailPage() {
                   LINE
                 </button>
                 <button
-                  onClick={handleCopyShareUrl}
+                  onClick={handleShare}
                   className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#7B63A8]/25 bg-white px-3 py-2 text-xs font-extrabold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
                 >
-                  <Copy className="h-4 w-4" />
-                  コピー
+                  <Share2 className="h-4 w-4" />
+                  通常の共有
                 </button>
               </div>
             </div>

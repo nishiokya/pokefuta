@@ -134,7 +134,7 @@ export default function VisitsPage() {
   }, []);
 
   const handleShare = async () => {
-    const shareText = visitsShareText();
+    const shareText = visitsShareText(visitedManholesCount);
     const shareUrl = 'https://pokefuta.com/visits';
     trackShareClick();
     try {

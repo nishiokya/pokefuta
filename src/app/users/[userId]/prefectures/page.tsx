@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, CheckCircle2, CircleDot, Compass, Stamp, Trophy } fr
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PrefectureProgressShareButton from '@/components/users/PrefectureProgressShareButton';
+import PrefectureCardShareButton from '@/components/users/PrefectureCardShareButton';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import {
   PublicPrefectureManhole,
@@ -107,7 +108,6 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
                 </p>
               </div>
               <PrefectureProgressShareButton
-                displayName={progress.displayName}
                 completedPrefectureCount={progress.completedPrefectureCount}
                 totalPrefectureCount={progress.totalPrefectureCount}
                 shareUrl={shareUrl}
@@ -164,12 +164,20 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {progress.prefectures.map((prefecture) => (
-            <PrefectureProgressCard
-              key={prefecture.name}
-              prefecture={prefecture}
-              highlighted={prefecture.name === selectedPrefecture}
-              userId={progress.userId}
-            />
+            <div key={prefecture.name} className="relative">
+              <PrefectureProgressCard
+                prefecture={prefecture}
+                highlighted={prefecture.name === selectedPrefecture}
+                userId={progress.userId}
+              />
+              <PrefectureCardShareButton
+                prefectureName={prefecture.name}
+                visited={prefecture.visited}
+                total={prefecture.total}
+                complete={prefecture.complete}
+                shareUrl={`${SITE_URL}/users/${encodeURIComponent(progress.userId)}/prefectures?prefecture=${encodeURIComponent(prefecture.name)}`}
+              />
+            </div>
           ))}
         </section>
       </main>
@@ -302,7 +310,7 @@ function PrefectureProgressCard({
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] font-bold text-[#6A4D36]">
+      <div className="mt-3 flex items-center justify-between gap-2 pr-9 text-[11px] font-bold text-[#6A4D36]">
         <span className="inline-flex items-center gap-1">
           <CircleDot className="h-3.5 w-3.5" />
           公開訪問ベース
