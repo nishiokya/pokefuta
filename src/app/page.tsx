@@ -373,7 +373,7 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上` : '集計中';
+  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上掲載` : '掲載数を集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -814,67 +814,66 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-8 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-12">
-                  <div className="absolute right-6 top-7 hidden w-[300px] rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block xl:w-[360px]">
-                    <img
-                      src="/pokefuta_photo_gallery_mockup.svg"
-                      alt=""
-                      className="h-[220px] w-full rounded-[6px] object-cover object-left-top xl:h-[250px]"
-                    />
-                  </div>
-                  <div className="relative max-w-3xl lg:max-w-[680px]">
-                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      ポケふた旅日記
+                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
+                    <div className="relative max-w-3xl">
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        ポケふた旅日記
+                      </div>
+                      <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                        全国に広がるポケふた。
+                      </h1>
+                      <div className="mt-4 max-w-2xl space-y-3 text-base font-medium leading-relaxed sm:text-lg">
+                        <p>
+                          海沿いの町、温泉地、離島、雪国の駅前。
+                          旅先でしか出会えない
+                          <span className="font-extrabold text-[#7B63A8]"> "レアなポケふた"</span> がたくさんあります。
+                        </p>
+                        <p>
+                          地図を片手に探し回ったり、偶然見つけたり。
+                          その土地の景色と一緒に、ポケふたを記録してみませんか？
+                        </p>
+                      </div>
+
+                      <p className="mt-4 text-xs font-bold text-[#9B9B9B]">全国387自治体 · {listedCountLabel}</p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          href="/nearby?tab=all"
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                        >
+                          <Compass className="h-4 w-4" />
+                          ポケふたを地図で探す
+                        </Link>
+                        <Link
+                          href="/nearby"
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          近くのポケふたを見る
+                        </Link>
+                        <Link
+                          href={uploadHref}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                        >
+                          <Camera className="h-4 w-4" />
+                          旅の記録を残す
+                        </Link>
+                      </div>
                     </div>
-                    <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                      全国に広がるポケふた。
-                    </h1>
-                    <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                      海沿いの町、<br />
-                      温泉地、<br />
-                      離島、<br />
-                      雪国の駅前。<br />
-                      <br />
-                      旅先でしか出会えない<br />
-                      <span className="font-extrabold text-[#7B63A8]">"レアなポケふた"</span> がたくさんあります。<br />
-                      <br />
-                      地図を片手に探し回ったり、<br />
-                      偶然見つけたり。<br />
-                      <br />
-                      その土地の景色と一緒に、<br />
-                      ポケふたを記録してみませんか？
-                    </p>
 
-                    <p className="mt-5 text-xs font-bold text-[#9B9B9B]">全国387自治体 · {listedCountLabel}枚以上掲載</p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Link
-                        href="/nearby?tab=all"
-                        className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                      >
-                        <Compass className="h-4 w-4" />
-                        ポケふたを地図で探す
-                      </Link>
-                      <Link
-                        href="/nearby"
-                        className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
-                      >
-                        <MapPin className="h-4 w-4" />
-                        近くのポケふたを見る
-                      </Link>
-                      <Link
-                        href={uploadHref}
-                        className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
-                      >
-                        <Camera className="h-4 w-4" />
-                        旅の記録を残す
-                      </Link>
+                    <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
+                      <img
+                        src="/pokefuta_photo_gallery_mockup.svg"
+                        alt=""
+                        className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
+                      />
                     </div>
                   </div>
                 </section>
 
-                <section className="mt-6">
+                <section className="mt-4 sm:mt-5">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
                     <div role="tablist" className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
                       {galleryTabs.map((tab) => {
