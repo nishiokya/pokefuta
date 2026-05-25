@@ -298,7 +298,7 @@ export default function HomePage() {
       setRareManholes(manholes);
       setRareLoaded(true);
     } catch {
-      // ignore
+      setRareLoaded(true);
     } finally {
       setRareLoading(false);
     }
@@ -854,7 +854,7 @@ export default function HomePage() {
                         className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                       >
                         <Compass className="h-4 w-4" />
-                        レアなポケふたを探す
+                        ポケふたを地図で探す
                       </Link>
                       <Link
                         href="/nearby"
@@ -876,12 +876,14 @@ export default function HomePage() {
 
                 <section className="mt-6">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
-                    <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
+                    <div role="tablist" className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
                       {galleryTabs.map((tab) => {
                         const isActive = galleryTab === tab.key;
                         return (
                           <button
                             key={tab.key}
+                            role="tab"
+                            aria-selected={isActive}
                             type="button"
                             onClick={() => selectGalleryTab(tab.key)}
                             className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
@@ -911,7 +913,7 @@ export default function HomePage() {
                     ) : (
                       <>
                         <p className="mb-3 text-xs font-bold text-[#6B6B6B]">
-                          まだ写真が少ないポケふた（{rareManholes.length}件）
+                          まだ誰も記録していないポケふた（{rareManholes.length}件）
                         </p>
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                           {rareManholes.map((manhole) => (
@@ -1365,7 +1367,7 @@ function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
           ✨ レアなポケふた
         </span>
         <span className="rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-[#6B6B6B]">
-          📷 まだ写真なし
+          🗺️ 未踏の地
         </span>
       </div>
 
