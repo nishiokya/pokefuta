@@ -831,11 +831,16 @@ export default function HomePage() {
                       全国に広がるポケふた。
                     </h1>
                     <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                      でも、まだ写真が少ない<br />
-                      <span className="font-extrabold text-[#7B63A8]">"レアなポケふた"</span> もたくさんあります。<br />
+                      海沿いの町、<br />
+                      温泉地、<br />
+                      離島、<br />
+                      雪国の駅前。<br />
                       <br />
-                      旅先で偶然見つけたり、<br />
-                      地図を片手に探し回ったり。<br />
+                      旅先でしか出会えない<br />
+                      <span className="font-extrabold text-[#7B63A8]">"レアなポケふた"</span> がたくさんあります。<br />
+                      <br />
+                      地図を片手に探し回ったり、<br />
+                      偶然見つけたり。<br />
                       <br />
                       その土地の景色と一緒に、<br />
                       ポケふたを記録してみませんか？
