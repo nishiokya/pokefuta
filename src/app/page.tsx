@@ -285,7 +285,7 @@ export default function HomePage() {
     if (rareLoaded || rareLoading) return;
     setRareLoading(true);
     try {
-      const response = await fetch('/api/manholes?no_photos=true&limit=96', { credentials: 'omit' });
+      const response = await fetch('/api/manholes?no_photos=true&limit=500', { credentials: 'omit' });
       if (!response.ok) throw new Error('Failed to load rare manholes');
       const data = await response.json();
       const manholes: JourneyManhole[] = Array.isArray(data.manholes)
