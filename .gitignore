@@ -2,6 +2,7 @@
 manhole_images/*
 *.raw.ndjson
 *.log
+manhole_update.sql
 __pycache__/
 *.pyc
 *.pyo
@@ -31,6 +32,7 @@ public/workbox-*.js.map
 public/worker-*.js.map
 
 .claude/*
+!.claude/commands/
 
 database/mirgrations/*
 
