@@ -10,9 +10,7 @@ import {
   ChevronRight,
   CircleDot,
   Compass,
-  Heart,
   MapPin,
-  MessageCircle,
   Sparkles,
   Stamp,
 } from 'lucide-react';
@@ -27,7 +25,7 @@ import { calculateDistance, isValidCoordinates } from '@/lib/location';
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -39,7 +37,6 @@ type FeedVisit = {
   comments_count: number;
 };
 
-type GalleryTab = 'latest';
 type JourneyTab = 'history' | 'unvisited';
 
 type JourneyVisit = {
@@ -74,11 +71,6 @@ type PrefectureProgress = {
 type PrefectureCandidate = PrefectureProgress & {
   label: '制覇済み' | '制覇目前' | '旅の続き' | '近くで行けそう';
 };
-
-const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobileLabel: string }> = [
-  { key: 'latest', label: '最新', mobileLabel: '最新' },
-  { key: 'prefectures', label: 'ポケふたを探す', mobileLabel: '探す' },
-];
 
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
   { key: 'history', label: '訪問履歴' },
@@ -163,7 +155,6 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
   const [journeyTab, setJourneyTab] = useState<JourneyTab>('history');
   const feedPerPage = 24;
   const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
@@ -234,7 +225,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at`,
+        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&include_manhole_tags=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -785,13 +776,15 @@ export default function HomePage() {
                   <div className="relative max-w-3xl lg:max-w-[680px]">
                     <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
                       <Sparkles className="h-3.5 w-3.5" />
-                      旅行スタンプ帳
+                      ポケふた収集帳
                     </div>
                     <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                      旅先で見つけたポケふたを記録しよう
+                      全国387自治体に広がるポケふた
                     </h1>
                     <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                      旅行やお出かけで出会ったポケふた写真をみんなでシェアしよう！
+                      でも、まだ写真が少ない「レアなポケふた」もたくさんあります。<br />
+                      旅先で偶然見つけたり、地図を片手に探し回ったり。<br />
+                      その土地の景色と一緒に、記録してみませんか。
                     </p>
 
                     <div className="mt-7 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
@@ -814,43 +807,29 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                </section>
 
-                <section className="mt-6">
-                  <div className="-mx-4 overflow-x-auto px-4 pb-1">
-                    <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
-                      {galleryTabs.map((tab) => {
-                        if (tab.key === 'prefectures') {
-                          return (
-                            <Link
-                              key={tab.key}
-                              href="/nearby?tab=all"
-                              className="flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] px-5 text-sm font-bold text-[#2A2A2A] transition hover:bg-white"
-                            >
-                              <span className="hidden sm:inline">{tab.label}</span>
-                              <span className="sm:hidden">{tab.mobileLabel}</span>
-                              <MapPin className="h-4 w-4" />
-                            </Link>
-                          );
-                        }
-
-                        const isActive = activeTab === tab.key;
-                        return (
-                          <button
-                            key={tab.key}
-                            type="button"
-                            onClick={() => setActiveTab(tab.key as GalleryTab)}
-                            className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
-                              isActive
-                                ? 'bg-[#7B63A8] text-white shadow-sm'
-                                : 'text-[#2A2A2A] hover:bg-white'
-                            }`}
-                          >
-                            {tab.label}
-                          </button>
-                        );
-                      })}
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link
+                        href="/nearby?tab=all"
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                      >
+                        <Compass className="h-4 w-4" />
+                        レアなポケふたを探す
+                      </Link>
+                      <Link
+                        href="/nearby"
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        地図で近くを見る
+                      </Link>
+                      <Link
+                        href={uploadHref}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                      >
+                        <Camera className="h-4 w-4" />
+                        旅の写真を投稿する
+                      </Link>
                     </div>
                   </div>
                 </section>
@@ -881,7 +860,7 @@ export default function HomePage() {
                         const canNavigate = Boolean(manholeId);
                         const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                        const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、いいね ${visit.likes_count}、コメント ${visit.comments_count}`;
+                        const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}`;
                         const cardContent = (
                           <>
                             {photo?.thumbnail_url ? (
@@ -907,16 +886,18 @@ export default function HomePage() {
                                 {locationLabel || 'ポケふた'}
                               </div>
                               <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
-                              <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
-                                <span className="inline-flex items-center gap-1">
-                                  <Heart className="h-4 w-4" />
-                                  {visit.likes_count}
-                                </span>
-                                <span className="inline-flex items-center gap-1">
-                                  <MessageCircle className="h-4 w-4" />
-                                  {visit.comments_count}
-                                </span>
-                              </div>
+                              {(() => {
+                                const tags = getManholeTags(visit.manhole, 2);
+                                return tags.length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {tags.map((tag) => (
+                                      <span key={tag} className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold backdrop-blur-sm">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </>
                         );
