@@ -56,9 +56,8 @@ export default function ShareButtons({
         showCopyToast(true);
       }
     } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Share failed:', error);
-      }
+      if (error instanceof Error && error.name === 'AbortError') return;
+      showCopyToast(false);
     }
   };
 
