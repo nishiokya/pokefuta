@@ -1,10 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Share2 } from 'lucide-react';
-import { SITE_NAME } from '@/lib/constants';
-import { openSharePanel, prefectureProgressShareText } from '@/lib/share';
-import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import ShareButtons from '@/components/ShareButtons';
+import { prefectureProgressShareText } from '@/lib/share';
 
 type PrefectureProgressShareButtonProps = {
   completedPrefectureCount: number;
@@ -17,54 +14,12 @@ export default function PrefectureProgressShareButton({
   totalPrefectureCount,
   shareUrl,
 }: PrefectureProgressShareButtonProps) {
-  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
-  const { trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
-
-  useEffect(() => {
-    return () => {
-      sharePanelCleanupRef.current?.();
-    };
-  }, []);
-
-  const handleShare = async () => {
-    const shareText = prefectureProgressShareText(
-      completedPrefectureCount,
-      totalPrefectureCount
-    );
-
-    trackShareClick();
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: SITE_NAME,
-          text: shareText,
-          url: shareUrl,
-        });
-        return;
-      }
-
-      sharePanelCleanupRef.current?.();
-      sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
-        onShareX: () => trackShareX(),
-        onShareLine: () => trackShareLine(),
-        onCopyLink: () => trackCopyLink(),
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Prefecture progress share failed:', error);
-      }
-    }
-  };
+  const shareText = prefectureProgressShareText(completedPrefectureCount, totalPrefectureCount);
 
   return (
-    <button
-      type="button"
-      onClick={handleShare}
-      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] bg-[#B5483C] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_14px_rgba(181,72,60,0.22)] transition hover:bg-[#9F3D33] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
-    >
-      <Share2 className="h-4 w-4" />
-      達成状況を共有
-    </button>
+    <div>
+      <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">達成状況を共有する</p>
+      <ShareButtons shareText={shareText} shareUrl={shareUrl} />
+    </div>
   );
 }

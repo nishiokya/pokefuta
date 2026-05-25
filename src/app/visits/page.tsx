@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Bookmark,
@@ -12,7 +12,6 @@ import {
   MapPin,
   Navigation,
   PlusCircle,
-  Share2,
   Sparkles,
   Stamp,
   Trash2,
@@ -23,10 +22,10 @@ import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import ShareButtons from '@/components/ShareButtons';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { openSharePanel, visitsShareText } from '@/lib/share';
-import { SITE_NAME } from '@/lib/constants';
+import { visitsShareText } from '@/lib/share';
 
 interface Visit {
   id: string;
@@ -106,9 +105,7 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const { trackView, trackPassportOpen, trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
-  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => { return () => { sharePanelCleanupRef.current?.(); }; }, []);
+  const { trackView, trackPassportOpen } = useAnalytics();
 
   const selectPassportTab = (tab: PassportTab) => {
     setActiveTab(tab);
@@ -132,28 +129,6 @@ export default function VisitsPage() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  const handleShare = async () => {
-    const shareText = visitsShareText(visitedManholesCount);
-    const shareUrl = 'https://pokefuta.com/visits';
-    trackShareClick();
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: SITE_NAME, text: shareText, url: shareUrl });
-      } else {
-        sharePanelCleanupRef.current?.();
-        sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
-          onShareX: () => trackShareX(),
-          onShareLine: () => trackShareLine(),
-          onCopyLink: () => trackCopyLink(),
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Share failed:', error);
-      }
-    }
-  };
 
   const checkAuth = async () => {
     try {
@@ -683,13 +658,6 @@ export default function VisitsPage() {
                   </h1>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={handleShare}
-                    className="rounded-lg border border-[#8C6A4A]/30 bg-[#F6EEDC] p-2 text-[#6A4D36] transition-colors hover:bg-[#EDD9BC]"
-                    aria-label="スタンプ帳を共有"
-                  >
-                    <Share2 size={18} />
-                  </button>
                   <div className="rounded-lg border border-[#B65A4B]/30 bg-[#F8D9C4] px-3 py-2 text-center">
                     <p className="font-pixel text-2xl leading-none text-[#B5483C]">{visitedManholesCount}</p>
                     <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">STAMPS</p>
@@ -737,6 +705,14 @@ export default function VisitsPage() {
                   )}
                 </div>
               )}
+
+              <div className="mt-4">
+                <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">スタンプ帳を共有する</p>
+                <ShareButtons
+                  shareText={visitsShareText(visitedManholesCount)}
+                  shareUrl="https://pokefuta.com/visits"
+                />
+              </div>
             </div>
           </section>
 

@@ -1,21 +1,22 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Share2, MessageCircle, Building2, Sparkles } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Building2, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import ShareButtons from '@/components/ShareButtons';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { buildLineShareUrl, buildXShareUrl, manholeShareText, photoShareText } from '@/lib/share';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import { manholeShareText, photoShareText } from '@/lib/share';
+import { SITE_URL } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
@@ -110,10 +111,6 @@ export default function ManholeDetailPage() {
     trackManholeDetailOpen,
     trackRouteOpen,
     trackVisitDelete,
-    trackShareClick,
-    trackShareX,
-    trackShareLine,
-    trackCopyLink,
   } = useAnalytics();
 
   useEffect(() => {
@@ -383,11 +380,9 @@ export default function ManholeDetailPage() {
     setSelectedVisitId(null);
   };
 
-  const buildSharePayload = () => {
-    if (!manhole) return;
-
+  const sharePayload = useMemo(() => {
+    if (!manhole) return null;
     const municipality = manhole.city || manhole.municipality || '場所未設定';
-    const shareTitle = `${manhole.prefecture}${municipality}のポケふた`;
     const titleHashtags = getTopTitleHashtags(manhole.titles);
     const shareablePhoto = photos.find(
       (photo) => currentUserId && photo.visit?.user_id === currentUserId && photo.visit?.is_public === true
@@ -399,48 +394,13 @@ export default function ManholeDetailPage() {
     const shareUrl = shareablePhoto
       ? `${SITE_URL}/p/${shareablePhoto.id}`
       : `${SITE_URL}/manhole/${manhole.id}`;
-    const trackParams = { manhole_id: manhole.id, prefecture: manhole.prefecture };
-
-    return { shareTitle, shareText, shareUrl, titleHashtags, trackParams };
-  };
-
-  const handleShare = async () => {
-    const payload = buildSharePayload();
-    if (!payload) return;
-    const { shareTitle, shareText, shareUrl, trackParams } = payload;
-
-    trackShareClick(trackParams);
-
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        trackCopyLink(trackParams);
-        alert('リンクをコピーしました');
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Share failed:', error);
-      }
-    }
-  };
-
-  const handleShareX = () => {
-    const payload = buildSharePayload();
-    if (!payload) return;
-    trackShareClick(payload.trackParams);
-    trackShareX(payload.trackParams);
-    window.open(buildXShareUrl(payload.shareText, payload.shareUrl, payload.titleHashtags), '_blank', 'noopener,noreferrer');
-  };
-
-  const handleShareLine = () => {
-    const payload = buildSharePayload();
-    if (!payload) return;
-    trackShareClick(payload.trackParams);
-    trackShareLine(payload.trackParams);
-    window.open(buildLineShareUrl(payload.shareUrl), '_blank', 'noopener,noreferrer');
-  };
+    return {
+      shareText,
+      shareUrl,
+      hashtags: titleHashtags,
+      analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture },
+    };
+  }, [manhole, photos, currentUserId]);
 
 
   if (loading) {
@@ -674,8 +634,8 @@ export default function ManholeDetailPage() {
 
               {/* Call to Actions */}
               {manhole.is_visited ? (
-                // Visited: Add more photos + Directions + Share
-                <div className="grid grid-cols-3 gap-2">
+                // Visited: Add more photos + Directions
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => router.push(currentUserId ? '/upload' : '/login?redirect=/upload')}
                     className="rpg-button rpg-button-primary flex items-center justify-center gap-1 px-2"
@@ -690,17 +650,10 @@ export default function ManholeDetailPage() {
                     <Navigation className="w-4 h-4" />
                     <span className="font-pixelJp text-xs">経路案内</span>
                   </button>
-                  <button
-                    onClick={handleShare}
-                    className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#8C6A4A]/25 hover:bg-[#8C6A4A]/10"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">共有</span>
-                  </button>
                 </div>
               ) : (
-                // Unvisited: Directions + Record visit/Login CTA + Share
-                <div className="grid grid-cols-3 gap-2">
+                // Unvisited: Directions + Record visit/Login CTA
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={openInMaps}
                     className="rpg-button rpg-button-success flex items-center justify-center gap-1 px-2"
@@ -725,39 +678,20 @@ export default function ManholeDetailPage() {
                       <span className="font-pixelJp text-xs text-[#7B63A8]">旅の続きで記録</span>
                     </button>
                   )}
-                  <button
-                    onClick={handleShare}
-                    className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#8C6A4A]/25 hover:bg-[#8C6A4A]/10"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">共有</span>
-                  </button>
                 </div>
               )}
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <button
-                  onClick={handleShareX}
-                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#2A2A2A]/20 bg-[#2A2A2A] px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-black"
-                >
-                  <span className="font-pixel text-sm">X</span>
-                  で共有
-                </button>
-                <button
-                  onClick={handleShareLine}
-                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#06C755]/30 bg-[#06C755] px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#05B34C]"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  LINE
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#7B63A8]/25 bg-white px-3 py-2 text-xs font-extrabold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
-                >
-                  <Share2 className="h-4 w-4" />
-                  通常の共有
-                </button>
-              </div>
+              {sharePayload && (
+                <div className="mt-3">
+                  <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">このポケふたを共有する</p>
+                  <ShareButtons
+                    shareText={sharePayload.shareText}
+                    shareUrl={sharePayload.shareUrl}
+                    hashtags={sharePayload.hashtags}
+                    analyticsParams={sharePayload.analyticsParams}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

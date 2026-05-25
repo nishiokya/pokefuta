@@ -5,8 +5,9 @@ import { ArrowLeft, Camera, CheckCircle2, CircleDot, Compass, Stamp, Trophy } fr
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PrefectureProgressShareButton from '@/components/users/PrefectureProgressShareButton';
-import PrefectureCardShareButton from '@/components/users/PrefectureCardShareButton';
+import ShareButtons from '@/components/ShareButtons';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
+import { prefectureCardShareText } from '@/lib/share';
 import {
   PublicPrefectureManhole,
   PublicPrefectureProgress,
@@ -98,20 +99,13 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
               <Trophy className="h-3.5 w-3.5" />
               都道府県達成状況
             </div>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
-                  {progress.displayName}のポケふた旅
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
-                  公開中の訪問記録をもとにした、都道府県ごとの達成状況です。
-                </p>
-              </div>
-              <PrefectureProgressShareButton
-                completedPrefectureCount={progress.completedPrefectureCount}
-                totalPrefectureCount={progress.totalPrefectureCount}
-                shareUrl={shareUrl}
-              />
+            <div>
+              <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
+                {progress.displayName}のポケふた旅
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
+                公開中の訪問記録をもとにした、都道府県ごとの達成状況です。
+              </p>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -126,6 +120,12 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
                 style={{ width: `${Math.min(progress.completionRate, 100)}%` }}
               />
             </div>
+
+            <PrefectureProgressShareButton
+              completedPrefectureCount={progress.completedPrefectureCount}
+              totalPrefectureCount={progress.totalPrefectureCount}
+              shareUrl={shareUrl}
+            />
           </div>
         </section>
 
@@ -137,6 +137,18 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
                 <h2 className="mt-1 text-xl font-extrabold text-[#4F3828]">{selectedProgress.name}</h2>
               </div>
               <ProgressPill prefecture={selectedProgress} />
+            </div>
+            <div className="mt-3 border-t border-[#DDA63A]/20 pt-3">
+              <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">この達成状況を共有する</p>
+              <ShareButtons
+                shareText={prefectureCardShareText(
+                  selectedProgress.name,
+                  selectedProgress.visited,
+                  selectedProgress.total,
+                  selectedProgress.complete
+                )}
+                shareUrl={shareUrl}
+              />
             </div>
           </section>
         )}
@@ -164,20 +176,12 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
 
         <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {progress.prefectures.map((prefecture) => (
-            <div key={prefecture.name} className="relative">
-              <PrefectureProgressCard
-                prefecture={prefecture}
-                highlighted={prefecture.name === selectedPrefecture}
-                userId={progress.userId}
-              />
-              <PrefectureCardShareButton
-                prefectureName={prefecture.name}
-                visited={prefecture.visited}
-                total={prefecture.total}
-                complete={prefecture.complete}
-                shareUrl={`${SITE_URL}/users/${encodeURIComponent(progress.userId)}/prefectures?prefecture=${encodeURIComponent(prefecture.name)}`}
-              />
-            </div>
+            <PrefectureProgressCard
+              key={prefecture.name}
+              prefecture={prefecture}
+              highlighted={prefecture.name === selectedPrefecture}
+              userId={progress.userId}
+            />
           ))}
         </section>
       </main>

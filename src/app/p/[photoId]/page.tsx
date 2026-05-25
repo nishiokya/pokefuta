@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PhotoShareButtons from './PhotoShareButtons';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
+import { photoShareText } from '@/lib/share';
 import {
   getManholeLocationLabel,
   getSortedTitles,
@@ -70,6 +72,9 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
   const titles = getSortedTitles(photo.manhole.titles);
   const locationLabel = getManholeLocationLabel(photo.manhole);
+  const shareHashtags = titles.slice(0, 2).map((t) => t.hashtag).filter((h): h is string => Boolean(h));
+  const shareText = photoShareText(locationLabel, shareHashtags, photo.manhole.pokemons);
+  const shareUrl = `${SITE_URL}/p/${photo.id}`;
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
@@ -132,6 +137,12 @@ export default async function SharedPhotoPage({ params }: PageProps) {
                 {photo.visit.comment}
               </p>
             )}
+
+            <PhotoShareButtons
+              shareText={shareText}
+              shareUrl={shareUrl}
+              hashtags={shareHashtags}
+            />
 
             <div className="flex flex-wrap gap-3">
               <Link
