@@ -37,7 +37,13 @@ type FeedVisit = {
   comments_count: number;
 };
 
+type GalleryTab = 'latest' | 'rare';
 type JourneyTab = 'history' | 'unvisited';
+
+const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
+  { key: 'latest', label: '最新の写真' },
+  { key: 'rare', label: 'レアなポケふた' },
+];
 
 type JourneyVisit = {
   id: string;
@@ -155,6 +161,10 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  const [galleryTab, setGalleryTab] = useState<GalleryTab>('latest');
+  const [rareManholes, setRareManholes] = useState<JourneyManhole[]>([]);
+  const [rareLoaded, setRareLoaded] = useState(false);
+  const [rareLoading, setRareLoading] = useState(false);
   const [journeyTab, setJourneyTab] = useState<JourneyTab>('history');
   const feedPerPage = 24;
   const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
@@ -258,6 +268,34 @@ export default function HomePage() {
     } catch {
       // ignore
     }
+  };
+
+  const loadRareManholes = async () => {
+    if (rareLoaded || rareLoading) return;
+    setRareLoading(true);
+    try {
+      const response = await fetch('/api/manholes?no_photos=true&limit=96', { credentials: 'omit' });
+      if (!response.ok) throw new Error('Failed to load rare manholes');
+      const data = await response.json();
+      const manholes: JourneyManhole[] = Array.isArray(data.manholes)
+        ? data.manholes.sort((a: JourneyManhole, b: JourneyManhole) =>
+            `${a.prefecture}${a.municipality ?? ''}`.localeCompare(
+              `${b.prefecture}${b.municipality ?? ''}`, 'ja'
+            )
+          )
+        : [];
+      setRareManholes(manholes);
+      setRareLoaded(true);
+    } catch {
+      // ignore
+    } finally {
+      setRareLoading(false);
+    }
+  };
+
+  const selectGalleryTab = (tab: GalleryTab) => {
+    setGalleryTab(tab);
+    if (tab === 'rare') loadRareManholes();
   };
 
   const loadJourney = async () => {
@@ -835,6 +873,55 @@ export default function HomePage() {
                 </section>
 
                 <section className="mt-6">
+                  <div className="-mx-4 overflow-x-auto px-4 pb-1">
+                    <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
+                      {galleryTabs.map((tab) => {
+                        const isActive = galleryTab === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => selectGalleryTab(tab.key)}
+                            className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
+                              isActive
+                                ? 'bg-[#7B63A8] text-white shadow-sm'
+                                : 'text-[#2A2A2A] hover:bg-white'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+
+                {galleryTab === 'rare' && (
+                  <section className="mt-6">
+                    {rareLoading ? (
+                      <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                        <p className="text-sm font-bold text-[#6B6B6B]">読み込み中…</p>
+                      </div>
+                    ) : rareManholes.length === 0 ? (
+                      <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                        <p className="text-sm font-bold text-[#6B6B6B]">レアなポケふたが見つかりませんでした</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mb-3 text-xs font-bold text-[#6B6B6B]">
+                          写真がまだ投稿されていないポケふた（{rareManholes.length}件）
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
+                          {rareManholes.map((manhole) => (
+                            <RareManholeCard key={manhole.id} manhole={manhole} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                )}
+
+                <section className="mt-6" style={{ display: galleryTab === 'latest' ? undefined : 'none' }}>
                   {visibleFeed.length === 0 ? (
                     <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                       <p className="text-sm font-bold text-[#6B6B6B]">
@@ -941,7 +1028,7 @@ export default function HomePage() {
             </div>
 
             {/* Feed Pagination */}
-            {!isLoggedIn && showPagination && (
+            {!isLoggedIn && galleryTab === 'latest' && showPagination && (
               <div className="mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm">
                 <div className="flex items-center justify-center gap-3">
                   <button
@@ -1257,6 +1344,46 @@ function JourneyCandidateNotice({ text }: { text: string }) {
     <div className="col-span-full rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-4 py-5 text-sm font-bold text-[#6A4D36] shadow-sm">
       {text}
     </div>
+  );
+}
+
+function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
+  const tags = getManholeTags(manhole, 3);
+
+  return (
+    <Link
+      href={`/manhole/${manhole.id}`}
+      className="group relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-[8px] border-2 border-dashed border-[#7B63A8]/30 bg-[#F5F0FF] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
+    >
+      <div className="absolute inset-0 opacity-[0.05] [background-image:linear-gradient(90deg,#7B63A8_1px,transparent_1px),linear-gradient(#7B63A8_1px,transparent_1px)] [background-size:16px_16px]" />
+      <div className="relative flex items-center justify-between gap-2">
+        <span className="rounded-full bg-[#7B63A8]/15 px-2 py-1 text-[11px] font-extrabold text-[#7B63A8]">
+          レア
+        </span>
+        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-[#B5483C]">
+          📷 未撮影
+        </span>
+      </div>
+
+      <div className="relative flex flex-1 items-center justify-center py-3">
+        <div className="flex h-16 w-16 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#7B63A8]/30 text-[#7B63A8]/60">
+          <MapPin className="h-7 w-7" />
+        </div>
+      </div>
+
+      <div className="relative">
+        <p className="line-clamp-1 text-sm font-extrabold text-[#2A2A2A]">
+          {[manhole.prefecture, manhole.municipality].filter(Boolean).join(' ')}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(tags.length > 0 ? tags : [getManholeTitle(manhole)]).slice(0, 3).map((tag) => (
+            <span key={tag} className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[#7B63A8]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+    </Link>
   );
 }
 

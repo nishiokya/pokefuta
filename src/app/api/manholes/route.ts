@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     const radius = parseFloat(searchParams.get('radius') || '50'); // km, default 50km
     const limit = parseInt(searchParams.get('limit') || '500');
     const visited = searchParams.get('visited'); // 'true', 'false', or null for all
+    const noPhotos = searchParams.get('no_photos') === 'true';
 
     // Validate radius (max 100km for performance)
     if (radius > 100) {
@@ -207,6 +208,7 @@ export async function GET(request: NextRequest) {
             if (visited === 'false') return !manhole.is_visited;
             return true;
           })
+          .filter(manhole => !noPhotos || manhole.photo_count === 0)
           .sort((a, b) => a.distance - b.distance)
           .slice(0, limit);
 
@@ -250,7 +252,8 @@ export async function GET(request: NextRequest) {
           if (visited === 'true') return manhole.is_visited;
           if (visited === 'false') return !manhole.is_visited;
           return true;
-        });
+        })
+        .filter(manhole => !noPhotos || manhole.photo_count === 0);
 
       console.log(`Returning ${manholesWithCoordinates.length} manholes with coordinates`);
       return NextResponse.json({
