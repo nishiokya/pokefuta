@@ -706,13 +706,14 @@ export default function VisitsPage() {
                 </div>
               )}
 
-              <div className="mt-4">
-                <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">スタンプ帳を共有する</p>
+              {visitedManholesCount > 0 && (
                 <ShareButtons
+                  label="スタンプ帳を共有する"
                   shareText={visitsShareText(visitedManholesCount)}
                   shareUrl="https://pokefuta.com/visits"
+                  className="mt-4"
                 />
-              </div>
+              )}
             </div>
           </section>
 

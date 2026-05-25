@@ -9,6 +9,7 @@ import { SITE_NAME } from '@/lib/constants';
 interface ShareButtonsProps {
   shareText: string;
   shareUrl: string;
+  label?: string;
   hashtags?: string[];
   analyticsParams?: PokefutaEventParams;
   className?: string;
@@ -25,6 +26,7 @@ function showCopyToast(success: boolean) {
 export default function ShareButtons({
   shareText,
   shareUrl,
+  label,
   hashtags = [],
   analyticsParams,
   className,
@@ -61,7 +63,9 @@ export default function ShareButtons({
   };
 
   return (
-    <div className={`grid grid-cols-3 gap-2 ${className ?? ''}`}>
+    <div className={className}>
+      {label && <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">{label}</p>}
+      <div className="grid grid-cols-3 gap-2">
       <button
         onClick={handleShareX}
         className="inline-flex items-center justify-center gap-1 rounded-[8px] border border-[#2A2A2A]/20 bg-[#2A2A2A] px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-black"
@@ -83,6 +87,7 @@ export default function ShareButtons({
         <Share2 className="h-4 w-4" />
         共有
       </button>
+      </div>
     </div>
   );
 }

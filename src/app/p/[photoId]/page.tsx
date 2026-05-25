@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
-import PhotoShareButtons from './PhotoShareButtons';
+import ShareButtons from '@/components/ShareButtons';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { photoShareText } from '@/lib/share';
@@ -138,7 +138,8 @@ export default async function SharedPhotoPage({ params }: PageProps) {
               </p>
             )}
 
-            <PhotoShareButtons
+            <ShareButtons
+              label="この写真を共有する"
               shareText={shareText}
               shareUrl={shareUrl}
               hashtags={shareHashtags}

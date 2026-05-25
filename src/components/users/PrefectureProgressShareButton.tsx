@@ -17,9 +17,6 @@ export default function PrefectureProgressShareButton({
   const shareText = prefectureProgressShareText(completedPrefectureCount, totalPrefectureCount);
 
   return (
-    <div>
-      <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">達成状況を共有する</p>
-      <ShareButtons shareText={shareText} shareUrl={shareUrl} />
-    </div>
+    <ShareButtons label="達成状況を共有する" shareText={shareText} shareUrl={shareUrl} />
   );
 }

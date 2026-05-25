@@ -138,18 +138,17 @@ export default async function UserPrefecturesPage({ params, searchParams }: Page
               </div>
               <ProgressPill prefecture={selectedProgress} />
             </div>
-            <div className="mt-3 border-t border-[#DDA63A]/20 pt-3">
-              <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">この達成状況を共有する</p>
-              <ShareButtons
-                shareText={prefectureCardShareText(
-                  selectedProgress.name,
-                  selectedProgress.visited,
-                  selectedProgress.total,
-                  selectedProgress.complete
-                )}
-                shareUrl={shareUrl}
-              />
-            </div>
+            <ShareButtons
+              label="この達成状況を共有する"
+              shareText={prefectureCardShareText(
+                selectedProgress.name,
+                selectedProgress.visited,
+                selectedProgress.total,
+                selectedProgress.complete
+              )}
+              shareUrl={shareUrl}
+              className="mt-3 border-t border-[#DDA63A]/20 pt-3"
+            />
           </section>
         )}
 

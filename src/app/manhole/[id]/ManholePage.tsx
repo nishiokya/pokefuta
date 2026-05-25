@@ -682,15 +682,14 @@ export default function ManholeDetailPage() {
               )}
 
               {sharePayload && (
-                <div className="mt-3">
-                  <p className="font-pixelJp text-[10px] text-[#6A4D36] mb-1.5">このポケふたを共有する</p>
-                  <ShareButtons
-                    shareText={sharePayload.shareText}
-                    shareUrl={sharePayload.shareUrl}
-                    hashtags={sharePayload.hashtags}
-                    analyticsParams={sharePayload.analyticsParams}
-                  />
-                </div>
+                <ShareButtons
+                  label="このポケふたを共有する"
+                  shareText={sharePayload.shareText}
+                  shareUrl={sharePayload.shareUrl}
+                  hashtags={sharePayload.hashtags}
+                  analyticsParams={sharePayload.analyticsParams}
+                  className="mt-3"
+                />
               )}
             </div>
           </div>
