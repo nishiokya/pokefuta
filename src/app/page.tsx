@@ -42,7 +42,7 @@ type JourneyTab = 'history' | 'unvisited';
 
 const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
   { key: 'latest', label: '最新の写真' },
-  { key: 'rare', label: 'レアなポケふた' },
+  { key: 'rare', label: '投稿募集中' },
 ];
 
 type JourneyVisit = {
@@ -909,7 +909,7 @@ export default function HomePage() {
                     ) : (
                       <>
                         <p className="mb-3 text-xs font-bold text-[#6B6B6B]">
-                          写真がまだ投稿されていないポケふた（{rareManholes.length}件）
+                          写真の投稿を募集中のポケふた（{rareManholes.length}件）
                         </p>
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                           {rareManholes.map((manhole) => (
@@ -1358,7 +1358,7 @@ function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
       <div className="absolute inset-0 opacity-[0.05] [background-image:linear-gradient(90deg,#7B63A8_1px,transparent_1px),linear-gradient(#7B63A8_1px,transparent_1px)] [background-size:16px_16px]" />
       <div className="relative flex items-center justify-between gap-2">
         <span className="rounded-full bg-[#7B63A8]/15 px-2 py-1 text-[11px] font-extrabold text-[#7B63A8]">
-          レア
+          投稿募集中
         </span>
         <span className="rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-[#B5483C]">
           📷 未撮影
