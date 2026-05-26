@@ -26,6 +26,7 @@ async function loadNotoSansCjk(): Promise<ArrayBuffer | null> {
 }
 
 export async function GET(_request: Request, { params }: RouteContext) {
+  try {
   const [progress, fontData] = await Promise.all([
     loadPublicUserPrefectureProgress(params.userId),
     loadNotoSansCjk(),
@@ -57,16 +58,15 @@ export async function GET(_request: Request, { params }: RouteContext) {
         <div
           style={{
             position: 'absolute',
-            inset: 0,
-            backgroundImage:
-              'linear-gradient(90deg, rgba(140,106,74,0.10) 1px, transparent 1px), linear-gradient(rgba(140,106,74,0.10) 1px, transparent 1px)',
+            top: 0, right: 0, bottom: 0, left: 0,
+            backgroundImage: 'linear-gradient(#8C6A4A1A 1px, transparent 1px)',
             backgroundSize: '32px 32px',
           }}
         />
         <div
           style={{
             position: 'absolute',
-            inset: 32,
+            top: 32, right: 32, bottom: 32, left: 32,
             border: '4px solid rgba(140,106,74,0.18)',
             borderRadius: 20,
           }}
@@ -115,6 +115,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
       },
     }
   );
+  } catch (err) {
+    console.error('[OGP] users prefectures render failed:', err);
+    return new Response('Internal Server Error', {
+      status: 500,
+      headers: { 'Cache-Control': 'public, max-age=60' },
+    });
+  }
 }
 
 function OgpStat({ label, value }: { label: string; value: string }) {
