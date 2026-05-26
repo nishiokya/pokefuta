@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Bookmark,
@@ -12,7 +12,6 @@ import {
   MapPin,
   Navigation,
   PlusCircle,
-  Share2,
   Sparkles,
   Stamp,
   Trash2,
@@ -21,11 +20,12 @@ import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import ShareButtons from '@/components/ShareButtons';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { openSharePanel, visitsShareText } from '@/lib/share';
-import { SITE_NAME } from '@/lib/constants';
+import { visitsShareText } from '@/lib/share';
 
 interface Visit {
   id: string;
@@ -66,6 +66,25 @@ const tabs: { id: PassportTab; label: string }[] = [
   { id: 'unvisited', label: '未訪問' },
 ];
 
+const passportTabIds = new Set<PassportTab>(tabs.map((tab) => tab.id));
+
+const getPassportTabFromUrl = (): PassportTab => {
+  if (typeof window === 'undefined') return 'stamps';
+  const tab = new URLSearchParams(window.location.search).get('tab') as PassportTab | null;
+  return tab && passportTabIds.has(tab) ? tab : 'stamps';
+};
+
+const updatePassportTabUrl = (tab: PassportTab) => {
+  const url = new URL(window.location.href);
+  if (tab === 'stamps') {
+    url.searchParams.delete('tab');
+  } else {
+    url.searchParams.set('tab', tab);
+  }
+  url.hash = '';
+  window.history.pushState({}, '', `${url.pathname}${url.search}`);
+};
+
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return '日付なし';
@@ -86,9 +105,12 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const { trackView, trackPassportOpen, trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
-  const sharePanelCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => { return () => { sharePanelCleanupRef.current?.(); }; }, []);
+  const { trackView, trackPassportOpen } = useAnalytics();
+
+  const selectPassportTab = (tab: PassportTab) => {
+    setActiveTab(tab);
+    updatePassportTabUrl(tab);
+  };
 
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
@@ -97,27 +119,16 @@ export default function VisitsPage() {
     checkAuth();
   }, []);
 
-  const handleShare = async () => {
-    const shareText = visitsShareText();
-    const shareUrl = 'https://pokefuta.com/visits';
-    trackShareClick();
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: SITE_NAME, text: shareText, url: shareUrl });
-      } else {
-        sharePanelCleanupRef.current?.();
-        sharePanelCleanupRef.current = openSharePanel(shareText, shareUrl, {
-          onShareX: () => trackShareX(),
-          onShareLine: () => trackShareLine(),
-          onCopyLink: () => trackCopyLink(),
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Share failed:', error);
-      }
-    }
-  };
+  useEffect(() => {
+    setActiveTab(getPassportTabFromUrl());
+
+    const handlePopState = () => {
+      setActiveTab(getPassportTabFromUrl());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const checkAuth = async () => {
     try {
@@ -475,6 +486,8 @@ export default function VisitsPage() {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
+        <Header title="スタンプ帳" />
+
         <div className="max-w-3xl mx-auto p-4 space-y-4">
           {/* Preview Header */}
           <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -488,7 +501,7 @@ export default function VisitsPage() {
                 ポケふた訪問パスポート
               </h1>
               <p className="mt-3 text-sm font-medium text-[#6A4D36]">
-                ログインすると、全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
+                ログインすると、あなたの旅の続きとして全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
               </p>
 
               {/* Sample Progress Bar */}
@@ -518,7 +531,7 @@ export default function VisitsPage() {
                   href="/login?redirect=/visits"
                   className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
                 >
-                  ログイン
+                  旅の続きへ
                 </Link>
               </div>
             </div>
@@ -591,7 +604,7 @@ export default function VisitsPage() {
               ))}
             </div>
             <p className="mt-3 text-center text-xs text-[#6A4D36]">
-              ログインして、あなたの旅を記録しましょう
+              ログインして、あなたの旅の続きを記録しましょう
             </p>
           </section>
 
@@ -602,7 +615,7 @@ export default function VisitsPage() {
               旅の記録を保存しませんか？
             </h3>
             <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
-              ログインすると、訪問済みや行きたい場所を記録できます。<br />
+              ログインすると、旅の続きとして訪問済みや行きたい場所を記録できます。<br />
               全国制覇率や都道府県別の進捗も見られます。
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -617,7 +630,7 @@ export default function VisitsPage() {
                 href="/login?redirect=/visits"
                 className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
               >
-                ログイン
+                旅の続きへ
               </Link>
             </div>
           </section>
@@ -630,6 +643,8 @@ export default function VisitsPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F3E7CC]">
+      <Header title="スタンプ帳" />
+
       <div className="max-w-3xl mx-auto pb-[10rem]">
         <div className="p-4 space-y-4">
           <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -643,13 +658,6 @@ export default function VisitsPage() {
                   </h1>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={handleShare}
-                    className="rounded-lg border border-[#8C6A4A]/30 bg-[#F6EEDC] p-2 text-[#6A4D36] transition-colors hover:bg-[#EDD9BC]"
-                    aria-label="スタンプ帳を共有"
-                  >
-                    <Share2 size={18} />
-                  </button>
                   <div className="rounded-lg border border-[#B65A4B]/30 bg-[#F8D9C4] px-3 py-2 text-center">
                     <p className="font-pixel text-2xl leading-none text-[#B5483C]">{visitedManholesCount}</p>
                     <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">STAMPS</p>
@@ -697,6 +705,15 @@ export default function VisitsPage() {
                   )}
                 </div>
               )}
+
+              {visitedManholesCount > 0 && (
+                <ShareButtons
+                  label="スタンプ帳を共有する"
+                  shareText={visitsShareText(visitedManholesCount)}
+                  shareUrl="https://pokefuta.com/visits"
+                  className="mt-4"
+                />
+              )}
             </div>
           </section>
 
@@ -711,12 +728,13 @@ export default function VisitsPage() {
             </section>
           )}
 
-          <nav className="sticky top-2 z-20 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur">
+          <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur sm:top-[calc(env(safe-area-inset-top)+4.25rem)]">
             <div className="grid grid-cols-4 gap-1">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  type="button"
+                  onClick={() => selectPassportTab(tab.id)}
                   className={`min-h-[38px] rounded-md px-2 text-center font-pixelJp text-[11px] font-bold transition-colors sm:text-xs ${
                     activeTab === tab.id
                       ? 'bg-[#4F3828] text-[#FFF7E5]'
@@ -734,7 +752,7 @@ export default function VisitsPage() {
           ) : (
             <>
               {activeTab === 'stamps' && (
-                <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <section className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                   {passportManholes.slice(0, 60).map((manhole) => (
                     <StampCard
                       key={manhole.id}
@@ -754,7 +772,7 @@ export default function VisitsPage() {
               )}
 
               {activeTab === 'unvisited' && (
-                <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <section className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                   {unvisitedManholes.slice(0, 60).map((manhole) => (
                     <StampCard key={manhole.id} manhole={manhole} />
                   ))}
@@ -867,22 +885,22 @@ function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSumm
   return (
     <Link
       href={`/manhole/${manhole.id}`}
-      className={`relative flex aspect-[4/5] flex-col justify-between rounded-lg border-2 p-3 shadow-sm transition-transform hover:-translate-y-0.5 ${
+      className={`relative flex aspect-[4/5] flex-col justify-between rounded-md border-2 p-1.5 shadow-sm transition-transform hover:-translate-y-0.5 ${
         isVisited
           ? 'border-[#B5483C]/45 bg-[#FFF7E5]'
           : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]/75'
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className={`rounded-full px-2 py-1 font-pixelJp text-[10px] font-bold ${
+        <span className={`rounded-full px-1 py-0.5 font-pixelJp text-[8px] font-bold leading-none ${
           isVisited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
         }`}>
-          {isVisited ? '済' : '未訪問'}
+          {isVisited ? '済' : '未'}
         </span>
-        <div className="flex items-center gap-1">
-          {summary?.hasPhotos && <Camera className="h-4 w-4 text-[#B5483C]" />}
+        <div className="flex items-center gap-0.5">
+          {summary?.hasPhotos && <Camera className="h-3 w-3 text-[#B5483C]" />}
           {summary && summary.count > 1 && (
-            <span className="rounded-full bg-[#4F3828] px-1.5 py-0.5 font-pixel text-[10px] text-white">
+            <span className="rounded-full bg-[#4F3828] px-1 py-0.5 font-pixel text-[7px] leading-none text-white">
               x{summary.count}
             </span>
           )}
@@ -891,7 +909,7 @@ function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSumm
 
       <div className="flex flex-1 items-center justify-center">
         {isVisited ? (
-          <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
+          <div className="relative aspect-square w-3/4 overflow-hidden rounded-full border-[3px] border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
             {summary?.latestVisit.photos[0]?.thumbnail_url ? (
               <img
                 src={summary.latestVisit.photos[0].thumbnail_url}
@@ -904,27 +922,26 @@ function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSumm
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]">
-                <CircleDot className="h-8 w-8 text-[#4F3828]/70" />
+                <CircleDot className="h-4 w-4 text-[#4F3828]/70" />
               </div>
             )}
           </div>
         ) : (
-          <div className="flex h-20 w-20 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-center text-[#A39580]">
+          <div className="flex aspect-square w-3/4 rotate-[-8deg] items-center justify-center rounded-full border-[3px] border-[#B8AB96] text-center text-[#A39580]">
             <div>
-              <Stamp className="mx-auto h-6 w-6" />
-              <p className="mt-1 font-pixel text-[10px] leading-none">NEXT</p>
+              <Stamp className="mx-auto h-4 w-4" />
+              <p className="font-pixel text-[7px] leading-none">NEXT</p>
             </div>
           </div>
         )}
       </div>
 
       <div>
-        <p className="line-clamp-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+        <p className="truncate font-pixelJp text-[9px] font-bold leading-tight text-[#4F3828]">
           {getMunicipality(manhole)}
         </p>
-        <p className="mt-1 truncate font-pixelJp text-[11px] text-[#6A4D36]">{manhole.prefecture}</p>
         {summary && (
-          <p className="mt-2 font-pixel text-xs text-[#B5483C]">{formatVisitDate(summary.latestVisit.visited_at, 'yyyy/M')}</p>
+          <p className="font-pixel text-[8px] text-[#B5483C]">{formatVisitDate(summary.latestVisit.visited_at, 'yyyy/M')}</p>
         )}
       </div>
     </Link>

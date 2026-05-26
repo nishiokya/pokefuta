@@ -12,11 +12,16 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
       PORT: "3100"
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
       NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT: "36.0"
       NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG: "138.0"
       NEXT_PUBLIC_MAP_DEFAULT_ZOOM: "10"
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_ENDPOINT: https://example.com
+      R2_BUCKET: image
 
     steps:
       - name: Checkout

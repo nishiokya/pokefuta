@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { CircleDot, Home, Menu, Search, TrendingUp } from 'lucide-react';
-import MobileMenuDrawer from '@/components/MobileMenuDrawer';
+import { CircleDot, Home, Image, Search } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -16,7 +15,6 @@ function isActivePath(pathname: string, href: string) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { trackNavClick } = useAnalytics();
 
@@ -52,47 +50,27 @@ export default function BottomNav() {
         ]
       : [
           { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
-          { href: '/popular', label: '人気', icon: <TrendingUp className="w-6 h-6 mb-1" /> },
+          { href: '/popular', label: '投稿', icon: <Image className="w-6 h-6 mb-1" /> },
           { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
         ],
     [isLoggedIn]
   );
 
   return (
-    <>
-      <nav className="nav-rpg">
-        <div className="flex justify-around items-center max-w-md mx-auto py-2">
-          {items.map((item) => {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
-                onClick={() => trackNavClick(item.label)}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={() => {
-              // ✅ GA: メニューボタンクリック追跡
-              trackNavClick('メニュー');
-              setMenuOpen(true);
-            }}
-            className="nav-rpg-item"
-            aria-label="メニュー"
+    <nav className="nav-rpg">
+      <div className="flex justify-around items-center max-w-md mx-auto py-2">
+        {items.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+            onClick={() => trackNavClick(item.label)}
           >
-            <Menu className="w-6 h-6 mb-1" />
-            <span>メニュー</span>
-          </button>
-        </div>
-      </nav>
-
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
-    </>
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -43,8 +44,8 @@ export default function PopularPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'みんなのポケふた旅 - ポケふた訪問記録';
-    trackView('/popular', 'みんなのポケふた旅', 'popular');
+    document.title = 'みんなのポケふた投稿 - ポケふた訪問記録';
+    trackView('/popular', 'みんなのポケふた投稿', 'popular');
 
     (async () => {
       try {
@@ -110,74 +111,51 @@ export default function PopularPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 font-bold" aria-label="ホームに戻る">
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
-              <span className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-[#E85046]" />
-              <span className="absolute inset-x-0 top-1/2 h-[2px] bg-[#2A2A2A]" />
-              <span className="relative h-3 w-3 rounded-full border-2 border-[#2A2A2A] bg-white" />
-            </span>
-            <span className="text-base sm:text-lg">みんなのポケふた旅</span>
-          </Link>
-
-          <div className="flex items-center gap-2">
-            {!isLoggedIn && (
-              <>
-                <Link
-                  href="/login"
-                  className="rounded-lg border border-[#7B63A8] px-4 py-2 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
-                >
-                  ログイン
-                </Link>
-                <Link
-                  href="/signup"
-                  className="rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                >
-                  新規登録
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <Header title="みんなのポケふた投稿" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Hero Section */}
-        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-gradient-to-br from-[#FFF8EB] to-[#FFE6D5] px-5 py-8 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-12">
-          <div className="absolute right-6 top-6 opacity-20">
-            <TrendingUp className="h-32 w-32 text-[#7B63A8]" />
-          </div>
-          <div className="relative max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-              <Sparkles className="h-3.5 w-3.5" />
-              みんなのポケふた写真
-            </div>
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              旅先で見つけたポケふたを眺めよう
-            </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-[#6B6B6B] sm:text-lg">
-              全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
-              ログインすると、あなたも旅の記録を保存できます。
-            </p>
-
-            {!isLoggedIn && (
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                >
-                  <Camera className="h-4 w-4" />
-                  無料で旅の記録をはじめる
-                </Link>
-                <Link
-                  href="/visits"
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
-                >
-                  スタンプ帳を見る
-                </Link>
+        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="relative max-w-3xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                <Sparkles className="h-3.5 w-3.5" />
+                みんなのポケふた投稿
               </div>
-            )}
+              <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                旅先で出会ったポケふた写真を眺めよう
+              </h1>
+              <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+                全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
+                ログインすると、あなたの旅の続きとして記録を保存できます。
+              </p>
+
+              {!isLoggedIn && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                  >
+                    <Camera className="h-4 w-4" />
+                    無料で旅の記録をはじめる
+                  </Link>
+                  <Link
+                    href="/visits"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                  >
+                    スタンプ帳を見る
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
+              <img
+                src="/pokefuta_photo_gallery_mockup.svg"
+                alt=""
+                className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
+              />
+            </div>
           </div>
         </section>
 
@@ -326,7 +304,7 @@ export default function PopularPage() {
                 <Sparkles className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]" />
                 <h3 className="text-xl font-extrabold">この旅を自分のスタンプ帳に保存しませんか？</h3>
                 <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
-                  ログインすると、訪問済みや行きたい場所を記録できます。
+                  ログインすると、旅の続きとして訪問済みや行きたい場所を記録できます。
                   全国制覇率や都道府県別の進捗も見られます。
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -341,7 +319,7 @@ export default function PopularPage() {
                     href="/login"
                     className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
                   >
-                    ログイン
+                    旅の続きへ
                   </Link>
                 </div>
               </section>

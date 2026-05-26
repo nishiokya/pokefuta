@@ -17,8 +17,6 @@ export interface Database {
           avatar_url: string | null;
           created_at: string;
           updated_at: string;
-          settings: Record<string, any>;
-          stats: UserStats;
           all_prefectures_completed_at: string | null;
           all_prefectures_outdated_at: string | null;
         };
@@ -27,16 +25,12 @@ export interface Database {
           auth_uid: string;
           display_name?: string | null;
           avatar_url?: string | null;
-          settings?: Record<string, any>;
-          stats?: UserStats;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
         };
         Update: {
           display_name?: string | null;
           avatar_url?: string | null;
-          settings?: Record<string, any>;
-          stats?: UserStats;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
         };
@@ -452,14 +446,6 @@ export interface Database {
       };
     };
   };
-}
-
-export interface UserStats {
-  total_visits: number;
-  total_photos: number;
-  prefectures_visited: string[];
-  first_visit: string | null;
-  last_visit: string | null;
 }
 
 export interface Weather {

@@ -1,25 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
+  CircleDot,
   Compass,
   ExternalLink,
   MapPin,
-  Menu,
   Navigation,
   RefreshCw,
   Search,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface ManholeWithDistance extends Manhole {
-  distance: number;
+  distance?: number;
   visit?: {
     id: string;
     shot_at: string;
@@ -49,30 +49,62 @@ export default function NearbyPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
+  const [query, setQuery] = useState('');
   const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
-  // ページ初回マウント時のみ発火
   useEffect(() => {
+    document.title = 'ポケふたを探す - ポケふた訪問記録';
     trackNearbyOpen();
-  }, []);
 
-  useEffect(() => {
-    document.title = '近くのポケふた - ポケふた訪問記録';
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const initialTab: SearchTab = tab === 'all' || tab === 'unvisited' ? tab : 'nearby';
+    setActiveTab(initialTab);
+    loadAllManholes();
+
     (async () => {
+      let loggedIn = false;
       try {
         const supabase = createBrowserClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        setIsLoggedIn(Boolean(session?.user));
+        loggedIn = Boolean(session?.user);
+        setIsLoggedIn(loggedIn);
       } catch {
         setIsLoggedIn(false);
+      } finally {
+        setSessionChecked(true);
       }
+
+      if (initialTab === 'all') {
+        setLoading(false);
+        return;
+      }
+
+      if (initialTab === 'unvisited' && !loggedIn) {
+        setActiveTab('all');
+        setLoading(false);
+        return;
+      }
+
+      getCurrentLocationAndLoadManholes();
     })();
-    getCurrentLocationAndLoadManholes();
-    loadAllManholes();
+  }, []);
+
+  useEffect(() => {
+    if (sessionChecked && !isLoggedIn && activeTab === 'unvisited') {
+      setActiveTab('all');
+    }
+  }, [activeTab, isLoggedIn, sessionChecked]);
+
+  useEffect(() => {
+    if (!sessionChecked || activeTab === 'all') return;
+    if (activeTab === 'unvisited' && !isLoggedIn) return;
+    if (!userLocation) return;
+    loadNearbyManholes(userLocation.lat, userLocation.lng);
   }, [radius]);
 
   const loadAllManholes = async () => {
@@ -241,59 +273,50 @@ export default function NearbyPage() {
     window.location.href = `/manhole/${manhole.id}`;
   };
 
+  const handleTabChange = (tab: SearchTab) => {
+    setActiveTab(tab);
+    if ((tab === 'nearby' || tab === 'unvisited') && !userLocation && nearbyManholes.length === 0) {
+      getCurrentLocationAndLoadManholes();
+    }
+  };
+
+  const visibleSearchTabs = searchTabs.filter((tab) => isLoggedIn || tab.key !== 'unvisited');
+
+  const filteredAllManholes = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return allManholes;
+
+    return allManholes.filter((manhole) => {
+      const target = [
+        manhole.title,
+        manhole.prefecture,
+        manhole.municipality,
+        manhole.city,
+        ...(manhole.pokemons || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return target.includes(normalized);
+    });
+  }, [allManholes, query]);
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 font-bold" aria-label="ポケふた写真館">
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
-              <span className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-[#E85046]" />
-              <span className="absolute inset-x-0 top-1/2 h-[2px] bg-[#2A2A2A]" />
-              <span className="relative h-3 w-3 rounded-full border-2 border-[#2A2A2A] bg-white" />
-            </span>
-            <span className="text-base sm:text-lg">ポケふた写真館</span>
-          </Link>
+      <Header title="ポケふたを探す" />
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/manholes"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="検索"
-              title="検索"
-            >
-              <Search className="h-5 w-5" />
-            </Link>
-            <Link
-              href="#nearby-controls"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="絞り込み"
-              title="絞り込み"
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </Link>
-            <Link
-              href={uploadHref}
-              className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
-            >
-              <Camera className="h-4 w-4" />
-              写真を投稿
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
-        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
+      <main className="relative mx-auto max-w-6xl px-3 pb-5 pt-3 sm:px-4 sm:pb-6 sm:pt-8">
+        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="relative max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
               <Compass className="h-3.5 w-3.5" />
               旅先で探す
             </div>
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              近くのポケふたを見つけよう
+            <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+              ポケふたを探す
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-              現在地の周辺にあるポケふたを探して、次の寄り道先を決めよう。
+            <p className="mt-2 max-w-2xl text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
+              現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。
             </p>
           </div>
         </section>
@@ -311,48 +334,41 @@ export default function NearbyPage() {
         )}
 
         {userLocation && (
-          <section id="nearby-controls" className="mt-5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-4 shadow-sm sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-                  <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{nearbyManholes.length}</div>
-                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">発見</div>
+          <section id="nearby-controls" className="mt-3 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mt-5 sm:p-5">
+            <div className="grid gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
+                  <div className="text-lg font-extrabold leading-none text-[#7B63A8] sm:text-xl">{nearbyManholes.length}</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">発見</div>
                 </div>
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-                  <div className="text-xl font-extrabold leading-none text-[#FF8F1F]">{radius}km</div>
-                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">範囲</div>
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
+                  <div className="text-lg font-extrabold leading-none text-[#FF8F1F] sm:text-xl">{radius}km</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">範囲</div>
                 </div>
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-                  <div className="text-xl font-extrabold leading-none text-[#2D846C]">
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
+                  <div className="text-lg font-extrabold leading-none text-[#2D846C] sm:text-xl">
                     {nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-'}
                   </div>
-                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">最寄り</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">最寄り</div>
                 </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={getCurrentLocationAndLoadManholes}
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:bg-[#FFB347]/20 lg:flex-none"
-                  title="現在地を更新"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  現在地を更新
-                </button>
-                <Link
-                  href="/manholes"
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] lg:flex-none"
-                >
-                  <Search className="h-4 w-4" />
-                  一覧で探す
-                </Link>
               </div>
             </div>
 
-            <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#6B6B6B]">
-                <span>検索範囲</span>
-                <span>1km - 100km</span>
+            <div className="mt-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="min-w-0 text-xs font-bold text-[#6B6B6B]">
+                  <span>検索範囲</span>
+                  <span className="ml-2 text-[#9B8D78]">1km - 100km</span>
+                </div>
+                <button
+                  onClick={getCurrentLocationAndLoadManholes}
+                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-bold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:bg-[#FFB347]/20 sm:gap-2 sm:px-4 sm:text-sm"
+                  title="現在地を更新"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="sm:hidden">更新</span>
+                  <span className="hidden sm:inline">現在地を更新</span>
+                </button>
               </div>
               <input
                 type="range"
@@ -369,17 +385,17 @@ export default function NearbyPage() {
           </section>
         )}
 
-        <section className="mt-5">
-          <div className="-mx-4 overflow-x-auto px-4 pb-1">
-            <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
-              {searchTabs.map((tab) => {
+        <section className="mt-3 sm:mt-5">
+          <div className="-mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4">
+            <div className="flex min-w-max gap-1.5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-0.5 shadow-sm sm:min-w-0 sm:gap-2 sm:p-1">
+              {visibleSearchTabs.map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
+                    onClick={() => handleTabChange(tab.key)}
+                    className={`min-h-[44px] rounded-[7px] px-4 text-sm font-bold transition sm:px-5 ${
                       isActive
                         ? 'bg-[#7B63A8] text-white shadow-sm'
                         : 'text-[#2A2A2A] hover:bg-white'
@@ -393,8 +409,35 @@ export default function NearbyPage() {
           </div>
         </section>
 
-        {((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
-          <div className="flex items-center justify-center py-10">
+        {activeTab === 'all' && (
+          <section className="mt-3 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mt-5 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7B63A8]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="地域名・ポケモン名で検索"
+                  className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/15 bg-white/80 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#7B63A8]"
+                  placeholder="地域名・ポケモン名で検索"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3 sm:min-w-[15rem]">
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
+                  <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{allManholes.length}</div>
+                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">総数</div>
+                </div>
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
+                  <div className="text-xl font-extrabold leading-none text-[#2D846C]">{filteredAllManholes.length}</div>
+                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">表示中</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
+          <div className="flex items-center justify-center py-7 sm:py-10">
             <div className="text-center">
               <div className="font-bold text-[#7B63A8]">
                 {activeTab === 'all' ? '全ポケふたを読み込み中' : '検索中'}<span className="rpg-loading"></span>
@@ -403,17 +446,17 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {!((activeTab === 'nearby' && loading) || (activeTab === 'all' && allLoading)) && (
-          <section className="mt-5">
+        {!(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
+          <section className="mt-3 sm:mt-5">
             {(() => {
               const displayManholes =
-                activeTab === 'all' ? allManholes :
+                activeTab === 'all' ? filteredAllManholes :
                 activeTab === 'unvisited' ? nearbyManholes.filter(m => !m.visit) :
                 nearbyManholes;
 
               return displayManholes.length === 0 ? (
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
-                  <MapPin className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]/60" />
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-7 text-center shadow-sm sm:px-5 sm:py-10">
+                  <MapPin className="mx-auto mb-2 h-9 w-9 text-[#7B63A8]/60 sm:mb-3 sm:h-10 sm:w-10" />
                   <p className="text-sm font-bold text-[#2A2A2A]">
                     {activeTab === 'unvisited'
                       ? '近くに未訪問のポケふたが見つかりませんでした'
@@ -426,33 +469,42 @@ export default function NearbyPage() {
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {displayManholes.map((manhole) => (
                   <article
                     key={manhole.id}
                     className="cursor-pointer overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
                     onClick={() => viewManholeDetail(manhole)}
                   >
-                    {manhole.visit && manhole.visit.photos && manhole.visit.photos.length > 0 && (
-                      <div className="grid grid-cols-3 gap-1 bg-[#F6EEDC] p-1">
-                        {manhole.visit.photos.slice(0, 3).map((photo: any) => (
-                          <div
-                            key={photo.id}
-                            className="relative aspect-square overflow-hidden rounded-[6px] bg-white"
-                          >
-                            <img
-                              src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
-                              alt="ポケふた写真"
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
+                    <div className="bg-[#F6EEDC] p-1">
+                      {manhole.visit?.photos && manhole.visit.photos.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-1">
+                          {manhole.visit.photos.slice(0, 3).map((photo: any) => (
+                            <div
+                              key={photo.id}
+                              className="relative aspect-square overflow-hidden rounded-[6px] bg-white"
+                            >
+                              <img
+                                src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
+                                alt="ポケふた写真"
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex aspect-[4/1] items-center justify-center rounded-[6px] bg-[#E9DEC9] sm:aspect-[3/1]">
+                          <div className="flex flex-col items-center text-[#B8AB96]">
+                            <CircleDot className="h-6 w-6 sm:h-8 sm:w-8" />
+                            <p className="mt-1 font-pixel text-[9px] leading-none">POKEFUTA</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
 
-                    <div className="p-4">
-                      <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="p-3 sm:p-4">
+                      <div className="mb-2 flex items-start justify-between gap-2 sm:mb-3 sm:gap-3">
                         <div className="min-w-0">
                           <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
                             {manhole.prefecture}
@@ -463,8 +515,8 @@ export default function NearbyPage() {
                           </div>
                         </div>
                         {activeTab !== 'all' && (
-                          <div className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-right shadow-sm ring-1 ring-[#7B63A8]/15">
-                            <div className="text-base font-extrabold leading-none text-[#7B63A8]">
+                          <div className="shrink-0 rounded-[8px] bg-white px-2.5 py-1.5 text-right shadow-sm ring-1 ring-[#7B63A8]/15 sm:px-3 sm:py-2">
+                            <div className="text-sm font-extrabold leading-none text-[#7B63A8] sm:text-base">
                               {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
                             </div>
                             <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
@@ -473,14 +525,14 @@ export default function NearbyPage() {
                       </div>
 
                       {manhole.visit && (
-                        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#2D846C]/10 px-3 py-1 text-xs font-bold text-[#2D846C]">
+                        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#2D846C]/10 px-3 py-1 text-xs font-bold text-[#2D846C] sm:mb-3">
                           <Camera className="h-3.5 w-3.5" />
                           訪問済み {formatDate(manhole.visit.shot_at)}
                         </div>
                       )}
 
                       {manhole.pokemons && manhole.pokemons.length > 0 && (
-                        <div className="mb-4 flex flex-wrap gap-1.5">
+                        <div className="mb-3 flex flex-wrap gap-1.5 sm:mb-4">
                           {manhole.pokemons.slice(0, 3).map((pokemon, index) => (
                             <span
                               key={index}
@@ -499,7 +551,7 @@ export default function NearbyPage() {
 
                       <button
                         onClick={(e) => openInMaps(manhole, e)}
-                        className="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                         title="Google Mapsで経路を表示"
                       >
                         <Navigation className="h-4 w-4" />
@@ -524,9 +576,9 @@ export default function NearbyPage() {
 
       <Link
         href={uploadHref}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#7B63A8] px-5 py-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#6A5299] sm:bottom-6 sm:right-6"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-3 z-40 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7B63A8] px-4 py-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#6A5299] sm:bottom-6 sm:right-6 sm:gap-2 sm:px-5 sm:py-4 sm:text-sm"
       >
-        <Camera className="h-5 w-5" />
+        <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
         写真を投稿
       </Link>
 

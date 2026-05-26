@@ -1,0 +1,32 @@
+name: OGP Linux Verification
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify-ogp-linux:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      NEXT_PUBLIC_APP_URL: https://pokefuta.com
+      NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT: "35.681236"
+      NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG: "139.767125"
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_ENDPOINT: https://example.com
+      R2_BUCKET: image
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run build
+      - run: npm run verify:ogp-linux

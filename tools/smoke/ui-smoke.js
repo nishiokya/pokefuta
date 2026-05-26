@@ -100,6 +100,11 @@ async function withServer(callback) {
       NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT: process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0',
       NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG: process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0',
       NEXT_PUBLIC_MAP_DEFAULT_ZOOM: process.env.NEXT_PUBLIC_MAP_DEFAULT_ZOOM || '10',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'ci-service-role-key',
+      R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || 'ci-placeholder',
+      R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY || 'ci-placeholder',
+      R2_ENDPOINT: process.env.R2_ENDPOINT || 'https://example.com',
+      R2_BUCKET: process.env.R2_BUCKET || 'image',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -156,9 +161,12 @@ async function installMocks(page) {
 
     if (url.hostname.includes('tile.openstreetmap.org')) {
       request.respond({
-        status: 204,
+        status: 200,
         contentType: 'image/png',
-        body: '',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+          'base64'
+        ),
       });
       return;
     }
@@ -231,10 +239,14 @@ async function assertMapVisible(page, context) {
 
 async function capture(page, name) {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
-  await page.screenshot({
-    path: path.join(ARTIFACT_DIR, `${name}.png`),
-    fullPage: true,
-  });
+  try {
+    await page.screenshot({
+      path: path.join(ARTIFACT_DIR, `${name}.png`),
+      fullPage: false,
+    });
+  } catch (error) {
+    console.warn(`ui-smoke screenshot skipped (${name}): ${error.message}`);
+  }
 }
 
 async function verifyHome(page, viewport) {
@@ -242,11 +254,20 @@ async function verifyHome(page, viewport) {
   await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle0', timeout: 30_000 });
   await assertNoRuntimeError(page, context);
   await assertText(page, 'ポケふた写真館', context);
-  await assertAnyText(page, ['まだ投稿がありません', '最近の投稿'], context);
-  for (const label of ['探す', '人気', 'スタンプ帳', 'メニュー']) {
+  await assertText(page, 'まだ投稿がありません', context);
+  for (const label of ['探す', '投稿', 'スタンプ帳']) {
     await assertText(page, label, context);
   }
   await assertAnyText(page, ['アカウント作成', 'ログイン'], context);
+  await assertNoHorizontalOverflow(page, context);
+}
+
+async function verifyPopular(page, viewport) {
+  const context = `/popular ${viewport.name}`;
+  await page.goto(`${BASE_URL}/popular`, { waitUntil: 'networkidle0', timeout: 30_000 });
+  await assertNoRuntimeError(page, context);
+  await assertText(page, 'みんなのポケふた投稿', context);
+  await assertText(page, 'まだ投稿がありません', context);
   await assertNoHorizontalOverflow(page, context);
 }
 
@@ -267,7 +288,7 @@ async function verifyMap(page, viewport) {
 async function run() {
   await withServer(async () => {
     const browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
@@ -285,6 +306,8 @@ async function run() {
           await installMocks(page);
           await verifyHome(page, viewport);
           await capture(page, `home-${viewport.name}`);
+          await verifyPopular(page, viewport);
+          await capture(page, `popular-${viewport.name}`);
           await verifyMap(page, viewport);
           await capture(page, `map-${viewport.name}`);
 
@@ -303,11 +326,11 @@ async function run() {
           await capture(page, `failure-${viewport.name}`).catch(() => {});
           throw error;
         } finally {
-          await page.close();
+          await page.close().catch(() => {});
         }
       }
     } finally {
-      await browser.close();
+      await browser.close().catch(() => {});
     }
   });
 }

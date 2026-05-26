@@ -1,24 +1,61 @@
 import 'server-only';
+import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 
 const WIDTH = 1200;
 const HEIGHT = 630;
-const TEMPLATE_PATH = path.join(process.cwd(), 'public', 'ogp', 'pokefuta_ogp_template.svg');
-const BACKGROUND_PATH = path.join(process.cwd(), 'public', 'ogp', 'pokefuta_ogp_background_1200x630.png');
+const OGP_FONT_NAME = 'Noto Sans CJK JP';
+const OGP_FONT_RELATIVE_PATH = path.join('public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf');
+const TEMPLATE_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_template.svg');
+const BACKGROUND_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_background_1200x630.png');
+const OGP_FONT_PATH = resolveOgpAssetPath(OGP_FONT_RELATIVE_PATH);
+const TEMPLATE_PATH = resolveOgpAssetPath(TEMPLATE_RELATIVE_PATH);
+const BACKGROUND_PATH = resolveOgpAssetPath(BACKGROUND_RELATIVE_PATH);
 
 type PokefutaOgpTemplateInput = {
   photoBuffer: Buffer;
   prefecture: string;
   city: string;
   pokemonNames: string;
-  badgeEmoji?: string;
   badgeLabel?: string;
-  statsLabel?: string;
 };
 
-function escapeXml(value: string): string {
+type TextLayerInput = {
+  text: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  minFontSize?: number;
+  color: string;
+  align?: 'left' | 'center' | 'right';
+};
+
+export function getOgpFontPath(): string {
+  return OGP_FONT_PATH;
+}
+
+function resolveOgpAssetPath(relativePath: string): string {
+  const cwd = process.cwd();
+  const candidates = [
+    path.resolve(cwd, relativePath),
+    path.resolve(cwd, '.next', relativePath),
+    path.resolve(cwd, '..', relativePath),
+  ];
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
+
+export function assertOgpFontExists(fontPath = OGP_FONT_PATH): void {
+  if (!existsSync(fontPath)) {
+    throw new Error(`OGP font file is missing: ${fontPath}`);
+  }
+}
+
+function escapePango(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -46,6 +83,80 @@ const templateAssetsPromise = Promise.all([
   backgroundDataUri: imageDataUri(backgroundBuffer, 'image/png'),
 }));
 
+function textTopFromBaseline(baseline: number, fontSize: number): number {
+  return Math.max(0, Math.round(baseline - fontSize * 0.9));
+}
+
+function estimateTextWidth(text: string, fontSize: number): number {
+  return Array.from(text).reduce((width, character) => {
+    if (/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/.test(character)) {
+      return width + fontSize;
+    }
+    if (/[A-Z0-9]/.test(character)) {
+      return width + fontSize * 0.68;
+    }
+    if (/[a-z]/.test(character)) {
+      return width + fontSize * 0.56;
+    }
+    return width + fontSize * 0.42;
+  }, 0);
+}
+
+function fitFontSizeToWidth(input: TextLayerInput): number {
+  const minFontSize = input.minFontSize ?? Math.max(12, Math.floor(input.fontSize * 0.72));
+  const estimatedWidth = estimateTextWidth(input.text, input.fontSize);
+
+  if (estimatedWidth <= input.width) {
+    return input.fontSize;
+  }
+
+  return Math.max(minFontSize, Math.floor((input.fontSize * input.width) / estimatedWidth));
+}
+
+async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
+  assertOgpFontExists();
+
+  const fontSize = fitFontSizeToWidth(input);
+  const markup = `<span foreground="${input.color}" font_desc="${OGP_FONT_NAME} ${fontSize}">${escapePango(input.text)}</span>`;
+  const inputBuffer = await sharp({
+    text: {
+      text: markup,
+      font: OGP_FONT_NAME,
+      fontfile: OGP_FONT_PATH,
+      width: input.width,
+      height: input.height,
+      align: input.align ?? 'left',
+      rgba: true,
+    },
+  })
+    .png()
+    .toBuffer();
+
+  return {
+    input: inputBuffer,
+    left: input.left,
+    top: input.top,
+  };
+}
+
+async function buildTextLayers(layers: TextLayerInput[]): Promise<sharp.OverlayOptions[]> {
+  return Promise.all(layers.map((layer) => renderTextLayer(layer)));
+}
+
+async function renderBaseSvg(template: string, replacements: Record<string, string>): Promise<Buffer> {
+  let svg = template;
+  for (const [search, replacement] of Object.entries(replacements)) {
+    svg = replaceAll(svg, search, replacement);
+  }
+
+  const fontFaceToken = ['@font', 'face'].join('-');
+  if (svg.includes(fontFaceToken)) {
+    throw new Error(`OGP SVG must not depend on ${fontFaceToken}`);
+  }
+
+  return sharp(Buffer.from(svg)).resize(WIDTH, HEIGHT).png().toBuffer();
+}
+
 export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput): Promise<Buffer> {
   const [{ template, backgroundDataUri }, photoBuffer] = await Promise.all([
     templateAssetsPromise,
@@ -57,21 +168,145 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
 
   const photoDataUri = imageDataUri(photoBuffer, 'image/jpeg');
   const badgeLabel = input.badgeLabel ?? '見つけたポケふた';
+  const cityTitle = `${truncate(input.city, 10)}のポケふた`;
+  const base = await renderBaseSvg(template, {
+    './pokefuta_ogp_background_1200x630.png': backgroundDataUri,
+    '{{photoDataUri}}': photoDataUri,
+  });
 
-  let svg = template;
-  svg = replaceAll(svg, './pokefuta_ogp_background_1200x630.png', backgroundDataUri);
-  svg = replaceAll(svg, '📷 MY POKEFUTA PHOTO', 'MY POKEFUTA PHOTO');
-  svg = replaceAll(svg, '{{photoDataUri}}', photoDataUri);
-  svg = replaceAll(svg, '{{prefecture}}', escapeXml(truncate(input.prefecture, 8)));
-  svg = replaceAll(svg, '{{city}}', escapeXml(truncate(input.city, 10)));
-  svg = replaceAll(svg, '{{pokemonNames}}', escapeXml(truncate(input.pokemonNames, 20)));
-  svg = replaceAll(svg, '{{badgeEmoji}}', escapeXml(input.badgeEmoji ?? '📍'));
-  svg = replaceAll(svg, '{{badgeLabel}}', escapeXml(truncate(badgeLabel, 14)));
-  svg = replaceAll(
-    svg,
-    '{{statsLabel}}',
-    escapeXml(truncate(input.statsLabel ?? '全国のポケふた写真をシェア', 28))
-  );
+  const textLayers = await buildTextLayers([
+    {
+      text: 'MY POKEFUTA PHOTO',
+      left: 100,
+      top: textTopFromBaseline(456, 25),
+      width: 285,
+      height: 46,
+      fontSize: 25,
+      color: '#FFFFFF',
+    },
+    {
+      text: truncate(input.prefecture, 8),
+      left: 535,
+      top: 61,
+      width: 205,
+      height: 44,
+      fontSize: 24,
+      color: '#FFFFFF',
+      align: 'center',
+    },
+    {
+      text: cityTitle,
+      left: 523,
+      top: textTopFromBaseline(190, 64),
+      width: 650,
+      height: 90,
+      fontSize: 58,
+      minFontSize: 46,
+      color: '#FFFFFF',
+    },
+    {
+      text: cityTitle,
+      left: 520,
+      top: textTopFromBaseline(185, 64),
+      width: 650,
+      height: 90,
+      fontSize: 58,
+      minFontSize: 46,
+      color: '#3A2C22',
+    },
+    {
+      text: truncate(input.pokemonNames, 20),
+      left: 528,
+      top: textTopFromBaseline(265, 33),
+      width: 610,
+      height: 54,
+      fontSize: 31,
+      minFontSize: 24,
+      color: '#17614F',
+    },
+    {
+      text: truncate(badgeLabel, 14),
+      left: 560,
+      top: textTopFromBaseline(348, 29),
+      width: 410,
+      height: 52,
+      fontSize: 29,
+      color: '#17614F',
+    },
+    {
+      text: '旅先で見つける、全国のポケふたマップ',
+      left: 520,
+      top: textTopFromBaseline(440, 31),
+      width: 640,
+      height: 56,
+      fontSize: 29,
+      minFontSize: 25,
+      color: '#2F241C',
+    },
+    {
+      text: '旅行・お出かけのお供に！',
+      left: 90,
+      top: textTopFromBaseline(585, 24),
+      width: 390,
+      height: 44,
+      fontSize: 20,
+      minFontSize: 18,
+      color: '#FFFFFF',
+    },
+    {
+      text: 'pokefuta.com',
+      left: 900,
+      top: textTopFromBaseline(586, 25),
+      width: 224,
+      height: 44,
+      fontSize: 23,
+      color: '#17614F',
+      align: 'center',
+    },
+  ]);
 
-  return sharp(Buffer.from(svg)).resize(WIDTH, HEIGHT).png().toBuffer();
+  return sharp(base).composite(textLayers).png().toBuffer();
+}
+
+export async function renderOgpFallback(input: {
+  title: string;
+  subtitle: string;
+  siteLabel?: string;
+}): Promise<Buffer> {
+  const baseSvg = `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${WIDTH}" height="${HEIGHT}" fill="#F6EEDC"/>
+    <rect x="40" y="40" width="1120" height="550" rx="28" fill="#FFF8EB" stroke="#7B63A8" stroke-opacity="0.22" stroke-width="4"/>
+  </svg>`;
+  const base = await sharp(Buffer.from(baseSvg)).png().toBuffer();
+  const textLayers = await buildTextLayers([
+    {
+      text: truncate(input.title, 24),
+      left: 100,
+      top: textTopFromBaseline(300, 64),
+      width: 980,
+      height: 90,
+      fontSize: 64,
+      color: '#4F3828',
+    },
+    {
+      text: truncate(input.subtitle, 34),
+      left: 104,
+      top: textTopFromBaseline(370, 34),
+      width: 980,
+      height: 58,
+      fontSize: 34,
+      color: '#7B63A8',
+    },
+    {
+      text: input.siteLabel ?? 'pokefuta.com',
+      left: 104,
+      top: textTopFromBaseline(430, 28),
+      width: 520,
+      height: 48,
+      fontSize: 28,
+      color: '#5D6E68',
+    },
+  ]);
+
+  return sharp(base).composite(textLayers).png().toBuffer();
 }

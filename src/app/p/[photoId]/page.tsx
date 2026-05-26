@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
+import ShareButtons from '@/components/ShareButtons';
 import { formatDateJa } from '@/lib/date';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
+import { photoShareText } from '@/lib/share';
 import {
   getManholeLocationLabel,
   getSortedTitles,
@@ -37,7 +40,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ? photo.visit.comment
     : `${locationLabel}で見つけたポケふた写真です。`;
   const pageUrl = `${SITE_URL}/p/${photo.id}`;
-  const imageUrl = `${pageUrl}/opengraph-image`;
+  const imageUrl = `${pageUrl}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
   return {
     title,
@@ -69,20 +72,21 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
   const titles = getSortedTitles(photo.manhole.titles);
   const locationLabel = getManholeLocationLabel(photo.manhole);
+  const shareHashtags = titles.slice(0, 2).map((t) => t.hashtag).filter((h): h is string => Boolean(h));
+  const shareText = photoShareText(locationLabel, shareHashtags, photo.manhole.pokemons);
+  const shareUrl = `${SITE_URL}/p/${photo.id}`;
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+      <Header
+        title={SITE_NAME}
+        actions={
           <Link href={`/manhole/${photo.manhole.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[#4F3828]">
             <ArrowLeft className="h-4 w-4" />
             マンホール詳細へ
           </Link>
-          <Link href="/" className="text-sm font-extrabold text-[#7B63A8]">
-            {SITE_NAME}
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-4xl px-4 py-5 sm:py-8">
         <article className="overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -133,6 +137,13 @@ export default async function SharedPhotoPage({ params }: PageProps) {
                 {photo.visit.comment}
               </p>
             )}
+
+            <ShareButtons
+              label="この写真を共有する"
+              shareText={shareText}
+              shareUrl={shareUrl}
+              hashtags={shareHashtags}
+            />
 
             <div className="flex flex-wrap gap-3">
               <Link

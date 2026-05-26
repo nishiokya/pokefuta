@@ -10,24 +10,22 @@ import {
   ChevronRight,
   CircleDot,
   Compass,
-  Heart,
   MapPin,
-  MessageCircle,
-  Search,
-  SlidersHorizontal,
   Sparkles,
   Stamp,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
+import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { calculateDistance, isValidCoordinates } from '@/lib/location';
 
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -39,8 +37,13 @@ type FeedVisit = {
   comments_count: number;
 };
 
-type GalleryTab = 'latest';
+type GalleryTab = 'latest' | 'rare';
 type JourneyTab = 'history' | 'unvisited';
+
+const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
+  { key: 'latest', label: '最新の旅の記録' },
+  { key: 'rare', label: 'レアなポケふた' },
+];
 
 type JourneyVisit = {
   id: string;
@@ -66,17 +69,35 @@ type PrefectureProgress = {
   visited: number;
   remaining: number;
   rate: number;
+  unvisitedLatitude?: number;
+  unvisitedLongitude?: number;
+  distanceFromLatestKm?: number;
 };
 
-const galleryTabs: Array<{ key: GalleryTab | 'prefectures'; label: string; mobileLabel: string }> = [
-  { key: 'latest', label: '最新', mobileLabel: '最新' },
-  { key: 'prefectures', label: '都道府県から探す', mobileLabel: '探す' },
-];
+type PrefectureCandidate = PrefectureProgress & {
+  label: '制覇済み' | '制覇目前' | '旅の続き' | '近くで行けそう';
+};
 
 const journeyTabs: Array<{ key: JourneyTab; label: string }> = [
   { key: 'history', label: '訪問履歴' },
   { key: 'unvisited', label: '未訪問' },
 ];
+
+const getJourneyTabFromUrl = (): JourneyTab => {
+  if (typeof window === 'undefined') return 'history';
+  return new URLSearchParams(window.location.search).get('tab') === 'unvisited' ? 'unvisited' : 'history';
+};
+
+const updateJourneyTabUrl = (tab: JourneyTab, hash?: string) => {
+  const url = new URL(window.location.href);
+  if (tab === 'history') {
+    url.searchParams.delete('tab');
+  } else {
+    url.searchParams.set('tab', tab);
+  }
+  url.hash = hash ? `#${hash}` : '';
+  window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+};
 
 const getDisplayName = (session: any) => {
   const metadataName = session?.user?.user_metadata?.display_name;
@@ -122,16 +143,23 @@ const getManholeTags = (
   return tags.slice(0, max);
 };
 
-const stableHash = (value: string) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
+const hasCoordinates = (manhole?: Pick<JourneyManhole, 'latitude' | 'longitude'> | null) =>
+  isValidCoordinates(manhole?.latitude, manhole?.longitude);
+
+const INTERNAL_TAG_LABELS: Record<string, string> = {
+  unique_pokemon: '✨ このポケモンは全国でここだけ',
+  rare_pokemon: '🗾 レアポケふた',
+};
+
+const safeTagLabel = (tag: string): string | null => {
+  if (INTERNAL_TAG_LABELS[tag]) return INTERNAL_TAG_LABELS[tag];
+  if (/^[a-z][a-z0-9_]{2,}$/.test(tag)) return null;
+  return tag;
 };
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState('タコさん');
   const [loading, setLoading] = useState(true);
   const [totalManholes, setTotalManholes] = useState(0);
@@ -144,10 +172,21 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<GalleryTab>('latest');
+  const [galleryTab, setGalleryTab] = useState<GalleryTab>('latest');
+  const [rareManholes, setRareManholes] = useState<JourneyManhole[]>([]);
+  const [rareLoaded, setRareLoaded] = useState(false);
+  const [rareLoading, setRareLoading] = useState(false);
   const [journeyTab, setJourneyTab] = useState<JourneyTab>('history');
   const feedPerPage = 24;
   const { trackView, trackCollectionOpen, updateUserProperties } = useAnalytics();
+
+  const selectJourneyTab = (tab: JourneyTab, hash?: string) => {
+    setJourneyTab(tab);
+    updateJourneyTabUrl(tab, hash);
+    if (hash) {
+      window.requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' }));
+    }
+  };
 
   useEffect(() => {
     document.title = 'ポケふた写真館 - ポケふた訪問記録';
@@ -162,11 +201,14 @@ export default function HomePage() {
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
         trackCollectionOpen({ is_logged_in: loggedIn });
-        if (loggedIn) {
+        if (loggedIn && session?.user?.id) {
           setUserName(getDisplayName(session));
           updateUserProperties({ registered_user: true });
           setLoading(false);
           loadJourney();
+          const { data: myAppUserId } = await supabase
+            .rpc('get_my_app_user_id' as never);
+          setCurrentUserId((myAppUserId as string | null) ?? null);
         }
       } catch (error) {
         console.error('Session check error:', error);
@@ -180,6 +222,23 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    setJourneyTab(getJourneyTabFromUrl());
+
+    const handlePopState = () => {
+      setJourneyTab(getJourneyTabFromUrl());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && journeyTab === 'unvisited' && window.location.hash === '#journey-unvisited') {
+      window.requestAnimationFrame(() => document.getElementById('journey-unvisited')?.scrollIntoView());
+    }
+  }, [journeyTab, loading]);
+
+  useEffect(() => {
     loadFeed();
   }, [currentPage]);
 
@@ -187,7 +246,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at`,
+        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&include_manhole_tags=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -220,6 +279,34 @@ export default function HomePage() {
     } catch {
       // ignore
     }
+  };
+
+  const loadRareManholes = async () => {
+    if (rareLoaded || rareLoading) return;
+    setRareLoading(true);
+    try {
+      const response = await fetch('/api/manholes?no_photos=true&limit=500', { credentials: 'omit' });
+      if (!response.ok) throw new Error('Failed to load rare manholes');
+      const data = await response.json();
+      const manholes: JourneyManhole[] = Array.isArray(data.manholes)
+        ? data.manholes.sort((a: JourneyManhole, b: JourneyManhole) =>
+            `${a.prefecture}${a.municipality ?? ''}`.localeCompare(
+              `${b.prefecture}${b.municipality ?? ''}`, 'ja'
+            )
+          )
+        : [];
+      setRareManholes(manholes);
+      setRareLoaded(true);
+    } catch {
+      setRareLoaded(true);
+    } finally {
+      setRareLoading(false);
+    }
+  };
+
+  const selectGalleryTab = (tab: GalleryTab) => {
+    setGalleryTab(tab);
+    if (tab === 'rare') loadRareManholes();
   };
 
   const loadJourney = async () => {
@@ -286,12 +373,14 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const visibleFeed =
-    sortedFeed.length > 1 && sortedFeed.length % 2 === 1 ? sortedFeed.slice(0, -1) : sortedFeed;
-  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上` : '集計中';
+  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上掲載` : '掲載数を集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
+  const visibleFeed =
+    canGoNext && sortedFeed.length >= 3 && sortedFeed.length % 3 !== 0
+      ? sortedFeed.slice(0, sortedFeed.length - (sortedFeed.length % 3))
+      : sortedFeed;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
   const knownTotalManholes = totalManholes > 0 ? totalManholes : null;
@@ -356,25 +445,62 @@ export default function HomePage() {
         return new Date(bVisit?.shot_at || 0).getTime() - new Date(aVisit?.shot_at || 0).getTime();
       });
 
+    const latestVisitedManhole = visitedManholes.find(hasCoordinates);
     const prefectureProgress: PrefectureProgress[] = Array.from(
       allJourneyManholes.reduce((map, manhole) => {
         const name = manhole.prefecture || '都道府県未設定';
-        const current = map.get(name) || { totalIds: new Set<number>(), visitedIds: new Set<number>() };
+        const current = map.get(name) || {
+          totalIds: new Set<number>(),
+          visitedIds: new Set<number>(),
+          unvisitedLatitudeSum: 0,
+          unvisitedLongitudeSum: 0,
+          unvisitedCoordinateCount: 0,
+        };
         current.totalIds.add(manhole.id);
-        if (visitsByManholeId.has(manhole.id)) current.visitedIds.add(manhole.id);
+        if (visitsByManholeId.has(manhole.id)) {
+          current.visitedIds.add(manhole.id);
+        } else if (hasCoordinates(manhole)) {
+          current.unvisitedLatitudeSum += manhole.latitude!;
+          current.unvisitedLongitudeSum += manhole.longitude!;
+          current.unvisitedCoordinateCount += 1;
+        }
         map.set(name, current);
         return map;
-      }, new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>())
+      }, new Map<string, {
+        totalIds: Set<number>;
+        visitedIds: Set<number>;
+        unvisitedLatitudeSum: number;
+        unvisitedLongitudeSum: number;
+        unvisitedCoordinateCount: number;
+      }>())
     )
       .map(([name, value]) => {
         const total = value.totalIds.size;
         const visited = value.visitedIds.size;
+        const unvisitedLatitude =
+          value.unvisitedCoordinateCount > 0 ? value.unvisitedLatitudeSum / value.unvisitedCoordinateCount : undefined;
+        const unvisitedLongitude =
+          value.unvisitedCoordinateCount > 0 ? value.unvisitedLongitudeSum / value.unvisitedCoordinateCount : undefined;
+        const distanceFromLatestKm =
+          latestVisitedManhole &&
+          typeof unvisitedLatitude === 'number' &&
+          typeof unvisitedLongitude === 'number'
+            ? calculateDistance(
+                latestVisitedManhole.latitude!,
+                latestVisitedManhole.longitude!,
+                unvisitedLatitude,
+                unvisitedLongitude
+              )
+            : undefined;
         return {
           name,
           total,
           visited,
           remaining: Math.max(total - visited, 0),
           rate: total > 0 ? (visited / total) * 100 : 0,
+          unvisitedLatitude,
+          unvisitedLongitude,
+          distanceFromLatestKm,
         };
       })
       .sort((a, b) => {
@@ -400,17 +526,74 @@ export default function HomePage() {
         return dateDiff !== 0 ? dateDiff : b.id - a.id;
       })
       .slice(0, 4);
-    const usedCandidateIds = new Set([...nearbyCandidates, ...recentCandidates].map((manhole) => manhole.id));
-    const todaySeed = new Date().toISOString().slice(0, 10);
-    const interestingCandidates = unvisitedManholes
-      .filter((manhole) => !usedCandidateIds.has(manhole.id))
-      .filter((manhole) => (manhole.photo_count ?? 0) === 0)
-      .filter((manhole) => Array.isArray(manhole.titles) && manhole.titles.length > 0)
+
+    const completedPrefectures = prefectureProgress
+      .filter((prefecture) => prefecture.total > 0 && prefecture.remaining === 0)
       .sort((a, b) => {
-        const aPriority = Math.max(...a.titles.map((title) => title.priority ?? 0), 0);
-        const bPriority = Math.max(...b.titles.map((title) => title.priority ?? 0), 0);
-        if (bPriority !== aPriority) return bPriority - aPriority;
-        return stableHash(`${todaySeed}:${a.id}`) - stableHash(`${todaySeed}:${b.id}`);
+        if (b.total !== a.total) return b.total - a.total;
+        return a.name.localeCompare(b.name, 'ja');
+      });
+    const unfinishedPrefectures = prefectureProgress.filter(
+      (prefecture) => prefecture.total > 0 && prefecture.remaining > 0
+    );
+    const continuingPrefecture =
+      unfinishedPrefectures
+        .filter((prefecture) => prefecture.visited > 0)
+        .sort((a, b) => {
+          if (a.remaining !== b.remaining) return a.remaining - b.remaining;
+          if (b.visited !== a.visited) return b.visited - a.visited;
+          return a.name.localeCompare(b.name, 'ja');
+        })[0] || null;
+    const nextPrefectureCandidates: PrefectureCandidate[] = unfinishedPrefectures
+      .map((prefecture) => {
+        const isNearComplete = prefecture.visited > 0 && prefecture.remaining <= 3;
+        const hasNearbySignal = typeof prefecture.distanceFromLatestKm === 'number';
+        const label: PrefectureCandidate['label'] = isNearComplete
+          ? '制覇目前'
+          : hasNearbySignal
+            ? '近くで行けそう'
+            : '旅の続き';
+        return { ...prefecture, label };
+      })
+      .sort((a, b) => {
+        const aNearComplete = a.visited > 0 && a.remaining <= 3 ? 0 : 1;
+        const bNearComplete = b.visited > 0 && b.remaining <= 3 ? 0 : 1;
+        if (aNearComplete !== bNearComplete) return aNearComplete - bNearComplete;
+
+        const aDistance = a.distanceFromLatestKm ?? Number.POSITIVE_INFINITY;
+        const bDistance = b.distanceFromLatestKm ?? Number.POSITIVE_INFINITY;
+        if (aDistance !== bDistance) return aDistance - bDistance;
+
+        if (b.remaining !== a.remaining) return b.remaining - a.remaining;
+        if (b.visited !== a.visited) return b.visited - a.visited;
+        return a.name.localeCompare(b.name, 'ja');
+      })
+      .slice(0, 3);
+    const progressByPrefecture = new Map(prefectureProgress.map((prefecture) => [prefecture.name, prefecture]));
+    const usedUnvisitedCandidateIds = new Set(
+      [...nearbyCandidates, ...recentCandidates].map((manhole) => manhole.id)
+    );
+    const journeyContinuationCandidates = unvisitedManholes
+      .filter((manhole) => !usedUnvisitedCandidateIds.has(manhole.id))
+      .sort((a, b) => {
+        const aProgress = progressByPrefecture.get(a.prefecture || '都道府県未設定');
+        const bProgress = progressByPrefecture.get(b.prefecture || '都道府県未設定');
+        const aSameAsContinuing = continuingPrefecture && a.prefecture === continuingPrefecture.name ? 0 : 1;
+        const bSameAsContinuing = continuingPrefecture && b.prefecture === continuingPrefecture.name ? 0 : 1;
+        if (aSameAsContinuing !== bSameAsContinuing) return aSameAsContinuing - bSameAsContinuing;
+
+        const aVisited = aProgress?.visited ?? 0;
+        const bVisited = bProgress?.visited ?? 0;
+        if (bVisited !== aVisited) return bVisited - aVisited;
+
+        const aRemaining = aProgress?.remaining ?? Number.POSITIVE_INFINITY;
+        const bRemaining = bProgress?.remaining ?? Number.POSITIVE_INFINITY;
+        if (aRemaining !== bRemaining) return aRemaining - bRemaining;
+
+        return `${a.prefecture}${getMunicipality(a)}${a.id}`.localeCompare(
+          `${b.prefecture}${getMunicipality(b)}${b.id}`,
+          'ja'
+        );
       })
       .slice(0, 4);
 
@@ -418,68 +601,31 @@ export default function HomePage() {
       visitsByManholeId,
       visitedCount: visitsByManholeId.size,
       visitedManholes,
-      prefectureProgress,
-      leadingPrefectures: prefectureProgress.filter((prefecture) => prefecture.visited > 0).slice(0, 3),
-      nextPrefecture: prefectureProgress.find((prefecture) => prefecture.visited > 0 && prefecture.remaining > 0),
+      completedPrefectures,
+      continuingPrefecture,
+      nextPrefectureCandidates,
       nearbyCandidates,
       recentCandidates,
-      interestingCandidates,
+      journeyContinuationCandidates,
     };
   }, [journeyVisits, journeyManholes, nearbyUnvisited]);
 
   const {
     visitsByManholeId,
     visitedCount,
-    prefectureProgress,
-    leadingPrefectures,
-    nextPrefecture,
+    completedPrefectures,
+    continuingPrefecture,
+    nextPrefectureCandidates,
     visitedManholes,
     nearbyCandidates,
     recentCandidates,
-    interestingCandidates,
+    journeyContinuationCandidates,
   } = journeyData;
   const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 font-bold" aria-label="ポケふた写真館">
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2A2A2A] bg-white shadow-sm">
-              <span className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-[#E85046]" />
-              <span className="absolute inset-x-0 top-1/2 h-[2px] bg-[#2A2A2A]" />
-              <span className="relative h-3 w-3 rounded-full border-2 border-[#2A2A2A] bg-white" />
-            </span>
-            <span className="text-base sm:text-lg">ポケふた写真館</span>
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/manholes"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="検索"
-              title="検索"
-            >
-              <Search className="h-5 w-5" />
-            </Link>
-            <Link
-              href="/nearby"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="絞り込み"
-              title="絞り込み"
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </Link>
-            <Link
-              href={uploadHref}
-              className="hidden items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:flex"
-            >
-              <Camera className="h-4 w-4" />
-              写真を投稿
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header title="ポケふた写真館" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Loading State */}
@@ -497,7 +643,7 @@ export default function HomePage() {
           <>
             {isLoggedIn ? (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8">
+                <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8 sm:py-8">
                   <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
                   <div className="relative">
                     <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
@@ -508,38 +654,68 @@ export default function HomePage() {
                       {userName}のポケふた旅
                     </h1>
 
-                    <div className="mt-5 max-w-3xl rounded-[8px] border border-[#8C6A4A]/15 bg-white/60 p-4">
-                      <div className="mb-2 flex items-end justify-between gap-3">
+                    <div className="mt-5 rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:p-5">
+                      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
                         <div>
-                          <p className="font-pixel text-2xl text-[#4F3828]">
-                            {visitedCount} / {knownTotalManholes ?? '集計中'} STAMPS
-                          </p>
-                          <p className="mt-1 text-xs font-bold text-[#6A4D36]">旅の進捗</p>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                              <p className="font-pixel text-3xl leading-none text-[#4F3828] sm:text-4xl">
+                                {visitedCount} / {knownTotalManholes ?? '集計中'}
+                              </p>
+                              <p className="mt-2 text-xs font-extrabold text-[#6A4D36]">STAMPS</p>
+                            </div>
+                            <div className="rounded-[7px] border border-[#B5483C]/20 bg-[#FFF7E5] px-3 py-2">
+                              <p className="text-[11px] font-extrabold text-[#6A4D36]">全国達成率</p>
+                              <p className="mt-1 font-pixel text-2xl leading-none text-[#B5483C]">
+                                {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4 h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#8C6A4A] via-[#DDA63A] to-[#2C765E]"
+                              style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
+                            />
+                          </div>
+                          <JourneyPrefectureOverview
+                            completedPrefectures={completedPrefectures}
+                            continuingPrefecture={continuingPrefecture}
+                            userId={currentUserId}
+                          />
                         </div>
-                        <p className="font-pixel text-xl text-[#B5483C]">
-                          {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
-                        </p>
-                      </div>
-                      <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]"
-                          style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                        />
-                      </div>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        {(leadingPrefectures.length > 0 ? leadingPrefectures : prefectureProgress.slice(0, 3)).map((prefecture) => (
-                          <JourneyPrefectureStat key={prefecture.name} prefecture={prefecture} />
-                        ))}
+
+                        <div>
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-extrabold text-[#6A4D36]">次に狙いたい県</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#8C6A4A]">旅の続きにしやすい候補</p>
+                            </div>
+                            <Compass className="h-5 w-5 text-[#B5483C]" />
+                          </div>
+                          {nextPrefectureCandidates.length > 0 ? (
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                              {nextPrefectureCandidates.map((prefecture) => (
+                                <JourneyPrefectureStat
+                                  key={prefecture.name}
+                                  prefecture={prefecture}
+                                  label={prefecture.label}
+                                  userId={currentUserId}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <JourneyCandidateNotice text="最初の訪問を記録すると、次の旅先候補がここに育っていきます。" />
+                          )}
+                          <Link
+                            href="/nearby?tab=unvisited"
+                            className="mt-4 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[7px] bg-[#B5483C] px-5 py-3 text-sm font-extrabold text-white shadow-[0_6px_14px_rgba(181,72,60,0.22)] transition hover:bg-[#9F3D33] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+                          >
+                            <MapPin className="h-5 w-5" />
+                            次のポケふたを探す
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                    {nextPrefecture && (
-                      <div className="mt-4 inline-flex rounded-[7px] border border-[#DDA63A]/30 bg-[#FFF0C7] px-3 py-2">
-                        <p className="flex items-center gap-2 text-xs font-extrabold text-[#8C6315]">
-                          <Award className="h-4 w-4" />
-                          あと{nextPrefecture.remaining}枚で{nextPrefecture.name}制覇
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </section>
 
@@ -552,7 +728,7 @@ export default function HomePage() {
                           <button
                             key={tab.key}
                             type="button"
-                            onClick={() => setJourneyTab(tab.key)}
+                            onClick={() => selectJourneyTab(tab.key)}
                             className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
                               isActive
                                 ? 'bg-[#4F3828] text-[#FFF7E5] shadow-sm'
@@ -605,11 +781,11 @@ export default function HomePage() {
                     >
                       {nearbyCandidates.length > 0 ? (
                         nearbyCandidates.map((manhole) => (
-                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="近い" />
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="近くで行けそう" />
                         ))
                       ) : (
                         <JourneyCandidateNotice
-                          text={nearbyStatus === 'unavailable' ? '位置情報が使えませんでした。最近追加と発見候補から探せます。' : '位置情報を使うと近くの未訪問を4件表示できます。'}
+                          text={nearbyStatus === 'unavailable' ? '位置情報が使えませんでした。最近追加の候補から探せます。' : '位置情報を使うと近くの未訪問を4件表示できます。'}
                         />
                       )}
                     </JourneyCandidateSection>
@@ -624,13 +800,13 @@ export default function HomePage() {
                       )}
                     </JourneyCandidateSection>
 
-                    <JourneyCandidateSection title="称号が気になる未訪問" description="写真がまだ少なく、titlesが個性的な発見候補">
-                      {interestingCandidates.length > 0 ? (
-                        interestingCandidates.map((manhole) => (
-                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="発見" />
+                    <JourneyCandidateSection id="journey-unvisited" title="旅の続きを見る" description="新しい目的地を地図から探す前の候補">
+                      {journeyContinuationCandidates.length > 0 ? (
+                        journeyContinuationCandidates.map((manhole) => (
+                          <JourneyUnvisitedCard key={manhole.id} manhole={manhole} badge="旅の続き" />
                         ))
                       ) : (
-                        <JourneyCandidateNotice text="称号つきの未訪問候補を準備中です。" />
+                        <JourneyCandidateNotice text="未訪問候補を準備中です。" />
                       )}
                     </JourneyCandidateSection>
                   </section>
@@ -638,73 +814,77 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-8 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-12">
-                  <div className="absolute right-6 top-7 hidden w-[300px] rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block xl:w-[360px]">
-                    <img
-                      src="/pokefuta_photo_gallery_mockup.svg"
-                      alt=""
-                      className="h-[220px] w-full rounded-[6px] object-cover object-left-top xl:h-[250px]"
-                    />
-                  </div>
-                  <div className="relative max-w-3xl lg:max-w-[680px]">
-                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      旅行スタンプ帳
-                    </div>
-                    <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                      旅先で見つけたポケふたを記録しよう
-                    </h1>
-                    <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                      旅行やお出かけで出会ったポケふた写真をみんなでシェアしよう！
-                    </p>
+                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
+                    <div className="relative max-w-3xl">
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        ポケふた旅日記
+                      </div>
+                      <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                        全国に広がるポケふた。
+                      </h1>
+                      <div className="mt-4 max-w-2xl space-y-3 text-base font-medium leading-relaxed sm:text-lg">
+                        <p>
+                          海沿いの町、温泉地、離島、雪国の駅前。
+                          旅先でしか出会えない
+                          <span className="font-extrabold text-[#7B63A8]"> "レアなポケふた"</span> がたくさんあります。
+                        </p>
+                        <p>
+                          地図を片手に探し回ったり、偶然見つけたり。
+                          その土地の景色と一緒に、ポケふたを記録してみませんか？
+                        </p>
+                      </div>
 
-                    <div className="mt-7 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="flex items-center gap-3 rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-4 shadow-sm">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#7B63A8] shadow-sm">
-                          <MapPin className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <div className="text-xl font-extrabold leading-none">全国387自治体</div>
-                          <div className="mt-1 text-xs font-bold text-[#6B6B6B]">に設置</div>
-                        </div>
+                      <p className="mt-4 text-xs font-bold text-[#9B9B9B]">全国387自治体 · {listedCountLabel}</p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          href="/nearby?tab=all"
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                        >
+                          <Compass className="h-4 w-4" />
+                          ポケふたを地図で探す
+                        </Link>
+                        <Link
+                          href="/nearby"
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          近くのポケふたを見る
+                        </Link>
+                        <Link
+                          href={uploadHref}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                        >
+                          <Camera className="h-4 w-4" />
+                          旅の記録を残す
+                        </Link>
                       </div>
-                      <div className="flex items-center gap-3 rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-4 shadow-sm">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#FF8F1F] shadow-sm">
-                          <Compass className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <div className="text-xl font-extrabold leading-none">{listedCountLabel}</div>
-                          <div className="mt-1 text-xs font-bold text-[#6B6B6B]">のポケふたを掲載</div>
-                        </div>
-                      </div>
+                    </div>
+
+                    <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
+                      <img
+                        src="/pokefuta_photo_gallery_mockup.svg"
+                        alt=""
+                        className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
+                      />
                     </div>
                   </div>
                 </section>
 
-                <section className="mt-6">
+                <section className="mt-4 sm:mt-5">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
-                    <div className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
+                    <div role="tablist" className="flex min-w-max gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-1 shadow-sm sm:min-w-0">
                       {galleryTabs.map((tab) => {
-                        if (tab.key === 'prefectures') {
-                          return (
-                            <Link
-                              key={tab.key}
-                              href="/manholes"
-                              className="flex min-h-[44px] items-center justify-center gap-2 rounded-[7px] px-5 text-sm font-bold text-[#2A2A2A] transition hover:bg-white"
-                            >
-                              <span className="hidden sm:inline">{tab.label}</span>
-                              <span className="sm:hidden">{tab.mobileLabel}</span>
-                              <MapPin className="h-4 w-4" />
-                            </Link>
-                          );
-                        }
-
-                        const isActive = activeTab === tab.key;
+                        const isActive = galleryTab === tab.key;
                         return (
                           <button
                             key={tab.key}
+                            role="tab"
+                            aria-selected={isActive}
                             type="button"
-                            onClick={() => setActiveTab(tab.key as GalleryTab)}
+                            onClick={() => selectGalleryTab(tab.key)}
                             className={`min-h-[44px] rounded-[7px] px-5 text-sm font-bold transition ${
                               isActive
                                 ? 'bg-[#7B63A8] text-white shadow-sm'
@@ -719,7 +899,32 @@ export default function HomePage() {
                   </div>
                 </section>
 
-                <section className="mt-6">
+                {galleryTab === 'rare' && (
+                  <section className="mt-6">
+                    {rareLoading ? (
+                      <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                        <p className="text-sm font-bold text-[#6B6B6B]">読み込み中…</p>
+                      </div>
+                    ) : rareManholes.length === 0 ? (
+                      <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                        <p className="text-sm font-bold text-[#6B6B6B]">レアなポケふたが見つかりませんでした</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mb-3 text-xs font-bold text-[#6B6B6B]">
+                          まだ誰も記録していないポケふた（{rareManholes.length}件）
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
+                          {rareManholes.map((manhole) => (
+                            <RareManholeCard key={manhole.id} manhole={manhole} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                )}
+
+                <section className="mt-6" style={{ display: galleryTab === 'latest' ? undefined : 'none' }}>
                   {visibleFeed.length === 0 ? (
                     <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                       <p className="text-sm font-bold text-[#6B6B6B]">
@@ -730,7 +935,7 @@ export default function HomePage() {
                         className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                       >
                         <Camera className="w-4 h-4" />
-                        <span>ログインして投稿</span>
+                        <span>旅の続きで投稿</span>
                       </Link>
                     </div>
                   ) : (
@@ -745,7 +950,7 @@ export default function HomePage() {
                         const canNavigate = Boolean(manholeId);
                         const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                        const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、いいね ${visit.likes_count}、コメント ${visit.comments_count}`;
+                        const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}`;
                         const cardContent = (
                           <>
                             {photo?.thumbnail_url ? (
@@ -771,16 +976,20 @@ export default function HomePage() {
                                 {locationLabel || 'ポケふた'}
                               </div>
                               <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
-                              <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
-                                <span className="inline-flex items-center gap-1">
-                                  <Heart className="h-4 w-4" />
-                                  {visit.likes_count}
-                                </span>
-                                <span className="inline-flex items-center gap-1">
-                                  <MessageCircle className="h-4 w-4" />
-                                  {visit.comments_count}
-                                </span>
-                              </div>
+                              {(() => {
+                                const tags = getManholeTags(visit.manhole, 2)
+                                  .map(safeTagLabel)
+                                  .filter(Boolean) as string[];
+                                return tags.length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {tags.map((tag) => (
+                                      <span key={tag} className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold backdrop-blur-sm">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </>
                         );
@@ -824,7 +1033,7 @@ export default function HomePage() {
             </div>
 
             {/* Feed Pagination */}
-            {!isLoggedIn && showPagination && (
+            {!isLoggedIn && galleryTab === 'latest' && showPagination && (
               <div className="mt-7 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm">
                 <div className="flex items-center justify-center gap-3">
                   <button
@@ -873,19 +1082,118 @@ export default function HomePage() {
   );
 }
 
-function JourneyPrefectureStat({ prefecture }: { prefecture: PrefectureProgress }) {
+function JourneyPrefectureOverview({
+  completedPrefectures,
+  continuingPrefecture,
+  userId,
+}: {
+  completedPrefectures: PrefectureProgress[];
+  continuingPrefecture: PrefectureProgress | null;
+  userId: string | null;
+}) {
   return (
-    <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
-        <p className="shrink-0 font-pixel text-sm text-[#B5483C]">
-          {prefecture.visited}/{prefecture.total}
-        </p>
+    <div className="mt-5 space-y-4">
+      <div>
+        <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#2C765E]">
+          <Award className="h-4 w-4" />
+          制覇済み
+        </div>
+        {completedPrefectures.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {completedPrefectures.slice(0, 8).map((prefecture) => (
+              <JourneyPrefectureStat
+                key={prefecture.name}
+                prefecture={prefecture}
+                label="制覇済み"
+                userId={userId}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[7px] border border-dashed border-[#8C6A4A]/25 bg-[#FFF7E5] px-3 py-3 text-xs font-bold text-[#6A4D36]">
+            はじめての県制覇まで、旅の記録を重ねていこう。
+          </div>
+        )}
       </div>
-      <div className="h-2 overflow-hidden rounded-sm bg-[#E4D4B8]">
-        <div className="h-full bg-[#3F9D7D]" style={{ width: `${Math.min(prefecture.rate, 100)}%` }} />
+
+      <div>
+        <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#6A4D36]">
+          <Compass className="h-4 w-4 text-[#8C6A4A]" />
+          旅の続き
+        </div>
+        {continuingPrefecture ? (
+          <JourneyPrefectureStat prefecture={continuingPrefecture} label="旅の続き" userId={userId} />
+        ) : (
+          <div className="rounded-[7px] border border-dashed border-[#8C6A4A]/25 bg-[#FFF7E5] px-3 py-3 text-xs font-bold text-[#6A4D36]">
+            訪問を記録すると、続きにしたい県がここに出ます。
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function JourneyPrefectureStat({
+  prefecture,
+  label,
+  userId,
+}: {
+  prefecture: PrefectureProgress;
+  label?: PrefectureCandidate['label'];
+  userId?: string | null;
+}) {
+  const complete = prefecture.total > 0 && prefecture.remaining === 0;
+  const displayLabel = label || (complete ? '制覇済み' : '旅の続き');
+  const content = (
+    <>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-extrabold text-[#4F3828]">{prefecture.name}</p>
+          <p className="mt-1 font-pixel text-sm leading-none text-[#B5483C]">
+            {prefecture.visited} / {prefecture.total}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-extrabold ${
+          complete
+            ? 'bg-[#E6F4DD] text-[#2C765E]'
+            : displayLabel === '制覇目前'
+              ? 'bg-[#FFF0C7] text-[#8C6315]'
+              : displayLabel === '近くで行けそう'
+                ? 'bg-white text-[#B5483C]'
+                : 'bg-[#EFE2CE] text-[#6A4D36]'
+        }`}>
+          {displayLabel}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-sm border border-[#8C6A4A]/10 bg-[#E4D4B8]">
+        <div
+          className={`h-full ${complete ? 'bg-[#2C765E]' : 'bg-[#8C6A4A]'}`}
+          style={{ width: `${Math.min(prefecture.rate, 100)}%` }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] font-bold text-[#6A4D36]">
+        <span>{complete ? '制覇済み' : `あと${prefecture.remaining}枚`}</span>
+        <span>{prefecture.rate.toFixed(0)}%</span>
+      </div>
+    </>
+  );
+
+  if (!userId) {
+    return (
+      <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/users/${encodeURIComponent(userId)}/prefectures?prefecture=${encodeURIComponent(prefecture.name)}`}
+      className="block rounded-[7px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+      aria-label={`${prefecture.name}の達成状況を見る`}
+    >
+      {content}
+    </Link>
   );
 }
 
@@ -968,18 +1276,20 @@ function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visi
 }
 
 function JourneyCandidateSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div id={id}>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-[#4F3828]">{title}</h2>
@@ -1039,6 +1349,50 @@ function JourneyCandidateNotice({ text }: { text: string }) {
     <div className="col-span-full rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-4 py-5 text-sm font-bold text-[#6A4D36] shadow-sm">
       {text}
     </div>
+  );
+}
+
+function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
+  const tags = getManholeTags(manhole, 3);
+
+  return (
+    <Link
+      href={`/manhole/${manhole.id}`}
+      className="group relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-[8px] border-2 border-dashed border-[#7B63A8]/30 bg-[#F5F0FF] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
+    >
+      <div className="absolute inset-0 opacity-[0.05] [background-image:linear-gradient(90deg,#7B63A8_1px,transparent_1px),linear-gradient(#7B63A8_1px,transparent_1px)] [background-size:16px_16px]" />
+      <div className="relative flex items-center justify-between gap-2">
+        <span className="rounded-full bg-[#7B63A8]/15 px-2 py-1 text-[11px] font-extrabold text-[#7B63A8]">
+          ✨ レアなポケふた
+        </span>
+        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-[#6B6B6B]">
+          🗺️ 未踏の地
+        </span>
+      </div>
+
+      <div className="relative flex flex-1 items-center justify-center py-3">
+        <div className="flex h-16 w-16 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#7B63A8]/30 text-[#7B63A8]/60">
+          <MapPin className="h-7 w-7" />
+        </div>
+      </div>
+
+      <div className="relative">
+        <p className="line-clamp-1 text-sm font-extrabold text-[#2A2A2A]">
+          {[manhole.prefecture, manhole.municipality].filter(Boolean).join(' ')}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(tags.length > 0 ? tags : [getManholeTitle(manhole)])
+            .map(safeTagLabel)
+            .filter(Boolean)
+            .slice(0, 3)
+            .map((tag) => (
+              <span key={tag!} className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[#7B63A8]">
+                {tag}
+              </span>
+            ))}
+        </div>
+      </div>
+    </Link>
   );
 }
 

@@ -52,6 +52,7 @@ export function useAnalytics() {
   const trackLoginSuccess  = useCallback((p?: PokefutaEventParams) => pokefutaEvents.loginSuccess(p), []);
   const trackSignupStart   = useCallback((p?: PokefutaEventParams) => pokefutaEvents.signupStart(p), []);
   const trackSignupComplete= useCallback((p?: PokefutaEventParams) => pokefutaEvents.signupComplete(p), []);
+  const trackSignupEmailConfirmed = useCallback((p?: PokefutaEventParams) => pokefutaEvents.signupEmailConfirmed(p), []);
   const trackLogout        = useCallback((p?: PokefutaEventParams) => pokefutaEvents.logout(p), []);
 
   // --- 訪問記録系 ---
@@ -85,6 +86,7 @@ export function useAnalytics() {
 
   // --- SNS導線系 ---
   const trackFooterXClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.footerXClick(p), []);
+  const trackXLinkClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.xLinkClick(p), []);
 
   // --- 後方互換用 ---
   const trackSearch = useCallback(
@@ -126,6 +128,7 @@ export function useAnalytics() {
     trackLoginSuccess,
     trackSignupStart,
     trackSignupComplete,
+    trackSignupEmailConfirmed,
     trackLogout,
 
     // 訪問記録系
@@ -159,6 +162,7 @@ export function useAnalytics() {
 
     // SNS導線系
     trackFooterXClick,
+    trackXLinkClick,
 
     // 内部エラー追跡
     trackApiError,
