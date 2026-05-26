@@ -115,40 +115,47 @@ export default function PopularPage() {
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Hero Section */}
-        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-gradient-to-br from-[#FFF8EB] to-[#FFE6D5] px-5 py-8 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-12">
-          <div className="absolute right-6 top-6 opacity-20">
-            <TrendingUp className="h-32 w-32 text-[#7B63A8]" />
-          </div>
-          <div className="relative max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-              <Sparkles className="h-3.5 w-3.5" />
-              みんなのポケふた投稿
-            </div>
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              旅先で出会ったポケふた写真を眺めよう
-            </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-[#6B6B6B] sm:text-lg">
-              全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
-              ログインすると、あなたの旅の続きとして記録を保存できます。
-            </p>
-
-            {!isLoggedIn && (
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                >
-                  <Camera className="h-4 w-4" />
-                  無料で旅の記録をはじめる
-                </Link>
-                <Link
-                  href="/visits"
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
-                >
-                  スタンプ帳を見る
-                </Link>
+        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="relative max-w-3xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                <Sparkles className="h-3.5 w-3.5" />
+                みんなのポケふた投稿
               </div>
-            )}
+              <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                旅先で出会ったポケふた写真を眺めよう
+              </h1>
+              <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+                全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
+                ログインすると、あなたの旅の続きとして記録を保存できます。
+              </p>
+
+              {!isLoggedIn && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                  >
+                    <Camera className="h-4 w-4" />
+                    無料で旅の記録をはじめる
+                  </Link>
+                  <Link
+                    href="/visits"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                  >
+                    スタンプ帳を見る
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
+              <img
+                src="/pokefuta_photo_gallery_mockup.svg"
+                alt=""
+                className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
+              />
+            </div>
           </div>
         </section>
 
