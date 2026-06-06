@@ -299,6 +299,7 @@ export interface Database {
         };
         Update: {
           metadata?: Record<string, any>;
+          shot_context_label?: ShotContextLabel | null;
           sort_order?: number;
           updated_at?: string;
         };

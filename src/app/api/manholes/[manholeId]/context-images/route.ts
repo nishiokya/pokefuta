@@ -4,8 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { Database, ShotContextLabel } from '@/types/database';
 import { generateContextImageStorageKey, storage } from '@/lib/storage';
+import { SHOT_CONTEXT_LABELS } from '@/lib/shot-context-labels';
 
 const MAX_CONTEXT_IMAGES_PER_USER_MANHOLE = 5;
+const MAX_CONTEXT_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 const IOS_PLATFORM_HEADER = 'x-pokefuta-client-platform';
 const IOS_TOKEN_HEADER = 'x-pokefuta-ios-api-key';
 
@@ -17,15 +19,12 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'image/webp',
 ]);
 
-const SHOT_CONTEXT_LABELS = new Set<ShotContextLabel>([
-  'centered_clean',
-  'selfie_with_manhole',
-  'wide_context',
-  'signage_info',
-  'partial_occluded',
-  'not_relevant',
-  'low_quality',
-]);
+class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
 
 function isIosContextRequest(request: NextRequest) {
   const platform = request.headers.get(IOS_PLATFORM_HEADER)?.toLowerCase();
@@ -46,20 +45,20 @@ function isIosContextRequest(request: NextRequest) {
 function parseJsonField(value: FormDataEntryValue | null, fieldName: string) {
   if (value == null || value === '') return null;
   if (typeof value !== 'string') {
-    throw new Error(`${fieldName} must be a JSON string`);
+    throw new ValidationError(`${fieldName} must be a JSON string`);
   }
 
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error(`${fieldName} must be valid JSON`);
+    throw new ValidationError(`${fieldName} must be valid JSON`);
   }
 }
 
 function parseShotContextLabel(value: FormDataEntryValue | null): ShotContextLabel | null {
   if (typeof value !== 'string' || value.length === 0) return null;
   if (!SHOT_CONTEXT_LABELS.has(value as ShotContextLabel)) {
-    throw new Error('Invalid shot_context_label');
+    throw new ValidationError('Invalid shot_context_label');
   }
   return value as ShotContextLabel;
 }
@@ -68,7 +67,7 @@ function parseConfidence(value: FormDataEntryValue | null) {
   if (typeof value !== 'string' || value.length === 0) return null;
   const confidence = Number(value);
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-    throw new Error('shot_context_confidence must be between 0 and 1');
+    throw new ValidationError('shot_context_confidence must be between 0 and 1');
   }
   return confidence;
 }
@@ -183,6 +182,13 @@ export async function POST(
       }, { status: 400 });
     }
 
+    if (file.size > MAX_CONTEXT_IMAGE_SIZE_BYTES) {
+      return NextResponse.json({
+        success: false,
+        error: `Context image is too large (max ${MAX_CONTEXT_IMAGE_SIZE_BYTES / 1024 / 1024}MB)`,
+      }, { status: 400 });
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
 
@@ -275,18 +281,12 @@ export async function POST(
       }
     }
 
-    const message = error?.message || 'Unknown error';
-    const status = message.includes('Invalid')
-      || message.includes('must be')
-      || message.includes('valid JSON')
-      ? 400
-      : 500;
-
+    const isValidation = error instanceof ValidationError;
     console.error('Context image upload error:', error);
     return NextResponse.json({
       success: false,
-      error: status === 400 ? message : 'Failed to upload context image',
-      details: status === 400 ? undefined : message,
-    }, { status });
+      error: isValidation ? error.message : 'Failed to upload context image',
+      details: isValidation ? undefined : error?.message,
+    }, { status: isValidation ? 400 : 500 });
   }
 }
