@@ -104,7 +104,7 @@ export function trackPageView(
   pageTitle: string,
   pageType?: string
 ): void {
-  trackEvent('page_view', {
+  trackEvent('p_page_view', {
     page_path: pagePath,
     page_title: pageTitle,
     page_type: pageType,
