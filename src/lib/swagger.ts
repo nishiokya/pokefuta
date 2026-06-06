@@ -25,6 +25,12 @@ const options: swaggerJsdoc.Options = {
           name: 'supabase-auth-token',
           description: 'Supabase認証Cookie',
         },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Supabase Access Token (iOSアプリ等モバイルクライアント用)',
+        },
       },
       schemas: {
         Manhole: {
@@ -91,6 +97,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'visits', description: '訪問記録' },
       { name: 'photos', description: '写真管理' },
       { name: 'auth', description: '認証' },
+      { name: 'user', description: '認証ユーザー自身のリソース' },
     ],
   },
   apis: ['./src/app/api/**/*.ts'],
