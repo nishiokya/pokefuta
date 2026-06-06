@@ -80,7 +80,7 @@ import { Database } from '@/types/database';
 // ==========================================
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { manholeId: string } }
 ) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -89,7 +89,7 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const manholeId = Number(params.id);
+    const manholeId = Number(params.manholeId);
     if (!Number.isFinite(manholeId)) {
       return NextResponse.json(
         { success: false, error: 'Invalid manhole id' },
@@ -179,7 +179,7 @@ export async function GET(
 // ==========================================
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { manholeId: string } }
 ) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
@@ -192,7 +192,7 @@ export async function POST(
       );
     }
 
-    const manholeId = Number(params.id);
+    const manholeId = Number(params.manholeId);
     if (!Number.isFinite(manholeId)) {
       return NextResponse.json(
         { success: false, error: 'Invalid manhole id' },

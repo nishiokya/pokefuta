@@ -36,6 +36,32 @@ export function generateStorageKey(type: 'original' | 'thumb', size?: number): s
   return `photos/original/${year}/${month}/${uuid}.jpg`;
 }
 
+export function generateContextImageStorageKey(manholeId: number, contentType?: string): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const uuid = crypto.randomUUID();
+  const extension = contentTypeToExtension(contentType);
+
+  return `photos/context/original/${year}/${month}/manholes/${manholeId}/${uuid}.${extension}`;
+}
+
+function contentTypeToExtension(contentType?: string): string {
+  switch (contentType) {
+    case 'image/png':
+      return 'png';
+    case 'image/heic':
+      return 'heic';
+    case 'image/heif':
+      return 'heif';
+    case 'image/webp':
+      return 'webp';
+    case 'image/jpeg':
+    default:
+      return 'jpg';
+  }
+}
+
 export function parseStorageKey(key: string) {
   const parts = key.split('/');
   if (parts.length < 4) {

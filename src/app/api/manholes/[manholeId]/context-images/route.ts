@@ -1,0 +1,292 @@
+import { createHash } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
+import { Database, ShotContextLabel } from '@/types/database';
+import { generateContextImageStorageKey, storage } from '@/lib/storage';
+import { SHOT_CONTEXT_LABELS } from '@/lib/shot-context-labels';
+
+const MAX_CONTEXT_IMAGES_PER_USER_MANHOLE = 5;
+const MAX_CONTEXT_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+const IOS_PLATFORM_HEADER = 'x-pokefuta-client-platform';
+const IOS_TOKEN_HEADER = 'x-pokefuta-ios-api-key';
+
+const ALLOWED_CONTENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+]);
+
+class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+function isIosContextRequest(request: NextRequest) {
+  const platform = request.headers.get(IOS_PLATFORM_HEADER)?.toLowerCase();
+  if (platform !== 'ios') return false;
+
+  const configuredToken = process.env.IOS_CONTEXT_UPLOAD_TOKEN;
+  if (!configuredToken) return true;
+
+  const tokenHeader = request.headers.get(IOS_TOKEN_HEADER);
+  const authorization = request.headers.get('authorization');
+  const bearerToken = authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : null;
+
+  return tokenHeader === configuredToken || bearerToken === configuredToken;
+}
+
+function parseJsonField(value: FormDataEntryValue | null, fieldName: string) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new ValidationError(`${fieldName} must be a JSON string`);
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new ValidationError(`${fieldName} must be valid JSON`);
+  }
+}
+
+function parseShotContextLabel(value: FormDataEntryValue | null): ShotContextLabel | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (!SHOT_CONTEXT_LABELS.has(value as ShotContextLabel)) {
+    throw new ValidationError('Invalid shot_context_label');
+  }
+  return value as ShotContextLabel;
+}
+
+function parseConfidence(value: FormDataEntryValue | null) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const confidence = Number(value);
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new ValidationError('shot_context_confidence must be between 0 and 1');
+  }
+  return confidence;
+}
+
+async function getImageDimensions(buffer: Buffer) {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    return {
+      width: metadata.width ?? null,
+      height: metadata.height ?? null,
+    };
+  } catch {
+    return {
+      width: null,
+      height: null,
+    };
+  }
+}
+
+/**
+ * @swagger
+ * /api/manholes/{manholeId}/context-images:
+ *   post:
+ *     summary: iOSアプリからマンホール周辺画像をアップロード
+ *     tags: [photos]
+ *     security:
+ *       - cookieAuth: []
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { manholeId: string } }
+) {
+  let uploadedStorageKey: string | null = null;
+
+  try {
+    if (!isIosContextRequest(request)) {
+      return NextResponse.json({
+        success: false,
+        error: 'iOS app authorization required',
+      }, { status: 403 });
+    }
+
+    const manholeId = Number(params.manholeId);
+    if (!Number.isInteger(manholeId) || manholeId <= 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid manhole_id',
+      }, { status: 400 });
+    }
+
+    const token = request.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
+    }
+    const supabase = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
+    }
+
+    const { data: manhole, error: manholeError } = await supabase
+      .from('manhole')
+      .select('id')
+      .eq('id', manholeId)
+      .single();
+
+    if (manholeError || !manhole) {
+      return NextResponse.json({
+        success: false,
+        error: 'Manhole not found',
+      }, { status: 404 });
+    }
+
+    const { count, error: countError } = await supabase
+      .from('photo_context_image')
+      .select('id', { count: 'exact', head: true })
+      .eq('manhole_id', manholeId)
+      .eq('created_by', user.id);
+
+    if (countError) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to count context images',
+        details: countError.message,
+      }, { status: 500 });
+    }
+
+    if ((count ?? 0) >= MAX_CONTEXT_IMAGES_PER_USER_MANHOLE) {
+      return NextResponse.json({
+        success: false,
+        error: `Context image limit reached (max ${MAX_CONTEXT_IMAGES_PER_USER_MANHOLE})`,
+      }, { status: 400 });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    if (!file) {
+      return NextResponse.json({
+        success: false,
+        error: 'No file provided',
+      }, { status: 400 });
+    }
+
+    if (!ALLOWED_CONTENT_TYPES.has(file.type)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Unsupported image content type',
+      }, { status: 400 });
+    }
+
+    if (file.size > MAX_CONTEXT_IMAGE_SIZE_BYTES) {
+      return NextResponse.json({
+        success: false,
+        error: `Context image is too large (max ${MAX_CONTEXT_IMAGE_SIZE_BYTES / 1024 / 1024}MB)`,
+      }, { status: 400 });
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const fileSize = arrayBuffer.byteLength;
+
+    const shotContextLabel = parseShotContextLabel(formData.get('shot_context_label'));
+    const shotContextConfidence = parseConfidence(formData.get('shot_context_confidence'));
+    const shotContextConfidences = parseJsonField(
+      formData.get('shot_context_confidences'),
+      'shot_context_confidences'
+    );
+    const metadata = parseJsonField(formData.get('metadata'), 'metadata') ?? {};
+    const exif = parseJsonField(formData.get('exif'), 'exif');
+    const appVersion = formData.get('app_version');
+    const deviceModel = formData.get('device_model');
+    const sortOrder = formData.get('sort_order');
+    const parsedSortOrder = typeof sortOrder === 'string' && sortOrder.length > 0
+      ? Number(sortOrder)
+      : count ?? 0;
+
+    if (!Number.isInteger(parsedSortOrder) || parsedSortOrder < 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'sort_order must be a non-negative integer',
+      }, { status: 400 });
+    }
+
+    const buffer = Buffer.from(arrayBuffer);
+    const sha256 = createHash('sha256').update(buffer).digest('hex');
+    const dimensions = await getImageDimensions(buffer);
+    const storageKey = generateContextImageStorageKey(manholeId, file.type);
+    uploadedStorageKey = storageKey;
+
+    await storage.put(storageKey, buffer, {
+      contentType: file.type,
+      cacheControl: 'public, max-age=31536000, immutable',
+      metadata: {
+        'manhole-id': String(manholeId),
+        'created-by': user.id,
+        'source-platform': 'ios',
+        ...(shotContextLabel ? { 'shot-context-label': shotContextLabel } : {}),
+      },
+    });
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('photo_context_image')
+      .insert({
+        manhole_id: manholeId,
+        storage_provider: process.env.STORAGE_PROVIDER || 'r2',
+        storage_key: storageKey,
+        original_name: file.name || null,
+        content_type: file.type,
+        file_size: fileSize,
+        width: dimensions.width,
+        height: dimensions.height,
+        sha256,
+        exif,
+        metadata,
+        shot_context_label: shotContextLabel,
+        shot_context_confidence: shotContextConfidence,
+        shot_context_confidences: shotContextConfidences,
+        source_platform: 'ios',
+        app_version: typeof appVersion === 'string' && appVersion.length > 0 ? appVersion : null,
+        device_model: typeof deviceModel === 'string' && deviceModel.length > 0 ? deviceModel : null,
+        sort_order: parsedSortOrder,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError || !inserted) {
+      throw new Error(insertError?.message || 'Failed to create context image record');
+    }
+
+    const signedUrl = await storage.getSignedUrl(storageKey, 3600);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Context image uploaded successfully',
+      context_image: {
+        ...inserted,
+        url: signedUrl.url,
+        expires_at: signedUrl.expiresAt,
+      },
+    });
+  } catch (error: any) {
+    if (uploadedStorageKey && storage.delete) {
+      try {
+        await storage.delete(uploadedStorageKey);
+      } catch (storageError) {
+        console.error('Failed to cleanup context image after error:', storageError);
+      }
+    }
+
+    const isValidation = error instanceof ValidationError;
+    console.error('Context image upload error:', error);
+    return NextResponse.json({
+      success: false,
+      error: isValidation ? error.message : 'Failed to upload context image',
+      details: isValidation ? undefined : error?.message,
+    }, { status: isValidation ? 400 : 500 });
+  }
+}

@@ -6,6 +6,15 @@ export interface ManholeTitle {
   priority?: number;
 }
 
+export type ShotContextLabel =
+  | 'centered_clean'
+  | 'selfie_with_manhole'
+  | 'wide_context'
+  | 'signage_info'
+  | 'partial_occluded'
+  | 'not_relevant'
+  | 'low_quality';
+
 export interface Database {
   public: {
     Tables: {
@@ -239,6 +248,60 @@ export interface Database {
           thumbnail_small?: ArrayBuffer | null;
           thumbnail_medium?: ArrayBuffer | null;
           metadata?: Record<string, any> | null;
+        };
+      };
+      photo_context_image: {
+        Row: {
+          id: string;
+          manhole_id: number;
+          storage_provider: string;
+          storage_key: string;
+          original_name: string | null;
+          content_type: string;
+          file_size: number | null;
+          width: number | null;
+          height: number | null;
+          sha256: string | null;
+          exif: ExifData | null;
+          metadata: Record<string, any>;
+          shot_context_label: ShotContextLabel | null;
+          shot_context_confidence: number | null;
+          shot_context_confidences: Record<string, any> | null;
+          source_platform: string;
+          app_version: string | null;
+          device_model: string | null;
+          sort_order: number;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          manhole_id: number;
+          storage_provider?: string;
+          storage_key: string;
+          original_name?: string | null;
+          content_type: string;
+          file_size?: number | null;
+          width?: number | null;
+          height?: number | null;
+          sha256?: string | null;
+          exif?: ExifData | null;
+          metadata?: Record<string, any>;
+          shot_context_label?: ShotContextLabel | null;
+          shot_context_confidence?: number | null;
+          shot_context_confidences?: Record<string, any> | null;
+          source_platform?: string;
+          app_version?: string | null;
+          device_model?: string | null;
+          sort_order?: number;
+          created_by: string;
+        };
+        Update: {
+          metadata?: Record<string, any>;
+          shot_context_label?: ShotContextLabel | null;
+          sort_order?: number;
+          updated_at?: string;
         };
       };
       shared_link: {
