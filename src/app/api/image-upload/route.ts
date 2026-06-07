@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
@@ -133,7 +133,7 @@ import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordina
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
 
     // ✅ 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
     const { searchParams } = new URL(request.url);

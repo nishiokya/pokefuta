@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
@@ -110,7 +110,7 @@ import { Database } from '@/types/database';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const { searchParams } = new URL(request.url);
 
     // Optional filters
@@ -285,7 +285,7 @@ export async function GET(request: NextRequest) {
         manhole: visit.manhole,
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
-        note: visit.note,
+        note: 'note' in visit ? visit.note : null,
         comment: visit.comment,
         is_public: visit.is_public,
         created_at: visit.created_at,

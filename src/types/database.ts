@@ -43,6 +43,7 @@ export interface Database {
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
         };
+        Relationships: [];
       };
       manhole: {
         Row: {
@@ -71,7 +72,7 @@ export interface Database {
           updated_at: string;
         };
         Insert: {
-          id: number;
+          id?: number;
           title: string;
           prefecture: string;
           prefecture_id?: number | null;
@@ -92,6 +93,8 @@ export interface Database {
           is_active?: boolean;
           last_verified_at?: string;
           data_source?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Update: {
           title?: string;
@@ -115,6 +118,7 @@ export interface Database {
           last_verified_at?: string;
           data_source?: string | null;
         };
+        Relationships: [];
       };
       manhole_comment: {
         Row: {
@@ -149,6 +153,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       visit: {
         Row: {
@@ -184,6 +189,7 @@ export interface Database {
           is_public?: boolean;  // 公開/非公開フラグ
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
+        Relationships: [];
       };
       photo: {
         Row: {
@@ -249,6 +255,7 @@ export interface Database {
           thumbnail_medium?: ArrayBuffer | null;
           metadata?: Record<string, any> | null;
         };
+        Relationships: [];
       };
       photo_context_image: {
         Row: {
@@ -303,6 +310,7 @@ export interface Database {
           sort_order?: number;
           updated_at?: string;
         };
+        Relationships: [];
       };
       shared_link: {
         Row: {
@@ -334,6 +342,7 @@ export interface Database {
           expires_at?: string | null;
           is_active?: boolean;
         };
+        Relationships: [];
       };
       image: {
         Row: {
@@ -382,6 +391,7 @@ export interface Database {
           exif_data?: ExifData | null;
           metadata?: Record<string, any> | null;
         };
+        Relationships: [];
       };
       prefecture: {
         Row: {
@@ -406,6 +416,7 @@ export interface Database {
           name_en?: string | null;
           display_order?: number;
         };
+        Relationships: [];
       };
       prefecture_badge: {
         Row: {
@@ -437,6 +448,70 @@ export interface Database {
           outdated_at?: string | null;
           completion_percentage?: number;
         };
+        Relationships: [];
+      };
+      visit_like: {
+        Row: {
+          id: string;
+          visit_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          visit_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          visit_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      visit_comment: {
+        Row: {
+          id: string;
+          visit_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          visit_id: string;
+          user_id: string;
+          content: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          content?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      visit_bookmark: {
+        Row: {
+          id: string;
+          visit_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          visit_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          visit_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {
@@ -452,6 +527,7 @@ export interface Database {
           first_visit: string | null;
           last_visit: string | null;
         };
+        Relationships: [];
       };
       prefecture_completion_tracker: {
         Row: {
@@ -473,6 +549,7 @@ export interface Database {
           created_at: string | null;
           updated_at: string | null;
         };
+        Relationships: [];
       };
     };
     Functions: {
@@ -506,6 +583,15 @@ export interface Database {
           p_user_id: string;
         };
         Returns: undefined;
+      };
+      get_site_stats: {
+        Args: Record<string, never>;
+        Returns: {
+          total_manhole: number;
+          total_manholes_with_photos: number;
+          total_posts: number;
+          total_users: number;
+        }[];
       };
     };
   };

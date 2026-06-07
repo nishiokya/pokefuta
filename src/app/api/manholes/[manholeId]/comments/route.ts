@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
@@ -83,7 +83,7 @@ export async function GET(
   { params }: { params: { manholeId: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -182,7 +182,7 @@ export async function POST(
   { params }: { params: { manholeId: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {

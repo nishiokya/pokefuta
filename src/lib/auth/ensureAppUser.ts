@@ -12,7 +12,7 @@ import type { Database } from '@/types/database';
  * @param displayName - Optional display_name from user metadata (preferred over email-derived name)
  */
 export async function ensureAppUser(
-  supabase: SupabaseClient<Database>,
+  supabase: SupabaseClient<any>,
   userId: string,
   email?: string,
   displayName?: string

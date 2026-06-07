@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import type { Database, ManholeTitle } from '@/types/database';
 
@@ -29,7 +29,7 @@ const getTopTitlePriority = (titles?: ManholeTitle[] | null) =>
 
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { data, error } = await supabase
       .from('manhole')

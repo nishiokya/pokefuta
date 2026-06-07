@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage } from '@/lib/storage';
@@ -71,7 +71,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const photoId = params.id;
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size'); // 'small', 'medium', 'large', or null for original
@@ -138,7 +138,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const photoId = params.id;
 
     // ✅ 1. 認証チェック

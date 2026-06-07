@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { supabaseAdmin } from '@/lib/supabase/client';
@@ -89,7 +89,7 @@ async function fetchActivityStats(admin: SupabaseClient<Database>) {
 
 export async function GET() {
   try {
-    const routeClient = createRouteHandlerClient<Database>({ cookies });
+    const routeClient = createRouteHandlerClient({ cookies });
 
     // Prefer RPC to avoid RLS issues (works for anon/auth when DB migration is applied)
     const { data: rpcData, error: rpcError } = await routeClient.rpc('get_site_stats');
