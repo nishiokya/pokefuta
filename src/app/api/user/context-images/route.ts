@@ -62,6 +62,34 @@ import { storage } from '@/lib/storage';
  *                       shot_context_label:
  *                         type: string
  *                         nullable: true
+ *                       shot_context_confidence:
+ *                         type: number
+ *                         nullable: true
+ *                       shot_context_confidences:
+ *                         type: object
+ *                         nullable: true
+ *                       manhole_classifier_label:
+ *                         type: string
+ *                         enum: [manhole, not_manhole]
+ *                         nullable: true
+ *                       manhole_classifier_confidence:
+ *                         type: number
+ *                         nullable: true
+ *                       manhole_detection_result:
+ *                         type: object
+ *                         nullable: true
+ *                       overlay_quality_grade:
+ *                         type: string
+ *                         enum: [p, e, g, f, b]
+ *                         nullable: true
+ *                       annotation_manhole_label:
+ *                         type: string
+ *                         enum: [manhole, not_manhole]
+ *                         nullable: true
+ *                       annotation_shot_context_label:
+ *                         type: string
+ *                         enum: [centered_clean, selfie_with_manhole, wide_context, signage_info, partial_occluded, not_relevant, low_quality]
+ *                         nullable: true
  *                       source_platform:
  *                         type: string
  *                         nullable: true

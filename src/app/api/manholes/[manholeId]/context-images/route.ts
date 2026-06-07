@@ -2,7 +2,12 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
-import { Database, ShotContextLabel } from '@/types/database';
+import {
+  Database,
+  ManholeClassifierLabel,
+  OverlayQualityGrade,
+  ShotContextLabel,
+} from '@/types/database';
 import { generateContextImageStorageKey, storage } from '@/lib/storage';
 import { SHOT_CONTEXT_LABELS } from '@/lib/shot-context-labels';
 
@@ -18,6 +23,8 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'image/heif',
   'image/webp',
 ]);
+const MANHOLE_LABELS = new Set<ManholeClassifierLabel>(['manhole', 'not_manhole']);
+const OVERLAY_QUALITY_GRADES = new Set<OverlayQualityGrade>(['p', 'e', 'g', 'f', 'b']);
 
 class ValidationError extends Error {
   constructor(message: string) {
@@ -55,6 +62,10 @@ function parseJsonField(value: FormDataEntryValue | null, fieldName: string) {
   }
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function parseShotContextLabel(value: FormDataEntryValue | null): ShotContextLabel | null {
   if (typeof value !== 'string' || value.length === 0) return null;
   if (!SHOT_CONTEXT_LABELS.has(value as ShotContextLabel)) {
@@ -63,13 +74,61 @@ function parseShotContextLabel(value: FormDataEntryValue | null): ShotContextLab
   return value as ShotContextLabel;
 }
 
-function parseConfidence(value: FormDataEntryValue | null) {
+function parseAnnotationShotContextLabel(value: FormDataEntryValue | null): ShotContextLabel | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (!SHOT_CONTEXT_LABELS.has(value as ShotContextLabel)) {
+    throw new ValidationError('Invalid annotation_shot_context_label');
+  }
+  return value as ShotContextLabel;
+}
+
+function parseConfidence(value: FormDataEntryValue | null, fieldName: string) {
   if (typeof value !== 'string' || value.length === 0) return null;
   const confidence = Number(value);
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-    throw new ValidationError('shot_context_confidence must be between 0 and 1');
+    throw new ValidationError(`${fieldName} must be between 0 and 1`);
   }
   return confidence;
+}
+
+function parseOptionalManholeLabel(
+  value: FormDataEntryValue | null,
+  fieldName: string
+): ManholeClassifierLabel | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (!MANHOLE_LABELS.has(value as ManholeClassifierLabel)) {
+    throw new ValidationError(`${fieldName} must be one of: manhole, not_manhole`);
+  }
+  return value as ManholeClassifierLabel;
+}
+
+function parseOptionalOverlayQualityGrade(value: FormDataEntryValue | null): OverlayQualityGrade | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (!OVERLAY_QUALITY_GRADES.has(value as OverlayQualityGrade)) {
+    throw new ValidationError('overlay_quality_grade must be one of: p, e, g, f, b');
+  }
+  return value as OverlayQualityGrade;
+}
+
+function metadataString(metadata: unknown, key: string) {
+  if (!isPlainObject(metadata)) return null;
+  const value = metadata[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function metadataConfidence(metadata: unknown, key: string, fieldName: string) {
+  if (!isPlainObject(metadata)) return null;
+  const value = metadata[key];
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new ValidationError(`${fieldName} must be between 0 and 1`);
+    }
+    return value;
+  }
+  if (typeof value === 'string' && value.length > 0) {
+    return parseConfidence(value, fieldName);
+  }
+  return null;
 }
 
 async function getImageDimensions(buffer: Buffer) {
@@ -94,7 +153,61 @@ async function getImageDimensions(buffer: Buffer) {
  *     summary: iOSアプリからマンホール周辺画像をアップロード
  *     tags: [photos]
  *     security:
- *       - cookieAuth: []
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *               shot_context_label:
+ *                 type: string
+ *                 enum: [centered_clean, selfie_with_manhole, wide_context, signage_info, partial_occluded, not_relevant, low_quality]
+ *               shot_context_confidence:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 1
+ *               shot_context_confidences:
+ *                 type: string
+ *                 description: JSON string containing all shot context label confidences.
+ *               manhole_classifier_label:
+ *                 type: string
+ *                 enum: [manhole, not_manhole]
+ *               manhole_classifier_confidence:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 1
+ *               manhole_detection_result:
+ *                 type: string
+ *                 description: JSON string containing detector status, confidence, bbox, raw_bbox, and model_name.
+ *               overlay_quality_grade:
+ *                 type: string
+ *                 enum: [p, e, g, f, b]
+ *               annotation_manhole_label:
+ *                 type: string
+ *                 enum: [manhole, not_manhole]
+ *               annotation_shot_context_label:
+ *                 type: string
+ *                 enum: [centered_clean, selfie_with_manhole, wide_context, signage_info, partial_occluded, not_relevant, low_quality]
+ *               metadata:
+ *                 type: string
+ *                 description: JSON string. Legacy metadata.manhole_classifier_* values are used as fallback when top-level classifier fields are absent.
+ *               exif:
+ *                 type: string
+ *                 description: JSON string.
+ *               app_version:
+ *                 type: string
+ *               device_model:
+ *                 type: string
+ *               sort_order:
+ *                 type: integer
+ *                 minimum: 0
  */
 export async function POST(
   request: NextRequest,
@@ -193,12 +306,44 @@ export async function POST(
     const fileSize = arrayBuffer.byteLength;
 
     const shotContextLabel = parseShotContextLabel(formData.get('shot_context_label'));
-    const shotContextConfidence = parseConfidence(formData.get('shot_context_confidence'));
+    const shotContextConfidence = parseConfidence(
+      formData.get('shot_context_confidence'),
+      'shot_context_confidence'
+    );
     const shotContextConfidences = parseJsonField(
       formData.get('shot_context_confidences'),
       'shot_context_confidences'
     );
     const metadata = parseJsonField(formData.get('metadata'), 'metadata') ?? {};
+    const topLevelManholeClassifierLabel = parseOptionalManholeLabel(
+      formData.get('manhole_classifier_label'),
+      'manhole_classifier_label'
+    );
+    const metadataManholeClassifierLabel = metadataString(metadata, 'manhole_classifier_label');
+    const manholeClassifierLabel = topLevelManholeClassifierLabel ?? parseOptionalManholeLabel(
+      metadataManholeClassifierLabel,
+      'metadata.manhole_classifier_label'
+    );
+    const manholeClassifierConfidence = parseConfidence(
+      formData.get('manhole_classifier_confidence'),
+      'manhole_classifier_confidence'
+    ) ?? metadataConfidence(
+      metadata,
+      'manhole_classifier_confidence',
+      'metadata.manhole_classifier_confidence'
+    );
+    const manholeDetectionResult = parseJsonField(
+      formData.get('manhole_detection_result'),
+      'manhole_detection_result'
+    );
+    const overlayQualityGrade = parseOptionalOverlayQualityGrade(formData.get('overlay_quality_grade'));
+    const annotationManholeLabel = parseOptionalManholeLabel(
+      formData.get('annotation_manhole_label'),
+      'annotation_manhole_label'
+    );
+    const annotationShotContextLabel = parseAnnotationShotContextLabel(
+      formData.get('annotation_shot_context_label')
+    );
     const exif = parseJsonField(formData.get('exif'), 'exif');
     const appVersion = formData.get('app_version');
     const deviceModel = formData.get('device_model');
@@ -248,6 +393,12 @@ export async function POST(
         shot_context_label: shotContextLabel,
         shot_context_confidence: shotContextConfidence,
         shot_context_confidences: shotContextConfidences,
+        manhole_classifier_label: manholeClassifierLabel,
+        manhole_classifier_confidence: manholeClassifierConfidence,
+        manhole_detection_result: manholeDetectionResult,
+        overlay_quality_grade: overlayQualityGrade,
+        annotation_manhole_label: annotationManholeLabel,
+        annotation_shot_context_label: annotationShotContextLabel,
         source_platform: 'ios',
         app_version: typeof appVersion === 'string' && appVersion.length > 0 ? appVersion : null,
         device_model: typeof deviceModel === 'string' && deviceModel.length > 0 ? deviceModel : null,
