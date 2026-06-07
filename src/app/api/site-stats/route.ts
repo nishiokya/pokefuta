@@ -41,21 +41,36 @@ async function fetchActivityStats(admin: SupabaseClient<Database>) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (supabaseUrl && serviceRoleKey) {
     try {
-      const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?per_page=1000`, {
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      });
-      if (res.ok) {
-        const totalCount = res.headers.get('x-total-count');
-        auth_users = totalCount !== null ? parseInt(totalCount, 10) : null;
+      const ago7dDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const perPage = 1000;
+      let page = 1;
+      let activeCount = 0;
+      let totalAuthUsers: number | null = null;
+
+      while (true) {
+        const res = await fetch(
+          `${supabaseUrl}/auth/v1/admin/users?per_page=${perPage}&page=${page}`,
+          { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } }
+        );
+        if (!res.ok) break;
+
+        if (page === 1) {
+          const totalCount = res.headers.get('x-total-count');
+          totalAuthUsers = totalCount !== null ? parseInt(totalCount, 10) : null;
+        }
+
         const json = await res.json();
         const users: Array<{ last_sign_in_at?: string | null }> = json.users ?? [];
-        active_users_7d = users.filter(
-          (u) => u.last_sign_in_at && u.last_sign_in_at >= ago7d
+        activeCount += users.filter(
+          (u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= ago7dDate
         ).length;
+
+        if (users.length < perPage) break;
+        page++;
       }
+
+      auth_users = totalAuthUsers;
+      active_users_7d = activeCount;
     } catch {
       // non-critical
     }
@@ -105,7 +120,7 @@ export async function GET() {
         posts: toCount(row.total_posts),
         manholes: toCount(row.total_manhole),
         manholes_with_photos: manholesWithPhotos,
-        ...activity,
+        ...(activity ?? {}),
         source: 'rpc',
       });
     }
@@ -143,6 +158,7 @@ export async function GET() {
       success: true,
       users: null,
       auth_users: null,
+      active_users_7d: null,
       posts: null,
       manholes: null,
       manholes_with_photos: null,
@@ -159,6 +175,7 @@ export async function GET() {
         success: false,
         users: null,
         auth_users: null,
+        active_users_7d: null,
         posts: null,
         manholes: null,
         manholes_with_photos: null,
