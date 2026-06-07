@@ -17,7 +17,7 @@
 ## ✨ 主な機能
 
 ### 現在の機能
-- 📧 **Emailログイン** - Supabase Auth（パスワードレス）
+- 📧 **Emailログイン** - Supabase Auth（メール＋パスワード）
 - 📸 **写真アップロード** - 自動位置/日時抽出（EXIF）
 - 🎯 **マンホール自動マッチング** - GPS位置情報から近くのポケふた候補を提示
 - 🗺️ **地図表示** - 訪問済/未訪問を色分け、都道府県別フィルタ
@@ -42,7 +42,7 @@
 - **UI**: Lucide React (アイコン)
 
 ### バックエンド
-- **Auth**: Supabase Auth (パスワードレス認証)
+- **Auth**: Supabase Auth (メール＋パスワード認証)
 - **Database**: Supabase PostgreSQL + PostGIS (地理拡張)
 - **Storage**: Cloudflare R2 (S3互換)
 - **API**: Next.js API Routes
@@ -61,13 +61,25 @@
 ## 📊 データベース設計
 
 ```sql
--- ユーザー（Supabase Auth拡張）
-app_user (id, auth_uid, display_name, avatar_url, stats...)
+-- Supabase が管理する認証テーブル（直接操作不可）
+auth.users (id, email, user_metadata{display_name}, ...)
+
+-- アプリのユーザープロフィールテーブル
+-- ⚠️ app_user.id と app_user.auth_uid は別UUID
+app_user (
+  id UUID,               -- 内部PK（プロフィールURL /users/{id} に使用）
+  auth_uid UUID,         -- auth.users.id への FK（認証IDと一致）
+  display_name,
+  avatar_url,
+  all_prefectures_completed_at,  -- 全国制覇バッジ用
+  ...
+)
 
 -- ポケふたマスタ（公式データ）
 manhole (id, title, prefecture, municipality, location:GEOGRAPHY, pokemons...)
 
--- 訪問記録（user_id → auth.users.id を直接参照）
+-- 訪問記録
+-- user_id = auth.users.id = app_user.auth_uid（内部PK の app_user.id ではない）
 visit (id, user_id, manhole_id, shot_location:GEOGRAPHY, shot_at, note...)
 
 -- 写真（Cloudflare R2）
@@ -77,12 +89,33 @@ photo (id, visit_id, manhole_id, storage_key, exif, thumbnails...)
 shared_link (id, visit_id, token, expires_at...)
 ```
 
+### ユーザーモデルの重要な注意点
+
+#### `app_user.id` と `auth_uid` の区別
+
+```
+auth.users.id  ←→  app_user.auth_uid  （同じ値: Supabase auth UID）
+                    app_user.id         （別UUID: 内部PK、プロフィールURL用）
+                    visit.user_id       （= auth.users.id = app_user.auth_uid）
+```
+
+- **`app_user` を auth UID で検索するとき**: `.eq('auth_uid', user.id)` ✅
+- **`app_user` を内部ID で検索するとき**: `.eq('id', appUserId)` ✅（RPC `get_my_app_user_id()` で取得）
+- **間違い**: `.eq('id', user.id)` ❌ → 必ずマッチしない
+
+#### `app_user` の遅延作成
+
+`app_user` レコードはサインアップ時には作成されません。ユーザーが初めて書き込み操作（写真投稿・いいね・ブックマーク）を行ったときに `ensureAppUser()` で自動作成されます。
+
+- `auth.users` の件数 ≠ `app_user` の件数（差分 = 登録のみで未投稿のユーザー）
+- `display_name` は `auth.user_metadata.display_name` から初回コピーされる
+
 ### RLS ポリシー
 
-- **app_user**: 自分のプロフィールのみ読み書き可能
+- **app_user**: 自分のレコードのみ SELECT 可能（migration 013 で追加）
 - **manhole**: 全員が閲覧可能（公開データ）
-- **visit**: 自分の訪問記録のみ読み書き可能
-- **photo**: 全員が閲覧可能、作成・更新・削除は自分のvisit経由のみ
+- **visit**: 自分の訪問記録のみ読み書き可能（`auth.uid() = user_id`）
+- **photo**: 全員が閲覧可能、作成・更新・削除は自分の visit 経由のみ
 
 ## 🚀 セットアップ
 
@@ -263,13 +296,18 @@ USING (auth.uid() = user_id);
 
 ### 認証チェック
 
-すべてのAPI Routeで認証チェックを実装：
+すべての API Route で認証チェックを実装。サーバーサイドでは `getUser()` を使用します：
 
 ```typescript
-const { data: { session } } = await supabase.auth.getSession();
-if (!session?.user) {
+// Route Handler（サーバーサイド）: getUser() を使う
+// getSession() はクッキーをそのまま信頼するため、サーバーサイドでは getUser() が正しい
+const { data: { user }, error } = await supabase.auth.getUser();
+if (error || !user) {
   return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 }
+
+// クライアントサイド（ブラウザ）: getSession() で十分
+const { data: { session } } = await supabase.auth.getSession();
 ```
 
 ### 環境変数の保護
