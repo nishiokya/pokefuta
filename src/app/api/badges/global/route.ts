@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const { data: userData, error: userError } = await supabase
       .from('app_user')
       .select('all_prefectures_completed_at, all_prefectures_outdated_at')
-      .eq('id', user.id)
+      .eq('auth_uid', user.id)
       .single();
 
     if (userError) {
