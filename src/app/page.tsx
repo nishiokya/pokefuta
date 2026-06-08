@@ -41,8 +41,8 @@ type GalleryTab = 'latest' | 'rare';
 type JourneyTab = 'history' | 'unvisited';
 
 const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
-  { key: 'latest', label: '最新の旅の記録' },
-  { key: 'rare', label: 'レアなポケふた' },
+  { key: 'latest', label: 'みんなの投稿写真' },
+  { key: 'rare', label: '写真が少ないポケふた' },
 ];
 
 type JourneyVisit = {
@@ -373,7 +373,6 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上掲載` : '掲載数を集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -814,63 +813,88 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
+                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="relative max-w-3xl">
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                      <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
                         <Sparkles className="h-3.5 w-3.5" />
-                        ポケふた旅日記
+                        ポケふたスタンプ帳
                       </div>
-                      <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                        全国に広がるポケふた。
+                      <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                        ポケふた巡りを、あなただけのスタンプ帳に。
                       </h1>
-                      <div className="mt-4 max-w-2xl space-y-3 text-base font-medium leading-relaxed sm:text-lg">
-                        <p>
-                          海沿いの町、温泉地、離島、雪国の駅前。
-                          旅先でしか出会えない
-                          <span className="font-extrabold text-[#7B63A8]"> "レアなポケふた"</span> がたくさんあります。
-                        </p>
-                        <p>
-                          地図を片手に探し回ったり、偶然見つけたり。
-                          その土地の景色と一緒に、ポケふたを記録してみませんか？
-                        </p>
-                      </div>
+                      <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-[#4A4A4A] sm:mt-4 sm:text-lg">
+                        旅先で見つけたポケふたを写真と一緒に記録。訪問済みの場所やみんなの投稿写真を見ながら、ポケふた巡りを楽しく残しましょう。
+                      </p>
 
-                      <p className="mt-4 text-xs font-bold text-[#9B9B9B]">全国387自治体 · {listedCountLabel}</p>
+                      {knownTotalManholes != null && knownTotalManholes > 0 && (
+                        <p className="mt-2 hidden text-xs font-bold text-[#9B9B9B] sm:block">
+                          全国{knownTotalManholes}枚以上のポケふたに対応
+                          {totalPosts && totalPosts > 0 ? ` · 投稿写真${totalPosts}枚以上` : ''}
+                        </p>
+                      )}
 
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-2 flex flex-wrap gap-2 sm:mt-3">
                         <Link
-                          href="/nearby?tab=all"
-                          className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+                          href="/login"
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:py-2.5"
                         >
-                          <Compass className="h-4 w-4" />
-                          ポケふたを地図で探す
+                          <Stamp className="h-4 w-4" />
+                          スタンプ帳をはじめる
                         </Link>
                         <Link
                           href="/nearby"
-                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white sm:py-2.5"
                         >
                           <MapPin className="h-4 w-4" />
                           近くのポケふたを見る
                         </Link>
-                        <Link
-                          href={uploadHref}
-                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGalleryTab('latest');
+                            requestAnimationFrame(() =>
+                              document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' })
+                            );
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white sm:py-2.5"
                         >
                           <Camera className="h-4 w-4" />
-                          旅の記録を残す
-                        </Link>
+                          みんなの写真を見る
+                        </button>
                       </div>
                     </div>
 
                     <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
-                      <img
-                        src="/pokefuta_photo_gallery_mockup.svg"
-                        alt=""
-                        className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
-                      />
+                      <StampBookMockup />
                     </div>
                   </div>
+                </section>
+
+                <section className="mt-4 rounded-[8px] border border-[#7B63A8]/15 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-extrabold text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
+                        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs font-bold text-[#4A4A4A]">
+                          <span>📍 行ったポケふたを記録</span>
+                          <span>📸 写真で思い出を保存</span>
+                          <span>🗾 都道府県の達成状況</span>
+                          <span>🔍 近くの未訪問を探せる</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <Link
+                          href="/login"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] whitespace-nowrap"
+                        >
+                          <Stamp className="h-3.5 w-3.5" />
+                          無料ではじめる
+                        </Link>
+                        <a href="https://data.pokefuta.com" className="text-[10px] text-[#9B9B9B] underline hover:text-[#7B63A8]" target="_blank" rel="noopener noreferrer">
+                          地図で探す → data.pokefuta.com
+                        </a>
+                      </div>
+                    </div>
                 </section>
 
                 <section className="mt-4 sm:mt-5">
@@ -924,7 +948,7 @@ export default function HomePage() {
                   </section>
                 )}
 
-                <section className="mt-6" style={{ display: galleryTab === 'latest' ? undefined : 'none' }}>
+                <section id="gallery" className="mt-6" style={{ display: galleryTab === 'latest' ? undefined : 'none' }}>
                   {visibleFeed.length === 0 ? (
                     <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                       <p className="text-sm font-bold text-[#6B6B6B]">
@@ -1078,6 +1102,68 @@ export default function HomePage() {
       )}
 
       <BottomNav />
+    </div>
+  );
+}
+
+const MOCKUP_STAMPS = [
+  { src: '/mockup/s1.jpeg', name: 'ルギア' },
+  { src: '/mockup/s2.jpeg', name: 'ホエルオー' },
+  { src: '/mockup/s3.jpeg', name: 'ロコン' },
+];
+
+function StampBookMockup() {
+  return (
+    <div className="overflow-hidden rounded-[10px] border-2 border-[#C9B8E8] bg-[#FFFDF7] text-xs">
+      {/* Passport header */}
+      <div className="flex items-center justify-between bg-[#7B63A8] px-3 py-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-white">
+          <Stamp className="h-3.5 w-3.5" />
+          ポケふたパスポート
+        </div>
+        <div className="flex items-center gap-1 rounded-full bg-[#FFB347] px-2 py-0.5 text-[9px] font-extrabold text-white">
+          <Award className="h-2.5 w-2.5" />
+          355達成!
+        </div>
+      </div>
+
+      <div className="space-y-2 p-2.5">
+        {/* 全国 + 都道府県 横並び */}
+        <div className="flex gap-2 border-b border-dashed border-[#DDD0F5] pb-2">
+          <div className="flex-1">
+            <div className="text-[9px] font-bold text-[#9B9B9B]">全国</div>
+            <div className="text-2xl font-extrabold leading-tight text-[#7B63A8]">
+              355
+              <span className="ml-0.5 text-[10px] font-bold text-[#9B9B9B]">/ 470</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="text-[9px] font-bold text-[#9B9B9B]">都道府県制覇</div>
+            <div className="mt-0.5 flex flex-col gap-0.5">
+              {['北海道', '愛知県', '東京都'].map((name) => (
+                <div key={name} className="flex items-center gap-0.5 rounded-full bg-[#2C765E] px-1.5 py-0.5 text-[8px] font-extrabold text-white w-fit">
+                  <span>✓</span>{name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent 3 stamps with real photos */}
+        <div>
+          <div className="mb-1 text-[9px] font-extrabold text-[#6B6B6B]">最近集めたポケふた</div>
+          <div className="flex gap-1.5">
+            {MOCKUP_STAMPS.slice(0, 3).map(({ src, name }) => (
+              <div key={src} className="flex flex-1 flex-col items-center gap-0.5">
+                <div className="aspect-square w-full overflow-hidden rounded-full border-2 border-[#7B63A8] shadow-sm">
+                  <img src={src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                </div>
+                <span className="text-center text-[8px] font-bold leading-tight text-[#7B63A8]">{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
