@@ -154,6 +154,25 @@ async function getImageDimensions(buffer: Buffer) {
  *     tags: [photos]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: manholeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: header
+ *         name: x-pokefuta-client-platform
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [ios]
+ *         description: Must be "ios". Required for all requests to this endpoint.
+ *       - in: header
+ *         name: x-pokefuta-ios-api-key
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: iOS API key. Required when IOS_CONTEXT_UPLOAD_TOKEN is configured (alternative to Bearer token).
  *     requestBody:
  *       required: true
  *       content:
@@ -332,10 +351,17 @@ export async function POST(
       'manhole_classifier_confidence',
       'metadata.manhole_classifier_confidence'
     );
-    const manholeDetectionResult = parseJsonField(
+    const manholeDetectionResultRaw = parseJsonField(
       formData.get('manhole_detection_result'),
       'manhole_detection_result'
     );
+    if (manholeDetectionResultRaw !== null && !isPlainObject(manholeDetectionResultRaw)) {
+      return NextResponse.json({
+        success: false,
+        error: 'manhole_detection_result must be a JSON object',
+      }, { status: 400 });
+    }
+    const manholeDetectionResult = manholeDetectionResultRaw;
     const overlayQualityGrade = parseOptionalOverlayQualityGrade(formData.get('overlay_quality_grade'));
     const annotationManholeLabel = parseOptionalManholeLabel(
       formData.get('annotation_manhole_label'),
