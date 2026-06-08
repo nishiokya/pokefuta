@@ -1224,12 +1224,12 @@ function StampBookMockup() {
         {/* 都道府県達成 Grid */}
         <div className="border-t border-dashed border-[#DDD0F5] pt-2">
           <div className="mb-1 text-[9px] font-extrabold text-[#6B6B6B]">都道府県達成</div>
-          <div className="flex flex-wrap gap-[2px]">
+          <div className="flex flex-wrap gap-0.5">
             {PREFECTURE_GRID.map(({ short, state, title }) => (
               <div
                 key={short}
                 title={title}
-                className={`rounded-[2px] px-[3px] py-[1px] text-[7px] font-bold leading-tight ${PREFECTURE_STATE_CLASS[state]}`}
+                className={`rounded-sm px-[3px] py-[1px] text-[7px] font-bold leading-tight ${PREFECTURE_STATE_CLASS[state]}`}
               >
                 {short}
               </div>
