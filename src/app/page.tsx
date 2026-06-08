@@ -1109,16 +1109,10 @@ export default function HomePage() {
   );
 }
 
-const MOCKUP_STAMPS: Array<{ src: string; name?: string }> = [
+const MOCKUP_STAMPS = [
   { src: '/mockup/s1.jpeg', name: 'ルギア' },
   { src: '/mockup/s2.jpeg', name: 'ホエルオー' },
   { src: '/mockup/s3.jpeg', name: 'ロコン' },
-  { src: '/mockup/s4.jpeg' },
-  { src: '/mockup/s5.jpeg' },
-  { src: '/mockup/s6.jpeg' },
-  { src: '/mockup/s7.jpeg' },
-  { src: '/mockup/s8.jpeg' },
-  { src: '/mockup/s9.jpeg' },
 ];
 
 function StampBookMockup() {
