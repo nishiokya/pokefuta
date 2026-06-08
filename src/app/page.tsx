@@ -828,10 +828,12 @@ export default function HomePage() {
                         旅先で見つけたポケふたを写真と一緒に記録。訪問済みの場所やみんなの投稿写真を見ながら、ポケふた巡りを楽しく残しましょう。
                       </p>
 
-                      <p className="mt-2 hidden text-xs font-bold text-[#9B9B9B] sm:block">
-                        全国{knownTotalManholes ?? 470}枚以上のポケふたに対応
-                        {totalPosts && totalPosts > 0 ? ` · 投稿写真${totalPosts}枚以上` : ''}
-                      </p>
+                      {knownTotalManholes != null && knownTotalManholes > 0 && (
+                        <p className="mt-2 hidden text-xs font-bold text-[#9B9B9B] sm:block">
+                          全国{knownTotalManholes}枚以上のポケふたに対応
+                          {totalPosts && totalPosts > 0 ? ` · 投稿写真${totalPosts}枚以上` : ''}
+                        </p>
+                      )}
 
                       <div className="mt-2 flex flex-wrap gap-2 sm:mt-3">
                         <Link
@@ -848,13 +850,19 @@ export default function HomePage() {
                           <MapPin className="h-4 w-4" />
                           近くのポケふたを見る
                         </Link>
-                        <a
-                          href="#gallery"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGalleryTab('latest');
+                            requestAnimationFrame(() =>
+                              document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' })
+                            );
+                          }}
                           className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white sm:py-2.5"
                         >
                           <Camera className="h-4 w-4" />
                           みんなの写真を見る
-                        </a>
+                        </button>
                       </div>
                     </div>
 
@@ -1101,7 +1109,7 @@ export default function HomePage() {
   );
 }
 
-const MOCKUP_STAMPS = [
+const MOCKUP_STAMPS: Array<{ src: string; name?: string }> = [
   { src: '/mockup/s1.jpeg', name: 'ルギア' },
   { src: '/mockup/s2.jpeg', name: 'ホエルオー' },
   { src: '/mockup/s3.jpeg', name: 'ロコン' },
