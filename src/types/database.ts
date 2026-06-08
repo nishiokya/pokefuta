@@ -15,6 +15,9 @@ export type ShotContextLabel =
   | 'not_relevant'
   | 'low_quality';
 
+export type ManholeClassifierLabel = 'manhole' | 'not_manhole';
+export type OverlayQualityGrade = 'p' | 'e' | 'g' | 'f' | 'b';
+
 export interface Database {
   public: {
     Tables: {
@@ -274,6 +277,12 @@ export interface Database {
           shot_context_label: ShotContextLabel | null;
           shot_context_confidence: number | null;
           shot_context_confidences: Record<string, any> | null;
+          manhole_classifier_label: ManholeClassifierLabel | null;
+          manhole_classifier_confidence: number | null;
+          manhole_detection_result: Record<string, any> | null;
+          overlay_quality_grade: OverlayQualityGrade | null;
+          annotation_manhole_label: ManholeClassifierLabel | null;
+          annotation_shot_context_label: ShotContextLabel | null;
           source_platform: string;
           app_version: string | null;
           device_model: string | null;
@@ -298,6 +307,12 @@ export interface Database {
           shot_context_label?: ShotContextLabel | null;
           shot_context_confidence?: number | null;
           shot_context_confidences?: Record<string, any> | null;
+          manhole_classifier_label?: ManholeClassifierLabel | null;
+          manhole_classifier_confidence?: number | null;
+          manhole_detection_result?: Record<string, any> | null;
+          overlay_quality_grade?: OverlayQualityGrade | null;
+          annotation_manhole_label?: ManholeClassifierLabel | null;
+          annotation_shot_context_label?: ShotContextLabel | null;
           source_platform?: string;
           app_version?: string | null;
           device_model?: string | null;
