@@ -373,7 +373,6 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const listedCountLabel = totalPosts && totalPosts > 0 ? `${totalPosts}枚以上掲載` : '掲載数を集計中';
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -872,8 +871,7 @@ export default function HomePage() {
                   </div>
                 </section>
 
-                {!isLoggedIn && (
-                  <section className="mt-4 rounded-[8px] border border-[#7B63A8]/15 bg-white px-4 py-3 shadow-sm">
+                <section className="mt-4 rounded-[8px] border border-[#7B63A8]/15 bg-white px-4 py-3 shadow-sm">
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-sm font-extrabold text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
@@ -897,8 +895,7 @@ export default function HomePage() {
                         </a>
                       </div>
                     </div>
-                  </section>
-                )}
+                </section>
 
                 <section className="mt-4 sm:mt-5">
                   <div className="-mx-4 overflow-x-auto px-4 pb-1">
@@ -1159,7 +1156,7 @@ function StampBookMockup() {
             {MOCKUP_STAMPS.slice(0, 3).map(({ src, name }) => (
               <div key={src} className="flex flex-1 flex-col items-center gap-0.5">
                 <div className="aspect-square w-full overflow-hidden rounded-full border-2 border-[#7B63A8] shadow-sm">
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <img src={src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </div>
                 <span className="text-center text-[8px] font-bold leading-tight text-[#7B63A8]">{name}</span>
               </div>
