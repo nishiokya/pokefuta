@@ -85,7 +85,6 @@ export function useAnalytics() {
   const trackRouteOpen        = useCallback((p?: PokefutaEventParams) => pokefutaEvents.routeOpen(p), []);
 
   // --- SNS導線系 ---
-  const trackFooterXClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.footerXClick(p), []);
   const trackXLinkClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.xLinkClick(p), []);
 
   // --- 後方互換用 ---
@@ -161,7 +160,6 @@ export function useAnalytics() {
     trackRouteOpen,
 
     // SNS導線系
-    trackFooterXClick,
     trackXLinkClick,
 
     // 内部エラー追跡

@@ -34,13 +34,11 @@ export default function ShareButtons({
   const { trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
 
   const handleShareX = () => {
-    trackShareClick(analyticsParams);
     trackShareX(analyticsParams);
     window.open(buildXShareUrl(shareText, shareUrl, hashtags), '_blank', 'noopener,noreferrer');
   };
 
   const handleShareLine = () => {
-    trackShareClick(analyticsParams);
     trackShareLine(analyticsParams);
     window.open(buildLineShareUrl(shareUrl), '_blank', 'noopener,noreferrer');
   };
