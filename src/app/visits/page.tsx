@@ -886,9 +886,9 @@ export default function VisitsPage() {
                           if (!last || last.label !== label) groups.push({ label, items: [pokemon] });
                           else last.items.push(pokemon);
                         });
-                        return groups.map((group) => (
-                          <div key={group.label}>
-                            <p className="mb-2 mt-4 font-pixelJp text-xs font-bold text-[#8C6A4A] first:mt-0">{group.label}</p>
+                        return groups.map((group, i) => (
+                          <div key={group.label} className={i > 0 ? 'mt-4' : ''}>
+                            <p className="mb-2 font-pixelJp text-xs font-bold text-[#8C6A4A]">{group.label}</p>
                             <div className="grid gap-3 sm:grid-cols-3">
                               {group.items.map((pokemon) => (
                                 <PokemonProgressCard key={pokemon.pokemonName} pokemon={pokemon} />
@@ -987,6 +987,7 @@ function PrefectureProgressCard({ prefecture }: { prefecture: PrefectureProgress
           <img
             src={prefecture.representativePhotoUrl}
             alt={prefecture.name}
+            loading="lazy"
             className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
           />
         )}
@@ -1029,6 +1030,7 @@ function PokemonProgressCard({ pokemon }: { pokemon: PokemonProgress }) {
           <img
             src={pokemon.representativePhotoUrl}
             alt={pokemon.pokemonName}
+            loading="lazy"
             className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
           />
         )}
