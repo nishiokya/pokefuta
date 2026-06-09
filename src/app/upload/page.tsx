@@ -91,7 +91,7 @@ export default function UploadPage() {
     document.title = '写真登録 - ポケふた訪問記録';
 
     // ✅ GA: ページビュー追跡
-    trackView('/upload', '写真登録', 'upload');
+    trackView('/upload', '写真登録', 'upload', true);
 
     loadManholes();
     // Cookieから公開設定を読み込み

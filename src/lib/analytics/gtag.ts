@@ -102,12 +102,14 @@ export function trackEvent(
 export function trackPageView(
   pagePath: string,
   pageTitle: string,
-  pageType?: string
+  pageType?: string,
+  isLoggedIn?: boolean
 ): void {
   trackEvent('p_page_view', {
     page_path: pagePath,
     page_title: pageTitle,
     page_type: pageType,
+    is_logged_in: isLoggedIn,
   });
 }
 

@@ -114,7 +114,6 @@ export default function VisitsPage() {
 
   useEffect(() => {
     document.title = 'ポケふた訪問パスポート - ポケふた訪問記録';
-    trackView('/visits', 'ポケふた訪問パスポート', 'visits');
     trackPassportOpen();
     checkAuth();
   }, []);
@@ -138,6 +137,7 @@ export default function VisitsPage() {
       } = await supabase.auth.getSession();
       const loggedIn = Boolean(session?.user);
       setIsLoggedIn(loggedIn);
+      trackView('/visits', 'ポケふた訪問パスポート', 'visits', loggedIn);
 
       if (loggedIn) {
         loadPassport();
@@ -148,6 +148,7 @@ export default function VisitsPage() {
     } catch (error) {
       console.error('Auth check error:', error);
       setIsLoggedIn(false);
+      trackView('/visits', 'ポケふた訪問パスポート', 'visits', false);
       loadManholesOnly();
     }
   };

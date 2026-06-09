@@ -45,7 +45,6 @@ export default function PopularPage() {
 
   useEffect(() => {
     document.title = 'みんなのポケふた投稿 - ポケふた訪問記録';
-    trackView('/popular', 'みんなのポケふた投稿', 'popular');
 
     (async () => {
       try {
@@ -53,10 +52,13 @@ export default function PopularPage() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        setIsLoggedIn(Boolean(session?.user));
+        const loggedIn = Boolean(session?.user);
+        setIsLoggedIn(loggedIn);
+        trackView('/popular', 'みんなのポケふた投稿', 'popular', loggedIn);
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
+        trackView('/popular', 'みんなのポケふた投稿', 'popular', false);
       }
     })();
 

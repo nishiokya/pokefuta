@@ -190,7 +190,6 @@ export default function HomePage() {
 
   useEffect(() => {
     document.title = 'ポケふた写真館 - ポケふた訪問記録';
-    trackView('/', 'ホーム', 'home');
 
     (async () => {
       try {
@@ -200,6 +199,7 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
+        trackView('/', 'ポケふた写真館', 'gallery_index', loggedIn);
         trackCollectionOpen({ is_logged_in: loggedIn });
         if (loggedIn && session?.user?.id) {
           setUserName(getDisplayName(session));
