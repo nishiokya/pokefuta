@@ -1537,8 +1537,11 @@ function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
 
       <div className="relative">
         <p className="line-clamp-1 text-sm font-extrabold text-[#2A2A2A]">
-          {manhole.building ? `${manhole.municipality}・${manhole.building}` : `${manhole.prefecture}${manhole.municipality ? ` ${manhole.municipality}` : ''}`}
+          {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
         </p>
+        {manhole.building && (
+          <p className="line-clamp-1 text-xs font-bold text-[#6B6B6B]">{manhole.building}</p>
+        )}
         <div className="mt-2 flex flex-wrap gap-1">
           {(tags.length > 0 ? tags : [getManholeTitle(manhole)])
             .map(safeTagLabel)
