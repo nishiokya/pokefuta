@@ -17,6 +17,7 @@ export interface GAUserProperties {
 
 /** pokefuta.com 共通イベントパラメータ */
 export interface PokefutaEventParams extends GAEventParams {
+  site_type?: 'photo' | 'map';
   manhole_id?: string | number;
   prefecture?: string;
   pokemon_ids?: string;    // カンマ区切り文字列 (GA4は配列非対応)
@@ -72,6 +73,7 @@ export function trackEvent(
   }
 
   const enrichedParams: GAEventParams = {
+    site_type: 'photo',
     page_path: isClientSide() ? window.location.pathname : undefined,
     page_title: isClientSide() ? document.title : undefined,
     event_timestamp: new Date().toISOString(),
