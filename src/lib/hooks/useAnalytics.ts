@@ -32,7 +32,7 @@ export function useAnalytics() {
   );
 
   const trackView = useCallback(
-    (pagePath: string, pageTitle: string, pageType?: string, isLoggedIn?: boolean) =>
+    (pagePath: string, pageTitle: string, pageType?: string, isLoggedIn: boolean = false) =>
       trackPageView(pagePath, pageTitle, pageType, isLoggedIn),
     []
   );
