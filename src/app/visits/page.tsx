@@ -44,7 +44,7 @@ interface Visit {
   is_bookmarked: boolean;
 }
 
-type PassportTab = 'stamps' | 'prefectures' | 'unvisited';
+type PassportTab = 'stamps' | 'prefectures' | 'pokemons' | 'unvisited';
 
 type VisitSummary = {
   count: number;
@@ -58,11 +58,22 @@ type PrefectureProgress = {
   visited: number;
   remaining: number;
   rate: number;
+  representativePhotoUrl: string | null;
+};
+
+type PokemonProgress = {
+  pokemonName: string;
+  totalManholes: number;
+  visitedManholes: number;
+  remaining: number;
+  rate: number;
+  representativePhotoUrl: string | null;
 };
 
 const tabs: { id: PassportTab; label: string }[] = [
   { id: 'stamps', label: 'スタンプ帳' },
   { id: 'prefectures', label: '都道府県' },
+  { id: 'pokemons', label: 'ポケモン' },
   { id: 'unvisited', label: '未訪問' },
 ];
 
@@ -105,6 +116,7 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showUnvisitedPrefectures, setShowUnvisitedPrefectures] = useState(false);
   const { trackView, trackPassportOpen } = useAnalytics();
 
   const selectPassportTab = (tab: PassportTab) => {
@@ -310,15 +322,18 @@ export default function VisitsPage() {
   }, [manholes, visits, visitSummaryByManholeId]);
 
   const prefectureProgress = useMemo<PrefectureProgress[]>(() => {
-    const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>();
+    const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number>; representativeManholeId: number | null }>();
 
     passportManholes.forEach((manhole) => {
       const prefecture = manhole.prefecture || '都道府県未設定';
-      const current = progress.get(prefecture) || { totalIds: new Set<number>(), visitedIds: new Set<number>() };
+      const current = progress.get(prefecture) || { totalIds: new Set<number>(), visitedIds: new Set<number>(), representativeManholeId: null };
       current.totalIds.add(manhole.id);
 
       if (visitSummaryByManholeId.has(manhole.id)) {
         current.visitedIds.add(manhole.id);
+        if (current.representativeManholeId === null) {
+          current.representativeManholeId = manhole.id;
+        }
       }
 
       progress.set(prefecture, current);
@@ -328,12 +343,16 @@ export default function VisitsPage() {
       .map(([name, value]) => {
         const total = value.totalIds.size;
         const visited = value.visitedIds.size;
+        const representativePhotoUrl = value.representativeManholeId !== null
+          ? (visitSummaryByManholeId.get(value.representativeManholeId)?.latestVisit.photos[0]?.thumbnail_url ?? null)
+          : null;
         return {
           name,
           total,
           visited,
           remaining: Math.max(total - visited, 0),
           rate: total > 0 ? (visited / total) * 100 : 0,
+          representativePhotoUrl,
         };
       })
       .sort((a, b) => {
@@ -343,7 +362,63 @@ export default function VisitsPage() {
       });
   }, [passportManholes, visitSummaryByManholeId]);
 
+  const pokemonProgress = useMemo<PokemonProgress[]>(() => {
+    const progress = new Map<string, {
+      totalIds: Set<number>;
+      visitedIds: Set<number>;
+      bestVisitedManhole: { id: number; pokemonCount: number } | null;
+    }>();
+
+    passportManholes.forEach((manhole) => {
+      (manhole.pokemons ?? []).forEach((pokemonName) => {
+        const current = progress.get(pokemonName) ?? { totalIds: new Set<number>(), visitedIds: new Set<number>(), bestVisitedManhole: null };
+        current.totalIds.add(manhole.id);
+        if (visitSummaryByManholeId.has(manhole.id)) {
+          current.visitedIds.add(manhole.id);
+          const pokemonCount = (manhole.pokemons ?? []).length;
+          if (!current.bestVisitedManhole || pokemonCount < current.bestVisitedManhole.pokemonCount) {
+            current.bestVisitedManhole = { id: manhole.id, pokemonCount };
+          }
+        }
+        progress.set(pokemonName, current);
+      });
+    });
+
+    return Array.from(progress.entries())
+      .map(([pokemonName, value]) => {
+        const totalManholes = value.totalIds.size;
+        const visitedManholes = value.visitedIds.size;
+        const representativePhotoUrl = value.bestVisitedManhole
+          ? (visitSummaryByManholeId.get(value.bestVisitedManhole.id)?.latestVisit.photos[0]?.thumbnail_url ?? null)
+          : null;
+        return {
+          pokemonName,
+          totalManholes,
+          visitedManholes,
+          remaining: Math.max(totalManholes - visitedManholes, 0),
+          rate: totalManholes > 0 ? (visitedManholes / totalManholes) * 100 : 0,
+          representativePhotoUrl,
+        };
+      })
+      .sort((a, b) => {
+        const aV = a.visitedManholes > 0 ? 0 : 1;
+        const bV = b.visitedManholes > 0 ? 0 : 1;
+        if (aV !== bV) return aV - bV;
+        if (a.remaining !== b.remaining) return a.remaining - b.remaining;
+        if (b.visitedManholes !== a.visitedManholes) return b.visitedManholes - a.visitedManholes;
+        if (b.totalManholes !== a.totalManholes) return b.totalManholes - a.totalManholes;
+        return a.pokemonName.localeCompare(b.pokemonName, 'ja');
+      });
+  }, [passportManholes, visitSummaryByManholeId]);
+
+  const visitedPokemonSpecies = pokemonProgress.filter((p) => p.visitedManholes > 0).length;
+  const totalPokemonSpecies = pokemonProgress.length;
+  const pokemonCompletionRate = totalPokemonSpecies > 0 ? (visitedPokemonSpecies / totalPokemonSpecies) * 100 : 0;
+
   const leadingPrefecture = prefectureProgress.find((prefecture) => prefecture.visited > 0) || prefectureProgress[0];
+  const nextAchievementPrefecture = prefectureProgress
+    .filter((p) => p.visited > 0 && p.remaining > 0)
+    .reduce<PrefectureProgress | null>((best, p) => (!best || p.remaining < best.remaining) ? p : best, null);
   const unvisitedManholes = passportManholes.filter((manhole) => !visitSummaryByManholeId.has(manhole.id));
   const recentMilestone = Math.floor(visitedManholesCount / 10) * 10;
 
@@ -648,64 +723,45 @@ export default function VisitsPage() {
 
       <div className="max-w-3xl mx-auto pb-[10rem]">
         <div className="p-4 space-y-4">
-          <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+          <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
             <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
             <div className="relative">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
-                  <h1 className="mt-1 font-pixelJp text-xl font-bold text-[#4F3828]">
-                    ポケふた訪問パスポート
-                  </h1>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <div className="rounded-lg border border-[#B65A4B]/30 bg-[#F8D9C4] px-3 py-2 text-center">
-                    <p className="font-pixel text-2xl leading-none text-[#B5483C]">{visitedManholesCount}</p>
-                    <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">STAMPS</p>
-                  </div>
-                </div>
-              </div>
+              <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
+              <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">ポケふた訪問パスポート</h1>
 
-              <div className="mt-5">
-                <div className="mb-2 flex items-end justify-between">
-                  <div>
-                    <p className="font-pixel text-2xl text-[#4F3828]">
-                      {visitedManholesCount} / {totalManholes ?? '集計中'}
-                    </p>
-                    <p className="font-pixelJp text-xs text-[#6A4D36]">訪問済みスタンプ</p>
-                  </div>
-                  <p className="font-pixel text-xl text-[#B5483C]">
-                    {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
-                  </p>
-                </div>
-                <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
-                  <div
-                    className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
-                    style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryStat label="達成率" value={completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`} />
-                <SummaryStat label="訪問自治体" value={`${visitedMunicipalityCount}`} />
-                <SummaryStat label="写真つき" value={`${visits.filter((visit) => visit.photos.length > 0).length}`} />
-                <SummaryStat
-                  label="先頭の県"
-                  value={leadingPrefecture ? `${leadingPrefecture.name} ${leadingPrefecture.visited}/${leadingPrefecture.total}` : '-'}
-                  compact
+              <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
+                <div
+                  className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
+                  style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
                 />
               </div>
 
-              {visitedManholesCount > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <AchievementBadge label="NEW STAMP" active={visitedManholesCount === 1} />
-                  {recentMilestone >= 10 && <AchievementBadge label={`${recentMilestone} STAMPS達成`} active />}
-                  {prefectureProgress.some((prefecture) => prefecture.total > 0 && prefecture.remaining === 0) && (
-                    <AchievementBadge label="都道府県コンプリート" active />
-                  )}
+              <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
+                <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
+                  <div className="px-3 py-2 text-center">
+                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
+                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedManholesCount}<span className="text-[#8C6A4A]">/{totalManholes ?? '-'}</span></p>
+                  </div>
+                  <div className="px-3 py-2 text-center">
+                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
+                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{prefectureProgress.filter((p) => p.visited > 0).length}<span className="text-[#8C6A4A]">/47</span></p>
+                  </div>
+                  <div className="px-3 py-2 text-center">
+                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
+                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
+                  </div>
                 </div>
-              )}
+                {nextAchievementPrefecture && (
+                  <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
+                    <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievementPrefecture.name}</p>
+                      <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievementPrefecture.visited}/{nextAchievementPrefecture.total}</p>
+                      <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievementPrefecture.remaining}枚</span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {visitedManholesCount > 0 && (
                 <ShareButtons
@@ -717,17 +773,6 @@ export default function VisitsPage() {
               )}
             </div>
           </section>
-
-          {prefectureProgress.some((prefecture) => prefecture.visited > 0) && (
-            <section className="grid gap-3 sm:grid-cols-3">
-              {prefectureProgress
-                .filter((prefecture) => prefecture.visited > 0)
-                .slice(0, 3)
-                .map((prefecture) => (
-                  <PrefectureMiniCard key={prefecture.name} prefecture={prefecture} />
-                ))}
-            </section>
-          )}
 
           <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur sm:top-[calc(env(safe-area-inset-top)+4.25rem)]">
             <div className="grid grid-cols-4 gap-1">
@@ -764,12 +809,97 @@ export default function VisitsPage() {
                 </section>
               )}
 
-              {activeTab === 'prefectures' && (
-                <section className="grid gap-3 sm:grid-cols-2">
-                  {prefectureProgress.map((prefecture) => (
-                    <PrefectureProgressCard key={prefecture.name} prefecture={prefecture} />
-                  ))}
-                </section>
+              {activeTab === 'prefectures' && (() => {
+                const complete = prefectureProgress.filter((p) => p.visited > 0 && p.remaining === 0);
+                const inProgress = prefectureProgress.filter((p) => p.visited > 0 && p.remaining > 0);
+                const notStarted = prefectureProgress.filter((p) => p.visited === 0);
+                return (
+                  <>
+                    {complete.length > 0 && (
+                      <div>
+                        <p className="mb-2 font-pixelJp text-xs font-bold text-[#8C6A4A]">達成済み</p>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {complete.map((p) => <PrefectureProgressCard key={p.name} prefecture={p} />)}
+                        </div>
+                      </div>
+                    )}
+                    {inProgress.length > 0 && (
+                      <div>
+                        <p className="mb-2 mt-4 font-pixelJp text-xs font-bold text-[#8C6A4A]">進行中</p>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {inProgress.map((p) => <PrefectureProgressCard key={p.name} prefecture={p} />)}
+                        </div>
+                      </div>
+                    )}
+                    {notStarted.length > 0 && (
+                      <div className="mt-4">
+                        {showUnvisitedPrefectures ? (
+                          <>
+                            <p className="mb-2 font-pixelJp text-xs font-bold text-[#8C6A4A]">未着手</p>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              {notStarted.map((p) => <PrefectureProgressCard key={p.name} prefecture={p} />)}
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowUnvisitedPrefectures(true)}
+                            className="w-full rounded-lg border border-dashed border-[#8C6A4A]/25 py-3 font-pixelJp text-xs text-[#8C6A4A] hover:bg-[#EAD9B8]/50"
+                          >
+                            未着手 {notStarted.length} 件を表示
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {activeTab === 'pokemons' && (
+                <>
+                  <section className="rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5] p-4 shadow-sm">
+                    <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">ポケモン達成</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <SummaryStat label="達成済み" value={`${visitedPokemonSpecies} 種`} />
+                      <SummaryStat label="全ポケモン" value={`${totalPokemonSpecies} 種`} />
+                      <SummaryStat label="達成率" value={`${pokemonCompletionRate.toFixed(1)}%`} />
+                    </div>
+                  </section>
+
+                  {visitedPokemonSpecies === 0 ? (
+                    <section className="rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5] p-8 text-center shadow-sm">
+                      <h2 className="font-pixelJp text-lg font-bold text-[#4F3828]">まだポケモン達成はありません</h2>
+                      <p className="mx-auto mt-3 max-w-sm font-pixelJp text-sm leading-6 text-[#6A4D36]">
+                        ポケふたを訪問すると、登場ポケモンごとの達成状況が表示されます。
+                      </p>
+                    </section>
+                  ) : (
+                    <>
+                      {(() => {
+                        type Group = { label: string; items: PokemonProgress[] };
+                        const groups: Group[] = [];
+                        pokemonProgress.filter((p) => p.visitedManholes > 0).forEach((pokemon) => {
+                          const label = pokemon.remaining === 0 ? 'コンプリート済み'
+                            : pokemon.remaining <= 3 ? `あと${pokemon.remaining}枚`
+                            : '進行中';
+                          const last = groups[groups.length - 1];
+                          if (!last || last.label !== label) groups.push({ label, items: [pokemon] });
+                          else last.items.push(pokemon);
+                        });
+                        return groups.map((group, i) => (
+                          <div key={group.label} className={i > 0 ? 'mt-4' : ''}>
+                            <p className="mb-2 font-pixelJp text-xs font-bold text-[#8C6A4A]">{group.label}</p>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              {group.items.map((pokemon) => (
+                                <PokemonProgressCard key={pokemon.pokemonName} pokemon={pokemon} />
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </>
+                  )}
+                </>
               )}
 
               {activeTab === 'unvisited' && (
@@ -852,16 +982,26 @@ function PrefectureProgressCard({ prefecture }: { prefecture: PrefectureProgress
 
   return (
     <article className="rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5] p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-pixelJp text-base font-bold text-[#4F3828]">{prefecture.name}</h2>
-          <p className="mt-1 font-pixelJp text-xs text-[#6A4D36]">
-            {complete ? '制覇済み' : `あと${prefecture.remaining}件`}
-          </p>
-        </div>
-        <div className={`rounded-md px-3 py-2 text-center ${complete ? 'bg-[#DFF1E9]' : 'bg-[#F8D9C4]'}`}>
-          <p className="font-pixel text-xl leading-none text-[#4F3828]">{prefecture.visited}/{prefecture.total}</p>
-          <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">{prefecture.rate.toFixed(0)}%</p>
+      <div className="flex items-start gap-3">
+        {prefecture.representativePhotoUrl && (
+          <img
+            src={prefecture.representativePhotoUrl}
+            alt={prefecture.name}
+            loading="lazy"
+            className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
+          />
+        )}
+        <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="font-pixelJp text-base font-bold text-[#4F3828]">{prefecture.name}</h2>
+            <p className="mt-1 font-pixelJp text-xs text-[#6A4D36]">
+              {complete ? '制覇済み' : `あと${prefecture.remaining}件`}
+            </p>
+          </div>
+          <div className={`flex-shrink-0 rounded-md px-3 py-2 text-center ${complete ? 'bg-[#DFF1E9]' : 'bg-[#F8D9C4]'}`}>
+            <p className="font-pixel text-xl leading-none text-[#4F3828]">{prefecture.visited}/{prefecture.total}</p>
+            <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">{prefecture.rate.toFixed(0)}%</p>
+          </div>
         </div>
       </div>
       <div className="mt-4 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/15 bg-[#E4D4B8]">
@@ -874,6 +1014,49 @@ function PrefectureProgressCard({ prefecture }: { prefecture: PrefectureProgress
         <div className="mt-3 flex items-center gap-2 rounded-md border border-[#3F9D7D]/25 bg-[#DFF1E9] px-3 py-2">
           <CheckCircle2 className="h-4 w-4 text-[#2C765E]" />
           <p className="font-pixelJp text-xs font-bold text-[#2C765E]">都道府県コンプリート</p>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function PokemonProgressCard({ pokemon }: { pokemon: PokemonProgress }) {
+  const complete = pokemon.totalManholes > 0 && pokemon.remaining === 0;
+
+  return (
+    <article className="rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5] p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        {pokemon.representativePhotoUrl && (
+          <img
+            src={pokemon.representativePhotoUrl}
+            alt={pokemon.pokemonName}
+            loading="lazy"
+            className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
+          />
+        )}
+        <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="font-pixelJp text-base font-bold text-[#4F3828]">{pokemon.pokemonName}</h2>
+            <p className="mt-1 font-pixelJp text-xs text-[#6A4D36]">
+              {complete ? '制覇済み' : `あと${pokemon.remaining}件`}
+            </p>
+          </div>
+          <div className={`flex-shrink-0 rounded-md px-3 py-2 text-center ${complete ? 'bg-[#DFF1E9]' : 'bg-[#F8D9C4]'}`}>
+            <p className="font-pixel text-xl leading-none text-[#4F3828]">{pokemon.visitedManholes}/{pokemon.totalManholes}</p>
+            <p className="font-pixelJp text-[10px] font-bold text-[#6A4D36]">{pokemon.rate.toFixed(0)}%</p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/15 bg-[#E4D4B8]">
+        <div
+          className={`h-full ${complete ? 'bg-[#3F9D7D]' : 'bg-[#D94D3F]'}`}
+          style={{ width: `${Math.min(pokemon.rate, 100)}%` }}
+        />
+      </div>
+      {complete && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-[#3F9D7D]/25 bg-[#DFF1E9] px-3 py-2">
+          <CheckCircle2 className="h-4 w-4 text-[#2C765E]" />
+          <p className="font-pixelJp text-xs font-bold text-[#2C765E]">ポケモンコンプリート</p>
         </div>
       )}
     </article>
