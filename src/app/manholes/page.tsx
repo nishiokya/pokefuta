@@ -162,9 +162,9 @@ export default function ManholesPage() {
                       <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
                         {manhole.title || `${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}`}
                       </h2>
-                      <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
-                        {manhole.prefecture} {manhole.municipality || manhole.city || ''}
-                      </p>
+                      {manhole.building && (
+                        <p className="mt-1 text-xs font-bold text-[#6B6B6B]">{manhole.building}</p>
+                      )}
                     </div>
                     <span className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-sm font-extrabold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15">
                       #{manhole.id}

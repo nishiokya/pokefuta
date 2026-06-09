@@ -25,7 +25,7 @@ import { calculateDistance, isValidCoordinates } from '@/lib/location';
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -48,7 +48,7 @@ const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
 type JourneyVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at?: string;
   photos: Array<{ id: string; thumbnail_url?: string; created_at?: string }>;
@@ -967,10 +967,9 @@ export default function HomePage() {
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                       {visibleFeed.map((visit, index) => {
                         const photo = visit.photos?.[0];
-                        const title = [visit.manhole?.prefecture, visit.manhole?.municipality]
-                          .filter(Boolean)
-                          .join(' ');
-                        const locationLabel = title || visit.shot_location || '';
+                        const locationLabel = visit.manhole?.building
+                          ? [visit.manhole.municipality, visit.manhole.building].filter(Boolean).join('・')
+                          : [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ') || visit.shot_location || '';
                         const manholeId = visit.manhole?.id ?? visit.manhole_id;
                         const canNavigate = Boolean(manholeId);
                         const to = canNavigate ? `/manhole/${manholeId}` : '';
@@ -1408,8 +1407,12 @@ function JourneyHistoryCard({ manhole, visits }: { manhole: JourneyManhole; visi
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="line-clamp-1 text-base font-extrabold text-[#4F3828]">{getMunicipality(manhole)}</p>
-            <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.prefecture}</p>
+            <p className="line-clamp-1 text-base font-extrabold text-[#4F3828]">
+              {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
+            </p>
+            {manhole.building && (
+              <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.building}</p>
+            )}
           </div>
           {latestVisit && (
             <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-[#B5483C]">
@@ -1490,8 +1493,12 @@ function JourneyUnvisitedCard({ manhole, badge }: { manhole: JourneyManhole; bad
       </div>
 
       <div className="relative">
-        <p className="line-clamp-1 text-sm font-extrabold text-[#4F3828]">{getMunicipality(manhole)}</p>
-        <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.prefecture}</p>
+        <p className="line-clamp-1 text-sm font-extrabold text-[#4F3828]">
+          {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
+        </p>
+        {manhole.building && (
+          <p className="mt-1 line-clamp-1 text-xs font-bold text-[#6A4D36]">{manhole.building}</p>
+        )}
         <div className="mt-2 flex flex-wrap gap-1">
           {(tags.length > 0 ? tags : [getManholeTitle(manhole)]).slice(0, 3).map((tag) => (
             <span key={tag} className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-[#6A4D36]">
@@ -1538,8 +1545,11 @@ function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
 
       <div className="relative">
         <p className="line-clamp-1 text-sm font-extrabold text-[#2A2A2A]">
-          {[manhole.prefecture, manhole.municipality].filter(Boolean).join(' ')}
+          {manhole.prefecture}{manhole.municipality ? ` ${manhole.municipality}` : ''}
         </p>
+        {manhole.building && (
+          <p className="line-clamp-1 text-xs font-bold text-[#6B6B6B]">{manhole.building}</p>
+        )}
         <div className="mt-2 flex flex-wrap gap-1">
           {(tags.length > 0 ? tags : [getManholeTitle(manhole)])
             .map(safeTagLabel)

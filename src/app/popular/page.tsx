@@ -22,7 +22,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -194,10 +194,9 @@ export default function PopularPage() {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                   {sortedFeed.map((visit, index) => {
                     const photo = visit.photos?.[0];
-                    const title = [visit.manhole?.prefecture, visit.manhole?.municipality]
-                      .filter(Boolean)
-                      .join(' ');
-                    const locationLabel = title || visit.shot_location || '';
+                    const locationLabel = visit.manhole?.building
+                      ? [visit.manhole.municipality, visit.manhole.building].filter(Boolean).join('・')
+                      : [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ') || visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';

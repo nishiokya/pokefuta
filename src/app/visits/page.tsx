@@ -598,7 +598,7 @@ export default function VisitsPage() {
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <Stamp className="h-6 w-6 text-[#B8AB96]" />
                     <p className="mt-1 line-clamp-2 text-[10px] font-bold text-[#6A4D36]">
-                      {getMunicipality(manhole)}
+                      {getMunicipality(manhole)}{manhole.building && `・${manhole.building}`}
                     </p>
                   </div>
                 </Link>
@@ -939,7 +939,7 @@ function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSumm
 
       <div>
         <p className="truncate font-pixelJp text-[9px] font-bold leading-tight text-[#4F3828]">
-          {getMunicipality(manhole)}
+          {getMunicipality(manhole)}{manhole.building && `・${manhole.building}`}
         </p>
         {summary && (
           <p className="font-pixel text-[8px] text-[#B5483C]">{formatVisitDate(summary.latestVisit.visited_at, 'yyyy/M')}</p>
