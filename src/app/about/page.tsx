@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 const journeySteps = [
@@ -74,7 +75,15 @@ export default function AboutPage() {
 
   useEffect(() => {
     document.title = 'このアプリについて - ポケふた訪問記録';
-    trackView('/about', 'このアプリについて', 'about');
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        trackView('/about', 'このアプリについて', 'about', Boolean(session?.user));
+      } catch {
+        trackView('/about', 'このアプリについて', 'about', false);
+      }
+    })();
   }, []);
 
   return (
