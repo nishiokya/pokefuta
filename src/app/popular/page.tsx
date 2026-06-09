@@ -194,7 +194,9 @@ export default function PopularPage() {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                   {sortedFeed.map((visit, index) => {
                     const photo = visit.photos?.[0];
-                    const locationLabel = [visit.manhole?.municipality, visit.manhole?.building].filter(Boolean).join('・') || visit.shot_location || '';
+                    const locationLabel = visit.manhole?.building
+                      ? [visit.manhole.municipality, visit.manhole.building].filter(Boolean).join('・')
+                      : [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ') || visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
