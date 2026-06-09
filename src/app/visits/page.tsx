@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { JapanPrefectureMap } from '@/components/JapanPrefectureMap';
 import Link from 'next/link';
 import {
   Bookmark,
@@ -765,11 +766,14 @@ export default function VisitsPage() {
               )}
 
               {activeTab === 'prefectures' && (
-                <section className="grid gap-3 sm:grid-cols-2">
-                  {prefectureProgress.map((prefecture) => (
-                    <PrefectureProgressCard key={prefecture.name} prefecture={prefecture} />
-                  ))}
-                </section>
+                <>
+                  <section className="grid gap-3 sm:grid-cols-2">
+                    {prefectureProgress.map((prefecture) => (
+                      <PrefectureProgressCard key={prefecture.name} prefecture={prefecture} />
+                    ))}
+                  </section>
+                  <JapanPrefectureMap prefectureProgress={prefectureProgress} />
+                </>
               )}
 
               {activeTab === 'unvisited' && (
