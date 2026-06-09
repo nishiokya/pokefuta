@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
+            building,
             pokemons${manholeTagFields}
           ),
           photos:photo (
@@ -181,6 +182,7 @@ export async function GET(request: NextRequest) {
             title,
             prefecture,
             municipality,
+            building,
             pokemons${manholeTagFields}
           ),
           photos:photo (

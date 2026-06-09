@@ -25,7 +25,7 @@ import { calculateDistance, isValidCoordinates } from '@/lib/location';
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -48,7 +48,7 @@ const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
 type JourneyVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> | null;
   shot_at: string;
   created_at?: string;
   photos: Array<{ id: string; thumbnail_url?: string; created_at?: string }>;
@@ -967,7 +967,8 @@ export default function HomePage() {
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                       {visibleFeed.map((visit, index) => {
                         const photo = visit.photos?.[0];
-                        const title = [visit.manhole?.prefecture, visit.manhole?.municipality]
+                        const locationParts = [visit.manhole?.municipality, visit.manhole?.building].filter(Boolean).join(' · ');
+                        const title = [visit.manhole?.prefecture, locationParts]
                           .filter(Boolean)
                           .join(' ');
                         const locationLabel = title || visit.shot_location || '';
@@ -1538,7 +1539,7 @@ function RareManholeCard({ manhole }: { manhole: JourneyManhole }) {
 
       <div className="relative">
         <p className="line-clamp-1 text-sm font-extrabold text-[#2A2A2A]">
-          {[manhole.prefecture, manhole.municipality].filter(Boolean).join(' ')}
+          {manhole.prefecture}{manhole.municipality && ` ${manhole.municipality}`}{manhole.building && ` · ${manhole.building}`}
         </p>
         <div className="mt-2 flex flex-wrap gap-1">
           {(tags.length > 0 ? tags : [getManholeTitle(manhole)])

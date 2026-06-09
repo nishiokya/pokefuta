@@ -22,7 +22,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 type FeedVisit = {
   id: string;
   manhole_id: number | null;
-  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'title' | 'pokemons'> | null;
+  manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons'> | null;
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
@@ -194,7 +194,8 @@ export default function PopularPage() {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                   {sortedFeed.map((visit, index) => {
                     const photo = visit.photos?.[0];
-                    const title = [visit.manhole?.prefecture, visit.manhole?.municipality]
+                    const locationParts = [visit.manhole?.municipality, visit.manhole?.building].filter(Boolean).join(' · ');
+                    const title = [visit.manhole?.prefecture, locationParts]
                       .filter(Boolean)
                       .join(' ');
                     const locationLabel = title || visit.shot_location || '';

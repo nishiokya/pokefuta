@@ -508,7 +508,7 @@ export default function NearbyPage() {
                         <div className="min-w-0">
                           <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
                             {manhole.prefecture}
-                            {manhole.municipality || manhole.city || ''}
+                            {manhole.municipality || manhole.city || ''}{(manhole.municipality || manhole.city) && manhole.building && ` · ${manhole.building}`}
                           </h2>
                           <div className="mt-1 text-xs font-bold text-[#6B6B6B]">
                             ポケふた #{manhole.id}
