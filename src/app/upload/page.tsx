@@ -10,6 +10,7 @@ import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
+import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 interface PhotoMetadata {
@@ -91,7 +92,15 @@ export default function UploadPage() {
     document.title = '写真登録 - ポケふた訪問記録';
 
     // ✅ GA: ページビュー追跡
-    trackView('/upload', '写真登録', 'upload', true);
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        trackView('/upload', '写真登録', 'upload', Boolean(session?.user));
+      } catch {
+        trackView('/upload', '写真登録', 'upload', true); // middleware が認証を保証
+      }
+    })();
 
     loadManholes();
     // Cookieから公開設定を読み込み

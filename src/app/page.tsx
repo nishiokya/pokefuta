@@ -213,6 +213,7 @@ export default function HomePage() {
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
+        trackView('/', 'ポケふた写真館', 'gallery_index', false);
         // エラー時もloadingをfalseに
         setLoading(false);
       }

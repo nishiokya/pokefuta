@@ -76,9 +76,13 @@ export default function AboutPage() {
   useEffect(() => {
     document.title = 'このアプリについて - ポケふた訪問記録';
     (async () => {
-      const supabase = createBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      trackView('/about', 'このアプリについて', 'about', Boolean(session?.user));
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        trackView('/about', 'このアプリについて', 'about', Boolean(session?.user));
+      } catch {
+        trackView('/about', 'このアプリについて', 'about', false);
+      }
     })();
   }, []);
 
