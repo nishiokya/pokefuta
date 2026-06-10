@@ -31,6 +31,9 @@ export interface ApiErrorEventParams extends GAEventParams {
   status_code: number;
   method: string;
   error_message?: string;
+  is_logged_in?: boolean | 'unknown';
+  page_type?: string;
+  component?: string;
 }
 
 // ==========================================
@@ -57,6 +60,17 @@ function isGtagAvailable(): boolean {
 }
 
 // ==========================================
+// auth 状態（全イベント自動付与用）
+// ==========================================
+
+let _analyticsIsLoggedIn: boolean | null = null;
+
+/** ApiErrorAnalytics や認証フローから呼ぶ。全イベントに is_logged_in が自動付与される。 */
+export function setAnalyticsAuthState(isLoggedIn: boolean): void {
+  _analyticsIsLoggedIn = isLoggedIn;
+}
+
+// ==========================================
 // コア関数: イベント送信
 // ==========================================
 
@@ -78,6 +92,7 @@ export function trackEvent(
     page_title: isClientSide() ? document.title : undefined,
     event_timestamp: new Date().toISOString(),
     user_locale: navigator.language || 'ja-JP',
+    is_logged_in: _analyticsIsLoggedIn !== null ? _analyticsIsLoggedIn : undefined,
     ...context,
     ...eventParams,
   };
@@ -228,7 +243,8 @@ export const errorEvents = {
     endpoint: string,
     statusCode: number,
     method: string = 'GET',
-    errorMessage?: string
+    errorMessage?: string,
+    additionalParams?: Pick<ApiErrorEventParams, 'is_logged_in' | 'page_type' | 'component'>
   ) =>
     trackEvent('error_event', {
       error_type: 'api_error',
@@ -237,6 +253,7 @@ export const errorEvents = {
       status_code: statusCode,
       method,
       error_message: errorMessage?.slice(0, 100),
+      ...additionalParams,
     } satisfies ApiErrorEventParams),
 
   auth: (errorCode: string) =>
