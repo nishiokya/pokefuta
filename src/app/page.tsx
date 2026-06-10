@@ -11,6 +11,8 @@ import {
   CircleDot,
   Compass,
   MapPin,
+  Navigation,
+  PlusCircle,
   Sparkles,
   Stamp,
 } from 'lucide-react';
@@ -512,6 +514,17 @@ export default function HomePage() {
         return a.name.localeCompare(b.name, 'ja');
       });
 
+    const visitedPrefectureCount = prefectureProgress.filter((p) => p.visited > 0).length;
+    const allPokemonSpecies = new Set<string>(allJourneyManholes.flatMap((m) => m.pokemons ?? []));
+    journeyVisits.forEach((v) => (v.manhole?.pokemons ?? []).forEach((p) => allPokemonSpecies.add(p)));
+    const visitedPokemonSpeciesSet = new Set<string>(journeyVisits.flatMap((v) => v.manhole?.pokemons ?? []));
+    const nextAchievement = prefectureProgress
+      .filter((p) => p.visited > 0 && p.remaining > 0)
+      .reduce<PrefectureProgress | null>(
+        (best, p) => (!best || p.remaining < best.remaining) ? p : best,
+        null
+      );
+
     const nearbyIds = new Set<number>();
     const nearbyCandidates = nearbyUnvisited
       .filter((manhole) => !visitsByManholeId.has(manhole.id))
@@ -601,6 +614,10 @@ export default function HomePage() {
     return {
       visitsByManholeId,
       visitedCount: visitsByManholeId.size,
+      visitedPrefectureCount,
+      visitedPokemonSpecies: visitedPokemonSpeciesSet.size,
+      totalPokemonSpecies: allPokemonSpecies.size,
+      nextAchievement,
       visitedManholes,
       completedPrefectures,
       continuingPrefecture,
@@ -614,21 +631,41 @@ export default function HomePage() {
   const {
     visitsByManholeId,
     visitedCount,
+    visitedPrefectureCount,
+    visitedPokemonSpecies,
+    totalPokemonSpecies,
+    nextAchievement,
+    visitedManholes,
     completedPrefectures,
     continuingPrefecture,
     nextPrefectureCandidates,
-    visitedManholes,
     nearbyCandidates,
     recentCandidates,
     journeyContinuationCandidates,
   } = journeyData;
   const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
 
+  const visitsByMonth = useMemo(() => {
+    const groups = new Map<string, JourneyVisit[]>();
+    const sorted = [...journeyVisits].sort(
+      (a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime()
+    );
+    for (const visit of sorted) {
+      const date = new Date(visit.shot_at);
+      if (isNaN(date.getTime())) continue;
+      const key = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+      const group = groups.get(key);
+      if (group) group.push(visit);
+      else groups.set(key, [visit]);
+    }
+    return Array.from(groups.entries()).map(([label, visits]) => ({ label, visits }));
+  }, [journeyVisits]);
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
       <Header title="ポケふた写真館" />
 
-      <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
+      <main className={`mx-auto max-w-6xl px-4 pt-5 sm:pt-8 ${isLoggedIn ? 'pb-[10rem]' : 'pb-6'}`}>
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-12">
@@ -644,78 +681,68 @@ export default function HomePage() {
           <>
             {isLoggedIn ? (
               <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_10px_26px_rgba(95,68,42,0.12)] sm:px-8 sm:py-8">
-                  <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+                <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+                  <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
                   <div className="relative">
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
-                      <Stamp className="h-3.5 w-3.5" />
-                      まいたび
+                    <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
+                    <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">{userName}のポケふた旅</h1>
+
+                    <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
+                      <div
+                        className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
+                        style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
+                      />
                     </div>
-                    <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
-                      {userName}のポケふた旅
-                    </h1>
 
-                    <div className="mt-5 rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:p-5">
-                      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-                        <div>
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                              <p className="font-pixel text-3xl leading-none text-[#4F3828] sm:text-4xl">
-                                {visitedCount} / {knownTotalManholes ?? '集計中'}
-                              </p>
-                              <p className="mt-2 text-xs font-extrabold text-[#6A4D36]">STAMPS</p>
-                            </div>
-                            <div className="rounded-[7px] border border-[#B5483C]/20 bg-[#FFF7E5] px-3 py-2">
-                              <p className="text-[11px] font-extrabold text-[#6A4D36]">全国達成率</p>
-                              <p className="mt-1 font-pixel text-2xl leading-none text-[#B5483C]">
-                                {completionRate === null ? '--%' : `${completionRate.toFixed(1)}%`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-4 h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/20 bg-[#E4D4B8]">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#8C6A4A] via-[#DDA63A] to-[#2C765E]"
-                              style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                            />
-                          </div>
-                          <JourneyPrefectureOverview
-                            completedPrefectures={completedPrefectures}
-                            continuingPrefecture={continuingPrefecture}
-                            userId={currentUserId}
-                          />
+                    <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
+                      <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
+                        <div className="px-3 py-2 text-center">
+                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
+                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedCount}<span className="text-[#8C6A4A]">/{knownTotalManholes ?? '-'}</span></p>
                         </div>
-
-                        <div>
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-xs font-extrabold text-[#6A4D36]">次に狙いたい県</p>
-                              <p className="mt-1 text-[11px] font-bold text-[#8C6A4A]">旅の続きにしやすい候補</p>
-                            </div>
-                            <Compass className="h-5 w-5 text-[#B5483C]" />
-                          </div>
-                          {nextPrefectureCandidates.length > 0 ? (
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                              {nextPrefectureCandidates.map((prefecture) => (
-                                <JourneyPrefectureStat
-                                  key={prefecture.name}
-                                  prefecture={prefecture}
-                                  label={prefecture.label}
-                                  userId={currentUserId}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <JourneyCandidateNotice text="最初の訪問を記録すると、次の旅先候補がここに育っていきます。" />
-                          )}
-                          <Link
-                            href="/nearby?tab=unvisited"
-                            className="mt-4 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[7px] bg-[#B5483C] px-5 py-3 text-sm font-extrabold text-white shadow-[0_6px_14px_rgba(181,72,60,0.22)] transition hover:bg-[#9F3D33] focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
-                          >
-                            <MapPin className="h-5 w-5" />
-                            次のポケふたを探す
-                          </Link>
+                        <div className="px-3 py-2 text-center">
+                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
+                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPrefectureCount}<span className="text-[#8C6A4A]">/47</span></p>
+                        </div>
+                        <div className="px-3 py-2 text-center">
+                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
+                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
                         </div>
                       </div>
+                      {nextAchievement && (
+                        <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
+                          <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievement.name}</p>
+                            <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievement.visited}/{nextAchievement.total}</p>
+                            <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievement.remaining}枚</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <Link
+                        href="/upload"
+                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-[#B5483C] px-2 font-pixelJp text-xs font-bold text-white"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+                        訪問を記録
+                      </Link>
+                      <Link
+                        href="/visits"
+                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
+                      >
+                        <Stamp className="h-3.5 w-3.5 shrink-0" />
+                        スタンプ帳
+                      </Link>
+                      <Link
+                        href="/nearby"
+                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
+                      >
+                        <Navigation className="h-3.5 w-3.5 shrink-0" />
+                        近くを探す
+                      </Link>
                     </div>
                   </div>
                 </section>
@@ -746,22 +773,18 @@ export default function HomePage() {
 
                 {journeyTab === 'history' ? (
                   <section className="mt-6">
-                    {visitedManholes.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-                        {visitedManholes.map((manhole) => (
-                          <JourneyHistoryCard
-                            key={manhole.id}
-                            manhole={manhole}
-                            visits={visitsByManholeId.get(manhole.id)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
+                    {visitsByMonth.length === 0 ? (
                       <JourneyEmptyState
                         title="まだ訪問履歴がありません"
                         description="最初の訪問を記録すると、ここに写真つきの旅のアルバムが育っていきます。"
                         uploadHref={uploadHref}
                       />
+                    ) : (
+                      <div className="space-y-8">
+                        {visitsByMonth.map(({ label, visits }) => (
+                          <VisitMonthGroup key={label} label={label} visits={visits} />
+                        ))}
+                      </div>
                     )}
                   </section>
                 ) : (
@@ -1080,13 +1103,18 @@ export default function HomePage() {
       </main>
 
       {isLoggedIn && (
-        <Link
-          href={uploadHref}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#B5483C] px-5 py-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#9F3D33] sm:bottom-6 sm:right-6"
-        >
-          <Camera className="h-5 w-5" />
-          訪問を記録
-        </Link>
+        <div className="fixed inset-x-0 bottom-[4.6rem] z-30 px-4">
+          <div className="mx-auto flex max-w-6xl gap-2 rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5]/95 p-2 shadow-lg backdrop-blur">
+            <Link href="/upload" className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md bg-[#B5483C] px-3 font-pixelJp text-xs font-bold text-white">
+              <PlusCircle className="h-4 w-4" />
+              訪問を記録
+            </Link>
+            <Link href="/visits" className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md border border-[#8C6A4A]/25 bg-white px-3 font-pixelJp text-xs font-bold text-[#4F3828]">
+              <Stamp className="h-4 w-4" />
+              スタンプ帳
+            </Link>
+          </div>
+        </div>
       )}
 
       <BottomNav />
@@ -1440,5 +1468,105 @@ function JourneyEmptyState({
         訪問を記録
       </Link>
     </div>
+  );
+}
+
+function VisitMonthGroup({ label, visits }: { label: string; visits: JourneyVisit[] }) {
+  const photoVisits = visits.filter((v) => v.photos.length > 0);
+  const noPhotoVisits = visits.filter((v) => v.photos.length === 0);
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <p className="text-sm font-extrabold text-[#4F3828]">{label}</p>
+        <span className="rounded-full bg-[#E9DEC9] px-2 py-0.5 text-xs font-bold text-[#6A4D36]">{visits.length}件</span>
+      </div>
+      {photoVisits.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {photoVisits.map((visit) => (
+            <VisitHistoryCard key={visit.id} visit={visit} hasPhoto />
+          ))}
+        </div>
+      )}
+      {noPhotoVisits.length > 0 && (
+        <div className={`${photoVisits.length > 0 ? 'mt-3' : ''} space-y-2`}>
+          {noPhotoVisits.map((visit) => (
+            <VisitHistoryCard key={visit.id} visit={visit} hasPhoto={false} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VisitHistoryCard({ visit, hasPhoto }: { visit: JourneyVisit; hasPhoto: boolean }) {
+  const photo = visit.photos[0];
+  const manhole = visit.manhole;
+  const manholeId = manhole?.id ?? visit.manhole_id;
+  const location = manhole?.building
+    ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
+    : [manhole?.prefecture, manhole?.municipality].filter(Boolean).join(' ') || 'ポケふた';
+  const tags = getManholeTags(manhole, 3).map(safeTagLabel).filter(Boolean) as string[];
+  const href = manholeId ? `/manhole/${manholeId}` : '#';
+
+  if (!hasPhoto) {
+    return (
+      <Link
+        href={href}
+        className="flex items-center gap-3 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#B8AB96] bg-[#E9DEC9]">
+          <Stamp className="h-4 w-4 text-[#A39580]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-1 text-sm font-extrabold text-[#4F3828]">{location}</p>
+          <p className="text-xs font-bold text-[#B5483C]">{formatDateJa(visit.shot_at)}</p>
+          {tags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {tags.slice(0, 2).map((tag) => (
+                <span key={tag} className="rounded-full border border-[#8C6A4A]/15 bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-[#6A4D36]">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="group overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+    >
+      <div className="relative aspect-square overflow-hidden bg-[#E9DEC9]">
+        {photo?.thumbnail_url ? (
+          <img
+            src={photo.thumbnail_url}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <CircleDot className="h-8 w-8 text-[#B8AB96]" />
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-2 pt-8">
+          <p className="line-clamp-1 text-xs font-extrabold text-white">{location}</p>
+          <p className="text-[10px] font-bold text-white/80">{formatDateJa(visit.shot_at)}</p>
+        </div>
+      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 p-2">
+          {tags.map((tag) => (
+            <span key={tag} className="rounded-full border border-[#8C6A4A]/15 bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[#6A4D36]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </Link>
   );
 }
