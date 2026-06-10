@@ -650,7 +650,7 @@ export default function VisitsPage() {
           {/* 旅を続けると… モックカード */}
           <section className="rounded-[8px] border border-[#7B63A8]/15 bg-white/80 px-4 py-4 shadow-sm sm:px-6">
             <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-[#9B9B9B]">旅を続けると…</p>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg bg-[#F5F0FF] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">全国</p>
                 <p className="font-pixel text-xl font-extrabold text-[#7B63A8]">
