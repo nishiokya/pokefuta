@@ -360,7 +360,6 @@ export default function HomePage() {
   }, [journeyVisits, journeyManholes]);
 
   const {
-    visitsByManholeId,
     visitedCount,
     visitedPrefectureCount,
     visitedPokemonSpecies,
@@ -881,14 +880,10 @@ function VisitHistoryCard({ visit, hasPhoto }: { visit: JourneyVisit; hasPhoto: 
     ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
     : [manhole?.prefecture, manhole?.municipality].filter(Boolean).join(' ') || 'ポケふた';
   const tags = getManholeTags(manhole, 3).map(safeTagLabel).filter(Boolean) as string[];
-  const href = manholeId ? `/manhole/${manholeId}` : '#';
 
   if (!hasPhoto) {
-    return (
-      <Link
-        href={href}
-        className="flex items-center gap-3 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
-      >
+    const compactContent = (
+      <>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#B8AB96] bg-[#E9DEC9]">
           <Stamp className="h-4 w-4 text-[#A39580]" />
         </div>
@@ -905,15 +900,27 @@ function VisitHistoryCard({ visit, hasPhoto }: { visit: JourneyVisit; hasPhoto: 
             </div>
           )}
         </div>
-      </Link>
+      </>
+    );
+    if (manholeId) {
+      return (
+        <Link
+          href={`/manhole/${manholeId}`}
+          className="flex items-center gap-3 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+        >
+          {compactContent}
+        </Link>
+      );
+    }
+    return (
+      <div className="flex items-center gap-3 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] px-3 py-2 shadow-sm">
+        {compactContent}
+      </div>
     );
   }
 
-  return (
-    <Link
-      href={href}
-      className="group overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
-    >
+  const photoCardContent = (
+    <>
       <div className="relative aspect-square overflow-hidden bg-[#E9DEC9]">
         {photo?.thumbnail_url ? (
           <img
@@ -941,6 +948,22 @@ function VisitHistoryCard({ visit, hasPhoto }: { visit: JourneyVisit; hasPhoto: 
           ))}
         </div>
       )}
-    </Link>
+    </>
+  );
+
+  if (manholeId) {
+    return (
+      <Link
+        href={`/manhole/${manholeId}`}
+        className="group overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#DDA63A]"
+      >
+        {photoCardContent}
+      </Link>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] shadow-sm">
+      {photoCardContent}
+    </div>
   );
 }

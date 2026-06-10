@@ -244,7 +244,7 @@ export const errorEvents = {
     statusCode: number,
     method: string = 'GET',
     errorMessage?: string,
-    additionalParams?: Partial<ApiErrorEventParams>
+    additionalParams?: Pick<ApiErrorEventParams, 'is_logged_in' | 'page_type' | 'component'>
   ) =>
     trackEvent('error_event', {
       error_type: 'api_error',

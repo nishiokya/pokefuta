@@ -48,7 +48,7 @@ function derivePageType(pathname: string): string {
   if (pathname === '/login') return 'login';
   if (pathname === '/signup') return 'signup';
   if (/^\/prefecture\//.test(pathname)) return 'prefecture';
-  if (/^\/user\//.test(pathname)) return 'user_profile';
+  if (/^\/users\//.test(pathname)) return 'user_profile';
   if (pathname === '/nearby') return 'nearby';
   return 'other';
 }
@@ -57,21 +57,27 @@ export default function ApiErrorAnalytics() {
   const isLoggedInRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    const supabase = createBrowserClient();
+    try {
+      const supabase = createBrowserClient();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const v = Boolean(session?.user);
-      isLoggedInRef.current = v;
-      setAnalyticsAuthState(v);
-    });
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          const v = Boolean(session?.user);
+          isLoggedInRef.current = v;
+          setAnalyticsAuthState(v);
+        })
+        .catch(() => {});
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const v = Boolean(session?.user);
-      isLoggedInRef.current = v;
-      setAnalyticsAuthState(v);
-    });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const v = Boolean(session?.user);
+        isLoggedInRef.current = v;
+        setAnalyticsAuthState(v);
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    } catch {
+      // analytics auth tracking is non-fatal
+    }
   }, []);
 
   useEffect(() => {
