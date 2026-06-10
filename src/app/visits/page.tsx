@@ -21,6 +21,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import StampBookMockup from '@/components/StampBookMockup';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -117,6 +118,7 @@ export default function VisitsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showUnvisitedPrefectures, setShowUnvisitedPrefectures] = useState(false);
+  const [sampleVisits, setSampleVisits] = useState<Array<{ id: string; thumbnail_url: string | null; location: string }>>([]);
   const { trackView, trackPassportOpen } = useAnalytics();
 
   const selectPassportTab = (tab: PassportTab) => {
@@ -167,9 +169,12 @@ export default function VisitsPage() {
 
   const loadManholesOnly = async () => {
     try {
-      const response = await fetch('/api/manholes?limit=1000');
-      if (response.ok) {
-        const data = await response.json();
+      const [manholesRes, visitsRes] = await Promise.all([
+        fetch('/api/manholes?limit=1000'),
+        fetch('/api/visits?with_photos=true&limit=6&order_by=created_at', { credentials: 'omit' }),
+      ]);
+      if (manholesRes.ok) {
+        const data = await manholesRes.json();
         const apiManholes: Manhole[] = Array.isArray(data.manholes)
           ? data.manholes.map((manhole: any) => ({
               ...manhole,
@@ -179,6 +184,20 @@ export default function VisitsPage() {
           : [];
         setManholes(apiManholes);
         setTotalManholes(typeof data.total === 'number' ? data.total : apiManholes.length || null);
+      }
+      if (visitsRes.ok) {
+        const data = await visitsRes.json();
+        if (data.success && Array.isArray(data.visits)) {
+          setSampleVisits(
+            data.visits.map((v: any) => ({
+              id: v.id,
+              thumbnail_url: v.photos?.[0]?.thumbnail_url ?? null,
+              location: v.manhole?.building
+                ? [v.manhole.municipality, v.manhole.building].filter(Boolean).join('・')
+                : [v.manhole?.prefecture, v.manhole?.municipality].filter(Boolean).join(' ') || 'ポケふた',
+            }))
+          );
+        }
       }
     } catch (error) {
       console.error('Failed to load manholes:', error);
@@ -560,157 +579,143 @@ export default function VisitsPage() {
 
   // Unauthenticated preview mode
   if (!isLoggedIn) {
+    const prefectureCount = manholes.length > 0
+      ? new Set(manholes.map((m) => m.prefecture).filter(Boolean)).size
+      : null;
+    const pokemonCount = manholes.length > 0
+      ? new Set(manholes.flatMap((m) => m.pokemons ?? [])).size
+      : null;
+
     return (
       <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
         <Header title="スタンプ帳" />
 
-        <div className="max-w-3xl mx-auto p-4 space-y-4">
-          {/* Preview Header */}
-          <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
-            <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
-            <div className="relative text-center">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1.5 text-xs font-bold text-[#7B63A8]">
-                <Sparkles className="h-3.5 w-3.5" />
-                スタンプ帳機能のプレビュー
-              </div>
-              <h1 className="font-pixelJp text-2xl font-bold text-[#4F3828]">
-                ポケふた訪問パスポート
-              </h1>
-              <p className="mt-3 text-sm font-medium text-[#6A4D36]">
-                ログインすると、あなたの旅の続きとして全国{totalManholes || '470'}箇所以上のポケふたをコレクションできます
-              </p>
+        <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 space-y-4 sm:pt-8">
+          {/* Hero — same grid layout as top page */}
+          <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="relative max-w-3xl">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  ポケふたスタンプ帳
+                </div>
+                <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-4xl">
+                  ポケふた訪問パスポート
+                </h1>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-[#4A4A4A] sm:mt-3 sm:text-base">
+                  あなた専用のスタンプ帳を無料で作れます
+                </p>
 
-              {/* Sample Progress Bar */}
-              <div className="mt-6 max-w-md mx-auto">
-                <div className="mb-2 flex items-end justify-between">
+                {/* Stats row */}
+                <div className="mt-3 flex flex-wrap gap-4 sm:mt-4">
                   <div>
-                    <p className="font-pixel text-xl text-[#4F3828]">0 / {totalManholes ?? '470'}</p>
-                    <p className="font-pixelJp text-xs text-[#6A4D36]">訪問済みスタンプ</p>
+                    <span className="font-pixel text-2xl font-extrabold text-[#7B63A8]">{totalManholes ?? '470'}</span>
+                    <span className="ml-1 text-xs font-bold text-[#9B9B9B]">全国のポケふた</span>
                   </div>
-                  <p className="font-pixel text-lg text-[#B5483C]">0.0%</p>
-                </div>
-                <div className="h-4 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
-                  <div className="h-full w-0 rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D]" />
-                </div>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                >
-                  <Stamp className="h-4 w-4" />
-                  無料でスタンプ帳をはじめる
-                </Link>
-                <Link
-                  href="/login?redirect=/visits"
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
-                >
-                  旅の続きへ
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          {/* Feature Showcase */}
-          <section className="space-y-3">
-            <h2 className="font-pixelJp text-lg font-bold text-[#4F3828]">スタンプ帳でできること</h2>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
-                  <Stamp className="h-5 w-5 text-[#7B63A8]" />
-                </div>
-                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">訪問記録を保存</h3>
-                <p className="mt-1 text-xs text-[#6A4D36]">
-                  見つけたポケふたを記録して、あなただけのコレクションを作れます
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
-                  <Camera className="h-5 w-5 text-[#7B63A8]" />
-                </div>
-                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">写真を投稿</h3>
-                <p className="mt-1 text-xs text-[#6A4D36]">
-                  撮影した写真をアップロードして、旅の思い出を残せます
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
-                  <MapPin className="h-5 w-5 text-[#7B63A8]" />
-                </div>
-                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">都道府県別の進捗</h3>
-                <p className="mt-1 text-xs text-[#6A4D36]">
-                  47都道府県の制覇状況を確認できます
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8]/10">
-                  <CheckCircle2 className="h-5 w-5 text-[#7B63A8]" />
-                </div>
-                <h3 className="font-pixelJp text-sm font-bold text-[#4F3828]">全国制覇を目指す</h3>
-                <p className="mt-1 text-xs text-[#6A4D36]">
-                  達成率を見ながら、全国のポケふたを巡る旅を楽しめます
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Sample Preview Images */}
-          <section className="rounded-lg border border-[#8C6A4A]/15 bg-white/70 p-4">
-            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">全国{totalManholes || '470'}箇所以上のコレクション</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {manholes.slice(0, 6).map((manhole) => (
-                <Link
-                  key={manhole.id}
-                  href={`/manhole/${manhole.id}`}
-                  className="group relative aspect-square overflow-hidden rounded-lg border-2 border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9] p-2 transition hover:border-[#7B63A8]"
-                >
-                  <div className="flex h-full flex-col items-center justify-center text-center">
-                    <Stamp className="h-6 w-6 text-[#B8AB96]" />
-                    <p className="mt-1 line-clamp-2 text-[10px] font-bold text-[#6A4D36]">
-                      {getMunicipality(manhole)}{manhole.building && `・${manhole.building}`}
-                    </p>
+                  <div>
+                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '47'}</span>
+                    <span className="ml-1 text-xs font-bold text-[#9B9B9B]">都道府県</span>
                   </div>
-                </Link>
-              ))}
+                  <div>
+                    <span className="font-pixel text-2xl font-extrabold text-[#FFB347]">{pokemonCount ?? '500+'}</span>
+                    <span className="ml-1 text-xs font-bold text-[#9B9B9B]">種類のポケモン</span>
+                  </div>
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:py-2.5"
+                  >
+                    <Stamp className="h-4 w-4" />
+                    無料でスタンプ帳を作る
+                  </Link>
+                  <Link
+                    href="/nearby"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white sm:py-2.5"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    近くのポケふたを探す
+                  </Link>
+                </div>
+              </div>
+
+              <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
+                <StampBookMockup />
+              </div>
             </div>
-            <p className="mt-3 text-center text-xs text-[#6A4D36]">
-              ログインして、あなたの旅の続きを記録しましょう
-            </p>
           </section>
 
-          {/* Bottom CTA */}
-          <section className="rounded-lg border border-[#FFB347]/30 bg-gradient-to-br from-[#FFF8EB] to-[#FFEDD5] p-6 text-center">
-            <Sparkles className="mx-auto mb-3 h-10 w-10 text-[#7B63A8]" />
-            <h3 className="font-pixelJp text-xl font-bold text-[#4F3828]">
-              旅の記録を保存しませんか？
-            </h3>
-            <p className="mt-2 text-sm font-medium text-[#6B6B6B]">
-              ログインすると、旅の続きとして訪問済みや行きたい場所を記録できます。<br />
-              全国制覇率や都道府県別の進捗も見られます。
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/signup"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-              >
-                <Camera className="h-4 w-4" />
-                無料で新規登録
-              </Link>
-              <Link
-                href="/login?redirect=/visits"
-                className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8] bg-white px-6 py-3 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#7B63A8]/5"
-              >
-                旅の続きへ
-              </Link>
+          {/* 旅を続けると… モックカード */}
+          <section className="rounded-[8px] border border-[#7B63A8]/15 bg-white/80 px-4 py-4 shadow-sm sm:px-6">
+            <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-[#9B9B9B]">旅を続けると…</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-[#F5F0FF] px-3 py-3 text-center">
+                <p className="text-[10px] font-bold text-[#9B9B9B]">全国</p>
+                <p className="font-pixel text-xl font-extrabold text-[#7B63A8]">
+                  80<span className="text-[11px] font-bold text-[#C0B8D0]">/{totalManholes ?? '470'}</span>
+                </p>
+              </div>
+              <div className="rounded-lg bg-[#EDFAF5] px-3 py-3 text-center">
+                <p className="text-[10px] font-bold text-[#9B9B9B]">都道府県</p>
+                <p className="font-pixel text-xl font-extrabold text-[#2C765E]">
+                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '47'}</span>
+                </p>
+              </div>
+              <div className="rounded-lg bg-[#FFF8EB] px-3 py-3 text-center">
+                <p className="text-[10px] font-bold text-[#9B9B9B]">ポケモン</p>
+                <p className="font-pixel text-xl font-extrabold text-[#C87C2A]">
+                  104<span className="text-[11px] font-bold text-[#D4BC8A]">/{pokemonCount ?? '500+'}</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#DDD0F5] px-2.5 py-1 text-xs font-bold text-[#7B63A8]">
+                <Stamp className="h-3 w-3" />
+                岐阜県 あと2枚で制覇
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#DDD0F5] px-2.5 py-1 text-xs font-bold text-[#7B63A8]">
+                <Stamp className="h-3 w-3" />
+                ニンフィア 4/6 収集中
+              </span>
             </div>
           </section>
-        </div>
+
+          {/* 旅写真プレビュー */}
+          {sampleVisits.length > 0 && (
+            <section className="rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 p-4">
+              <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">みんなの旅写真</h3>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {sampleVisits.slice(0, 6).map((sv) => (
+                  <div
+                    key={sv.id}
+                    className="relative aspect-square overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#E9DEC9]"
+                  >
+                    {sv.thumbnail_url ? (
+                      <img
+                        src={sv.thumbnail_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Stamp className="h-6 w-6 text-[#B8AB96]" />
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5">
+                      <p className="line-clamp-1 text-[9px] font-bold text-white">{sv.location}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-xs text-[#6A4D36]">
+                登録すると、あなたの旅写真もここに残せます
+              </p>
+            </section>
+          )}
+        </main>
 
         <BottomNav />
       </div>

@@ -10,11 +10,13 @@ import {
   MapPin,
   MessageCircle,
   Sparkles,
+  Stamp,
   TrendingUp,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import StampBookMockup from '@/components/StampBookMockup';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -39,12 +41,16 @@ export default function PopularPage() {
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [totalManholes, setTotalManholes] = useState<number | null>(null);
+  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
+  const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'みんなのポケふた投稿 - ポケふた訪問記録';
+    document.title = '全国のポケふた写真館 - ポケふた訪問記録';
 
     (async () => {
       try {
@@ -54,15 +60,16 @@ export default function PopularPage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
-        trackView('/popular', 'みんなのポケふた投稿', 'popular', loggedIn);
+        trackView('/popular', '全国のポケふた写真館', 'popular', loggedIn);
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
-        trackView('/popular', 'みんなのポケふた投稿', 'popular', false);
+        trackView('/popular', '全国のポケふた写真館', 'popular', false);
       }
     })();
 
     loadSiteStats();
+    loadRareManholes();
   }, []);
 
   useEffect(() => {
@@ -98,8 +105,25 @@ export default function PopularPage() {
       const data = await response.json();
       if (!data?.success) return;
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
+      setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
+      setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
     } catch {
       // ignore
+    }
+  };
+
+  const loadRareManholes = async () => {
+    try {
+      const response = await fetch('/api/manholes?no_photos=true&limit=12');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (Array.isArray(data.manholes)) {
+        setRareManholes(data.manholes);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setRareLoading(false);
     }
   };
 
@@ -113,7 +137,7 @@ export default function PopularPage() {
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="みんなのポケふた投稿" />
+      <Header title="全国のポケふた写真館" />
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         {/* Hero Section */}
@@ -122,14 +146,22 @@ export default function PopularPage() {
             <div className="relative max-w-3xl">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
                 <Sparkles className="h-3.5 w-3.5" />
-                みんなのポケふた投稿
+                ポケふた写真館
               </div>
               <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                旅先で出会ったポケふた写真を眺めよう
+                全国のポケふたを写真で埋めよう
               </h1>
               <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                全国のユーザーが記録した写真から、次に行きたい場所を見つけられます。
-                ログインすると、あなたの旅の続きとして記録を保存できます。
+                {totalPosts != null && totalPosts > 0 ? (
+                  <>
+                    {totalPosts}枚の旅写真が集まっています。
+                    {totalManholes != null && manholesWithPhotos != null && totalManholes > manholesWithPhotos && (
+                      <>残り{totalManholes - manholesWithPhotos}枚以上はまだ募集中。</>
+                    )}
+                  </>
+                ) : (
+                  <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
+                )}
               </p>
 
               {!isLoggedIn && (
@@ -152,11 +184,7 @@ export default function PopularPage() {
             </div>
 
             <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
-              <img
-                src="/pokefuta_photo_gallery_mockup.svg"
-                alt=""
-                className="h-[210px] w-full rounded-[6px] object-cover object-left-top xl:h-[230px]"
-              />
+              <StampBookMockup />
             </div>
           </div>
         </section>
@@ -170,6 +198,39 @@ export default function PopularPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 写真がまだないポケふた */}
+        {!rareLoading && rareManholes.length > 0 && (
+          <section className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-lg font-extrabold">
+                <Stamp className="h-5 w-5 text-[#7B63A8]" />
+                写真がまだないポケふた
+              </h2>
+              <span className="text-sm font-bold text-[#B5483C]">募集中</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {rareManholes.map((manhole) => {
+                const label = manhole.building
+                  ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
+                  : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
+                return (
+                  <Link
+                    key={manhole.id}
+                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/signup'}
+                    className="flex items-center gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-3 py-2.5 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40 hover:bg-white"
+                  >
+                    <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
+                    <span className="line-clamp-2 text-xs leading-snug">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-center text-xs font-medium text-[#6B6B6B]">
+              {isLoggedIn ? '写真を投稿して図鑑を埋めよう' : 'ログインして写真を投稿できます'}
+            </p>
+          </section>
         )}
 
         {/* Photo Gallery */}
