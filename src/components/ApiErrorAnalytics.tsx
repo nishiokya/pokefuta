@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
-import { errorEvents } from '@/lib/analytics/gtag';
+import { useEffect, useRef } from 'react';
+import { createBrowserClient } from '@/lib/supabase/client';
+import { errorEvents, setAnalyticsAuthState } from '@/lib/analytics/gtag';
 
 const API_ERROR_ANALYTICS_PATCHED = Symbol.for('pokefuta.apiErrorAnalyticsPatched');
 
@@ -38,7 +39,41 @@ function getMethod(input: RequestInfo | URL, init?: RequestInit): string {
   return 'GET';
 }
 
+function derivePageType(pathname: string): string {
+  if (/^\/manhole\//.test(pathname)) return 'manhole_detail';
+  if (pathname === '/') return 'gallery_index';
+  if (pathname === '/visits') return 'visits';
+  if (pathname === '/popular') return 'popular';
+  if (pathname === '/upload') return 'upload';
+  if (pathname === '/login') return 'login';
+  if (pathname === '/signup') return 'signup';
+  if (/^\/prefecture\//.test(pathname)) return 'prefecture';
+  if (/^\/user\//.test(pathname)) return 'user_profile';
+  if (pathname === '/nearby') return 'nearby';
+  return 'other';
+}
+
 export default function ApiErrorAnalytics() {
+  const isLoggedInRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const supabase = createBrowserClient();
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const v = Boolean(session?.user);
+      isLoggedInRef.current = v;
+      setAnalyticsAuthState(v);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const v = Boolean(session?.user);
+      isLoggedInRef.current = v;
+      setAnalyticsAuthState(v);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     const patchedWindow = window as PatchedWindow;
 
@@ -55,7 +90,11 @@ export default function ApiErrorAnalytics() {
         const response = await originalFetch(input, init);
 
         if (apiPath && !response.ok) {
-          errorEvents.api(apiPath, response.status, method, response.statusText);
+          errorEvents.api(apiPath, response.status, method, response.statusText, {
+            is_logged_in: isLoggedInRef.current === null ? 'unknown' : isLoggedInRef.current,
+            page_type: derivePageType(window.location.pathname),
+            component: 'ApiErrorAnalytics',
+          });
         }
 
         return response;
@@ -65,7 +104,12 @@ export default function ApiErrorAnalytics() {
             apiPath,
             0,
             method,
-            error instanceof Error ? error.message : 'Network request failed'
+            error instanceof Error ? error.message : 'Network request failed',
+            {
+              is_logged_in: isLoggedInRef.current === null ? 'unknown' : isLoggedInRef.current,
+              page_type: derivePageType(window.location.pathname),
+              component: 'ApiErrorAnalytics',
+            }
           );
         }
 
