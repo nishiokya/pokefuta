@@ -16,6 +16,7 @@ import {
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PCShell from '@/components/PCShell';
 import StampBookMockup from '@/components/StampBookMockup';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
@@ -386,111 +387,115 @@ export default function HomePage() {
     return Array.from(groups.entries()).map(([label, visits]) => ({ label, visits }));
   }, [journeyVisits]);
 
-  return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="ポケふた写真館" />
+  const journeyRail = (
+    <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+      <div className="relative">
+        <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
+        <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">{userName}のポケふた旅</h1>
 
-      <main className={`mx-auto max-w-6xl px-4 pt-5 sm:pt-8 ${isLoggedIn ? 'pb-[10rem]' : 'pb-6'}`}>
-        {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="font-bold text-[#7B63A8]">
-                読み込み中<span className="rpg-loading"></span>
-              </div>
+        <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
+          <div
+            className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
+            style={{ width: `${Math.min(completionRate, 100)}%` }}
+          />
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
+          <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPrefectureCount}<span className="text-[#8C6A4A]">/47</span></p>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
             </div>
           </div>
-        )}
+          {nextAchievement && (
+            <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
+              <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
+              <div className="flex items-center gap-2">
+                <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievement.name}</p>
+                <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievement.visited}/{nextAchievement.total}</p>
+                <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievement.remaining}枚</span>
+              </div>
+            </div>
+          )}
+        </div>
 
-        {!loading && (
-          <>
-            {isLoggedIn ? (
-              <>
-                <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
-                  <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
-                  <div className="relative">
-                    <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
-                    <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">{userName}のポケふた旅</h1>
+        <div className="mt-4 flex flex-col gap-2">
+          <Link
+            href="/upload"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-[#B5483C] px-2 font-pixelJp text-xs font-bold text-white"
+          >
+            <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+            訪問を記録
+          </Link>
+          <Link
+            href="/visits"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
+          >
+            <Stamp className="h-3.5 w-3.5 shrink-0" />
+            スタンプ帳
+          </Link>
+          <Link
+            href="/nearby"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
+          >
+            <Navigation className="h-3.5 w-3.5 shrink-0" />
+            近くを探す
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
 
-                    <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
-                      <div
-                        className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
-                        style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                      />
-                    </div>
+  return (
+    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] text-[#2A2A2A]" style={{ paddingBottom: isLoggedIn ? undefined : undefined }}>
+      <div className="lg:hidden">
+        <Header title="ポケふた写真館" />
+      </div>
 
-                    <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
-                      <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
-                        <div className="px-3 py-2 text-center">
-                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
-                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
-                        </div>
-                        <div className="px-3 py-2 text-center">
-                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
-                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPrefectureCount}<span className="text-[#8C6A4A]">/47</span></p>
-                        </div>
-                        <div className="px-3 py-2 text-center">
-                          <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
-                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
-                        </div>
-                      </div>
-                      {nextAchievement && (
-                        <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
-                          <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievement.name}</p>
-                            <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievement.visited}/{nextAchievement.total}</p>
-                            <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievement.remaining}枚</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="font-bold text-[#7B63A8]">
+              読み込み中<span className="rpg-loading"></span>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <Link
-                        href="/upload"
-                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-[#B5483C] px-2 font-pixelJp text-xs font-bold text-white"
-                      >
-                        <PlusCircle className="h-3.5 w-3.5 shrink-0" />
-                        訪問を記録
-                      </Link>
-                      <Link
-                        href="/visits"
-                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
-                      >
-                        <Stamp className="h-3.5 w-3.5 shrink-0" />
-                        スタンプ帳
-                      </Link>
-                      <Link
-                        href="/nearby"
-                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-[#8C6A4A]/25 bg-white px-2 font-pixelJp text-xs font-bold text-[#4F3828]"
-                      >
-                        <Navigation className="h-3.5 w-3.5 shrink-0" />
-                        近くを探す
-                      </Link>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="mt-6">
-                  {visitsByMonth.length === 0 ? (
-                    <JourneyEmptyState
-                      title="まだ訪問履歴がありません"
-                      description="最初の訪問を記録すると、ここに写真つきの旅のアルバムが育っていきます。"
-                      uploadHref={uploadHref}
-                    />
-                  ) : (
-                    <div className="space-y-8">
-                      {visitsByMonth.map(({ label, visits }) => (
-                        <VisitMonthGroup key={label} label={label} visits={visits} />
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </>
+      {!loading && isLoggedIn && (
+        <PCShell active="mytrip" rail={journeyRail} className="pb-[10rem] pt-5 sm:pt-8">
+          <section>
+            {visitsByMonth.length === 0 ? (
+              <JourneyEmptyState
+                title="まだ訪問履歴がありません"
+                description="最初の訪問を記録すると、ここに写真つきの旅のアルバムが育っていきます。"
+                uploadHref={uploadHref}
+              />
             ) : (
-              <>
-                <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
+              <div className="space-y-8">
+                {visitsByMonth.map(({ label, visits }) => (
+                  <VisitMonthGroup key={label} label={label} visits={visits} />
+                ))}
+              </div>
+            )}
+          </section>
+        </PCShell>
+      )}
+
+      {!loading && !isLoggedIn && (
+        <main className="mx-auto max-w-6xl px-4 pt-5 pb-6 sm:pt-8">
+          <>
+            <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
                   <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="relative max-w-3xl">
                       <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
@@ -707,8 +712,6 @@ export default function HomePage() {
                     </div>
                   )}
                 </section>
-              </>
-            )}
 
             <div className="sr-only" aria-live="polite">
               全ポケふた {totalManholes || 0}、写真あり {manholesWithPhotos ?? 0}、全投稿{' '}
@@ -751,11 +754,11 @@ export default function HomePage() {
             )}
 
           </>
-        )}
-      </main>
+        </main>
+      )}
 
       {isLoggedIn && (
-        <div className="fixed inset-x-0 bottom-[4.6rem] z-30 px-4">
+        <div className="fixed inset-x-0 bottom-[4.6rem] z-30 px-4 lg:hidden">
           <div className="mx-auto flex max-w-6xl gap-2 rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5]/95 p-2 shadow-lg backdrop-blur">
             <Link href="/upload" className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md bg-[#B5483C] px-3 font-pixelJp text-xs font-bold text-white">
               <PlusCircle className="h-4 w-4" />
