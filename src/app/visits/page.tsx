@@ -71,6 +71,8 @@ type PokemonProgress = {
   representativePhotoUrl: string | null;
 };
 
+const TOTAL_MANHOLES = 470;
+
 const tabs: { id: PassportTab; label: string }[] = [
   { id: 'stamps', label: 'スタンプ帳' },
   { id: 'prefectures', label: '都道府県' },
@@ -298,7 +300,7 @@ export default function VisitsPage() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
-  const completionRate = totalManholes ? (visitedManholesCount / totalManholes) * 100 : null;
+  const completionRate = (visitedManholesCount / TOTAL_MANHOLES) * 100;
 
   const visitedMunicipalityCount = useMemo(() => {
     return new Set(
@@ -745,7 +747,7 @@ export default function VisitsPage() {
                 <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
                   <div className="px-3 py-2 text-center">
                     <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
-                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedManholesCount}<span className="text-[#8C6A4A]">/{totalManholes ?? '-'}</span></p>
+                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedManholesCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
                   </div>
                   <div className="px-3 py-2 text-center">
                     <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>

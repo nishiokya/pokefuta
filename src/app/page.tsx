@@ -38,6 +38,8 @@ type FeedVisit = {
 
 type GalleryTab = 'latest' | 'rare';
 
+const TOTAL_MANHOLES = 470;
+
 const galleryTabs: Array<{ key: GalleryTab; label: string }> = [
   { key: 'latest', label: 'みんなの投稿写真' },
   { key: 'rare', label: '写真が少ないポケふた' },
@@ -366,7 +368,7 @@ export default function HomePage() {
     totalPokemonSpecies,
     nextAchievement,
   } = journeyData;
-  const completionRate = knownTotalManholes ? (visitedCount / knownTotalManholes) * 100 : null;
+  const completionRate = (visitedCount / TOTAL_MANHOLES) * 100;
 
   const visitsByMonth = useMemo(() => {
     const groups = new Map<string, JourneyVisit[]>();
@@ -421,7 +423,7 @@ export default function HomePage() {
                       <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
                         <div className="px-3 py-2 text-center">
                           <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
-                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedCount}<span className="text-[#8C6A4A]">/{knownTotalManholes ?? '-'}</span></p>
+                          <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
                         </div>
                         <div className="px-3 py-2 text-center">
                           <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
