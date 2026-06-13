@@ -453,7 +453,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] text-[#2A2A2A]" style={{ paddingBottom: isLoggedIn ? undefined : undefined }}>
+    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] text-[#2A2A2A]">
       <div className="lg:hidden">
         <Header title="ポケふた写真館" />
       </div>

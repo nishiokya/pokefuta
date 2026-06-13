@@ -150,7 +150,7 @@ function PCTopNav({ active }: PCTopNavProps) {
       <div style={{ flex: 1 }} />
 
       {/* Info */}
-      <Link href="/about" style={iconBtn} title="このアプリについて">
+      <Link href="/about" style={iconBtn} title="このアプリについて" aria-label="このアプリについて">
         <Info size={18} strokeWidth={2} />
       </Link>
 
@@ -161,6 +161,7 @@ function PCTopNav({ active }: PCTopNavProps) {
         rel="noopener noreferrer"
         style={{ ...iconBtn, fontSize: 15, fontWeight: 900 }}
         title="公式X @pokemonmanhole"
+        aria-label="公式X @pokemonmanhole"
       >
         X
       </a>
@@ -180,6 +181,7 @@ function PCTopNav({ active }: PCTopNavProps) {
               onClick={handleLogout}
               style={iconBtn}
               title="ログアウト"
+              aria-label="ログアウト"
             >
               <LogOut size={16} strokeWidth={2} />
             </button>
