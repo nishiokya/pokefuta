@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
@@ -127,6 +128,11 @@ export default function MyTripPage() {
 
   const completionRate = (uniqueVisitedCount / TOTAL_MANHOLES) * 100;
 
+  const visitedPrefectureCount = useMemo(
+    () => new Set(visits.map((v) => v.manhole?.prefecture).filter(Boolean)).size,
+    [visits]
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#efe6cf]">
@@ -139,13 +145,48 @@ export default function MyTripPage() {
     return null;
   }
 
+  const NUM = '"Outfit", system-ui, sans-serif';
+  const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
+
+  const myTripRail = (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
+        <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+          旅のサマリ
+        </p>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
+          {([
+            ['集めたポケふた', uniqueVisitedCount, '#2c2a26'],
+            ['今月', thisMonthCount > 0 ? `+${thisMonthCount}` : '0', '#bf5640'],
+            ['都道府県', visitedPrefectureCount, '#2c2a26'],
+            ['今年', thisYearCount, '#2c2a26'],
+          ] as [string, string | number, string][]).map(([label, value, color]) => (
+            <div key={label} className="bg-[#fffdf7] px-3 py-2.5 text-center">
+              <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
+              <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 18, color }}>{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 h-[7px] overflow-hidden rounded-full bg-[#e9dfc7]">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }} />
+        </div>
+        <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 6 }}>
+          完成率 {completionRate.toFixed(0)}% · あと{TOTAL_MANHOLES - uniqueVisitedCount}
+        </p>
+      </div>
+      <Link href="/visits" className="flex items-center justify-center rounded-[12px] border border-[#e9dfc7] bg-[#efe6cf] px-4 py-2.5 font-pixelJp text-xs font-bold text-[#4F3828]">
+        スタンプ帳を見る →
+      </Link>
+    </div>
+  );
+
   return (
     <div className="min-h-screen safe-area-inset bg-[#efe6cf]">
       <div className="lg:hidden">
         <Header title="マイ旅" />
       </div>
 
-      <PCShell active="mytrip" className="pb-32 pt-4 lg:pt-6">
+      <PCShell active="mytrip" rail={myTripRail} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-6 max-w-2xl lg:max-w-none">
 
           {/* Slim PhotoDex header */}
@@ -188,7 +229,7 @@ export default function MyTripPage() {
               className="mt-2 pt-2 border-t border-[#e9dfc7]"
               style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e' }}
             >
-              達成率 全国 {uniqueVisitedCount}/{TOTAL_MANHOLES} ({completionRate.toFixed(0)}%)
+              達成率 全国 {uniqueVisitedCount}/{TOTAL_MANHOLES} · 都道府県 {visitedPrefectureCount}/47
             </p>
           </div>
 

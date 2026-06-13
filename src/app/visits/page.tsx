@@ -80,6 +80,15 @@ type HashtagProgress = {
   rate: number;
 };
 
+type NearCompleteItem = {
+  kind: 'pref' | 'pokemon' | 'feature';
+  label: string;
+  remaining: number;
+  visited: number;
+  total: number;
+  rate: number;
+};
+
 const TOTAL_MANHOLES = 470;
 
 const segments: { id: SegmentTab; label: string }[] = [
@@ -444,6 +453,42 @@ export default function VisitsPage() {
     [prefectureProgress]
   );
 
+  const nearCompleteAll = useMemo<NearCompleteItem[]>(() => {
+    const items: NearCompleteItem[] = [
+      ...nearCompletePrefectures.map((p) => ({
+        kind: 'pref' as const,
+        label: `${p.name}完成`,
+        remaining: p.remaining,
+        visited: p.visited,
+        total: p.total,
+        rate: p.rate,
+      })),
+      ...pokemonProgress
+        .filter((p) => p.visitedManholes > 0 && p.remaining > 0 && p.remaining <= 3)
+        .slice(0, 3)
+        .map((p) => ({
+          kind: 'pokemon' as const,
+          label: `${p.pokemonName}完成`,
+          remaining: p.remaining,
+          visited: p.visitedManholes,
+          total: p.totalManholes,
+          rate: p.rate,
+        })),
+      ...hashtagProgress
+        .filter((h) => h.remaining > 0 && h.remaining <= 2)
+        .slice(0, 2)
+        .map((h) => ({
+          kind: 'feature' as const,
+          label: `${h.tag}制覇`,
+          remaining: h.remaining,
+          visited: h.visited,
+          total: h.total,
+          rate: h.rate,
+        })),
+    ];
+    return items.sort((a, b) => a.remaining - b.remaining).slice(0, 8);
+  }, [nearCompletePrefectures, pokemonProgress, hashtagProgress]);
+
   const visitedManholesForDex = useMemo(
     () => passportManholes
       .filter((m) => visitSummaryByManholeId.has(m.id))
@@ -748,13 +793,51 @@ export default function VisitsPage() {
     );
   }
 
+  const visitsRail = (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
+        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const }}>
+          PHOTO DEX
+        </p>
+        <div className="mt-1.5 flex items-baseline gap-0.5">
+          <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 28, color: '#2c2a26', lineHeight: 1 }}>{visitedManholesCount}</span>
+          <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 14, color: '#c5b89e' }}>/{TOTAL_MANHOLES}</span>
+        </div>
+        <div className="mt-2 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }} />
+        </div>
+        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e', marginTop: 8 }}>
+          完成率 {completionRate.toFixed(0)}% · あと{TOTAL_MANHOLES - visitedManholesCount}
+        </p>
+      </div>
+      <Link href="/nearby" className="flex items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm">
+        <Camera className="h-4 w-4" />
+        近くのポケふたを撮りに行く
+      </Link>
+      {nearCompleteAll[0] && (
+        <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-4 shadow-sm">
+          <span style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, fontWeight: 800, color: '#9a6d05' }}>
+            🏆 あと{nearCompleteAll[0].remaining}でコンプ
+          </span>
+          <p className="font-pixelJp text-sm font-bold text-[#4F3828] mt-1 truncate">{nearCompleteAll[0].label}</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
+            <div className="h-full rounded-full" style={{ width: `${nearCompleteAll[0].rate.toFixed(0)}%`, background: '#e2a015' }} />
+          </div>
+          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e', marginTop: 4 }}>
+            {nearCompleteAll[0].visited}/{nearCompleteAll[0].total}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen safe-area-inset bg-[#efe6cf]">
       <div className="lg:hidden">
         <Header title="スタンプ帳" />
       </div>
 
-      <PCShell active="stamp" className="pb-32 pt-4 lg:pt-6">
+      <PCShell active="stamp" rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
           {/* PhotoDex サマリーヘッダー（v2 コンパクト） */}
@@ -855,25 +938,41 @@ export default function VisitsPage() {
                     </div>
                   </div>
 
-                  {/* コンプリート目前 */}
-                  {nearCompletePrefectures.length > 0 && (
+                  {/* コンプリート目前（都道府県・ポケモン・特徴 混在） */}
+                  {nearCompleteAll.length > 0 && (
                     <div>
                       <h2 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
                       <div className="-mx-1 overflow-x-auto px-1 pb-1">
                         <div className="flex gap-3" style={{ width: 'max-content' }}>
-                          {nearCompletePrefectures.map((p) => (
+                          {nearCompleteAll.map((item) => (
                             <div
-                              key={p.name}
+                              key={`${item.kind}-${item.label}`}
                               className="w-40 shrink-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm"
                             >
-                              <div className="flex items-baseline gap-1 mb-1">
-                                <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 13, color: '#9a6d05' }}>あと{p.remaining}枚</span>
+                              <div className="flex items-center gap-1 mb-1">
+                                <span
+                                  style={{
+                                    fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif',
+                                    fontWeight: 800,
+                                    fontSize: 11,
+                                    borderRadius: 999,
+                                    padding: '3px 8px',
+                                    background: item.kind === 'feature' ? '#e2f2e9' : '#f6e4b6',
+                                    color: item.kind === 'feature' ? '#1f9d63' : '#9a6d05',
+                                    whiteSpace: 'nowrap' as const,
+                                  }}
+                                >
+                                  あと{item.remaining}
+                                </span>
                               </div>
-                              <p className="font-pixelJp text-sm font-bold text-[#4F3828] truncate">{p.name}完成</p>
+                              <p className="font-pixelJp text-sm font-bold text-[#4F3828] truncate">{item.label}</p>
                               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
-                                <div className="h-full rounded-full" style={{ width: `${p.rate.toFixed(0)}%`, background: '#e2a015' }} />
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${item.rate.toFixed(0)}%`, background: item.kind === 'feature' ? '#1f9d63' : '#e2a015' }}
+                                />
                               </div>
-                              <p className="mt-1 font-pixelJp text-[10px] text-[#8C6A4A]">{p.visited}/{p.total}</p>
+                              <p className="mt-1 font-pixelJp text-[10px] text-[#8C6A4A]">{item.visited}/{item.total}</p>
                               <Link
                                 href="/nearby"
                                 className="mt-2 flex items-center justify-center gap-1 rounded-[8px] bg-[#bf5640] px-2 py-1.5 font-pixelJp text-[10px] font-bold text-white"
