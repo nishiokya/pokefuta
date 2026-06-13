@@ -1,24 +1,45 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MapPin, Stamp, BookOpen } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { createBrowserClient } from '@/lib/supabase/client';
 
 type NavTab = 'search' | 'stamp' | 'mytrip';
 
-interface NavItem {
-  key: NavTab;
-  label: string;
-  href: string;
-  Icon: React.ComponentType<{ className?: string }>;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'search', label: '探す', href: '/nearby', Icon: MapPin },
-  { key: 'stamp', label: 'スタンプ帳', href: '/visits', Icon: Stamp },
-  { key: 'mytrip', label: 'マイ旅', href: '/my-trip', Icon: BookOpen },
+const NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
+  { key: 'search', label: '探す', href: '/nearby' },
+  { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
+  { key: 'mytrip', label: 'マイ旅', href: '/my-trip' },
 ];
+
+const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
+
+function PokeballMark({ size = 28 }: { size?: number }) {
+  const center = size * 0.38;
+  return (
+    <span
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        border: '2px solid #2A2A2A',
+        background: '#fff',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '50%', background: '#E85046' }} />
+      <span style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: '#2A2A2A', transform: 'translateY(-50%)' }} />
+      <span style={{ position: 'relative', width: center, height: center, borderRadius: '50%', border: '2px solid #2A2A2A', background: '#fff', zIndex: 1 }} />
+    </span>
+  );
+}
 
 interface PCTopNavProps {
   active?: NavTab;
@@ -26,35 +47,126 @@ interface PCTopNavProps {
 
 function PCTopNav({ active }: PCTopNavProps) {
   const pathname = usePathname();
-  const resolveActive = (key: NavTab, href: string): boolean => {
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!cancelled) {
+          if (session?.user) {
+            setDisplayName(
+              session.user.user_metadata?.display_name ||
+              session.user.email?.split('@')[0] ||
+              'トレーナー'
+            );
+          }
+          setAuthLoaded(true);
+        }
+      } catch {
+        if (!cancelled) setAuthLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const resolveActive = (key: NavTab, href: string) => {
     if (active) return active === key;
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   return (
-    <nav className="hidden lg:flex items-center justify-between px-8 py-[14px] border-b border-[#e9dfc7] bg-[#fffdf7]">
-      <Link href="/" className="flex items-center gap-2 shrink-0">
-        <span className="font-pixel text-[#4F3828] text-base font-bold tracking-wide">pokefuta</span>
+    <nav
+      className="hidden lg:flex sticky top-0 z-50"
+      style={{
+        alignItems: 'center',
+        gap: 14,
+        padding: '14px 32px',
+        background: '#f4ecda',
+        borderBottom: '1px solid #e9dfc7',
+      }}
+    >
+      {/* ロゴ */}
+      <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: 'none' }}>
+        <PokeballMark size={28} />
+        <span style={{ fontWeight: 700, fontSize: 18, color: '#38414f', fontFamily: ROUND }}>ポケふた</span>
       </Link>
-      <div className="flex items-center gap-1">
-        {NAV_ITEMS.map(({ key, label, href, Icon }) => {
+
+      {/* ナビリンク */}
+      <div style={{ display: 'flex', gap: 4, marginLeft: 18 }}>
+        {NAV_ITEMS.map(({ key, label, href }) => {
           const isActive = resolveActive(key, href);
           return (
             <Link
               key={key}
               href={href}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-colors ${
-                isActive
-                  ? 'bg-[#bf5640] text-white'
-                  : 'text-[#4F3828] hover:bg-[#efe6cf]'
-              }`}
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: isActive ? '#2c2a26' : '#6f6657',
+                padding: '7px 13px',
+                borderRadius: 9,
+                background: isActive ? '#e9dfc7' : 'transparent',
+                textDecoration: 'none',
+              }}
             >
-              <Icon className="h-4 w-4 shrink-0" />
               {label}
             </Link>
           );
         })}
       </div>
+
+      {/* スペーサー */}
+      <div style={{ flex: 1 }} />
+
+      {/* 検索ピル */}
+      <Link
+        href="/nearby"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          background: '#fff',
+          border: '1px solid #e9dfc7',
+          borderRadius: 999,
+          padding: '6px 8px 6px 14px',
+          textDecoration: 'none',
+        }}
+      >
+        <Search size={15} color="#9b917e" strokeWidth={2.2} />
+        <span style={{ fontSize: 12.5, color: '#9b917e', width: 120 }}>ポケふたを探す</span>
+      </Link>
+
+      {/* ユーザー */}
+      {authLoaded && (
+        displayName ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#6f6657', flexShrink: 0 }}>
+            <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
+              👤
+            </span>
+            {displayName}
+          </span>
+        ) : (
+          <Link
+            href="/login"
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#bf5640',
+              padding: '6px 14px',
+              borderRadius: 999,
+              border: '1px solid #bf5640',
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            ログイン
+          </Link>
+        )
+      )}
     </nav>
   );
 }
@@ -85,7 +197,7 @@ export default function PCShell({ active, children, rail, className }: PCShellPr
             <div className="min-w-0">{children}</div>
             {/* PC: 右カラム sticky */}
             <div className="hidden lg:block">
-              <div className="sticky top-[80px] flex flex-col gap-[14px]">{rail}</div>
+              <div className="sticky top-[72px] flex flex-col gap-[14px]">{rail}</div>
             </div>
           </div>
         ) : (
