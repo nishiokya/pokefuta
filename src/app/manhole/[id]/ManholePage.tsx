@@ -4,17 +4,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Trash2, User as UserIcon, Stamp, CircleDot, CheckCircle2, ChevronDown, Building2, Sparkles } from 'lucide-react';
+import { MapPin, ArrowLeft, Camera, Navigation, Clock, Building2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
-import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { SITE_URL } from '@/lib/constants';
@@ -67,11 +64,11 @@ const getTopTitleHashtags = (titles?: ManholeTitle[] | null) =>
     .map((title) => title.hashtag)
     .filter((hashtag): hashtag is string => Boolean(hashtag));
 
-const getTitleAccentClass = (index: number) => {
+const getTitlePillClass = (index: number) => {
   const classes = [
-    'border-[#D94D3F]/40 bg-[#F8D9C4] text-[#9F392F]',
-    'border-[#7B63A8]/35 bg-[#EFE7FF] text-[#604895]',
-    'border-[#2E8B74]/35 bg-[#DFF4EA] text-[#236B59]',
+    'bg-[#F8D9C4] text-[#9F392F]',
+    'bg-[#EFE7FF] text-[#604895]',
+    'bg-[#DFF4EA] text-[#236B59]',
   ];
   return classes[index] || classes[0];
 };
@@ -106,8 +103,6 @@ export default function ManholeDetailPage() {
   const [commentsSubmitting, setCommentsSubmitting] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newManholeComment, setNewManholeComment] = useState('');
-  const [showDetails, setShowDetails] = useState(false);
-
   const {
     trackManholeDetailOpen,
     trackRouteOpen,
@@ -475,239 +470,147 @@ export default function ManholeDetailPage() {
       </div>
 
       <PCShell active="search" className="pb-32 pt-4 lg:pt-6">
-      <div className="space-y-4 max-w-2xl lg:max-w-none">
-        {/* Visit Achievement Hero Card */}
-        <div className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
-          <div className="absolute inset-0 opacity-[0.04] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+      <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          <div className="relative">
-            {/* Status Badge - Floating on top */}
-            <div className="absolute top-4 right-4 z-10">
-              <div className={`rounded-full px-3 py-1.5 border shadow-md ${
-                manhole.is_visited
-                  ? 'border-[#B5483C]/30 bg-[#F8D9C4]'
-                  : 'border-[#8C6A4A]/25 bg-white/90 backdrop-blur'
-              }`}>
-                <span className={`font-pixelJp text-xs font-bold ${
-                  manhole.is_visited ? 'text-[#B5483C]' : 'text-[#8C6A4A]'
-                }`}>
-                  {manhole.is_visited ? '✓ 訪問済み' : '未訪問'}
-                </span>
-              </div>
-            </div>
+        {/* PhotoPrompt Hero */}
+        {(() => {
+          const viewerPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
+          const firstPublicPhoto = photos.find(p => p.visit?.is_public === true);
+          const heroPhoto = viewerPhoto || firstPublicPhoto;
+          const photoCount = photos.length;
+          const viewerHasPhoto = Boolean(viewerPhoto);
 
-            {/* Hero Photo Section */}
-            {(() => {
-              const userPublicPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId && p.visit?.is_public === true);
-              const userPrivatePhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId && p.visit?.is_public !== true);
-              const publicPhoto = photos.find(p => p.visit?.is_public === true);
-              const mainPhoto = userPublicPhoto || userPrivatePhoto || publicPhoto;
-
-              return mainPhoto ? (
-                // Photo hero - prefer own public photo, then own private photo, then public community photo.
+          return (
+            <div className="overflow-hidden rounded-[18px] border border-[#e9dfc7] bg-[#fffdf7] shadow-sm">
+              {heroPhoto ? (
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img
-                    src={`/api/photo/${mainPhoto.id}?size=small`}
-                    alt="訪問記念写真"
+                    src={`/api/photo/${heroPhoto.id}?size=small`}
+                    alt={viewerHasPhoto ? 'あなたの訪問写真' : '訪問写真'}
                     className="w-full h-full object-cover"
                     loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.classList.add('bg-[#E9DEC9]');
-                        parent.innerHTML = `
-                          <div class="absolute inset-0 flex items-center justify-center">
-                            <div class="text-center">
-                              <svg class="w-16 h-16 text-[#8C6A4A] opacity-30 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                              </svg>
-                              <p class="font-pixelJp text-xs text-[#8C6A4A]">写真を読み込めませんでした</p>
-                            </div>
-                          </div>
-                        `;
-                      }
-                    }}
                   />
-                  {/* Gradient overlay for text readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                  {/* Achievement badge */}
-                  <div className="absolute bottom-4 right-4">
-                    <div className="bg-[#D94D3F] border-2 border-white rounded-full p-2 shadow-lg">
-                      <CheckCircle2 className="h-6 w-6 text-white" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  {viewerHasPhoto ? (
+                    <div className="absolute top-3 right-3 rounded-full bg-[#1f9d63] px-3 py-1 font-pixelJp text-xs font-bold text-white">
+                      ✓ 訪問済み
                     </div>
-                  </div>
+                  ) : (
+                    <div className="absolute bottom-4 left-4">
+                      <p className="font-pixelJp text-sm font-bold text-white drop-shadow">あなたの構図を加えよう</p>
+                      <p className="font-pixelJp text-xs text-white/80">{photoCount}人が訪問</p>
+                    </div>
+                  )}
                 </div>
               ) : (
-                // Unvisited or no photo - Stamp placeholder
-                <div className="flex items-center justify-center py-12 bg-gradient-to-b from-[#F6EEDC] to-[#E9DEC9]">
-                  <div className="flex h-32 w-32 rotate-[-8deg] items-center justify-center rounded-full border-4 border-[#B8AB96] text-center text-[#A39580] bg-white/50 shadow-lg">
-                    <div>
-                      <Stamp className="mx-auto h-10 w-10" />
-                      <p className="mt-2 font-pixel text-xs leading-none">NEXT STAMP</p>
+                <div className="relative flex min-h-[188px] items-center justify-center bg-gradient-to-b from-[#efe6cf] to-[#e2d5be]">
+                  <div className="text-center">
+                    <div className="select-none font-pixel text-[72px] font-bold leading-none text-[#bf5640]/25">0</div>
+                    <div className="mt-2 inline-block rounded-full bg-[#bf5640] px-3 py-1 font-pixelJp text-xs font-bold text-white shadow-sm">
+                      一番乗りチャンス
                     </div>
                   </div>
-                </div>
-              );
-            })()}
-
-            {/* Info Section */}
-            <div className="p-5">
-              {titleBadges.length > 0 && (
-                <div className="mb-5 rounded-[8px] border-2 border-[#D94D3F]/25 bg-[#FFF0E2] p-3 shadow-[0_8px_18px_rgba(181,72,60,0.12)]">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#9F392F]">
-                    <Sparkles className="h-4 w-4" />
-                    このポケふたの注目タグ
-                  </div>
-                  <div className="grid gap-2">
-                    {titleBadges.map((title, index) => (
-                      <div
-                        key={title.key}
-                        className={`flex items-center gap-2 rounded-[8px] border px-3 py-2 text-sm font-extrabold shadow-sm ${getTitleAccentClass(index)}`}
-                      >
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/75 text-base shadow-sm">
-                          {title.emoji || '★'}
-                        </span>
-                        <span className="leading-tight">{title.label}</span>
-                      </div>
-                    ))}
+                  <div className="absolute top-3 right-3 rounded-full border border-[#e9dfc7] bg-white/90 px-3 py-1 font-pixelJp text-xs font-bold text-[#8C6A4A] backdrop-blur-sm">
+                    未訪問
                   </div>
                 </div>
               )}
 
-              {/* Location & Title */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-4 h-4 text-[#B5483C]" />
-                  <span className="font-pixelJp text-sm text-[#6A4D36] font-bold">
+              <div className="p-5">
+                <div className="mb-1 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-[#bf5640]" />
+                  <span className="font-pixelJp text-xs text-[#6A4D36]">
                     {manhole.prefecture} / {manhole.city || manhole.municipality}
                   </span>
                 </div>
-                <h2 className="font-pixelJp text-2xl font-bold text-[#4F3828] leading-tight mb-2">
+                <h2 className="mb-1 font-pixelJp text-xl font-bold leading-tight text-[#4F3828]">
                   {manhole.prefecture}{manhole.city || manhole.municipality}のポケふた
                 </h2>
                 {manhole.pokemons && manhole.pokemons.length > 0 && (
-                  <p className="font-pixelJp text-sm text-[#6A4D36]">
+                  <p className="mb-4 font-pixelJp text-sm text-[#6A4D36]">
                     {manhole.pokemons.join('・')}が描かれたポケモンマンホール
                   </p>
                 )}
-                {manhole.building && (
-                  <div className="mt-3 flex items-start gap-2 rounded-md border border-[#8C6A4A]/15 bg-white/60 p-3">
-                    <Building2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#B5483C]" />
-                    <div>
-                      <p className="font-pixelJp text-[11px] font-bold text-[#8C6A4A]">建物・目印</p>
-                      <p className="mt-1 font-pixelJp text-sm font-bold leading-relaxed text-[#4F3828]">
-                        {manhole.building}
-                      </p>
+
+                {!viewerHasPhoto && (
+                  <div className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 px-3 py-2.5">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="font-pixelJp text-xs font-bold text-[#4F3828]">{photoCount}人が訪問</span>
+                      {photoCount === 0 && (
+                        <span className="rounded-full bg-[#bf5640] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">#1になれる</span>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Visit Date */}
-              {manhole.is_visited && manhole.last_visit && (
-                <div className="flex items-center gap-2 mb-4 p-3 rounded-md bg-white/60 border border-[#8C6A4A]/15">
-                  <Clock className="w-4 h-4 text-[#B5483C]" />
-                  <span className="font-pixelJp text-sm text-[#4F3828] font-bold">
-                    訪問日: {new Date(manhole.last_visit).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
-                </div>
-              )}
-
-              {/* Your Visit Comment (if exists) */}
-              {(() => {
-                const userPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
-                return userPhoto?.visit?.comment ? (
-                  <div className="mb-4 p-3 rounded-md bg-white/60 border border-[#8C6A4A]/15">
-                    <p className="font-pixelJp text-sm text-[#4F3828] leading-relaxed">
-                      {userPhoto.visit.comment}
+                    <p className="font-pixelJp text-xs text-[#6A4D36]">
+                      撮ると写真図鑑も埋まる · {photoCount} → {photoCount + 1} / 470
                     </p>
                   </div>
-                ) : null;
-              })()}
+                )}
 
-              {/* Description */}
-              {manhole.description && (
-                <div className="mb-4 p-3 rounded-md bg-white/60 border border-[#8C6A4A]/15">
-                  <p className="font-pixelJp text-xs text-[#4F3828] leading-relaxed">
-                    {manhole.description}
-                  </p>
-                </div>
-              )}
+                {viewerHasPhoto && manhole.last_visit && (
+                  <div className="mb-4 flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-[#bf5640]" />
+                    <span className="font-pixelJp text-xs text-[#6A4D36]">
+                      {new Date(manhole.last_visit).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </span>
+                  </div>
+                )}
 
-              {/* Call to Actions */}
-              {manhole.is_visited ? (
-                // Visited: Add more photos + Directions
-                <div className="grid grid-cols-2 gap-2">
+                {(() => {
+                  const userPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
+                  return userPhoto?.visit?.comment ? (
+                    <p className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 p-3 font-pixelJp text-sm leading-relaxed text-[#4F3828]">
+                      {userPhoto.visit.comment}
+                    </p>
+                  ) : null;
+                })()}
+
+                {titleBadges.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-1.5">
+                    {titleBadges.map((title, idx) => (
+                      <span
+                        key={title.key}
+                        className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
+                      >
+                        {title.emoji || '★'} {title.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {!viewerHasPhoto && (
                   <button
                     onClick={() => router.push(currentUserId ? '/upload' : '/login?redirect=/upload')}
-                    className="rpg-button rpg-button-primary flex items-center justify-center gap-1 px-2"
+                    className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] py-3 font-pixelJp text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#a84b36]"
                   >
-                    <Camera className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">写真追加</span>
+                    <Camera className="h-4 w-4" />
+                    {photoCount === 0 ? '一番乗りで投稿する' : 'あなたの1枚を加える'}
                   </button>
-                  <button
-                    onClick={openInMaps}
-                    className="rpg-button rpg-button-success flex items-center justify-center gap-1 px-2"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">経路案内</span>
-                  </button>
-                </div>
-              ) : (
-                // Unvisited: Directions + Record visit/Login CTA
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={openInMaps}
-                    className="rpg-button rpg-button-success flex items-center justify-center gap-1 px-2"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    <span className="font-pixelJp text-xs">経路案内</span>
-                  </button>
-                  {currentUserId ? (
-                    <button
-                      onClick={() => router.push('/upload')}
-                      className="rpg-button rpg-button-primary flex items-center justify-center gap-1 px-2"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span className="font-pixelJp text-xs">訪問記録</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => router.push('/login?redirect=/upload')}
-                      className="rpg-button flex items-center justify-center gap-1 px-2 bg-white/70 border border-[#7B63A8] hover:bg-[#7B63A8]/5"
-                    >
-                      <Camera className="w-4 h-4 text-[#7B63A8]" />
-                      <span className="font-pixelJp text-xs text-[#7B63A8]">旅の続きで記録</span>
-                    </button>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
-              {sharePayload && (
-                <ShareButtons
-                  label="このポケふたを共有する"
-                  shareText={sharePayload.shareText}
-                  shareUrl={sharePayload.shareUrl}
-                  hashtags={sharePayload.hashtags}
-                  analyticsParams={sharePayload.analyticsParams}
-                  className="mt-3"
-                />
-              )}
+        <hr className="border-[#e9dfc7]" />
+
+        {manhole.building && (
+          <div className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
+            <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-[#bf5640]" />
+            <div>
+              <p className="mb-1 font-pixelJp text-[11px] font-bold text-[#8C6A4A]">建物・目印</p>
+              <p className="font-pixelJp text-sm font-bold leading-relaxed text-[#4F3828]">{manhole.building}</p>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Pokemon Info */}
         {manhole.pokemons && manhole.pokemons.length > 0 && (
-          <div className="rpg-window">
-            <h2 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">登場ポケモン</h2>
+          <div>
+            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">登場ポケモン</h3>
             <div className="flex flex-wrap gap-2">
               {manhole.pokemons.map((pokemon, index) => (
                 <span
                   key={index}
-                  className="bg-rpg-yellow px-2 py-1 border border-[#7B63A8]/15 font-pixelJp text-xs text-rpg-textDark"
+                  className="rounded-full border border-[#e9dfc7] bg-white px-3 py-1 font-pixelJp text-xs font-bold text-[#4F3828]"
                 >
                   {pokemon}
                 </span>
@@ -716,220 +619,42 @@ export default function ManholeDetailPage() {
           </div>
         )}
 
-        {/* Everyone's Photos - Only show if there are other people's photos */}
-        {(() => {
-          const othersPhotos = photos.filter(photo => !currentUserId || photo.visit?.user_id !== currentUserId);
-          return othersPhotos.length > 0 ? (
-            <div className="rpg-window">
-              <h2 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">
-                旅の写真 ({othersPhotos.length}枚)
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                {othersPhotos.map((photo) => {
-                  const visitComment = photo.visit?.comment?.trim();
-
-                  return (
-                    <div
-                      key={photo.id}
-                      className="bg-[#F6EEDC] border border-[#7B63A8]/15 rounded-lg overflow-hidden"
-                    >
-                      {/* Photo Image */}
-                      <div className="relative aspect-square bg-[#F6EEDC] overflow-hidden">
-                        <img
-                          src={`/api/photo/${photo.id}?size=small`}
-                          alt="ポケふた写真"
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent && !parent.querySelector('.error-placeholder')) {
-                              const errorDiv = document.createElement('div');
-                              errorDiv.className = 'error-placeholder absolute inset-0 bg-[#F6EEDC] flex flex-col items-center justify-center border border-[#7B63A8]/15';
-                              errorDiv.innerHTML = `
-                                <svg class="w-12 h-12 text-rpg-textDark opacity-50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                </svg>
-                                <span class="font-pixelJp text-[10px] text-rpg-textDark opacity-70 text-center px-2">画像が見つかりません</span>
-                              `;
-                              parent.appendChild(errorDiv);
-                            }
-                          }}
-                        />
-
-                        {/* Subtle overlay with user, date, and visit comment */}
-                        <div className="absolute bottom-0 left-0 right-0 z-10">
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pointer-events-none"></div>
-                          <div className="relative p-2">
-                            <div className="flex items-center gap-1 mb-1">
-                              <UserIcon className="w-3 h-3 text-white/80" />
-                              <span className="font-pixelJp text-[10px] text-white/80 truncate drop-shadow">
-                                {getPhotoUserLabel(photo)}
-                              </span>
-                            </div>
-                            {photo.visit?.shot_at && (
-                              <div className="flex items-center gap-1 mb-2">
-                                <Clock className="w-3 h-3 text-white/80" />
-                                <span className="font-pixelJp text-[10px] text-white/80 drop-shadow">
-                                  {formatDateJa(photo.visit.shot_at)}
-                                </span>
-                              </div>
-                            )}
-                            {visitComment && (
-                              <p className="mt-2 max-h-16 overflow-hidden whitespace-pre-wrap break-words rounded bg-black/35 px-2 py-1 font-pixelJp text-[10px] leading-relaxed text-white/90 drop-shadow">
-                                {visitComment}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        <div>
+          <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">場所</h3>
+          <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7]">
+            <div className="h-[130px]">
+              <MapComponent
+                center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
+                manholes={[manhole]}
+                onManholeClick={handleManholeClick}
+                userLocation={null}
+              />
             </div>
-          ) : null;
-        })()}
+            <div className="border-t border-[#e9dfc7] p-3">
+              <button
+                onClick={openInMaps}
+                className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#1f9d63] bg-white py-2.5 font-pixelJp text-sm font-bold text-[#1f9d63] transition-colors hover:bg-[#1f9d63]/5"
+              >
+                <Navigation className="h-4 w-4" />
+                経路案内
+              </button>
+            </div>
+          </div>
+        </div>
 
-        {/* Comments - Hidden for stamp collection experience */}
-        {false && (
-          <div className="rpg-window">
-            <h3 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">コメント</h3>
-
-            {commentsLoading ? (
-              <div className="py-6 text-center">
-                <span className="font-pixelJp text-sm text-rpg-textDark opacity-70">読み込み中...</span>
-              </div>
-            ) : manholeComments.length === 0 ? (
-              <div className="py-6 text-center">
-                <span className="font-pixelJp text-sm text-rpg-textDark opacity-70">まだコメントがありません</span>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {manholeComments.map((comment) => (
-                  <div key={comment.id} className="bg-[#F6EEDC] border border-[#7B63A8]/15 p-3 rounded">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-rpg-yellow border border-[#7B63A8]/15 rounded-full flex items-center justify-center">
-                        <span className="font-pixelJp text-xs text-rpg-textDark">{getCommentUserInitial(comment)}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-pixelJp text-sm text-[#7B63A8] font-bold truncate">{getCommentUserLabel(comment)}</span>
-                          <span className="font-pixelJp text-xs text-rpg-textDark opacity-60 flex-shrink-0">
-                            {format(new Date(comment.created_at), 'M/d HH:mm', { locale: ja })}
-                          </span>
-                        </div>
-                        <p className="font-pixelJp text-sm text-rpg-textDark whitespace-pre-wrap break-words">{comment.content}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {commentsError && (
-              <div className="mt-3">
-                <div className="bg-rpg-red/20 border-2 border-rpg-red p-2 rounded">
-                  <p className="font-pixelJp text-xs text-rpg-red">{commentsError}</p>
-                </div>
-              </div>
-            )}
-
-            {currentUserId ? (
-              <form onSubmit={handleSubmitManholeComment} className="mt-4 pt-4 border-t border-[#7B63A8]/15">
-                <div className="flex gap-2">
-                  <textarea
-                    value={newManholeComment}
-                    onChange={(e) => setNewManholeComment(e.target.value)}
-                    placeholder="コメントを入力..."
-                    className="flex-1 bg-white/70 border border-[#7B63A8]/15 p-2 font-pixelJp text-sm text-rpg-textDark placeholder-rpg-textDark/50 resize-none focus:outline-none focus:border-rpg-yellow rounded"
-                    rows={2}
-                    maxLength={1000}
-                    disabled={commentsSubmitting}
-                  />
-                  <button
-                    type="submit"
-                    disabled={commentsSubmitting || !newManholeComment.trim()}
-                    className="rpg-button rpg-button-success px-4 self-end disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="font-pixelJp text-xs">投稿</span>
-                  </button>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="font-pixelJp text-xs text-rpg-textDark opacity-70">{newManholeComment.length}/1000</span>
-                </div>
-              </form>
-            ) : (
-              <div className="mt-4 pt-4 border-t border-[#7B63A8]/15">
-                <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">ログインすると旅の記録にコメントを投稿できます</p>
-              </div>
-            )}
+        {sharePayload && (
+          <div>
+            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">共有</h3>
+            <ShareButtons
+              label=""
+              shareText={sharePayload.shareText}
+              shareUrl={sharePayload.shareUrl}
+              hashtags={sharePayload.hashtags}
+              analyticsParams={sharePayload.analyticsParams}
+            />
           </div>
         )}
 
-        {/* Map */}
-        <div className="rpg-window">
-          <h2 className="font-pixelJp text-sm font-bold text-rpg-textDark mb-3">場所</h2>
-          <div className="h-64 border border-[#7B63A8]/15 overflow-hidden">
-            <MapComponent
-              center={{
-                lat: manhole.latitude ?? 36.0,
-                lng: manhole.longitude ?? 138.0
-              }}
-              manholes={[manhole]}
-              onManholeClick={handleManholeClick}
-              userLocation={null}
-            />
-          </div>
-        </div>
-
-        {/* Additional Info - Collapsible */}
-        <div className="rpg-window">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="w-full flex items-center justify-between font-pixelJp text-sm font-bold text-rpg-textDark hover:text-[#7B63A8] transition-colors"
-          >
-            <h2 className="font-pixelJp text-sm font-bold">詳細データを見る</h2>
-            <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showDetails && (
-            <div className="mt-3 pt-3 border-t border-[#7B63A8]/15 space-y-2 font-pixelJp text-xs">
-              <div className="flex justify-between text-rpg-textDark">
-                <span className="opacity-70">ID</span>
-                <span className="font-pixel">{manhole.id}</span>
-              </div>
-              <div className="flex justify-between text-rpg-textDark">
-                <span className="opacity-70">緯度</span>
-                <span className="font-pixel text-[10px]">{manhole.latitude?.toFixed(6)}</span>
-              </div>
-              <div className="flex justify-between text-rpg-textDark">
-                <span className="opacity-70">経度</span>
-                <span className="font-pixel text-[10px]">{manhole.longitude?.toFixed(6)}</span>
-              </div>
-              {manhole.detail_url && (
-                <div className="flex justify-between items-center text-rpg-textDark">
-                  <span className="opacity-70">詳細URL</span>
-                  <a
-                    href={manhole.detail_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-rpg-blue underline truncate max-w-40"
-                  >
-                    公式情報
-                  </a>
-                </div>
-              )}
-              {manhole.created_at && (
-                <div className="flex justify-between text-rpg-textDark">
-                  <span className="opacity-70">作成日</span>
-                  <span>{new Date(manhole.created_at).toLocaleDateString('ja-JP')}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
       </PCShell>
 
