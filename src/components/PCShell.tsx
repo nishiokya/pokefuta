@@ -79,7 +79,7 @@ function PCTopNav({ active }: PCTopNavProps) {
 
   return (
     <nav
-      className="hidden lg:flex sticky top-0 z-50"
+      className="hidden lg:flex"
       style={{
         alignItems: 'center',
         gap: 14,
@@ -172,13 +172,13 @@ export default function PCShell({ active, children, rail, className }: PCShellPr
       <PCTopNav active={active} />
       <div className={`mx-auto w-full max-w-[1120px] px-4 lg:px-8 ${className ?? ''}`}>
         {rail ? (
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-[28px]">
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
             {/* モバイル: rail を children より先に表示 */}
             <div className="lg:hidden">{rail}</div>
             <div className="min-w-0">{children}</div>
-            {/* PC: 右カラム sticky */}
+            {/* PC: 右カラム sticky — items-start を外して右列が左列と同高さになるよう stretch させる */}
             <div className="hidden lg:block">
-              <div className="sticky top-[72px] flex flex-col gap-[14px]">{rail}</div>
+              <div className="sticky top-[20px] flex flex-col gap-[14px]">{rail}</div>
             </div>
           </div>
         ) : (
