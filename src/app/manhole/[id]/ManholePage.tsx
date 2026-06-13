@@ -66,9 +66,9 @@ const getTopTitleHashtags = (titles?: ManholeTitle[] | null) =>
 
 const getTitlePillClass = (index: number) => {
   const classes = [
-    'bg-[#F8D9C4] text-[#9F392F]',
-    'bg-[#EFE7FF] text-[#604895]',
-    'bg-[#DFF4EA] text-[#236B59]',
+    'bg-[#fdeae2] text-[#bf5640]',
+    'bg-[#ece9fb] text-[#6a5fc4]',
+    'bg-[#e2f2e9] text-[#1f9d63]',
   ];
   return classes[index] || classes[0];
 };
@@ -97,6 +97,7 @@ export default function ManholeDetailPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
 
   const [manholeComments, setManholeComments] = useState<ManholeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -118,6 +119,12 @@ export default function ManholeDetailPage() {
       loadCurrentUser();
     }
   }, [params.id]);
+
+  useEffect(() => {
+    if (manhole?.prefecture && prefectureDex?.total && currentUserId) {
+      loadPrefectureVisited(manhole.prefecture, prefectureDex.total);
+    }
+  }, [manhole?.prefecture, prefectureDex?.total, currentUserId]);
 
   // マンホール詳細閲覧トラッキング
   useEffect(() => {
@@ -210,15 +217,16 @@ export default function ManholeDetailPage() {
 
   const loadManholeDetail = async (id: string) => {
     try {
-      // First try to get all manholes and find the specific one
       const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
-        const manholesList = data.manholes || [];
+        const manholesList: Manhole[] = data.manholes || [];
         const foundManhole = manholesList.find((m: Manhole) => m.id.toString() === id);
 
         if (foundManhole) {
           setManhole(foundManhole);
+          const prefTotal = manholesList.filter((m) => m.prefecture === foundManhole.prefecture).length;
+          setPrefectureDex((prev) => prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal });
         } else {
           setError('マンホールが見つかりませんでした');
         }
@@ -230,6 +238,31 @@ export default function ManholeDetailPage() {
       setError('データの取得に失敗しました');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPrefectureVisited = async (prefecture: string, total: number) => {
+    try {
+      const res = await fetch('/api/visits?limit=1000');
+      if (!res.ok) return;
+      const data = await res.json();
+      const visits: Array<{ manhole?: { prefecture?: string } }> = Array.isArray(data.visits) ? data.visits : [];
+      const visited = new Set(
+        visits
+          .filter((v) => v.manhole?.prefecture === prefecture)
+          .map((v) => v.manhole?.prefecture)
+      ).size > 0
+        ? visits.filter((v) => v.manhole?.prefecture === prefecture).length
+        : 0;
+      // dedup by manhole id
+      const visitedManholeIds = new Set<number>(
+        visits
+          .filter((v: any) => v.manhole?.prefecture === prefecture && v.manhole?.id)
+          .map((v: any) => v.manhole.id as number)
+      );
+      setPrefectureDex({ current: visitedManholeIds.size, total });
+    } catch {
+      // keep defaults
     }
   };
 
@@ -533,16 +566,34 @@ export default function ManholeDetailPage() {
                 )}
 
                 {!viewerHasPhoto && (
-                  <div className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 px-3 py-2.5">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="font-pixelJp text-xs font-bold text-[#4F3828]">{photoCount}人が訪問</span>
-                      {photoCount === 0 && (
-                        <span className="rounded-full bg-[#bf5640] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">#1になれる</span>
-                      )}
+                  <div className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-[8px] bg-[#fde2c2] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#9a5a1e]">🏆 撮ると写真図鑑も埋まる</span>
                     </div>
-                    <p className="font-pixelJp text-xs text-[#6A4D36]">
-                      撮ると写真図鑑も埋まる · {photoCount} → {photoCount + 1} / 470
-                    </p>
+                    {prefectureDex ? (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#6A4D36', fontWeight: 600 }}>
+                            {manhole.prefecture} 写真図鑑
+                          </p>
+                          <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 18, lineHeight: 1.2, color: '#2c2a26' }}>
+                            {prefectureDex.current}{' '}
+                            <span style={{ color: '#c5b89e', fontSize: 14 }}>→</span>{' '}
+                            <span style={{ color: '#bf5640' }}>{prefectureDex.current + 1}</span>
+                            <span style={{ color: '#c5b89e', fontSize: 13, fontWeight: 600 }}> / {prefectureDex.total}</span>
+                          </p>
+                        </div>
+                        <div style={{ width: 1, background: '#e9dfc7', alignSelf: 'stretch' }} />
+                        <div className="text-center" style={{ minWidth: 48 }}>
+                          <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 20, color: '#1f9d63', lineHeight: 1 }}>+1</p>
+                          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 600, marginTop: 2 }}>シリーズ進捗</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="font-pixelJp text-xs text-[#6A4D36]">
+                        撮ると写真図鑑が埋まります
+                      </p>
+                    )}
                   </div>
                 )}
 
