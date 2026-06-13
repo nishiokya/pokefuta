@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Camera,
@@ -108,6 +109,7 @@ const safeTagLabel = (tag: string): string | null => {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState('タコさん');
@@ -141,13 +143,8 @@ export default function HomePage() {
         trackView('/', 'ポケふた写真館', 'gallery_index', loggedIn);
         trackCollectionOpen({ is_logged_in: loggedIn });
         if (loggedIn && session?.user?.id) {
-          setUserName(getDisplayName(session));
-          updateUserProperties({ registered_user: true });
-          setLoading(false);
-          loadJourney();
-          const { data: myAppUserId } = await supabase
-            .rpc('get_my_app_user_id' as never);
-          setCurrentUserId((myAppUserId as string | null) ?? null);
+          router.replace('/my-trip');
+          return;
         }
       } catch (error) {
         console.error('Session check error:', error);

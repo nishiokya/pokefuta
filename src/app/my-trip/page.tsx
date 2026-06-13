@@ -51,7 +51,11 @@ export default function MyTripPage() {
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
         trackView('/my-trip', 'マイ旅', 'mytrip', loggedIn);
-        if (loggedIn) await loadVisits();
+        if (loggedIn) {
+          await loadVisits();
+        } else {
+          router.replace('/login?redirect=/my-trip');
+        }
       } catch {
         setIsLoggedIn(false);
       } finally {
@@ -132,7 +136,6 @@ export default function MyTripPage() {
   }
 
   if (!isLoggedIn) {
-    router.replace('/login?redirect=/my-trip');
     return null;
   }
 
