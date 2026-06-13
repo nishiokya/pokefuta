@@ -13,6 +13,7 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PCShell from '@/components/PCShell';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { manholeShareText, photoShareText } from '@/lib/share';
@@ -457,21 +458,24 @@ export default function ManholeDetailPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
-      <Header
-        title={`${manhole.city || manhole.municipality}のポケふた`}
-        actions={
-          <button
-            onClick={() => router.back()}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-            aria-label="戻る"
-            title="戻る"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        }
-      />
+      <div className="lg:hidden">
+        <Header
+          title={`${manhole.city || manhole.municipality}のポケふた`}
+          actions={
+            <button
+              onClick={() => router.back()}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
+              aria-label="戻る"
+              title="戻る"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          }
+        />
+      </div>
 
-      <div className="p-4 max-w-2xl mx-auto space-y-4 pb-32">
+      <PCShell active="search" className="pb-32 pt-4 lg:pt-6">
+      <div className="space-y-4 max-w-2xl lg:max-w-none">
         {/* Visit Achievement Hero Card */}
         <div className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
           <div className="absolute inset-0 opacity-[0.04] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
@@ -927,6 +931,7 @@ export default function ManholeDetailPage() {
           )}
         </div>
       </div>
+      </PCShell>
 
       <BottomNav />
 

@@ -21,6 +21,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PCShell from '@/components/PCShell';
 import StampBookMockup from '@/components/StampBookMockup';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
@@ -724,64 +725,79 @@ export default function VisitsPage() {
     );
   }
 
+  const passportRail = (
+    <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
+      <div className="relative">
+        <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
+        <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">ポケふた訪問パスポート</h1>
+
+        <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
+          <div
+            className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
+            style={{ width: `${Math.min(completionRate, 100)}%` }}
+          />
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
+          <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedManholesCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{prefectureProgress.filter((p) => p.visited > 0).length}<span className="text-[#8C6A4A]">/47</span></p>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
+              <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
+            </div>
+          </div>
+          {nextAchievementPrefecture && (
+            <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
+              <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
+              <div className="flex items-center gap-2">
+                <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievementPrefecture.name}</p>
+                <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievementPrefecture.visited}/{nextAchievementPrefecture.total}</p>
+                <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievementPrefecture.remaining}枚</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {visitedManholesCount > 0 && (
+          <ShareButtons
+            label="スタンプ帳を共有する"
+            shareText={visitsShareText(visitedManholesCount)}
+            shareUrl="https://pokefuta.com/visits"
+            className="mt-4"
+          />
+        )}
+
+        <div className="mt-4 flex flex-col gap-2">
+          <Link href="/upload" className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-[#B5483C] px-3 font-pixelJp text-xs font-bold text-white">
+            <PlusCircle className="h-4 w-4" />
+            訪問を記録
+          </Link>
+          <Link href="/nearby" className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-[#8C6A4A]/25 bg-white px-3 font-pixelJp text-xs font-bold text-[#4F3828]">
+            <Navigation className="h-4 w-4" />
+            近くの未訪問
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <div className="min-h-screen safe-area-inset bg-[#F3E7CC]">
-      <Header title="スタンプ帳" />
+      <div className="lg:hidden">
+        <Header title="スタンプ帳" />
+      </div>
 
-      <div className="max-w-3xl mx-auto pb-[10rem]">
-        <div className="p-4 space-y-4">
-          <section className="relative overflow-hidden rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5] p-3 shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
-            <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
-            <div className="relative">
-              <p className="font-pixelJp text-[11px] font-bold text-[#9B5C2E]">POKEFUTA PASSPORT</p>
-              <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">ポケふた訪問パスポート</h1>
-
-              <div className="mt-3 h-3 overflow-hidden rounded-sm border border-[#8C6A4A]/25 bg-[#E4D4B8]">
-                <div
-                  className="h-full rounded-sm bg-gradient-to-r from-[#D94D3F] via-[#F1B642] to-[#3F9D7D] transition-all"
-                  style={{ width: `${Math.min(completionRate ?? 0, 100)}%` }}
-                />
-              </div>
-
-              <div className="mt-3 overflow-hidden rounded-lg border border-[#8C6A4A]/15 bg-white/55">
-                <div className="grid grid-cols-3 divide-x divide-[#8C6A4A]/15">
-                  <div className="px-3 py-2 text-center">
-                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">全国</p>
-                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedManholesCount}<span className="text-[#8C6A4A]">/{TOTAL_MANHOLES}</span></p>
-                  </div>
-                  <div className="px-3 py-2 text-center">
-                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">都道府県</p>
-                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{prefectureProgress.filter((p) => p.visited > 0).length}<span className="text-[#8C6A4A]">/47</span></p>
-                  </div>
-                  <div className="px-3 py-2 text-center">
-                    <p className="font-pixelJp text-[10px] font-bold text-[#8C6A4A]">ポケモン</p>
-                    <p className="mt-0.5 font-pixel text-sm font-bold text-[#4F3828]">{visitedPokemonSpecies}<span className="text-[#8C6A4A]">/{totalPokemonSpecies}</span></p>
-                  </div>
-                </div>
-                {nextAchievementPrefecture && (
-                  <div className="flex items-center justify-between gap-3 border-t border-[#8C6A4A]/15 px-3 py-2">
-                    <p className="font-pixelJp text-[10px] font-bold text-[#9B5C2E]">🎯 次の達成</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-pixelJp text-xs font-bold text-[#4F3828]">{nextAchievementPrefecture.name}</p>
-                      <p className="font-pixel text-xs text-[#6A4D36]">{nextAchievementPrefecture.visited}/{nextAchievementPrefecture.total}</p>
-                      <span className="rounded bg-[#F8D9C4] px-1.5 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">あと{nextAchievementPrefecture.remaining}枚</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {visitedManholesCount > 0 && (
-                <ShareButtons
-                  label="スタンプ帳を共有する"
-                  shareText={visitsShareText(visitedManholesCount)}
-                  shareUrl="https://pokefuta.com/visits"
-                  className="mt-4"
-                />
-              )}
-            </div>
-          </section>
-
-          <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur sm:top-[calc(env(safe-area-inset-top)+4.25rem)]">
+      <PCShell active="stamp" rail={passportRail} className="pb-[10rem] pt-4 lg:pt-6">
+        <div className="space-y-4">
+          <nav className="sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-30 -mx-1 rounded-lg border border-[#8C6A4A]/15 bg-[#FFF7E5]/95 p-1 shadow-sm backdrop-blur lg:top-4">
             <div className="grid grid-cols-4 gap-1">
               {tabs.map((tab) => (
                 <button
@@ -919,9 +935,9 @@ export default function VisitsPage() {
             </>
           )}
         </div>
-      </div>
+      </PCShell>
 
-      <div className="fixed inset-x-0 bottom-[4.6rem] z-30 px-4">
+      <div className="fixed inset-x-0 bottom-[4.6rem] z-30 px-4 lg:hidden">
         <div className="mx-auto flex max-w-3xl gap-2 rounded-lg border border-[#8C6A4A]/20 bg-[#FFF7E5]/95 p-2 shadow-lg backdrop-blur">
           <Link href="/upload" className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md bg-[#B5483C] px-3 font-pixelJp text-xs font-bold text-white">
             <PlusCircle className="h-4 w-4" />

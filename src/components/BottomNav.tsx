@@ -57,7 +57,7 @@ export default function BottomNav() {
   );
 
   return (
-    <nav className="nav-rpg">
+    <nav className="nav-rpg lg:hidden">
       <div className="flex justify-around items-center max-w-md mx-auto py-2">
         {items.map((item) => (
           <Link
