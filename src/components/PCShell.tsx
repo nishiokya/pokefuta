@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Search } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
 type NavTab = 'search' | 'stamp' | 'mytrip';
@@ -121,24 +120,6 @@ function PCTopNav({ active }: PCTopNavProps) {
 
       {/* スペーサー */}
       <div style={{ flex: 1 }} />
-
-      {/* 検索ピル */}
-      <Link
-        href="/nearby"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          background: '#fff',
-          border: '1px solid #e9dfc7',
-          borderRadius: 999,
-          padding: '6px 8px 6px 14px',
-          textDecoration: 'none',
-        }}
-      >
-        <Search size={15} color="#9b917e" strokeWidth={2.2} />
-        <span style={{ fontSize: 12.5, color: '#9b917e', width: 120 }}>ポケふたを探す</span>
-      </Link>
 
       {/* ユーザー */}
       {authLoaded && (
