@@ -246,15 +246,7 @@ export default function ManholeDetailPage() {
       const res = await fetch('/api/visits?limit=1000');
       if (!res.ok) return;
       const data = await res.json();
-      const visits: Array<{ manhole?: { prefecture?: string } }> = Array.isArray(data.visits) ? data.visits : [];
-      const visited = new Set(
-        visits
-          .filter((v) => v.manhole?.prefecture === prefecture)
-          .map((v) => v.manhole?.prefecture)
-      ).size > 0
-        ? visits.filter((v) => v.manhole?.prefecture === prefecture).length
-        : 0;
-      // dedup by manhole id
+      const visits: Array<{ manhole?: { prefecture?: string; id?: number } }> = Array.isArray(data.visits) ? data.visits : [];
       const visitedManholeIds = new Set<number>(
         visits
           .filter((v: any) => v.manhole?.prefecture === prefecture && v.manhole?.id)
