@@ -657,15 +657,35 @@ export default function VisitsPage() {
       ? new Set(manholes.flatMap((m) => m.pokemons ?? [])).size
       : null;
 
+    const unAuthRail = (
+      <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm space-y-3">
+        <p className="font-bold text-sm text-[#7B63A8]">あなた専用のスタンプ帳を無料で作れます</p>
+        <Link
+          href="/signup"
+          className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+        >
+          <Stamp className="h-4 w-4" /> 無料でスタンプ帳を作る
+        </Link>
+        <Link
+          href="/nearby"
+          className="flex items-center justify-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white px-4 py-2 text-sm font-bold text-[#7B63A8]"
+        >
+          <MapPin className="h-4 w-4" /> 近くのポケふたを探す
+        </Link>
+      </div>
+    );
+
     return (
       <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
-        <Header title="スタンプ帳" />
+        <div className="lg:hidden">
+          <Header title="スタンプ帳" />
+        </div>
 
-        <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 space-y-4 sm:pt-8">
-          {/* Hero — same grid layout as top page */}
+        <PCShell active="stamp" rail={unAuthRail} className="pb-32 pt-5 lg:pt-6">
+        <main className="space-y-4">
+          {/* Hero */}
           <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="relative max-w-3xl">
+            <div className="relative max-w-3xl">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
                   <Sparkles className="h-3.5 w-3.5" />
                   ポケふたスタンプ帳
@@ -684,11 +704,11 @@ export default function VisitsPage() {
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">全国のポケふた</span>
                   </div>
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '47'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '41'}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">都道府県</span>
                   </div>
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#FFB347]">{pokemonCount ?? '500+'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#FFB347]">{pokemonCount ?? '534'}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">種類のポケモン</span>
                   </div>
                 </div>
@@ -711,16 +731,14 @@ export default function VisitsPage() {
                   </Link>
                 </div>
               </div>
-
-              <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
-                <StampBookMockup />
-              </div>
-            </div>
           </section>
 
           {/* 旅を続けると… モックカード */}
           <section className="rounded-[8px] border border-[#7B63A8]/15 bg-white/80 px-4 py-4 shadow-sm sm:px-6">
-            <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-[#9B9B9B]">旅を続けると…</p>
+            <p className="mb-3 flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-[#9B9B9B]">
+              旅を続けると…
+              <span className="rounded border border-[#D8CCAE] px-1.5 py-0.5 text-[10px] font-bold text-[#9B9B9B] normal-case tracking-normal">例</span>
+            </p>
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg bg-[#F5F0FF] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">全国</p>
@@ -731,13 +749,13 @@ export default function VisitsPage() {
               <div className="rounded-lg bg-[#EDFAF5] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">都道府県</p>
                 <p className="font-pixel text-xl font-extrabold text-[#2C765E]">
-                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '47'}</span>
+                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '41'}</span>
                 </p>
               </div>
               <div className="rounded-lg bg-[#FFF8EB] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">ポケモン</p>
                 <p className="font-pixel text-xl font-extrabold text-[#C87C2A]">
-                  104<span className="text-[11px] font-bold text-[#D4BC8A]">/{pokemonCount ?? '500+'}</span>
+                  104<span className="text-[11px] font-bold text-[#D4BC8A]">/{pokemonCount ?? '534'}</span>
                 </p>
               </div>
             </div>
@@ -787,6 +805,7 @@ export default function VisitsPage() {
             </section>
           )}
         </main>
+        </PCShell>
 
         <BottomNav />
       </div>

@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Heart,
+  Lock,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -16,6 +17,7 @@ import {
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PCShell from '@/components/PCShell';
 import StampBookMockup from '@/components/StampBookMockup';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
@@ -135,57 +137,90 @@ export default function PopularPage() {
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
 
+  const unmetPhotoCount =
+    manholesWithPhotos != null && totalManholes != null
+      ? totalManholes - manholesWithPhotos
+      : null;
+
+  const pcGuestRail = !isLoggedIn ? (
+    <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-white shadow-sm">
+      <div className="flex items-center gap-2 bg-gradient-to-r from-[#fdeae2] to-[#fdf1e6] px-4 py-3">
+        <TrendingUp className="h-4 w-4 text-[#B5483C]" />
+        <span className="font-bold text-sm text-[#7d4536]">写真ゼロを埋めよう</span>
+        <span className="ml-auto">
+          <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? 279}</span>
+          <span className="text-xs text-[#6B6B6B]"> 件 募集中</span>
+        </span>
+      </div>
+      <div className="flex flex-col gap-3 p-4">
+        <p className="text-sm text-[#4A4A4A] leading-relaxed">
+          まだ写真の無いポケふたは残り{' '}
+          <b className="text-[#B5483C]">{unmetPhotoCount ?? 279}</b> 件。あなたの1枚目が、この場所の最初の記録になります。
+        </p>
+        <Link
+          href="/signup"
+          className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+        >
+          <Camera className="h-4 w-4" />
+          無料で旅の記録をはじめる
+        </Link>
+        <p className="flex items-center justify-center gap-1 text-center text-xs text-[#9B9B9B]">
+          <Lock className="h-3 w-3" />
+          ログインして写真を投稿できます
+        </p>
+      </div>
+    </div>
+  ) : undefined;
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <Header title="全国のポケふた写真館" />
+      <div className="lg:hidden">
+        <Header title="ポケふた写真館" />
+      </div>
 
-      <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
+      <PCShell active="post" rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
+      <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="relative max-w-3xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-                <Sparkles className="h-3.5 w-3.5" />
-                ポケふた写真館
-              </div>
-              <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                全国のポケふたを写真で埋めよう
-              </h1>
-              <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
-                {totalPosts != null && totalPosts > 0 ? (
-                  <>
-                    {totalPosts}枚の旅写真が集まっています。
-                    {totalManholes != null && manholesWithPhotos != null && totalManholes > manholesWithPhotos && (
-                      <>残り{totalManholes - manholesWithPhotos}枚以上はまだ募集中。</>
-                    )}
-                  </>
-                ) : (
-                  <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
-                )}
-              </p>
-
-              {!isLoggedIn && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href="/signup"
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                  >
-                    <Camera className="h-4 w-4" />
-                    無料で旅の記録をはじめる
-                  </Link>
-                  <Link
-                    href="/visits"
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
-                  >
-                    スタンプ帳を見る
-                  </Link>
-                </div>
+          <div className="relative max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
+              <Sparkles className="h-3.5 w-3.5" />
+              ポケふた写真館
+            </div>
+            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+              全国のポケふたを写真で埋めよう
+            </h1>
+            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+              {totalPosts != null && totalPosts > 0 ? (
+                <>
+                  いま <b>{totalPosts}</b> 枚の写真が集まっています。
+                  {unmetPhotoCount != null && unmetPhotoCount > 0 && (
+                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 件。</>
+                  )}
+                </>
+              ) : (
+                <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
               )}
-            </div>
+            </p>
 
-            <div className="hidden rotate-2 overflow-hidden rounded-[8px] border border-[#E2CFAE] bg-white p-2 shadow-lg lg:block">
-              <StampBookMockup />
-            </div>
+            {!isLoggedIn && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+                >
+                  <Camera className="h-4 w-4" />
+                  無料で旅の記録をはじめる
+                </Link>
+                <Link
+                  href="/visits"
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                >
+                  <Stamp className="h-4 w-4" />
+                  スタンプ帳を見る
+                </Link>
+              </div>
+            )}
           </div>
         </section>
 
@@ -389,6 +424,7 @@ export default function PopularPage() {
           </>
         )}
       </main>
+      </PCShell>
 
       <BottomNav />
     </div>

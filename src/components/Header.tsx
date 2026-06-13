@@ -141,8 +141,8 @@ export default function Header({
 
           {user ? (
             <div className="flex min-w-0 items-center gap-1.5">
-              <div className="hidden max-w-[9rem] items-center gap-1.5 truncate rounded-lg border border-[#7B63A8]/15 bg-white/70 px-2.5 py-2 text-xs font-bold text-[#2A2A2A] sm:flex">
-                <UserIcon className="h-4 w-4 flex-shrink-0 text-[#7B63A8]" />
+              <div className="flex max-w-[7rem] items-center gap-1 truncate rounded-lg border border-[#7B63A8]/15 bg-white/70 px-2 py-1.5 text-xs font-bold text-[#2A2A2A] sm:max-w-[9rem] sm:gap-1.5 sm:px-2.5 sm:py-2">
+                <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-[#7B63A8] sm:h-4 sm:w-4" />
                 <span className="truncate">{getDisplayName(user)}</span>
               </div>
               <button
