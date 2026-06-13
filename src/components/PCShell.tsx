@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { Info, LogOut } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
 type NavTab = 'search' | 'stamp' | 'mytrip';
@@ -40,12 +41,28 @@ function PokeballMark({ size = 28 }: { size?: number }) {
   );
 }
 
+const iconBtn: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: 'none',
+  background: 'transparent',
+  color: '#6f6657',
+  cursor: 'pointer',
+  flexShrink: 0,
+  textDecoration: 'none',
+};
+
 interface PCTopNavProps {
   active?: NavTab;
 }
 
 function PCTopNav({ active }: PCTopNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
 
@@ -71,6 +88,17 @@ function PCTopNav({ active }: PCTopNavProps) {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createBrowserClient();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await supabase.auth.signOut();
+      setDisplayName(null);
+      router.push('/');
+      router.refresh();
+    } catch { /* ignore */ }
+  };
 
   const resolveActive = (key: NavTab, href: string) => {
     if (active) return active === key;
@@ -121,14 +149,40 @@ function PCTopNav({ active }: PCTopNavProps) {
       {/* スペーサー */}
       <div style={{ flex: 1 }} />
 
+      {/* Info */}
+      <Link href="/about" style={iconBtn} title="このアプリについて">
+        <Info size={18} strokeWidth={2} />
+      </Link>
+
+      {/* X */}
+      <a
+        href="https://x.com/pokemonmanhole"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ ...iconBtn, fontSize: 15, fontWeight: 900 }}
+        title="公式X @pokemonmanhole"
+      >
+        X
+      </a>
+
       {/* ユーザー */}
       {authLoaded && (
         displayName ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#6f6657', flexShrink: 0 }}>
-            <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
-              👤
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#6f6657' }}>
+              <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
+                👤
+              </span>
+              {displayName}
             </span>
-            {displayName}
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={iconBtn}
+              title="ログアウト"
+            >
+              <LogOut size={16} strokeWidth={2} />
+            </button>
           </span>
         ) : (
           <Link
@@ -176,7 +230,7 @@ export default function PCShell({ active, children, rail, className }: PCShellPr
             {/* モバイル: rail を children より先に表示 */}
             <div className="lg:hidden">{rail}</div>
             <div className="min-w-0">{children}</div>
-            {/* PC: 右カラム sticky — items-start を外して右列が左列と同高さになるよう stretch させる */}
+            {/* PC: 右カラム sticky */}
             <div className="hidden lg:block">
               <div className="sticky top-[20px] flex flex-col gap-[14px]">{rail}</div>
             </div>

@@ -302,13 +302,61 @@ export default function NearbyPage() {
     });
   }, [allManholes, query]);
 
+  const NUM = '"Outfit", system-ui, sans-serif';
+  const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
+
+  const displayManholes = activeTab === 'nearby' || activeTab === 'unvisited'
+    ? nearbyManholes
+    : filteredAllManholes;
+  const nearestDistance = nearbyManholes[0]?.distance;
+
+  const nearbyRail = (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
+        <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+          {activeTab === 'nearby' ? '近くのポケふた' : activeTab === 'unvisited' ? '未訪問' : '一覧'}
+        </p>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
+          {([
+            ['発見', displayManholes.length, '#2c2a26'],
+            activeTab === 'nearby' || activeTab === 'unvisited'
+              ? ['範囲', `${radius}km`, '#6f6657']
+              : ['総数', allManholes.length, '#6f6657'],
+          ] as [string, string | number, string][]).map(([label, value, color]) => (
+            <div key={label} className="bg-[#fffdf7] px-3 py-2.5 text-center">
+              <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
+              <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color }}>{value}</p>
+            </div>
+          ))}
+        </div>
+        {(activeTab === 'nearby' || activeTab === 'unvisited') && nearestDistance !== undefined && (
+          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
+            最寄り {nearestDistance < 1 ? `${Math.round(nearestDistance * 1000)}m` : `${nearestDistance.toFixed(1)}km`}
+          </p>
+        )}
+        {activeTab === 'all' && query && (
+          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
+            「{query}」で絞り込み中
+          </p>
+        )}
+      </div>
+      <Link
+        href={uploadHref}
+        className="flex items-center justify-center gap-2 rounded-[12px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm"
+      >
+        <Camera className="h-4 w-4" />
+        写真を投稿する
+      </Link>
+    </div>
+  );
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
       <div className="lg:hidden">
         <Header title="ポケふたを探す" />
       </div>
 
-      <PCShell active="search" className="pb-32 pt-3 lg:pt-6">
+      <PCShell active="search" className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
       <main className="relative px-0 lg:px-0">
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="relative max-w-3xl">
