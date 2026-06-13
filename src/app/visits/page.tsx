@@ -46,7 +46,7 @@ interface Visit {
   is_bookmarked: boolean;
 }
 
-type SegmentTab = 'all' | 'prefectures' | 'pokemons';
+type SegmentTab = 'all' | 'prefectures' | 'pokemons' | 'features';
 
 type VisitSummary = {
   count: number;
@@ -72,12 +72,21 @@ type PokemonProgress = {
   representativePhotoUrl: string | null;
 };
 
+type HashtagProgress = {
+  tag: string;
+  total: number;
+  visited: number;
+  remaining: number;
+  rate: number;
+};
+
 const TOTAL_MANHOLES = 470;
 
 const segments: { id: SegmentTab; label: string }[] = [
   { id: 'all', label: 'ぜんぶ' },
   { id: 'prefectures', label: '都道府県' },
   { id: 'pokemons', label: 'ポケモン' },
+  { id: 'features', label: '特徴' },
 ];
 
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
@@ -399,6 +408,30 @@ export default function VisitsPage() {
   const visitedPokemonSpecies = pokemonProgress.filter((p) => p.visitedManholes > 0).length;
   const totalPokemonSpecies = pokemonProgress.length;
   const pokemonCompletionRate = totalPokemonSpecies > 0 ? (visitedPokemonSpecies / totalPokemonSpecies) * 100 : 0;
+
+  const hashtagProgress = useMemo<HashtagProgress[]>(() => {
+    const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>();
+    passportManholes.forEach((manhole) => {
+      const tags = [...(manhole.hashtags ?? []), ...(manhole.title_tags ?? [])];
+      tags.forEach((tag) => {
+        if (!tag) return;
+        const current = progress.get(tag) ?? { totalIds: new Set<number>(), visitedIds: new Set<number>() };
+        current.totalIds.add(manhole.id);
+        if (visitSummaryByManholeId.has(manhole.id)) current.visitedIds.add(manhole.id);
+        progress.set(tag, current);
+      });
+    });
+    return Array.from(progress.entries())
+      .map(([tag, v]) => ({
+        tag,
+        total: v.totalIds.size,
+        visited: v.visitedIds.size,
+        remaining: v.totalIds.size - v.visitedIds.size,
+        rate: v.totalIds.size > 0 ? (v.visitedIds.size / v.totalIds.size) * 100 : 0,
+      }))
+      .filter((h) => h.visited > 0)
+      .sort((a, b) => a.remaining - b.remaining || b.visited - a.visited);
+  }, [passportManholes, visitSummaryByManholeId]);
 
   const nextAchievementPrefecture = prefectureProgress
     .filter((p) => p.visited > 0 && p.remaining > 0)
@@ -724,53 +757,43 @@ export default function VisitsPage() {
       <PCShell active="stamp" className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          {/* PhotoDex サマリーヘッダー */}
+          {/* PhotoDex サマリーヘッダー（v2 コンパクト） */}
           <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-            <p
-              style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', marginBottom: 6, textTransform: 'uppercase' as const }}
-            >
-              PHOTO DEX · 写真図鑑コンプリート
-            </p>
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="flex items-baseline gap-1.5">
-                <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 26, color: '#2c2a26', lineHeight: 1 }}>
-                  {visitedManholesCount}
-                </span>
-                <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 14, color: '#9b917e' }}>
-                  集めたポケふた
-                </span>
-                <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 13, color: '#c5b89e' }}>
-                  / {TOTAL_MANHOLES}
-                </span>
-              </div>
-              {thisMonthVisitedCount > 0 && (
-                <div className="flex items-baseline gap-1">
-                  <span style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e' }}>今月</span>
-                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 18, color: '#bf5640' }}>+{thisMonthVisitedCount}</span>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const }}>
+                  PHOTO DEX
+                </p>
+                <div className="mt-1.5 flex items-baseline gap-0.5">
+                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 22, color: '#2c2a26', lineHeight: 1 }}>
+                    {visitedManholesCount}
+                  </span>
+                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 14, color: '#c5b89e' }}>
+                    /{TOTAL_MANHOLES}
+                  </span>
                 </div>
-              )}
+              </div>
+              <div className="text-right">
+                <div className="flex items-baseline gap-1 justify-end">
+                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 22, color: '#bf5640', lineHeight: 1 }}>
+                    {completionRate.toFixed(0)}
+                  </span>
+                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 700, fontSize: 14, color: '#bf5640' }}>%</span>
+                </div>
+                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 600, whiteSpace: 'nowrap' as const }}>
+                  完成率 · あと{TOTAL_MANHOLES - visitedManholesCount}
+                  {thisMonthVisitedCount > 0 && (
+                    <span style={{ color: '#bf5640', marginLeft: 6, fontWeight: 800 }}>今月+{thisMonthVisitedCount}</span>
+                  )}
+                </p>
+              </div>
             </div>
 
-            <div className="mt-2 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
+            <div className="mt-3 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }}
               />
-            </div>
-
-            <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
-              <div className="bg-[#fffdf7] px-3 py-2 text-center">
-                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 700 }}>完成率</p>
-                <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 16, color: '#2c2a26' }}>{completionRate.toFixed(0)}%</p>
-              </div>
-              <div className="bg-[#fffdf7] px-3 py-2 text-center border-x border-[#e9dfc7]">
-                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 700 }}>今月</p>
-                <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 16, color: '#bf5640' }}>+{thisMonthVisitedCount}</p>
-              </div>
-              <div className="bg-[#fffdf7] px-3 py-2 text-center">
-                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 700 }}>あと</p>
-                <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 16, color: '#2c2a26' }}>{TOTAL_MANHOLES - visitedManholesCount}</p>
-              </div>
             </div>
           </div>
 
@@ -903,34 +926,71 @@ export default function VisitsPage() {
                     </div>
                   )}
 
-                  {/* ポケモンコレクション（サマリー） */}
+                  {/* ポケモンコレクション（サマリー）— 塗り円形トークン */}
                   {visitedPokemonSpecies > 0 && (
                     <div>
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-3 flex items-center justify-between">
                         <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">ポケモンコレクション</h2>
                         <button type="button" onClick={() => setSegmentTab('pokemons')} className="font-pixelJp text-xs text-[#8C6A4A]">
                           {totalPokemonSpecies}匹 ›
                         </button>
                       </div>
+                      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3">
+                        <div className="flex gap-3 justify-around">
+                          {pokemonProgress.filter((p) => p.visitedManholes > 0).slice(0, 4).map((p) => {
+                            const done = p.remaining === 0;
+                            return (
+                              <div key={p.pokemonName} className="flex flex-col items-center gap-1.5" style={{ width: 60 }}>
+                                <div style={{ width: 52, height: 52, borderRadius: 999, padding: 3, background: done ? '#1f9d63' : '#e9dfc7', display: 'grid', placeItems: 'center' }}>
+                                  <div style={{ width: '100%', height: '100%', borderRadius: 999, overflow: 'hidden', background: 'repeating-linear-gradient(45deg,#d9cdb2 0 4px,#cfc2a3 4px 8px)', border: `1px solid ${done ? '#bfe6cf' : '#e9dfc7'}`, opacity: done ? 1 : 0.45, filter: done ? 'none' : 'grayscale(.5)' }} />
+                                </div>
+                                <span className="font-pixelJp text-center leading-tight" style={{ fontSize: 10, fontWeight: 700, color: '#6A4D36' }}>{p.pokemonName}</span>
+                                <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 11, color: done ? '#1f9d63' : '#9b917e' }}>
+                                  {done ? 'コンプ' : `${p.visitedManholes}/${p.totalManholes}`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 特徴コレクション（サマリー） */}
+                  {hashtagProgress.length > 0 && (
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">特徴コレクション</h2>
+                        <button type="button" onClick={() => setSegmentTab('features')} className="font-pixelJp text-xs text-[#8C6A4A]">
+                          すべて ›
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
-                        {pokemonProgress.filter((p) => p.visitedManholes > 0).slice(0, 12).map((p) => (
-                          <div
-                            key={p.pokemonName}
-                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
-                              p.remaining === 0
-                                ? 'border-[#1f9d63]/40 bg-[#e2f2e9]'
-                                : 'border-[#e9dfc7] bg-[#fffdf7]'
-                            }`}
-                          >
-                            <span className="font-pixelJp text-xs font-bold text-[#4F3828]">{p.pokemonName}</span>
+                        {hashtagProgress.slice(0, 8).map((h) => {
+                          const near = h.remaining > 0 && h.remaining <= 2;
+                          return (
                             <span
-                              style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 700, fontSize: 11 }}
-                              className={p.remaining === 0 ? 'text-[#1f9d63]' : 'text-[#8C6A4A]'}
+                              key={h.tag}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 7,
+                                background: near ? '#f6e4b6' : '#fffdf7',
+                                border: `1px solid ${near ? '#ecd9a8' : '#e9dfc7'}`,
+                                borderRadius: 999,
+                                padding: '7px 12px',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: near ? '#9a6d05' : '#6A4D36',
+                              }}
                             >
-                              {p.visitedManholes}/{p.totalManholes}
+                              {h.tag}
+                              <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 11, color: near ? '#9a6d05' : '#9b917e' }}>
+                                {h.visited}/{h.total}
+                              </span>
                             </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -967,6 +1027,59 @@ export default function VisitsPage() {
                   </div>
                 );
               })()}
+
+              {/* 特徴 全件タブ */}
+              {segmentTab === 'features' && (
+                <div className="space-y-4">
+                  {hashtagProgress.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="font-pixelJp text-sm text-[#8C6A4A]">まだ特徴コレクションはありません</p>
+                    </div>
+                  ) : (
+                    <>
+                      {hashtagProgress.filter((h) => h.remaining === 0).length > 0 && (
+                        <div>
+                          <p className="mb-2 font-pixelJp text-xs font-bold text-[#1f9d63]">制覇済み</p>
+                          <div className="flex flex-wrap gap-2">
+                            {hashtagProgress.filter((h) => h.remaining === 0).map((h) => (
+                              <span key={h.tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#e2f2e9', border: '1px solid #bfe6cf', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: '#1f9d63' }}>
+                                ✓ {h.tag}
+                                <span style={{ fontFamily: '"Outfit"', fontWeight: 800, fontSize: 11 }}>{h.visited}/{h.total}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {hashtagProgress.filter((h) => h.remaining > 0 && h.remaining <= 2).length > 0 && (
+                        <div>
+                          <p className="mb-2 font-pixelJp text-xs font-bold text-[#9a6d05]">目前</p>
+                          <div className="flex flex-wrap gap-2">
+                            {hashtagProgress.filter((h) => h.remaining > 0 && h.remaining <= 2).map((h) => (
+                              <span key={h.tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#f6e4b6', border: '1px solid #ecd9a8', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: '#9a6d05' }}>
+                                あと{h.remaining} {h.tag}
+                                <span style={{ fontFamily: '"Outfit"', fontWeight: 800, fontSize: 11 }}>{h.visited}/{h.total}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {hashtagProgress.filter((h) => h.remaining > 2).length > 0 && (
+                        <div>
+                          <p className="mb-2 font-pixelJp text-xs font-bold text-[#8C6A4A]">進行中</p>
+                          <div className="flex flex-wrap gap-2">
+                            {hashtagProgress.filter((h) => h.remaining > 2).map((h) => (
+                              <span key={h.tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fffdf7', border: '1px solid #e9dfc7', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: '#6A4D36' }}>
+                                {h.tag}
+                                <span style={{ fontFamily: '"Outfit"', fontWeight: 800, fontSize: 11, color: '#9b917e' }}>{h.visited}/{h.total}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* ポケモン 全件タブ */}
               {segmentTab === 'pokemons' && (
