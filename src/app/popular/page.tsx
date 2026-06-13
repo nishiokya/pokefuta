@@ -18,7 +18,6 @@ import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
-import StampBookMockup from '@/components/StampBookMockup';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -48,6 +47,7 @@ export default function PopularPage() {
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
@@ -62,10 +62,12 @@ export default function PopularPage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
+        setSessionChecked(true);
         trackView('/popular', '全国のポケふた写真館', 'popular', loggedIn);
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
+        setSessionChecked(true);
         trackView('/popular', '全国のポケふた写真館', 'popular', false);
       }
     })();
@@ -142,20 +144,20 @@ export default function PopularPage() {
       ? totalManholes - manholesWithPhotos
       : null;
 
-  const pcGuestRail = !isLoggedIn ? (
+  const pcGuestRail = sessionChecked && !isLoggedIn ? (
     <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-white shadow-sm">
       <div className="flex items-center gap-2 bg-gradient-to-r from-[#fdeae2] to-[#fdf1e6] px-4 py-3">
         <TrendingUp className="h-4 w-4 text-[#B5483C]" />
         <span className="font-bold text-sm text-[#7d4536]">写真ゼロを埋めよう</span>
         <span className="ml-auto">
-          <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? 279}</span>
+          <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? '–'}</span>
           <span className="text-xs text-[#6B6B6B]"> 件 募集中</span>
         </span>
       </div>
       <div className="flex flex-col gap-3 p-4">
         <p className="text-sm text-[#4A4A4A] leading-relaxed">
           まだ写真の無いポケふたは残り{' '}
-          <b className="text-[#B5483C]">{unmetPhotoCount ?? 279}</b> 件。あなたの1枚目が、この場所の最初の記録になります。
+          <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 件。あなたの1枚目が、この場所の最初の記録になります。
         </p>
         <Link
           href="/signup"

@@ -22,7 +22,6 @@ import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
-import StampBookMockup from '@/components/StampBookMockup';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import { createBrowserClient } from '@/lib/supabase/client';

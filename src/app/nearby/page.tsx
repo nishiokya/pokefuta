@@ -378,7 +378,7 @@ export default function NearbyPage() {
     </div>
   );
 
-  const nearbyRail = isLoggedIn ? authNearbyRail : guestNearbyRail;
+  const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
 
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
@@ -437,7 +437,7 @@ export default function NearbyPage() {
         </section>
 
         {sessionChecked && !isLoggedIn && (
-          <div className="mt-4 rounded-[8px] border border-[#7B63A8]/10 bg-white/70 px-4 py-4 shadow-sm space-y-3">
+          <div className="mt-4 lg:hidden rounded-[8px] border border-[#7B63A8]/10 bg-white/70 px-4 py-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
               <Link

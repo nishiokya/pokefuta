@@ -133,7 +133,7 @@ function PCTopNav({ active }: PCTopNavProps) {
 
       {/* ナビリンク */}
       <div style={{ display: 'flex', gap: 4, marginLeft: 18 }}>
-        {navItems.map(({ key, label, href }) => {
+        {authLoaded && navItems.map(({ key, label, href }) => {
           const isActive = resolveActive(key, href);
           return (
             <Link
