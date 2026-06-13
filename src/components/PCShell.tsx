@@ -3,12 +3,18 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Info, LogOut } from 'lucide-react';
+import { Info, LogOut, UserPlus } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
-type NavTab = 'search' | 'stamp' | 'mytrip';
+type NavTab = 'search' | 'post' | 'stamp' | 'mytrip';
 
-const NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
+const GUEST_NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
+  { key: 'search', label: '探す', href: '/nearby' },
+  { key: 'post', label: '投稿', href: '/popular' },
+  { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
+];
+
+const AUTH_NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
   { key: 'search', label: '探す', href: '/nearby' },
   { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
   { key: 'mytrip', label: 'マイ旅', href: '/my-trip' },
@@ -100,6 +106,9 @@ function PCTopNav({ active }: PCTopNavProps) {
     } catch { /* ignore */ }
   };
 
+  const isLoggedIn = authLoaded && displayName !== null;
+  const navItems = isLoggedIn ? AUTH_NAV_ITEMS : GUEST_NAV_ITEMS;
+
   const resolveActive = (key: NavTab, href: string) => {
     if (active) return active === key;
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -119,12 +128,12 @@ function PCTopNav({ active }: PCTopNavProps) {
       {/* ロゴ */}
       <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: 'none' }}>
         <PokeballMark size={28} />
-        <span style={{ fontWeight: 700, fontSize: 18, color: '#38414f', fontFamily: ROUND }}>ポケふた</span>
+        <span style={{ fontWeight: 700, fontSize: 18, color: '#38414f', fontFamily: ROUND }}>ポケふた写真館</span>
       </Link>
 
       {/* ナビリンク */}
       <div style={{ display: 'flex', gap: 4, marginLeft: 18 }}>
-        {NAV_ITEMS.map(({ key, label, href }) => {
+        {authLoaded && navItems.map(({ key, label, href }) => {
           const isActive = resolveActive(key, href);
           return (
             <Link
@@ -187,21 +196,42 @@ function PCTopNav({ active }: PCTopNavProps) {
             </button>
           </span>
         ) : (
-          <Link
-            href="/login"
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#bf5640',
-              padding: '6px 14px',
-              borderRadius: 999,
-              border: '1px solid #bf5640',
-              textDecoration: 'none',
-              flexShrink: 0,
-            }}
-          >
-            ログイン
-          </Link>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <Link
+              href="/login"
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#7B63A8',
+                padding: '6px 14px',
+                borderRadius: 999,
+                border: '1px solid #d7d0ef',
+                textDecoration: 'none',
+                flexShrink: 0,
+              }}
+            >
+              ログイン
+            </Link>
+            <Link
+              href="/signup"
+              className="flex items-center gap-1.5"
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: '#fff',
+                background: '#7B63A8',
+                padding: '6px 14px',
+                borderRadius: 999,
+                boxShadow: '0 2px 0 #5f55b8',
+                textDecoration: 'none',
+                flexShrink: 0,
+              }}
+              aria-label="新規登録"
+            >
+              <UserPlus size={15} strokeWidth={2.2} />
+              新規登録
+            </Link>
+          </span>
         )
       )}
     </nav>

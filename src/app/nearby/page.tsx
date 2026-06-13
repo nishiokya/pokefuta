@@ -11,6 +11,7 @@ import {
   Navigation,
   RefreshCw,
   Search,
+  Stamp,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
@@ -310,7 +311,7 @@ export default function NearbyPage() {
     : filteredAllManholes;
   const nearestDistance = nearbyManholes[0]?.distance;
 
-  const nearbyRail = (
+  const authNearbyRail = (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
         <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
@@ -350,6 +351,35 @@ export default function NearbyPage() {
     </div>
   );
 
+  const guestNearbyRail = (
+    <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm space-y-3">
+      <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
+      <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-xs text-[#6B6B6B]">
+        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#B5483C]" />行ったポケふたを記録</span>
+        <span className="flex items-center gap-1.5"><Camera className="h-3.5 w-3.5 text-[#B5483C]" />写真で思い出を保存</span>
+        <span className="flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5 text-[#B5483C]" />都道府県の達成状況</span>
+        <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5 text-[#B5483C]" />近くの未訪問を探せる</span>
+      </div>
+      <Link
+        href="/signup"
+        className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+      >
+        <Stamp className="h-4 w-4" />
+        スタンプ帳をはじめる
+      </Link>
+      <Link
+        href="/nearby"
+        className="flex items-center justify-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white px-4 py-2 text-sm font-bold text-[#7B63A8]"
+      >
+        <MapPin className="h-4 w-4" />
+        近くのポケふたを見る
+      </Link>
+      <p className="text-right text-[11px] text-[#9B9B9B]">地図で探す → data.pokefuta.com</p>
+    </div>
+  );
+
+  const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
+
   return (
     <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
       <div className="lg:hidden">
@@ -360,18 +390,73 @@ export default function NearbyPage() {
       <main className="relative px-0 lg:px-0">
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="relative max-w-3xl">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
-              <Compass className="h-3.5 w-3.5" />
-              旅先で探す
-            </div>
-            <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              ポケふたを探す
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
-              現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。
-            </p>
+            {sessionChecked && !isLoggedIn ? (
+              <>
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
+                  <Stamp className="h-3 w-3" />
+                  ポケふたスタンプ帳
+                </div>
+                <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-4xl">
+                  ポケふた巡りを、あなただけのスタンプ帳に。
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-[#4A4A4A] sm:mt-3 sm:text-base">
+                  旅先で見つけたポケふたを写真と一緒に記録。訪問済みの場所やみんなの投稿写真を見ながら、ポケふた巡りを楽しく残しましょう。
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+                  >
+                    <Stamp className="h-4 w-4" />
+                    スタンプ帳をはじめる
+                  </Link>
+                  <Link
+                    href="/nearby"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    近くのポケふたを見る
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
+                  <Compass className="h-3.5 w-3.5" />
+                  旅先で探す
+                </div>
+                <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                  ポケふたを探す
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
+                  現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。
+                </p>
+              </>
+            )}
           </div>
         </section>
+
+        {sessionChecked && !isLoggedIn && (
+          <div className="mt-4 lg:hidden rounded-[8px] border border-[#7B63A8]/10 bg-white/70 px-4 py-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
+              <Link
+                href="/signup"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-3 py-2 text-xs font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+              >
+                <Stamp className="h-3 w-3" />
+                無料ではじめる
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-[#6B6B6B]">
+              <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#B5483C]" />行ったポケふたを記録</span>
+              <span className="flex items-center gap-1.5"><Camera className="h-3.5 w-3.5 text-[#B5483C]" />写真で思い出を保存</span>
+              <span className="flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5 text-[#B5483C]" />都道府県の達成状況</span>
+              <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5 text-[#B5483C]" />近くの未訪問を探せる</span>
+            </div>
+            <p className="text-right text-[11px] text-[#9B9B9B]">地図で探す → data.pokefuta.com</p>
+          </div>
+        )}
 
         {locationError && (
           <div className="mt-4 rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
