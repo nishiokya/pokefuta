@@ -692,17 +692,20 @@ export default function ManholeDetailPage() {
                   <ImageIcon className="h-3 w-3" strokeWidth={2.2} />
                   みんなの写真 {commPhotos.length}枚
                 </span>
-                {/* top-right: mine / 未投稿 */}
-                {isLoggedIn &&
-                  (featuredPhoto?.visit?.user_id === currentUserId ? (
+                {/* top-right: mine / 未投稿
+                    「あなたは未投稿」は photoState !== 'mine' の時だけ表示。
+                    自分の写真があってもコミュニティ写真を選択中の場合は出さない。 */}
+                {isLoggedIn && (
+                  featuredPhoto?.visit?.user_id === currentUserId ? (
                     <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#1f9d63] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
                       あなたの写真
                     </span>
-                  ) : (
+                  ) : photoState !== 'mine' ? (
                     <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#bf5640] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
                       あなたは未投稿
                     </span>
-                  ))}
+                  ) : null
+                )}
                 {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 10px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
