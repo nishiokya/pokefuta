@@ -14,6 +14,7 @@ import {
   PlusCircle,
   Sparkles,
   Stamp,
+  Target,
   Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -89,6 +90,12 @@ type NearCompleteItem = {
 };
 
 const TOTAL_MANHOLES = 470;
+
+const KIND_COLOR: Record<NearCompleteItem['kind'], { badge: string; bar: string; bg: string }> = {
+  pref:    { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
+  pokemon: { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
+  feature: { badge: '#1f9d63', bar: '#1f9d63', bg: '#e2f2e9' },
+};
 
 const segments: { id: SegmentTab; label: string }[] = [
   { id: 'all', label: 'ぜんぶ' },
@@ -417,7 +424,7 @@ export default function VisitsPage() {
   const totalPokemonSpecies = pokemonProgress.length;
   const pokemonCompletionRate = totalPokemonSpecies > 0 ? (visitedPokemonSpecies / totalPokemonSpecies) * 100 : 0;
 
-  const hashtagProgress = useMemo<HashtagProgress[]>(() => {
+  const [hashtagProgress, totalAllHashtags] = useMemo<[HashtagProgress[], number]>(() => {
     const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>();
     passportManholes.forEach((manhole) => {
       const tags = [...(manhole.hashtags ?? []), ...(manhole.title_tags ?? [])];
@@ -429,7 +436,7 @@ export default function VisitsPage() {
         progress.set(tag, current);
       });
     });
-    return Array.from(progress.entries())
+    const items = Array.from(progress.entries())
       .map(([tag, v]) => ({
         tag,
         total: v.totalIds.size,
@@ -439,6 +446,7 @@ export default function VisitsPage() {
       }))
       .filter((h) => h.visited > 0)
       .sort((a, b) => a.remaining - b.remaining || b.visited - a.visited);
+    return [items, progress.size];
   }, [passportManholes, visitSummaryByManholeId]);
 
   const nextAchievementPrefecture = prefectureProgress
@@ -510,6 +518,9 @@ export default function VisitsPage() {
     });
     return seen.size;
   }, [sortedVisits]);
+
+  const visitedPrefectureCount = prefectureProgress.filter((p) => p.visited > 0).length;
+  const visitedFeaturesCount = hashtagProgress.length;
 
   const handleDeleteClick = (photoId: string, visitId: string) => {
     setSelectedPhotoId(photoId);
@@ -813,39 +824,50 @@ export default function VisitsPage() {
 
   const visitsRail = (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const }}>
-          PHOTO DEX
-        </p>
-        <div className="mt-1.5 flex items-baseline gap-0.5">
-          <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 28, color: '#2c2a26', lineHeight: 1 }}>{visitedManholesCount}</span>
-          <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 14, color: '#c5b89e' }}>/{TOTAL_MANHOLES}</span>
+      {/* PHOTO DEX — collection dashboard (A案: 二極ヘッダー) */}
+      <DexSummaryCard
+        got={visitedManholesCount}
+        total={TOTAL_MANHOLES}
+        completionRate={completionRate}
+        remain={TOTAL_MANHOLES - visitedManholesCount}
+        pref={{ cur: visitedPrefectureCount, total: 47 }}
+        poke={{ cur: visitedPokemonSpecies, total: totalPokemonSpecies }}
+        feat={{ cur: visitedFeaturesCount, total: totalAllHashtags }}
+      />
+
+      {/* Mini stamp wall (6-column × 4 rows = 24 cells) */}
+      {visitedManholesForDex.length > 0 && (
+        <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm">
+          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, color: '#6A4D36', marginBottom: 8 }}>集めたスタンプ</p>
+          <div className="grid grid-cols-6 gap-[5px]">
+            {visitedManholesForDex.slice(0, 24).map(({ id, thumbUrl }) => (
+              <Link key={id} href={`/manhole/${id}`} className="aspect-square overflow-hidden rounded-full border-2 border-[#bf5640]/40 bg-[#e9dfc7]">
+                {thumbUrl
+                  ? <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  : <div className="h-full w-full bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]" />}
+              </Link>
+            ))}
+          </div>
+          {visitedManholesCount > 24 && (
+            <p className="mt-2 text-center font-pixelJp text-[10px] text-[#8C6A4A]">すべて見る {visitedManholesCount} ›</p>
+          )}
         </div>
-        <div className="mt-2 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
-          <div className="h-full rounded-full" style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }} />
+      )}
+
+      {/* Near-complete items */}
+      {nearCompleteAll.length > 0 && (
+        <div className="space-y-2">
+          {nearCompleteAll.slice(0, 4).map((item) => (
+            <NearCompleteCard key={`${item.kind}-${item.label}`} item={item} variant="compact" />
+          ))}
         </div>
-        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e', marginTop: 8 }}>
-          完成率 {completionRate.toFixed(0)}% · あと{TOTAL_MANHOLES - visitedManholesCount}
-        </p>
-      </div>
+      )}
+
+      {/* CTA */}
       <Link href="/nearby" className="flex items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm">
         <Camera className="h-4 w-4" />
         近くのポケふたを撮りに行く
       </Link>
-      {nearCompleteAll[0] && (
-        <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-4 shadow-sm">
-          <span style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, fontWeight: 800, color: '#9a6d05' }}>
-            🏆 あと{nearCompleteAll[0].remaining}でコンプ
-          </span>
-          <p className="font-pixelJp text-sm font-bold text-[#4F3828] mt-1 truncate">{nearCompleteAll[0].label}</p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
-            <div className="h-full rounded-full" style={{ width: `${nearCompleteAll[0].rate.toFixed(0)}%`, background: '#e2a015' }} />
-          </div>
-          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e', marginTop: 4 }}>
-            {nearCompleteAll[0].visited}/{nearCompleteAll[0].total}
-          </p>
-        </div>
-      )}
     </div>
   );
 
@@ -858,45 +880,17 @@ export default function VisitsPage() {
       <PCShell active="stamp" rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          {/* PhotoDex サマリーヘッダー（v2 コンパクト） */}
-          <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const }}>
-                  PHOTO DEX
-                </p>
-                <div className="mt-1.5 flex items-baseline gap-0.5">
-                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 22, color: '#2c2a26', lineHeight: 1 }}>
-                    {visitedManholesCount}
-                  </span>
-                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 600, fontSize: 14, color: '#c5b89e' }}>
-                    /{TOTAL_MANHOLES}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="flex items-baseline gap-1 justify-end">
-                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 22, color: '#bf5640', lineHeight: 1 }}>
-                    {completionRate.toFixed(0)}
-                  </span>
-                  <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 700, fontSize: 14, color: '#bf5640' }}>%</span>
-                </div>
-                <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 600, whiteSpace: 'nowrap' as const }}>
-                  完成率 · あと{TOTAL_MANHOLES - visitedManholesCount}
-                  {thisMonthVisitedCount > 0 && (
-                    <span style={{ color: '#bf5640', marginLeft: 6, fontWeight: 800 }}>今月+{thisMonthVisitedCount}</span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }}
-              />
-            </div>
-          </div>
+          {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}
+          <DexSummaryCard
+            got={visitedManholesCount}
+            total={TOTAL_MANHOLES}
+            completionRate={completionRate}
+            remain={TOTAL_MANHOLES - visitedManholesCount}
+            pref={{ cur: visitedPrefectureCount, total: 47 }}
+            poke={{ cur: visitedPokemonSpecies, total: totalPokemonSpecies }}
+            feat={{ cur: visitedFeaturesCount, total: totalAllHashtags }}
+            className="lg:hidden"
+          />
 
           {/* セグメントタブ */}
           <nav className="flex gap-1.5 rounded-[12px] border border-[#e9dfc7] bg-[#fffdf7] p-1">
@@ -963,42 +957,7 @@ export default function VisitsPage() {
                       <div className="-mx-1 overflow-x-auto px-1 pb-1">
                         <div className="flex gap-3" style={{ width: 'max-content' }}>
                           {nearCompleteAll.map((item) => (
-                            <div
-                              key={`${item.kind}-${item.label}`}
-                              className="w-40 shrink-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm"
-                            >
-                              <div className="flex items-center gap-1 mb-1">
-                                <span
-                                  style={{
-                                    fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif',
-                                    fontWeight: 800,
-                                    fontSize: 11,
-                                    borderRadius: 999,
-                                    padding: '3px 8px',
-                                    background: item.kind === 'feature' ? '#e2f2e9' : '#f6e4b6',
-                                    color: item.kind === 'feature' ? '#1f9d63' : '#9a6d05',
-                                    whiteSpace: 'nowrap' as const,
-                                  }}
-                                >
-                                  あと{item.remaining}
-                                </span>
-                              </div>
-                              <p className="font-pixelJp text-sm font-bold text-[#4F3828] truncate">{item.label}</p>
-                              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${item.rate.toFixed(0)}%`, background: item.kind === 'feature' ? '#1f9d63' : '#e2a015' }}
-                                />
-                              </div>
-                              <p className="mt-1 font-pixelJp text-[10px] text-[#8C6A4A]">{item.visited}/{item.total}</p>
-                              <Link
-                                href="/nearby"
-                                className="mt-2 flex items-center justify-center gap-1 rounded-[8px] bg-[#bf5640] px-2 py-1.5 font-pixelJp text-[10px] font-bold text-white"
-                              >
-                                <Camera className="h-3 w-3" />
-                                次を撮る
-                              </Link>
-                            </div>
+                            <NearCompleteCard key={`${item.kind}-${item.label}`} item={item} />
                           ))}
                         </div>
                       </div>
@@ -1059,7 +1018,7 @@ export default function VisitsPage() {
                             return (
                               <div key={p.pokemonName} className="flex flex-col items-center gap-1.5" style={{ width: 60 }}>
                                 <div style={{ width: 52, height: 52, borderRadius: 999, padding: 3, background: done ? '#1f9d63' : '#e9dfc7', display: 'grid', placeItems: 'center' }}>
-                                  <div style={{ width: '100%', height: '100%', borderRadius: 999, overflow: 'hidden', background: 'repeating-linear-gradient(45deg,#d9cdb2 0 4px,#cfc2a3 4px 8px)', border: `1px solid ${done ? '#bfe6cf' : '#e9dfc7'}`, opacity: done ? 1 : 0.45, filter: done ? 'none' : 'grayscale(.5)' }} />
+                                  <div style={{ width: '100%', height: '100%', borderRadius: 999, overflow: 'hidden', background: 'radial-gradient(circle, #6F6658 0% 18%, #B9AA91 19% 29%, #6F6658 30% 33%, #D7C9AF 34% 48%, #8B7D67 49% 52%, #CFC0A5 53%)', border: `1px solid ${done ? '#bfe6cf' : '#e9dfc7'}`, opacity: done ? 1 : 0.45, filter: done ? 'none' : 'grayscale(.5)' }} />
                                 </div>
                                 <span className="font-pixelJp text-center leading-tight" style={{ fontSize: 10, fontWeight: 700, color: '#6A4D36' }}>{p.pokemonName}</span>
                                 <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 11, color: done ? '#1f9d63' : '#9b917e' }}>
@@ -1491,5 +1450,146 @@ function EmptyPassport() {
         </Link>
       </div>
     </section>
+  );
+}
+
+function AxisStats({
+  pref,
+  poke,
+  feat,
+}: {
+  pref: { cur: number; total: number };
+  poke: { cur: number; total: number };
+  feat: { cur: number; total: number };
+}) {
+  const items = [
+    { icon: <MapPin className="h-3 w-3" />, label: '都道府県', cur: pref.cur, total: pref.total },
+    { icon: <Target className="h-3 w-3" />, label: 'ポケモン', cur: poke.cur, total: poke.total },
+    { icon: <Sparkles className="h-3 w-3" />, label: '特徴', cur: feat.cur, total: feat.total },
+  ];
+  return (
+    <div className="flex overflow-hidden rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea]">
+      {items.map((s, i) => (
+        <div
+          key={s.label}
+          className="flex flex-1 flex-col items-center py-[9px] px-1 text-center"
+          style={{ borderLeft: i ? '1px solid #e9dfc7' : 'none' }}
+        >
+          <div className="flex items-center justify-center gap-1 text-[#9b917e]">
+            {s.icon}
+            <span style={{ fontSize: 10.5, fontWeight: 700 }}>{s.label}</span>
+          </div>
+          <div style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 15, marginTop: 3, color: '#2c2a26', lineHeight: 1 }}>
+            {s.cur}<span style={{ color: '#9b917e', fontSize: 11, fontWeight: 600 }}>/{s.total}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DexSummaryCard({
+  got,
+  total,
+  completionRate,
+  remain,
+  pref,
+  poke,
+  feat,
+  className,
+}: {
+  got: number;
+  total: number;
+  completionRate: number;
+  remain: number;
+  pref: { cur: number; total: number };
+  poke: { cur: number; total: number };
+  feat: { cur: number; total: number };
+  className?: string;
+}) {
+  return (
+    <div
+      className={`overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] shadow-sm${className ? ` ${className}` : ''}`}
+      style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 11 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div>
+          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const }}>
+            PHOTO DEX
+          </p>
+          <div style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 34, lineHeight: 1, marginTop: 5, color: '#2c2a26' }}>
+            {got}<span style={{ fontSize: 18, color: '#9b917e' }}>/{total}</span>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 30, lineHeight: 1, color: '#bf5640' }}>
+            {completionRate.toFixed(0)}<span style={{ fontSize: 16 }}>%</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#9b917e', fontWeight: 600, marginTop: 3 }}>完成率</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="flex-1 h-[9px] overflow-hidden rounded-full bg-[#e9dfc7]">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(completionRate, 100)}%`, background: 'linear-gradient(90deg,#e2a015,#bf5640)' }} />
+        </div>
+        <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontSize: 11.5, color: '#9b917e', fontWeight: 700, flex: '0 0 auto' }}>あと{remain}</span>
+      </div>
+      <AxisStats pref={pref} poke={poke} feat={feat} />
+    </div>
+  );
+}
+
+function NearCompleteCard({ item, variant = 'card' }: { item: NearCompleteItem; variant?: 'compact' | 'card' }) {
+  const color = KIND_COLOR[item.kind];
+  if (variant === 'compact') {
+    return (
+      <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
+        <span style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, fontWeight: 800, color: color.badge }}>
+          🏆 あと{item.remaining}でコンプ
+        </span>
+        <p className="font-pixelJp text-sm font-bold text-[#4F3828] mt-0.5 truncate">{item.label}</p>
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
+          <div className="h-full rounded-full" style={{ width: `${item.rate.toFixed(0)}%`, background: color.bar }} />
+        </div>
+        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', marginTop: 3 }}>
+          {item.visited}/{item.total}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="w-40 shrink-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
+      <div className="flex items-center gap-1 mb-1">
+        <span
+          style={{
+            fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif',
+            fontWeight: 800,
+            fontSize: 11,
+            borderRadius: 999,
+            padding: '3px 8px',
+            background: color.bg,
+            color: color.badge,
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          あと{item.remaining}
+        </span>
+      </div>
+      <p className="font-pixelJp text-sm font-bold text-[#4F3828] truncate">{item.label}</p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${item.rate.toFixed(0)}%`, background: color.bar }}
+        />
+      </div>
+      <p className="mt-1 font-pixelJp text-[10px] text-[#8C6A4A]">{item.visited}/{item.total}</p>
+      <Link
+        href="/nearby"
+        className="mt-2 flex items-center justify-center gap-1 rounded-[8px] bg-[#bf5640] px-2 py-1.5 font-pixelJp text-[10px] font-bold text-white"
+      >
+        <Camera className="h-3 w-3" />
+        次を撮る
+      </Link>
+    </div>
   );
 }
