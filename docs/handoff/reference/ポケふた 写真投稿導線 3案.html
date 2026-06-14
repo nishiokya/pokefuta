@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ポケふた 写真投稿導線 3案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@500;700;800;900&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* surfaces */
+    --page: #efe6cf;          /* canvas content bg behind app */
+    --app-bg: #f1e8d4;        /* app screen bg */
+    --header: #f4ecda;        /* top app bar */
+    --card: #fffdf7;          /* card surface */
+    --card-2: #fbf6ea;        /* secondary card */
+    --line: #e9dfc7;          /* hairline borders */
+    --line-soft: #f0e7d3;
+
+    /* ink */
+    --ink: #2c2a26;
+    --ink-soft: #6f6657;
+    --ink-faint: #9b917e;
+
+    /* brand */
+    --terracotta: #bf5640;    /* primary action */
+    --terracotta-d: #a8462f;
+    --indigo: #3b58a8;        /* passport blue / titles */
+    --green: #1f9d63;         /* prefecture / done */
+    --amber: #e2a015;         /* pokemon */
+    --amber-d: #b87d0a;
+    --purple: #7a6fd0;        /* signup */
+    --pokeball: #e3493b;
+
+    /* tints */
+    --peach-bg: #fdeae2; --peach-tx: #bf5640;
+    --lav-bg: #ece9fb;  --lav-tx: #6a5fc4;
+    --mint-bg: #e2f2e9; --mint-tx: #1f9d63;
+    --gold-bg: #f6e4b6; --gold-tx: #9a6d05;
+
+    --r-lg: 18px; --r-md: 14px; --r-sm: 10px;
+    --shadow: 0 1px 2px rgba(72,55,20,.05), 0 8px 22px rgba(72,55,20,.07);
+    --shadow-sm: 0 1px 2px rgba(72,55,20,.06), 0 3px 8px rgba(72,55,20,.05);
+
+    --jp: "Zen Kaku Gothic New", system-ui, sans-serif;
+    --round: "M PLUS Rounded 1c", system-ui, sans-serif;
+    --num: "Outfit", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--jp); color: var(--ink); background: #d9cba8; }
+
+  /* ---------- mobile app frame ---------- */
+  .app {
+    width: 390px;
+    height: 100%;
+    background: var(--app-bg);
+    border-radius: 30px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 4px rgba(60,45,15,.08), 0 18px 50px rgba(60,45,15,.16);
+    border: 1px solid rgba(255,255,255,.5);
+  }
+  .app__bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 12px;
+    background: var(--header);
+    border-bottom: 1px solid var(--line);
+  }
+  .app__bar .logo { width: 26px; height: 26px; flex: 0 0 auto; }
+  .app__bar .ttl { font-weight: 700; font-size: 17px; letter-spacing: .01em; color: #38414f; }
+  .app__bar .spacer { flex: 1; }
+  .app__bar .chip-mini {
+    font-size: 12px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink-soft);
+    display: inline-flex; align-items: center; gap: 5px; font-weight: 500;
+  }
+  .app__body { padding: 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+  .app__tab {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: rgba(250,246,236,.96);
+    border-top: 1px solid var(--line);
+    backdrop-filter: blur(6px);
+  }
+  .app__tab .t {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 9px 0 11px; font-size: 11px; color: var(--ink-faint); font-weight: 500;
+  }
+  .app__tab .t.on { color: var(--purple); }
+  .app__tab .t.on .ic { background: #ece9fb; }
+  .app__tab .ic {
+    width: 30px; height: 30px; border-radius: 999px;
+    display: grid; place-items: center;
+  }
+
+  /* ---------- shared ui ---------- */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+    line-height: 1; white-space: nowrap;
+  }
+  .pill.peach { background: var(--peach-bg); color: var(--peach-tx); }
+  .pill.lav { background: var(--lav-bg); color: var(--lav-tx); }
+  .pill.mint { background: var(--mint-bg); color: var(--mint-tx); }
+  .pill.gold { background: var(--gold-bg); color: var(--gold-tx); }
+
+  .btn {
+    border: none; border-radius: 12px; font-family: var(--round);
+    font-weight: 800; cursor: default; display: inline-flex; align-items: center;
+    justify-content: center; gap: 8px; letter-spacing: .02em;
+  }
+  .btn.primary { background: var(--terracotta); color: #fff; box-shadow: 0 2px 0 var(--terracotta-d); }
+  .btn.block { width: 100%; padding: 14px; font-size: 15px; }
+
+  .meter { height: 9px; border-radius: 999px; background: #e9dec5; overflow: hidden; }
+  .meter > span { display: block; height: 100%; border-radius: 999px; }
+
+  /* circular manhole placeholder (has-photo) */
+  .mh {
+    border-radius: 999px; position: relative; overflow: hidden;
+    background:
+      repeating-linear-gradient(45deg, #d9cdb2 0 6px, #cfc2a3 6px 12px);
+    border: 3px solid #b9aa86;
+    display: grid; place-items: center;
+  }
+  .mh .lbl { font-family: ui-monospace, monospace; font-size: 8px; color: #7c6f50; letter-spacing: .02em; }
+
+  /* empty / zero-photo frame */
+  .empty-frame {
+    border-radius: 999px; position: relative;
+    background: repeating-linear-gradient(135deg, #f3ecdc 0 9px, #eee5d0 9px 18px);
+    border: 2px dashed #cdbf9f;
+    display: grid; place-items: center; color: var(--ink-faint);
+  }
+
+  .canvas-note {
+    font-family: var(--round); font-size: 13px; color: #6b5f44;
+    background: #fff7e3; border: 1px solid #ecd9a8; border-radius: 10px;
+    padding: 10px 14px; line-height: 1.55; max-width: 360px;
+  }
+
+  /* faint divider label */
+  .micro { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--ink-faint); text-transform: uppercase; font-family: var(--num); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="screens-A.jsx"></script>
+<script type="text/babel" src="screens-B.jsx"></script>
+<script type="text/babel" src="screens-AB.jsx"></script>
+<script type="text/babel" src="screens-Stampbook.jsx"></script>
+<script type="text/babel" src="screens-Unified.jsx"></script>
+<script type="text/babel" src="screens-MyTrip.jsx"></script>
+<script type="text/babel" src="screens-C.jsx"></script>
+<script type="text/babel" src="screens-PC.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
