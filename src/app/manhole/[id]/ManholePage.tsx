@@ -324,7 +324,8 @@ export default function ManholeDetailPage() {
       trackRouteOpen({ manhole_id: manhole.id, prefecture: manhole.prefecture });
       window.open(
         `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`,
-        '_blank'
+        '_blank',
+        'noopener,noreferrer'
       );
     }
   };
@@ -488,7 +489,7 @@ export default function ManholeDetailPage() {
         )}
         {photoState === 'mine' && isLoggedIn && prefectureDex && (
           <span className="ml-auto shrink-0 font-['Outfit'] text-[14px] font-black text-[#1f9d63]">
-            1 / {prefectureDex.total} 達成
+            {prefectureDex.current} / {prefectureDex.total} 達成
           </span>
         )}
         {photoState === 'community' && isLoggedIn && (
@@ -702,21 +703,19 @@ export default function ManholeDetailPage() {
                       あなたは未投稿
                     </span>
                   ))}
-                {/* caption */}
+                {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/62 to-transparent px-3 pb-2.5 pt-7">
-                    <div className="flex items-center gap-2 text-white">
-                      <span className="text-xs font-bold">
-                        {featuredPhoto.visit?.user_id === currentUserId
-                          ? 'あなたの1枚'
-                          : `@${getPhotoUserLabel(featuredPhoto)}`}
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 10px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700 }}>
+                      {featuredPhoto.visit?.user_id === currentUserId
+                        ? 'あなたの1枚'
+                        : `@${getPhotoUserLabel(featuredPhoto)}`}
+                    </span>
+                    {featuredPhoto.visit?.shot_at && (
+                      <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'Outfit,sans-serif', opacity: 0.9 }}>
+                        {formatPhotoDate(featuredPhoto.visit.shot_at)}
                       </span>
-                      {featuredPhoto.visit?.shot_at && (
-                        <span className="ml-auto font-['Outfit'] text-[11px] opacity-90">
-                          {formatPhotoDate(featuredPhoto.visit.shot_at)}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -752,6 +751,16 @@ export default function ManholeDetailPage() {
                           <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1f9d63]">
                             <Camera className="h-2.5 w-2.5 text-white" strokeWidth={2.4} />
                           </span>
+                          {/* delete button — only reachable here since myPhotos excludes commPhotos */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(p.id, p.visit?.id); }}
+                            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60"
+                            title="削除"
+                            style={{ color: '#fff' }}
+                          >
+                            <span className="text-[9px] leading-none">×</span>
+                          </button>
                         </button>
                       ))}
                       {/* add slot */}
@@ -761,7 +770,7 @@ export default function ManholeDetailPage() {
                         className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
                         style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
                       >
-                        <Plus className="h-4.5 w-4.5 text-[#bf5640]" strokeWidth={2.5} />
+                        <Plus className="h-[18px] w-[18px] text-[#bf5640]" strokeWidth={2.5} />
                       </button>
                     </div>
                   </div>
@@ -796,17 +805,6 @@ export default function ManholeDetailPage() {
                           alt={`@${getPhotoUserLabel(p)}`}
                           className="h-full w-full object-cover"
                         />
-                        {/* delete own photo */}
-                        {p.visit?.user_id === currentUserId && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(p.id, p.visit?.id); }}
-                            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
-                            title="削除"
-                          >
-                            <span className="text-[9px] leading-none">×</span>
-                          </button>
-                        )}
                       </button>
                     ))}
                     {/* add slot when no own photos */}
