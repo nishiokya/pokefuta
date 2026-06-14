@@ -16,7 +16,7 @@ export default function UnauthFooter() {
   const items = [
     { href: '/', label: 'ホーム', icon: <Home className="w-6 h-6 mb-1" /> },
     { href: '/login?redirect=/upload', label: '旅の続き', icon: <LogIn className="w-6 h-6 mb-1" /> },
-    { href: '/signup', label: 'アカウント作成', icon: <UserPlus className="w-6 h-6 mb-1" /> },
+    { href: '/login', label: 'アカウント作成', icon: <UserPlus className="w-6 h-6 mb-1" /> },
   ];
 
   return (

@@ -165,7 +165,7 @@ export default function Header({
                 ログイン
               </Link>
               <Link
-                href="/signup"
+                href="/login"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7B63A8] text-white shadow-sm transition hover:bg-[#6A5299] sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:text-sm sm:font-bold"
                 aria-label="新規登録"
               >

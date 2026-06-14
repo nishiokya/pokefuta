@@ -248,7 +248,7 @@ export default function DevDebugPanel() {
 
           {/* Quick Actions */}
           <div className="space-y-2">
-            <a href="/signup" className="block text-center rpg-button text-xs py-1">
+            <a href="/login" className="block text-center rpg-button text-xs py-1">
               <span className="font-pixelJp">新規登録</span>
             </a>
             <a href="/login" className="block text-center rpg-button rpg-button-primary text-xs py-1">

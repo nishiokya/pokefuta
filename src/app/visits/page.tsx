@@ -672,7 +672,7 @@ export default function VisitsPage() {
       <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm space-y-3">
         <p className="font-bold text-sm text-[#7B63A8]">あなた専用のスタンプ帳を無料で作れます</p>
         <Link
-          href="/signup"
+          href="/login"
           className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
         >
           <Stamp className="h-4 w-4" /> 無料でスタンプ帳を作る
@@ -727,7 +727,7 @@ export default function VisitsPage() {
                 {/* CTA Buttons */}
                 <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
                   <Link
-                    href="/signup"
+                    href="/login"
                     className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:py-2.5"
                   >
                     <Stamp className="h-4 w-4" />

@@ -160,7 +160,7 @@ export default function HomePage() {
           <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 件。あなたの1枚目が、この場所の最初の記録になります。
         </p>
         <Link
-          href="/signup"
+          href="/login"
           className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
         >
           <Camera className="h-4 w-4" />
@@ -208,7 +208,7 @@ export default function HomePage() {
             {!isLoggedIn && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
                 >
                   <Camera className="h-4 w-4" />
@@ -255,7 +255,7 @@ export default function HomePage() {
                 return (
                   <Link
                     key={manhole.id}
-                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/signup'}
+                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/login'}
                     className="flex items-center gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-3 py-2.5 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40 hover:bg-white"
                   >
                     <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
@@ -408,7 +408,7 @@ export default function HomePage() {
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
                   <Link
-                    href="/signup"
+                    href="/login"
                     className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                   >
                     <Camera className="h-4 w-4" />
