@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { SITE_URL } from '@/lib/constants';
 
 function getSafeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
@@ -16,7 +17,10 @@ export async function GET(request: Request) {
   // Provider-level errors (user denied, invalid client) arrive as ?error= before our code runs
   const providerError = requestUrl.searchParams.get('error');
 
-  const loginUrl = new URL('/login', requestUrl.origin);
+  // requestUrl.origin はリバースプロキシ環境で localhost を返すことがある。
+  // NEXT_PUBLIC_SITE_URL > SITE_URL の順で優先し requestUrl.origin は使わない。
+  const appOrigin = process.env.NEXT_PUBLIC_SITE_URL ?? SITE_URL;
+  const loginUrl = new URL('/login', appOrigin);
 
   if (providerError) {
     loginUrl.searchParams.set(
