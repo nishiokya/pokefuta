@@ -43,6 +43,7 @@ interface Photo {
     display_name?: string | null;
     shot_at: string;
     created_at?: string;
+    note?: string;
     comment?: string;
     is_public?: boolean;
   };
@@ -853,6 +854,7 @@ export default function ManholeDetailPage() {
             {/* featured photo details */}
             {featuredPhoto && (() => {
               const isOwn = featuredPhoto.visit?.user_id === currentUserId;
+              const note = featuredPhoto.visit?.note;
               const comment = featuredPhoto.visit?.comment;
               const shotAt = featuredPhoto.visit?.shot_at;
               const isPublic = featuredPhoto.visit?.is_public;
@@ -894,6 +896,12 @@ export default function ManholeDetailPage() {
                       </button>
                     )}
                   </div>
+                  {/* note (自分のみ) */}
+                  {isOwn && note && (
+                    <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">
+                      📍 {note}
+                    </p>
+                  )}
                   {/* comment */}
                   {comment && (
                     <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">
