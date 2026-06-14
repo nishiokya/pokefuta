@@ -41,6 +41,7 @@ const nextConfig = {
     return config;
   },
   experimental: {
+    trustHost: true,
     serverComponentsExternalPackages: ['sharp'],
     outputFileTracingIncludes: {
       '/manhole/[id]/opengraph-image': [
