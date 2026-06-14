@@ -503,6 +503,7 @@ export async function GET(request: NextRequest) {
             shot_at,
             created_at,
             manhole_id,
+            note,
             comment,
             is_public
           )
