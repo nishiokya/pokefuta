@@ -213,7 +213,7 @@ function PCTopNav({ active }: PCTopNavProps) {
               ログイン
             </Link>
             <Link
-              href="/signup"
+              href="/login"
               className="flex items-center gap-1.5"
               style={{
                 fontSize: 13,

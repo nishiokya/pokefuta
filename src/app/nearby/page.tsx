@@ -361,7 +361,7 @@ export default function NearbyPage() {
         <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5 text-[#B5483C]" />近くの未訪問を探せる</span>
       </div>
       <Link
-        href="/signup"
+        href="/login"
         className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
       >
         <Stamp className="h-4 w-4" />
@@ -404,7 +404,7 @@ export default function NearbyPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
                   <Link
-                    href="/signup"
+                    href="/login"
                     className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
                   >
                     <Stamp className="h-4 w-4" />
@@ -441,7 +441,7 @@ export default function NearbyPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
               <Link
-                href="/signup"
+                href="/login"
                 className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-3 py-2 text-xs font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
               >
                 <Stamp className="h-3 w-3" />

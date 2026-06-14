@@ -109,7 +109,7 @@ export default function AboutPage() {
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
                 >
                   <UserPlus className="h-4 w-4" />

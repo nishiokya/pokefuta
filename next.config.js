@@ -77,6 +77,13 @@ const nextConfig = {
     ],
     formats: ['image/webp', 'image/avif'],
   },
+  redirects: async () => [
+    {
+      source: '/signup',
+      destination: '/login',
+      permanent: true,
+    },
+  ],
   headers: async () => [
     {
       source: '/manifest.json',

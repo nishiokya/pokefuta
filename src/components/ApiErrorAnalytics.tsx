@@ -46,7 +46,6 @@ function derivePageType(pathname: string): string {
   if (pathname === '/popular') return 'popular';
   if (pathname === '/upload') return 'upload';
   if (pathname === '/login') return 'login';
-  if (pathname === '/signup') return 'signup';
   if (/^\/prefecture\//.test(pathname)) return 'prefecture';
   if (/^\/users\//.test(pathname)) return 'user_profile';
   if (pathname === '/nearby') return 'nearby';
