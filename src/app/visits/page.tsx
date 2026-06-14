@@ -427,7 +427,7 @@ export default function VisitsPage() {
   const [hashtagProgress, totalAllHashtags] = useMemo<[HashtagProgress[], number]>(() => {
     const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>();
     passportManholes.forEach((manhole) => {
-      const tags = [...(manhole.hashtags ?? []), ...(manhole.title_tags ?? [])];
+      const tags = [...(manhole.hashtags ?? [])];
       tags.forEach((tag) => {
         if (!tag) return;
         const current = progress.get(tag) ?? { totalIds: new Set<number>(), visitedIds: new Set<number>() };
