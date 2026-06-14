@@ -93,10 +93,12 @@ const nextConfig = {
           key: 'X-DNS-Prefetch-Control',
           value: 'on',
         },
-        {
+        // HSTS は本番のみ。開発環境で送ると Chrome が localhost を https:// で開こうとして
+        // dev server (http only) に接続できなくなる。
+        ...(process.env.NODE_ENV === 'production' ? [{
           key: 'Strict-Transport-Security',
           value: 'max-age=63072000; includeSubDomains; preload',
-        },
+        }] : []),
         {
           key: 'X-Frame-Options',
           value: 'SAMEORIGIN',
