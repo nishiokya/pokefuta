@@ -3,8 +3,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { MapPin, ArrowLeft, Camera, Navigation, Clock, Building2 } from 'lucide-react';
+import {
+  MapPin, ArrowLeft, Camera, Navigation, Building2,
+  Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
+  Star, Sparkles,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
@@ -22,12 +25,10 @@ const MapComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-64 bg-[#F6EEDC] border border-[#7B63A8]/15 flex items-center justify-center">
-        <div className="font-pixelJp text-[#7B63A8]">
-          読み込み中<span className="rpg-loading"></span>
-        </div>
+      <div className="w-full h-[140px] bg-[#F6EEDC] border border-[#e9dfc7] flex items-center justify-center">
+        <div className="font-pixelJp text-[#6f6657] text-sm">読み込み中…</div>
       </div>
-    )
+    ),
   }
 );
 
@@ -42,7 +43,7 @@ interface Photo {
     display_name?: string | null;
     shot_at: string;
     created_at?: string;
-    comment?: string;  // 訪問コメント
+    comment?: string;
     is_public?: boolean;
   };
 }
@@ -73,6 +74,11 @@ const getTitlePillClass = (index: number) => {
   return classes[index] || classes[0];
 };
 
+const formatPhotoDate = (shot_at: string) => {
+  const d = new Date(shot_at);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+};
+
 interface ManholeComment {
   id: string;
   content: string;
@@ -98,21 +104,20 @@ export default function ManholeDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
+  const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
 
   const [manholeComments, setManholeComments] = useState<ManholeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsSubmitting, setCommentsSubmitting] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newManholeComment, setNewManholeComment] = useState('');
-  const {
-    trackManholeDetailOpen,
-    trackRouteOpen,
-    trackVisitDelete,
-  } = useAnalytics();
+
+  const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete } = useAnalytics();
 
   useEffect(() => {
     const manholeId = params.id;
     if (manholeId) {
+      setSelectedPhotoIdx(0);
       loadManholeDetail(manholeId as string);
       loadPhotos(manholeId as string);
       loadManholeComments(manholeId as string);
@@ -126,7 +131,6 @@ export default function ManholeDetailPage() {
     }
   }, [manhole?.prefecture, prefectureDex?.total, currentUserId]);
 
-  // マンホール詳細閲覧トラッキング
   useEffect(() => {
     if (manhole) {
       trackManholeDetailOpen({
@@ -137,21 +141,15 @@ export default function ManholeDetailPage() {
     }
   }, [manhole?.id]);
 
-  // Update document title and meta tags
   useEffect(() => {
     if (manhole) {
       const municipality = manhole.city || manhole.municipality || '場所未設定';
-      const pokemonList = manhole.pokemons && manhole.pokemons.length > 0
-        ? manhole.pokemons.join('・')
-        : '';
+      const pokemonList = manhole.pokemons?.length > 0 ? manhole.pokemons.join('・') : '';
 
-      // Update title
-      const titleText = pokemonList
+      document.title = pokemonList
         ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}｜ポケふたマップ`
         : `${manhole.prefecture}${municipality}のポケふた｜ポケふたマップ`;
-      document.title = titleText;
 
-      // Update meta description
       const descriptionText = pokemonList
         ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。経路案内や写真登録にも対応。`
         : `${manhole.prefecture}${municipality}にあるポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。`;
@@ -164,20 +162,18 @@ export default function ManholeDetailPage() {
       }
       metaDesc.setAttribute('content', descriptionText);
 
-      // Add JSON-LD structured data
       const structuredData = {
-        "@context": "https://schema.org",
-        "@type": "TouristAttraction",
-        "name": `${manhole.prefecture}${municipality}のポケふた`,
-        "description": pokemonList
+        '@context': 'https://schema.org',
+        '@type': 'TouristAttraction',
+        name: `${manhole.prefecture}${municipality}のポケふた`,
+        description: pokemonList
           ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホールです。`
           : `${manhole.prefecture}${municipality}にあるポケモンマンホールです。`,
-        "geo": manhole.latitude && manhole.longitude ? {
-          "@type": "GeoCoordinates",
-          "latitude": manhole.latitude,
-          "longitude": manhole.longitude
-        } : undefined,
-        "url": `https://pokefuta.com/manhole/${manhole.id}`
+        geo:
+          manhole.latitude && manhole.longitude
+            ? { '@type': 'GeoCoordinates', latitude: manhole.latitude, longitude: manhole.longitude }
+            : undefined,
+        url: `https://pokefuta.com/manhole/${manhole.id}`,
       };
 
       let script = document.querySelector('script[type="application/ld+json"]');
@@ -192,23 +188,18 @@ export default function ManholeDetailPage() {
 
   const getCommentUserLabel = (comment: ManholeComment) => {
     const name = comment.user.display_name;
-    if (name && name.trim().length > 0) return name;
-    return '名無し';
+    return name?.trim() || '名無し';
   };
 
-  const getCommentUserInitial = (comment: ManholeComment) => {
-    const label = getCommentUserLabel(comment);
-    return label?.[0]?.toUpperCase() || 'U';
-  };
+  const getCommentUserInitial = (comment: ManholeComment) =>
+    getCommentUserLabel(comment)?.[0]?.toUpperCase() || 'U';
 
   const loadCurrentUser = async () => {
     try {
       const response = await fetch('/api/auth/session');
       if (response.ok) {
         const data = await response.json();
-        if (data.authenticated && data.user?.id) {
-          setCurrentUserId(data.user.id);
-        }
+        if (data.authenticated && data.user?.id) setCurrentUserId(data.user.id);
       }
     } catch (err) {
       console.error('Failed to load current user:', err);
@@ -222,11 +213,12 @@ export default function ManholeDetailPage() {
         const data = await response.json();
         const manholesList: Manhole[] = data.manholes || [];
         const foundManhole = manholesList.find((m: Manhole) => m.id.toString() === id);
-
         if (foundManhole) {
           setManhole(foundManhole);
           const prefTotal = manholesList.filter((m) => m.prefecture === foundManhole.prefecture).length;
-          setPrefectureDex((prev) => prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal });
+          setPrefectureDex((prev) =>
+            prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal }
+          );
         } else {
           setError('マンホールが見つかりませんでした');
         }
@@ -246,13 +238,15 @@ export default function ManholeDetailPage() {
       const res = await fetch('/api/visits?limit=1000');
       if (!res.ok) return;
       const data = await res.json();
-      const visits: Array<{ manhole?: { prefecture?: string; id?: number } }> = Array.isArray(data.visits) ? data.visits : [];
-      const visitedManholeIds = new Set<number>(
+      const visits: Array<{ manhole?: { prefecture?: string; id?: number } }> = Array.isArray(data.visits)
+        ? data.visits
+        : [];
+      const visitedIds = new Set<number>(
         visits
           .filter((v: any) => v.manhole?.prefecture === prefecture && v.manhole?.id)
           .map((v: any) => v.manhole.id as number)
       );
-      setPrefectureDex({ current: visitedManholeIds.size, total });
+      setPrefectureDex({ current: visitedIds.size, total });
     } catch {
       // keep defaults
     }
@@ -263,9 +257,7 @@ export default function ManholeDetailPage() {
       const response = await fetch(`/api/image-upload?manhole_id=${id}`);
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.images) {
-          setPhotos(data.images);
-        }
+        if (data.success && data.images) setPhotos(data.images);
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
@@ -283,8 +275,7 @@ export default function ManholeDetailPage() {
       } else {
         setCommentsError(data.error || 'コメントの読み込みに失敗しました');
       }
-    } catch (err) {
-      console.error('Failed to load manhole comments:', err);
+    } catch {
       setCommentsError('コメントの読み込み中にエラーが発生しました');
     } finally {
       setCommentsLoading(false);
@@ -293,34 +284,23 @@ export default function ManholeDetailPage() {
 
   const handleSubmitManholeComment = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!currentUserId) return;
-    if (!newManholeComment.trim()) return;
-
+    if (!currentUserId || !newManholeComment.trim()) return;
     if (newManholeComment.length > 1000) {
       setCommentsError('コメントは1000文字以内で入力してください');
       return;
     }
-
     const manholeId = params.id;
     if (!manholeId) return;
-
     setCommentsSubmitting(true);
     setCommentsError(null);
     try {
       const response = await fetch(`/api/manholes/${manholeId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: newManholeComment.trim(),
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newManholeComment.trim() }),
       });
-
       const data = await response.json();
       if (response.ok && data.success) {
-        // APIが古い順（ascending）なので末尾に追加
         setManholeComments((prev) => [...prev, data.comment]);
         setNewManholeComment('');
       } else if (response.status === 401) {
@@ -328,8 +308,7 @@ export default function ManholeDetailPage() {
       } else {
         setCommentsError(data.error || 'コメントの投稿に失敗しました');
       }
-    } catch (err) {
-      console.error('Failed to post manhole comment:', err);
+    } catch {
       setCommentsError('コメントの投稿中にエラーが発生しました');
     } finally {
       setCommentsSubmitting(false);
@@ -337,15 +316,16 @@ export default function ManholeDetailPage() {
   };
 
   const handleManholeClick = (clickedManhole: Manhole) => {
-    // Navigate to the clicked manhole's detail page
     router.push(`/manhole/${clickedManhole.id}`);
   };
 
   const openInMaps = () => {
-    if (manhole && manhole.latitude && manhole.longitude) {
+    if (manhole?.latitude && manhole?.longitude) {
       trackRouteOpen({ manhole_id: manhole.id, prefecture: manhole.prefecture });
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
-      window.open(url, '_blank');
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`,
+        '_blank'
+      );
     }
   };
 
@@ -357,38 +337,32 @@ export default function ManholeDetailPage() {
 
   const handleDeleteConfirm = async () => {
     if (!selectedPhotoId || !selectedVisitId) return;
-
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/visits/${selectedVisitId}`, {
-        method: 'DELETE',
-      });
-
+      const response = await fetch(`/api/visits/${selectedVisitId}`, { method: 'DELETE' });
       const data = await response.json();
-
       if (response.ok && data.success) {
         trackVisitDelete({ manhole_id: manhole?.id });
-        // 成功: 写真リストから削除
-        const deletedPhotoIds = new Set<string>(data.photo_ids || [selectedPhotoId]);
-        const updatedPhotos = photos.filter(p => !deletedPhotoIds.has(p.id));
+        const deletedIds = new Set<string>(data.photo_ids || [selectedPhotoId]);
+        const updatedPhotos = photos.filter((p) => !deletedIds.has(p.id));
         setPhotos(updatedPhotos);
+        setSelectedPhotoIdx(0);
         setDeleteModalOpen(false);
         setSelectedPhotoId(null);
         setSelectedVisitId(null);
-
-        // 成功メッセージ
-        if (updatedPhotos.length === 0) {
-          alert(data.visit_deleted ? '写真と訪問記録を削除しました。このマンホールの写真はすべて削除されました。' : '写真を削除しました。このマンホールの写真はすべて削除されました。');
-        } else {
-          alert(data.visit_deleted ? '写真と訪問記録を削除しました' : '写真を削除しました');
-        }
+        alert(
+          data.visit_deleted
+            ? updatedPhotos.length === 0
+              ? '写真と訪問記録を削除しました。このマンホールの写真はすべて削除されました。'
+              : '写真と訪問記録を削除しました'
+            : updatedPhotos.length === 0
+            ? '写真を削除しました。このマンホールの写真はすべて削除されました。'
+            : '写真を削除しました'
+        );
       } else {
-        // エラー
-        console.error('Failed to delete photo:', data);
         alert(`削除に失敗しました: ${data.error || '不明なエラー'}`);
       }
-    } catch (error) {
-      console.error('Error deleting photo:', error);
+    } catch {
       alert('削除中にエラーが発生しました');
     } finally {
       setIsDeleting(false);
@@ -415,22 +389,14 @@ export default function ManholeDetailPage() {
     const shareUrl = shareablePhoto
       ? `${SITE_URL}/p/${shareablePhoto.id}`
       : `${SITE_URL}/manhole/${manhole.id}`;
-    return {
-      shareText,
-      shareUrl,
-      hashtags: titleHashtags,
-      analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture },
-    };
+    return { shareText, shareUrl, hashtags: titleHashtags, analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture } };
   }, [manhole, photos, currentUserId]);
-
 
   if (loading) {
     return (
       <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
-        <div className="text-center">
-          <div className="font-pixelJp text-[#7B63A8]">
-            読み込み中<span className="rpg-loading"></span>
-          </div>
+        <div className="font-pixelJp text-[#7B63A8]">
+          読み込み中<span className="rpg-loading" />
         </div>
       </div>
     );
@@ -439,33 +405,17 @@ export default function ManholeDetailPage() {
   if (error || !manhole) {
     return (
       <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
-        {/* Header */}
         <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.back()}
-                className="rpg-button p-2"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="font-pixelJp text-base text-rpg-yellow" style={{
-                textShadow: '2px 2px 0 #34495E'
-              }}>ポケふた詳細</h1>
-            </div>
-          </div>
+          <button onClick={() => router.back()} className="rpg-button p-2">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
         </div>
-
-        {/* Error State */}
         <div className="flex items-center justify-center min-h-[60vh] p-4">
           <div className="rpg-window text-center">
             <MapPin className="w-16 h-16 text-rpg-textDark opacity-50 mx-auto mb-4" />
             <h2 className="font-pixelJp text-lg text-rpg-textDark mb-2">エラー</h2>
             <p className="font-pixelJp text-sm text-rpg-textDark opacity-70 mb-4">{error}</p>
-            <button
-              onClick={() => router.push('/nearby')}
-              className="rpg-button rpg-button-primary"
-            >
+            <button onClick={() => router.push('/nearby')} className="rpg-button rpg-button-primary">
               <span className="font-pixelJp">近くを探す</span>
             </button>
           </div>
@@ -474,19 +424,215 @@ export default function ManholeDetailPage() {
     );
   }
 
+  // ── Derived photo state ────────────────────────────────────────────
+  const isLoggedIn = currentUserId !== null;
+  const myPhotos = isLoggedIn ? photos.filter((p) => p.visit?.user_id === currentUserId) : [];
+  const commPhotos = photos.filter(
+    (p) => p.visit?.is_public === true && (!isLoggedIn || p.visit?.user_id !== currentUserId)
+  );
+  const allDisplayPhotos = [...myPhotos, ...commPhotos];
+  const photoState: 'none' | 'mine' | 'community' =
+    photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
+  const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
+  const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
+  const municipality = manhole.city || manhole.municipality || '場所未設定';
   const titleBadges = getSortedTitles(manhole.titles);
 
+  // ── PromptCard (two copies: SP inline + PC rail) ────────────────────
+  // PCShell renders `rail` on mobile BEFORE children (above gallery).
+  // To avoid that, wrap the rail in `hidden lg:block` to suppress mobile;
+  // the inline copy (below title, `lg:hidden`) serves SP instead.
+  const promptCardContent = (
+    <div
+      className="overflow-hidden rounded-[18px] shadow-sm"
+      style={{
+        border: photoState === 'mine' && isLoggedIn ? '1.5px solid #c7e6d3' : '1.5px solid #efd9a3',
+        background: '#fffdf7',
+      }}
+    >
+      {/* Ribbon */}
+      <div
+        className="flex items-center gap-2.5 px-[14px] py-[11px]"
+        style={{
+          background:
+            photoState === 'mine' && isLoggedIn
+              ? 'linear-gradient(100deg,#e2f2e9,#eaf6ee)'
+              : 'linear-gradient(100deg,#fdeae2,#fdf1e6)',
+        }}
+      >
+        {photoState === 'mine' && isLoggedIn ? (
+          <Trophy className="h-4 w-4 shrink-0 text-[#1f9d63]" strokeWidth={2.2} />
+        ) : photoState === 'none' ? (
+          <Flag className="h-4 w-4 shrink-0 text-[#bf5640]" strokeWidth={2.4} />
+        ) : (
+          <ImageIcon className="h-4 w-4 shrink-0 text-[#bf5640]" strokeWidth={2.2} />
+        )}
+        <span
+          className="min-w-0 flex-1 font-pixelJp text-[12.5px] font-bold"
+          style={{ color: photoState === 'mine' && isLoggedIn ? '#1c6e49' : '#7d4536' }}
+        >
+          {photoState === 'none'
+            ? 'まだ誰も投稿していない'
+            : photoState === 'mine' && isLoggedIn
+            ? 'あなたの記録済み'
+            : isLoggedIn
+            ? 'あなたはまだ未記録'
+            : 'あなたの記録を残そう'}
+        </span>
+        {photoState === 'none' && (
+          <span className="ml-auto flex shrink-0 items-baseline gap-1">
+            <span className="font-['Outfit'] text-[15px] font-black text-[#9b917e]">0人</span>
+            <span className="text-[#d6b8a8] text-sm">›</span>
+            <span className="font-['Outfit'] text-[18px] font-black text-[#bf5640]">#1</span>
+          </span>
+        )}
+        {photoState === 'mine' && isLoggedIn && prefectureDex && (
+          <span className="ml-auto shrink-0 font-['Outfit'] text-[14px] font-black text-[#1f9d63]">
+            1 / {prefectureDex.total} 達成
+          </span>
+        )}
+        {photoState === 'community' && isLoggedIn && (
+          <span className="ml-auto flex shrink-0 items-baseline gap-0.5">
+            <span className="font-['Outfit'] text-[20px] font-black text-[#bf5640]">0</span>
+            <span className="font-['Outfit'] text-xs font-bold text-[#9b917e]">/1 図鑑</span>
+          </span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col gap-[11px] p-[14px]">
+        {/* Heading */}
+        <div className="flex items-center gap-2">
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px]"
+            style={{ background: photoState === 'mine' && isLoggedIn ? '#d6efdf' : '#fde2c2' }}
+          >
+            <Trophy
+              className="h-4 w-4"
+              style={{ color: photoState === 'mine' && isLoggedIn ? '#1f9d63' : '#b87d0a' }}
+              strokeWidth={2.2}
+            />
+          </span>
+          <span className="font-pixelJp text-[13.5px] font-bold">
+            {photoState === 'mine' && isLoggedIn ? 'この場所はコンプリート' : '撮ると写真図鑑も埋まる'}
+          </span>
+        </div>
+
+        {/* Dex */}
+        {!isLoggedIn ? (
+          <div className="flex items-center gap-2.5 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-[11px]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[#ece9fb]">
+              <Lock className="h-3.5 w-3.5 text-[#6a5fc4]" strokeWidth={2.1} />
+            </span>
+            <p className="font-pixelJp text-xs font-semibold leading-snug text-[#6f6657]">
+              ログインすると<strong className="text-[#2c2a26]">あなたの写真図鑑</strong>に記録されます
+            </p>
+          </div>
+        ) : photoState === 'mine' ? (
+          <div className="flex items-center gap-3 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-[11px]">
+            <div className="flex-1">
+              <p className="font-pixelJp text-[11.5px] font-semibold text-[#6f6657]">
+                {manhole.prefecture} 写真図鑑
+              </p>
+              <p className="font-['Outfit'] text-[18px] font-black leading-tight text-[#1f9d63]">
+                1{' '}
+                <span className="text-[13px] font-semibold text-[#9b917e]">
+                  / {prefectureDex?.total ?? '?'}
+                </span>
+              </p>
+            </div>
+            <span className="flex items-center gap-1.5 font-pixelJp text-[11.5px] font-bold text-[#1f9d63]">
+              <Trophy className="h-3.5 w-3.5" strokeWidth={2.2} />記録済み
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-[11px]">
+            <div className="flex-1">
+              <p className="font-pixelJp text-[11.5px] font-semibold text-[#6f6657]">
+                {manhole.prefecture} 写真図鑑
+              </p>
+              <p className="font-['Outfit'] text-[18px] font-black leading-tight">
+                {prefectureDex?.current ?? 0}
+                <span className="text-[#9b917e] text-[13px]"> → </span>
+                <span className="text-[#bf5640]">{(prefectureDex?.current ?? 0) + 1}</span>
+                <span className="text-[13px] font-semibold text-[#9b917e]">
+                  {' '}/ {prefectureDex?.total ?? '?'}
+                </span>
+              </p>
+            </div>
+            <div className="h-8 w-px bg-[#e9dfc7]" />
+            <div className="text-center">
+              <p className="font-['Outfit'] text-[20px] font-black leading-none text-[#1f9d63]">+1</p>
+              <p className="mt-0.5 font-pixelJp text-[10px] font-semibold text-[#9b917e]">シリーズ進捗</p>
+            </div>
+          </div>
+        )}
+
+        {/* CTA */}
+        {photoState === 'mine' && isLoggedIn ? (
+          <button
+            type="button"
+            onClick={() => router.push('/upload')}
+            className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#ecccc1] bg-white py-3 font-pixelJp text-sm font-bold text-[#bf5640] transition-colors hover:bg-[#fdeae2]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            別の構図を追加する
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
+            className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] py-3 font-pixelJp text-sm font-bold text-white shadow-[0_2px_0_#a8462f] transition-colors hover:bg-[#a84b36]"
+          >
+            {!isLoggedIn ? (
+              <Lock className="h-4 w-4" strokeWidth={2} />
+            ) : photoState === 'none' ? (
+              <Flag className="h-4 w-4" strokeWidth={2.5} />
+            ) : (
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+            )}
+            {!isLoggedIn
+              ? photoState === 'none'
+                ? 'ログインして一番乗り'
+                : 'ログインして投稿する'
+              : photoState === 'none'
+              ? '一番乗りで投稿する'
+              : 'あなたの1枚を加える'}
+          </button>
+        )}
+
+        {/* Hints */}
+        {photoState === 'mine' && isLoggedIn && (
+          <p className="flex items-center gap-2 font-pixelJp text-[11.5px] leading-snug text-[#9b917e]">
+            <Users className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            季節や時間帯を変えた1枚が、この場所の魅力をもっと伝えます。
+          </p>
+        )}
+        {!isLoggedIn && (
+          <p className="flex items-center gap-1.5 font-pixelJp text-[11.5px] text-[#9b917e]">
+            <Sparkles className="h-3 w-3 shrink-0" strokeWidth={2} />
+            ログインは無料・30秒。スタンプ帳もそのまま使えます。
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
+  // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
+  const promptCard = <div className="hidden lg:block">{promptCardContent}</div>;
+
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
+    <div className="min-h-screen safe-area-inset bg-[#f1e8d4]">
+      {/* Mobile header */}
       <div className="lg:hidden">
         <Header
-          title={`${manhole.city || manhole.municipality}のポケふた`}
+          title={`${municipality}のポケふた`}
           actions={
             <button
               onClick={() => router.back()}
               className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
               aria-label="戻る"
-              title="戻る"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -494,216 +640,400 @@ export default function ManholeDetailPage() {
         />
       </div>
 
-      <PCShell active="search" className="pb-32 pt-4 lg:pt-6">
-      <div className="space-y-5 max-w-2xl lg:max-w-none">
+      <PCShell active="search" className="pb-32 pt-4 lg:pt-6" rail={promptCard}>
+        <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
 
-        {/* PhotoPrompt Hero */}
-        {(() => {
-          const viewerPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
-          const firstPublicPhoto = photos.find(p => p.visit?.is_public === true);
-          const heroPhoto = viewerPhoto || firstPublicPhoto;
-          const photoCount = photos.length;
-          const viewerHasPhoto = Boolean(viewerPhoto);
-
-          return (
-            <div className="overflow-hidden rounded-[18px] border border-[#e9dfc7] bg-[#fffdf7] shadow-sm">
-              {heroPhoto ? (
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <img
-                    src={`/api/photo/${heroPhoto.id}?size=small`}
-                    alt={viewerHasPhoto ? 'あなたの訪問写真' : '訪問写真'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                  {viewerHasPhoto ? (
-                    <div className="absolute top-3 right-3 rounded-full bg-[#1f9d63] px-3 py-1 font-pixelJp text-xs font-bold text-white">
-                      ✓ 訪問済み
-                    </div>
-                  ) : (
-                    <div className="absolute bottom-4 left-4">
-                      <p className="font-pixelJp text-sm font-bold text-white drop-shadow">あなたの構図を加えよう</p>
-                      <p className="font-pixelJp text-xs text-white/80">{photoCount}人が訪問</p>
-                    </div>
-                  )}
+          {/* ── Gallery ── */}
+          {photoState === 'none' ? (
+            <div
+              className="relative overflow-hidden rounded-[18px] border-2 border-dashed border-[#cdbf9f]"
+              style={{
+                background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)',
+                minHeight: 210,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div className="text-center">
+                <div className="font-['Outfit'] text-[44px] font-black leading-none text-[#cdbb92]">0</div>
+                <div className="mt-2 font-pixelJp text-sm font-bold text-[#6f6657]">
+                  この場所の写真はまだ0枚
                 </div>
-              ) : (
-                <div className="relative flex min-h-[188px] items-center justify-center bg-gradient-to-b from-[#efe6cf] to-[#e2d5be]">
-                  <div className="text-center">
-                    <div className="select-none font-pixel text-[72px] font-bold leading-none text-[#bf5640]/25">0</div>
-                    <div className="mt-2 inline-block rounded-full bg-[#bf5640] px-3 py-1 font-pixelJp text-xs font-bold text-white shadow-sm">
-                      一番乗りチャンス
-                    </div>
-                  </div>
-                  <div className="absolute top-3 right-3 rounded-full border border-[#e9dfc7] bg-white/90 px-3 py-1 font-pixelJp text-xs font-bold text-[#8C6A4A] backdrop-blur-sm">
-                    未訪問
-                  </div>
+                <div className="mt-1 font-pixelJp text-xs font-bold text-[#bf5640]">
+                  あなたが最初の記録者に
                 </div>
-              )}
-
-              <div className="p-5">
-                <div className="mb-1 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-[#bf5640]" />
-                  <span className="font-pixelJp text-xs text-[#6A4D36]">
-                    {manhole.prefecture} / {manhole.city || manhole.municipality}
-                  </span>
-                </div>
-                <h2 className="mb-1 font-pixelJp text-xl font-bold leading-tight text-[#4F3828]">
-                  {manhole.prefecture}{manhole.city || manhole.municipality}のポケふた
-                </h2>
-                {manhole.pokemons && manhole.pokemons.length > 0 && (
-                  <p className="mb-4 font-pixelJp text-sm text-[#6A4D36]">
-                    {manhole.pokemons.join('・')}が描かれたポケモンマンホール
-                  </p>
-                )}
-
-                {!viewerHasPhoto && (
-                  <div className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded-[8px] bg-[#fde2c2] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#9a5a1e]">🏆 撮ると写真図鑑も埋まる</span>
-                    </div>
-                    {prefectureDex ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#6A4D36', fontWeight: 600 }}>
-                            {manhole.prefecture} 写真図鑑
-                          </p>
-                          <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 18, lineHeight: 1.2, color: '#2c2a26' }}>
-                            {prefectureDex.current}{' '}
-                            <span style={{ color: '#c5b89e', fontSize: 14 }}>→</span>{' '}
-                            <span style={{ color: '#bf5640' }}>{prefectureDex.current + 1}</span>
-                            <span style={{ color: '#c5b89e', fontSize: 13, fontWeight: 600 }}> / {prefectureDex.total}</span>
-                          </p>
-                        </div>
-                        <div style={{ width: 1, background: '#e9dfc7', alignSelf: 'stretch' }} />
-                        <div className="text-center" style={{ minWidth: 48 }}>
-                          <p style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontWeight: 800, fontSize: 20, color: '#1f9d63', lineHeight: 1 }}>+1</p>
-                          <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', fontWeight: 600, marginTop: 2 }}>シリーズ進捗</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="font-pixelJp text-xs text-[#6A4D36]">
-                        撮ると写真図鑑が埋まります
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {viewerHasPhoto && manhole.last_visit && (
-                  <div className="mb-4 flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-[#bf5640]" />
-                    <span className="font-pixelJp text-xs text-[#6A4D36]">
-                      {new Date(manhole.last_visit).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </span>
-                  </div>
-                )}
-
-                {(() => {
-                  const userPhoto = photos.find(p => currentUserId && p.visit?.user_id === currentUserId);
-                  return userPhoto?.visit?.comment ? (
-                    <p className="mb-4 rounded-[14px] border border-[#e9dfc7] bg-[#efe6cf]/60 p-3 font-pixelJp text-sm leading-relaxed text-[#4F3828]">
-                      {userPhoto.visit.comment}
-                    </p>
-                  ) : null;
-                })()}
-
-                {titleBadges.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-1.5">
-                    {titleBadges.map((title, idx) => (
-                      <span
-                        key={title.key}
-                        className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
-                      >
-                        {title.emoji || '★'} {title.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {!viewerHasPhoto && (
-                  <button
-                    onClick={() => router.push(currentUserId ? '/upload' : '/login?redirect=/upload')}
-                    className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] py-3 font-pixelJp text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#a84b36]"
-                  >
-                    <Camera className="h-4 w-4" />
-                    {photoCount === 0 ? '一番乗りで投稿する' : 'あなたの1枚を加える'}
-                  </button>
-                )}
+              </div>
+              <div className="absolute left-3 top-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ead9a8] bg-[rgba(255,247,229,0.94)] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#9a6d05] shadow-sm">
+                  <Flag className="h-3 w-3 text-[#bf8a17]" strokeWidth={2.4} />
+                  一番乗りチャンス
+                </span>
               </div>
             </div>
-          );
-        })()}
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* Featured */}
+              <div
+                className="relative overflow-hidden rounded-[18px] border border-[#e9dfc7] shadow-sm"
+                style={{ height: 232 }}
+              >
+                {featuredPhoto && (
+                  <img
+                    src={`/api/photo/${featuredPhoto.id}?size=small`}
+                    alt="ポケふた写真"
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+                {/* top-left: community count */}
+                <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
+                  <ImageIcon className="h-3 w-3" strokeWidth={2.2} />
+                  みんなの写真 {commPhotos.length}枚
+                </span>
+                {/* top-right: mine / 未投稿 */}
+                {isLoggedIn &&
+                  (featuredPhoto?.visit?.user_id === currentUserId ? (
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#1f9d63] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
+                      あなたの写真
+                    </span>
+                  ) : (
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#bf5640] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
+                      あなたは未投稿
+                    </span>
+                  ))}
+                {/* caption */}
+                {featuredPhoto && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/62 to-transparent px-3 pb-2.5 pt-7">
+                    <div className="flex items-center gap-2 text-white">
+                      <span className="text-xs font-bold">
+                        {featuredPhoto.visit?.user_id === currentUserId
+                          ? 'あなたの1枚'
+                          : `@${getPhotoUserLabel(featuredPhoto)}`}
+                      </span>
+                      {featuredPhoto.visit?.shot_at && (
+                        <span className="ml-auto font-['Outfit'] text-[11px] opacity-90">
+                          {formatPhotoDate(featuredPhoto.visit.shot_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-        <hr className="border-[#e9dfc7]" />
+              {/* Thumbnail strips */}
+              <div className="flex flex-col gap-3">
+                {/* Your photos */}
+                {isLoggedIn && myPhotos.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <Camera className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                      <span className="font-pixelJp text-[13px] font-bold">あなたの写真</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {myPhotos.map((p, i) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedPhotoIdx(i)}
+                          className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[11px]"
+                          style={{
+                            border:
+                              featuredPhoto?.id === p.id
+                                ? '2.5px solid #bf5640'
+                                : '2px solid #1f9d63',
+                          }}
+                        >
+                          <img
+                            src={`/api/photo/${p.id}?size=small`}
+                            alt="あなたの写真"
+                            className="h-full w-full object-cover"
+                          />
+                          <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1f9d63]">
+                            <Camera className="h-2.5 w-2.5 text-white" strokeWidth={2.4} />
+                          </span>
+                        </button>
+                      ))}
+                      {/* add slot */}
+                      <button
+                        type="button"
+                        onClick={() => router.push('/upload')}
+                        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
+                        style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
+                      >
+                        <Plus className="h-4.5 w-4.5 text-[#bf5640]" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-        {manhole.building && (
-          <div className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
-            <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-[#bf5640]" />
-            <div>
-              <p className="mb-1 font-pixelJp text-[11px] font-bold text-[#8C6A4A]">建物・目印</p>
-              <p className="font-pixelJp text-sm font-bold leading-relaxed text-[#4F3828]">{manhole.building}</p>
+                {/* Community photos */}
+                <div>
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                    <span className="font-pixelJp text-[13px] font-bold">みんなの写真</span>
+                    <span className="font-['Outfit'] text-xs font-bold text-[#9b917e]">
+                      {commPhotos.length}枚
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {commPhotos.map((p, i) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPhotoIdx(myPhotos.length + i)}
+                        title={`@${getPhotoUserLabel(p)}`}
+                        className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[11px]"
+                        style={{
+                          border:
+                            featuredPhoto?.id === p.id
+                              ? '2.5px solid #bf5640'
+                              : '1px solid #e9dfc7',
+                        }}
+                      >
+                        <img
+                          src={`/api/photo/${p.id}?size=small`}
+                          alt={`@${getPhotoUserLabel(p)}`}
+                          className="h-full w-full object-cover"
+                        />
+                        {/* delete own photo */}
+                        {p.visit?.user_id === currentUserId && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(p.id, p.visit?.id); }}
+                            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
+                            title="削除"
+                          >
+                            <span className="text-[9px] leading-none">×</span>
+                          </button>
+                        )}
+                      </button>
+                    ))}
+                    {/* add slot when no own photos */}
+                    {(!isLoggedIn || myPhotos.length === 0) && (
+                      <button
+                        type="button"
+                        onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
+                        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
+                        style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
+                      >
+                        {isLoggedIn ? (
+                          <Plus className="h-[18px] w-[18px] text-[#bf5640]" strokeWidth={2.5} />
+                        ) : (
+                          <Lock className="h-4 w-4 text-[#bcae8e]" strokeWidth={2} />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {manhole.pokemons && manhole.pokemons.length > 0 && (
+          {/* ── Title block ── */}
           <div>
-            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">登場ポケモン</h3>
-            <div className="flex flex-wrap gap-2">
-              {manhole.pokemons.map((pokemon, index) => (
+            <div className="mb-1 flex items-center gap-1.5 font-pixelJp text-xs font-semibold text-[#6f6657]">
+              <MapPin className="h-3.5 w-3.5 text-[#bf5640]" strokeWidth={2.2} />
+              {manhole.prefecture} / {municipality}
+            </div>
+            <h2 className="font-pixelJp text-xl font-bold leading-tight text-[#2c2a26]">
+              {manhole.prefecture}{municipality}のポケふた
+            </h2>
+            {photoState === 'community' && isLoggedIn && (
+              <p className="mt-1 font-pixelJp text-[13px] font-bold text-[#bf5640]">
+                あなたの構図で塗り替える
+              </p>
+            )}
+            {manhole.pokemons && manhole.pokemons.length > 0 && (
+              <p className="mt-1.5 font-pixelJp text-sm leading-relaxed text-[#6f6657]">
+                {manhole.pokemons.join('・')}が描かれたポケモンマンホール
+              </p>
+            )}
+            {photoState === 'mine' && myPhotos[0]?.visit?.comment && (
+              <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-3">
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
+                <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">
+                  {myPhotos[0].visit.comment}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── PromptCard (SP only — lg:hidden) ── */}
+          <div className="lg:hidden">{promptCardContent}</div>
+
+          {/* ── Rarity pills ── */}
+          {photoState === 'community' && isLoggedIn ? (
+            <div className="flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdeae2] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#bf5640]">
+                <Star className="h-3 w-3" strokeWidth={2} />夜・雪の構図はまだ無い
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ece9fb] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#6a5fc4]">
+                <Trophy className="h-3 w-3" strokeWidth={2} />ベスト写真を狙える
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e2f2e9] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#1f9d63]">
+                <Sparkles className="h-3 w-3" strokeWidth={2} />あなたの季節を残す
+              </span>
+            </div>
+          ) : titleBadges.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {titleBadges.map((title, idx) => (
                 <span
-                  key={index}
-                  className="rounded-full border border-[#e9dfc7] bg-white px-3 py-1 font-pixelJp text-xs font-bold text-[#4F3828]"
+                  key={title.key}
+                  className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
                 >
-                  {pokemon}
+                  {title.emoji || '★'} {title.label}
                 </span>
               ))}
             </div>
-          </div>
-        )}
+          ) : null}
 
-        <div>
-          <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">場所</h3>
-          <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7]">
-            <div className="h-[130px]">
-              <MapComponent
-                center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
-                manholes={[manhole]}
-                onManholeClick={handleManholeClick}
-                userLocation={null}
+          <hr className="border-[#e9dfc7]" />
+
+          {/* ── Building ── */}
+          {manhole.building && (
+            <div className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
+              <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-[#eef2f7]">
+                <Building2 className="h-5 w-5 text-[#5b667b]" strokeWidth={2} />
+              </span>
+              <div>
+                <p className="font-pixelJp text-[11px] font-bold text-[#9b917e]">建物・目印</p>
+                <p className="mt-0.5 font-pixelJp text-sm font-bold leading-snug text-[#2c2a26]">
+                  {manhole.building}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Pokemon ── */}
+          {manhole.pokemons && manhole.pokemons.length > 0 && (
+            <div>
+              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+                <Sparkles className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                登場ポケモン
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {manhole.pokemons.map((pokemon, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white px-3 py-1.5 font-pixelJp text-xs font-bold text-[#6f6657]"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#f6e4b6] text-[10px]">
+                      ◓
+                    </span>
+                    {pokemon}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Map ── */}
+          <div>
+            <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+              <MapPin className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+              場所
+            </h3>
+            <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7]">
+              <div className="h-[140px]">
+                <MapComponent
+                  center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
+                  manholes={[manhole]}
+                  onManholeClick={handleManholeClick}
+                  userLocation={null}
+                />
+              </div>
+              <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
+                <button
+                  onClick={openInMaps}
+                  className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1f9d63] py-2.5 font-pixelJp text-sm font-bold text-white transition-colors hover:bg-[#1a8a56]"
+                >
+                  <Navigation className="h-4 w-4" strokeWidth={2.4} />
+                  経路案内
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Share ── */}
+          {sharePayload && (
+            <div>
+              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+                <Users className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                このポケふたを共有
+              </h3>
+              <ShareButtons
+                label=""
+                shareText={sharePayload.shareText}
+                shareUrl={sharePayload.shareUrl}
+                hashtags={sharePayload.hashtags}
+                analyticsParams={sharePayload.analyticsParams}
               />
             </div>
-            <div className="border-t border-[#e9dfc7] p-3">
-              <button
-                onClick={openInMaps}
-                className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#1f9d63] bg-white py-2.5 font-pixelJp text-sm font-bold text-[#1f9d63] transition-colors hover:bg-[#1f9d63]/5"
-              >
-                <Navigation className="h-4 w-4" />
-                経路案内
-              </button>
+          )}
+
+          {/* ── Comments (preserved) ── */}
+          {(manholeComments.length > 0 || currentUserId) && (
+            <div>
+              <h3 className="mb-3 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">コメント</h3>
+              <div className="flex flex-col gap-3">
+                {commentsLoading && (
+                  <p className="font-pixelJp text-xs text-[#9b917e]">読み込み中…</p>
+                )}
+                {manholeComments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="flex gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dfe7f3] font-pixelJp text-sm font-bold text-[#6f6657]">
+                      {getCommentUserInitial(comment)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-0.5 flex items-center gap-2">
+                        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
+                          {getCommentUserLabel(comment)}
+                        </span>
+                        <span className="font-pixelJp text-[10px] text-[#9b917e]">
+                          {new Date(comment.created_at).toLocaleDateString('ja-JP')}
+                        </span>
+                      </div>
+                      <p className="font-pixelJp text-xs leading-relaxed text-[#6f6657]">
+                        {comment.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {currentUserId && (
+                  <form onSubmit={handleSubmitManholeComment} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newManholeComment}
+                      onChange={(e) => setNewManholeComment(e.target.value)}
+                      placeholder="コメントを追加…"
+                      maxLength={1000}
+                      className="flex-1 rounded-[12px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-xs text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-1 focus:ring-[#bf5640]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={commentsSubmitting || !newManholeComment.trim()}
+                      className="rounded-[12px] bg-[#bf5640] px-4 py-2 font-pixelJp text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      投稿
+                    </button>
+                  </form>
+                )}
+                {commentsError && (
+                  <p className="font-pixelJp text-xs text-[#bf5640]">{commentsError}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
-
-        {sharePayload && (
-          <div>
-            <h3 className="mb-3 font-pixelJp text-sm font-bold text-[#4F3828]">共有</h3>
-            <ShareButtons
-              label=""
-              shareText={sharePayload.shareText}
-              shareUrl={sharePayload.shareUrl}
-              hashtags={sharePayload.hashtags}
-              analyticsParams={sharePayload.analyticsParams}
-            />
-          </div>
-        )}
-
-      </div>
       </PCShell>
 
       <BottomNav />
 
-      {/* Delete Photo Modal */}
       {selectedPhotoId && (
         <DeletePhotoModal
           isOpen={deleteModalOpen}
