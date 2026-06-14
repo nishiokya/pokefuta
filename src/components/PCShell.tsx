@@ -10,7 +10,7 @@ type NavTab = 'search' | 'post' | 'stamp' | 'mytrip';
 
 const GUEST_NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
   { key: 'search', label: '探す', href: '/nearby' },
-  { key: 'post', label: '投稿', href: '/popular' },
+  { key: 'post', label: '投稿', href: '/' },
   { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
 ];
 

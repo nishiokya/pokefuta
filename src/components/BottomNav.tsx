@@ -50,7 +50,7 @@ export default function BottomNav() {
         ]
       : [
           { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
-          { href: '/popular', label: '投稿', icon: <Image className="w-6 h-6 mb-1" /> },
+          { href: '/', label: '投稿', icon: <Image className="w-6 h-6 mb-1" /> },
           { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
         ],
     [isLoggedIn]
