@@ -536,7 +536,7 @@ export default function ManholeDetailPage() {
                 {manhole.prefecture} 写真図鑑
               </p>
               <p className="font-['Outfit'] text-[18px] font-black leading-tight text-[#1f9d63]">
-                1{' '}
+                {prefectureDex?.current ?? '?'}{' '}
                 <span className="text-[13px] font-semibold text-[#9b917e]">
                   / {prefectureDex?.total ?? '?'}
                 </span>
@@ -847,14 +847,59 @@ export default function ManholeDetailPage() {
                 {manhole.pokemons.join('・')}が描かれたポケモンマンホール
               </p>
             )}
-            {photoState === 'mine' && myPhotos[0]?.visit?.comment && (
-              <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-3">
-                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
-                <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">
-                  {myPhotos[0].visit.comment}
-                </p>
-              </div>
-            )}
+            {/* featured photo details */}
+            {featuredPhoto && (() => {
+              const isOwn = featuredPhoto.visit?.user_id === currentUserId;
+              const comment = featuredPhoto.visit?.comment;
+              const shotAt = featuredPhoto.visit?.shot_at;
+              const isPublic = featuredPhoto.visit?.is_public;
+              const displayName = getPhotoUserLabel(featuredPhoto);
+              return (
+                <div className="mt-3 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] p-3 flex flex-col gap-2">
+                  {/* meta row */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {isOwn ? (
+                      <span className="inline-flex items-center gap-1 font-pixelJp text-[11.5px] font-bold text-[#1f9d63]">
+                        <Camera className="h-3 w-3" strokeWidth={2.2} />
+                        あなたの投稿
+                      </span>
+                    ) : (
+                      <span className="font-pixelJp text-[11.5px] font-bold text-[#6f6657]">
+                        @{displayName}
+                      </span>
+                    )}
+                    {shotAt && (
+                      <span className="font-['Outfit'] text-[11px] text-[#9b917e]">
+                        {formatPhotoDate(shotAt)}
+                      </span>
+                    )}
+                    {isOwn && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold"
+                        style={{ background: isPublic === false ? '#f3e8dc' : '#e2f2e9', color: isPublic === false ? '#9a5c2a' : '#1f9d63' }}
+                      >
+                        {isPublic === false ? '非公開' : '公開中'}
+                      </span>
+                    )}
+                    {isOwn && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(featuredPhoto.id, featuredPhoto.visit?.id)}
+                        className="ml-auto font-pixelJp text-[11px] font-bold text-[#bf5640] underline-offset-2 hover:underline"
+                      >
+                        この写真を削除
+                      </button>
+                    )}
+                  </div>
+                  {/* comment */}
+                  {comment && (
+                    <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">
+                      {comment}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
