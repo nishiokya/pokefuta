@@ -176,6 +176,9 @@ export async function GET() {
       latest_visit_at: null,
       posts_last_7d: null,
       posts_last_30d: null,
+      manhole_comments: null,
+      public_posts: null,
+      private_posts: null,
       source: 'unavailable',
     });
   } catch (error: unknown) {
@@ -193,6 +196,9 @@ export async function GET() {
         latest_visit_at: null,
         posts_last_7d: null,
         posts_last_30d: null,
+        manhole_comments: null,
+        public_posts: null,
+        private_posts: null,
         error: 'Failed to get site statistics',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
