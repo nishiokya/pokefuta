@@ -14,7 +14,8 @@ Steps:
   Auth users (registered) : {auth_users}
   Active users (7d login) : {active_users_7d}
   App users (active)      : {users}   ← wrote at least once; diff = signup-only users
-  Photos posted           : {posts}
+  Photos posted           : {posts} (公開: {public_posts}, 非公開: {private_posts})
+  Manhole comments        : {manhole_comments}
   Manholes total          : {manholes}
   Manholes w/ photos      : {manholes_with_photos}
 
@@ -33,6 +34,8 @@ Steps:
 
 Notes:
 - Use `jq` to parse JSON if available, otherwise parse manually.
+- Show `public_posts` and `private_posts` inline with Photos posted. If missing from response, show "N/A".
+- Show `manhole_comments` count. If missing, show "N/A".
 - If `latest_photo_at` is null, show "no photos yet".
 - Flag any anomalies:
   - `posts_last_7d == 0` → "No new photos this week"

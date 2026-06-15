@@ -648,17 +648,11 @@ export default function ManholeDetailPage() {
           {/* ── Gallery ── */}
           {photoState === 'none' ? (
             <div
-              className="relative overflow-hidden rounded-[18px] border-2 border-dashed border-[#cdbf9f]"
-              style={{
-                background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)',
-                minHeight: 210,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              className="relative overflow-hidden rounded-[16px] lg:rounded-[18px] border-2 border-dashed border-[#cdbf9f] h-[210px] lg:h-[360px] flex items-center justify-center"
+              style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)' }}
             >
               <div className="text-center">
-                <div className="font-['Outfit'] text-[44px] font-black leading-none text-[#cdbb92]">0</div>
+                <div className="font-['Outfit'] text-[44px] lg:text-[72px] font-black leading-none text-[#cdbb92]">0</div>
                 <div className="mt-2 font-pixelJp text-sm font-bold text-[#6f6657]">
                   この場所の写真はまだ0枚
                 </div>
@@ -677,14 +671,19 @@ export default function ManholeDetailPage() {
             <div className="flex flex-col gap-3">
               {/* Featured */}
               <div
-                className="relative overflow-hidden rounded-[18px] border border-[#e9dfc7] shadow-sm"
-                style={{ height: 232 }}
+                className="relative overflow-hidden rounded-[16px] lg:rounded-[18px] shadow-sm h-[300px] lg:h-[392px]"
+                style={{
+                  border: featuredPhoto?.visit?.user_id === currentUserId
+                    ? '2.5px solid #1f9d63'
+                    : '1px solid #e9dfc7',
+                  background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)',
+                }}
               >
                 {featuredPhoto && (
                   <img
                     src={`/api/photo/${featuredPhoto.id}?size=small`}
                     alt="ポケふた写真"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     loading="lazy"
                   />
                 )}
@@ -739,7 +738,7 @@ export default function ManholeDetailPage() {
                           key={p.id}
                           type="button"
                           onClick={() => setSelectedPhotoIdx(i)}
-                          className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[11px]"
+                          className="relative h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 overflow-hidden rounded-[11px]"
                           style={{
                             border:
                               featuredPhoto?.id === p.id
@@ -771,7 +770,7 @@ export default function ManholeDetailPage() {
                       <button
                         type="button"
                         onClick={() => router.push('/upload')}
-                        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
+                        className="flex h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
                         style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
                       >
                         <Plus className="h-[18px] w-[18px] text-[#bf5640]" strokeWidth={2.5} />
@@ -796,7 +795,7 @@ export default function ManholeDetailPage() {
                         type="button"
                         onClick={() => setSelectedPhotoIdx(myPhotos.length + i)}
                         title={`@${getPhotoUserLabel(p)}`}
-                        className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[11px]"
+                        className="relative h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 overflow-hidden rounded-[11px]"
                         style={{
                           border:
                             featuredPhoto?.id === p.id
@@ -816,7 +815,7 @@ export default function ManholeDetailPage() {
                       <button
                         type="button"
                         onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
-                        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
+                        className="flex h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
                         style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
                       >
                         {isLoggedIn ? (

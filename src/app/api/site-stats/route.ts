@@ -26,12 +26,18 @@ async function fetchActivityStats(admin: SupabaseClient<Database>) {
     { data: latestVisit },
     { count: posts7d },
     { count: posts30d },
+    { count: commentsCount },
+    { count: publicPhotosCount },
+    { count: privatePhotosCount },
   ] = await Promise.all([
     admin.from('photo').select('created_at').order('created_at', { ascending: false }).limit(1),
     admin.from('app_user').select('created_at').order('created_at', { ascending: false }).limit(1),
     admin.from('visit').select('shot_at').order('shot_at', { ascending: false }).limit(1),
     admin.from('photo').select('id', { head: true, count: 'exact' }).gte('created_at', ago7d),
     admin.from('photo').select('id', { head: true, count: 'exact' }).gte('created_at', ago30d),
+    admin.from('manhole_comment').select('id', { head: true, count: 'exact' }),
+    admin.from('photo').select('id, visit:visit_id!inner(is_public)', { head: true, count: 'exact' }).eq('visit.is_public', true),
+    admin.from('photo').select('id, visit:visit_id!inner(is_public)', { head: true, count: 'exact' }).eq('visit.is_public', false),
   ]);
 
   // auth.users の総件数 + 直近7日ログイン数を Admin Auth REST API から取得
@@ -84,6 +90,9 @@ async function fetchActivityStats(admin: SupabaseClient<Database>) {
     posts_last_30d: posts30d ?? 0,
     auth_users,
     active_users_7d,
+    manhole_comments: commentsCount ?? 0,
+    public_posts: publicPhotosCount ?? 0,
+    private_posts: privatePhotosCount ?? 0,
   };
 }
 
@@ -167,6 +176,9 @@ export async function GET() {
       latest_visit_at: null,
       posts_last_7d: null,
       posts_last_30d: null,
+      manhole_comments: null,
+      public_posts: null,
+      private_posts: null,
       source: 'unavailable',
     });
   } catch (error: unknown) {
@@ -184,6 +196,9 @@ export async function GET() {
         latest_visit_at: null,
         posts_last_7d: null,
         posts_last_30d: null,
+        manhole_comments: null,
+        public_posts: null,
+        private_posts: null,
         error: 'Failed to get site statistics',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
