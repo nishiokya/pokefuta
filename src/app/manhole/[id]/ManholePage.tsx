@@ -120,6 +120,7 @@ export default function ManholeDetailPage() {
     const manholeId = params.id;
     if (manholeId) {
       setSelectedPhotoIdx(0);
+      setPhotoExpanded(false);
       loadManholeDetail(manholeId as string);
       loadPhotos(manholeId as string);
       loadManholeComments(manholeId as string);
@@ -681,6 +682,7 @@ export default function ManholeDetailPage() {
                 className="relative block w-full overflow-hidden rounded-[16px] lg:rounded-[18px] shadow-sm"
                 style={{
                   aspectRatio: photoExpanded ? '3/4' : '1/1',
+                  minHeight: photoExpanded ? undefined : 300,
                   border: featuredPhoto?.visit?.user_id === currentUserId
                     ? '2.5px solid #1f9d63'
                     : '1px solid #e9dfc7',
@@ -724,7 +726,7 @@ export default function ManholeDetailPage() {
                 </span>
                 {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
-                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 10px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 10px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 11 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 700 }}>
                       {featuredPhoto.visit?.user_id === currentUserId
                         ? 'あなたの1枚'
@@ -866,15 +868,28 @@ export default function ManholeDetailPage() {
                 {manhole.pokemons.join('・')}が描かれたポケモンマンホール
               </p>
             )}
-            {/* Visit memo — sparkles card, only when user has posted */}
-            {photoState === 'mine' && (() => {
-              const ownPhoto = myPhotos[0];
-              const memo = ownPhoto?.visit?.note || ownPhoto?.visit?.comment;
-              if (!memo) return null;
+            {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
+            {featuredPhoto && (() => {
+              const isOwn = featuredPhoto.visit?.user_id === currentUserId;
+              const memo = featuredPhoto.visit?.note || featuredPhoto.visit?.comment;
+              const isPublic = featuredPhoto.visit?.is_public;
+              if (!memo && !isOwn) return null;
               return (
                 <div className="mt-3 flex items-start gap-2.5 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] px-[13px] py-[11px]">
                   <Sparkles className="mt-0.5 h-[15px] w-[15px] shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
-                  <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
+                  <div className="flex-1 min-w-0">
+                    {memo && (
+                      <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
+                    )}
+                    {isOwn && (
+                      <span
+                        className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold"
+                        style={{ background: isPublic === false ? '#f3e8dc' : '#e2f2e9', color: isPublic === false ? '#9a5c2a' : '#1f9d63' }}
+                      >
+                        {isPublic === false ? '非公開' : '公開中'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })()}
