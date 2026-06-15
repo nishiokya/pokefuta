@@ -726,7 +726,7 @@ export default function ManholeDetailPage() {
                 </span>
                 {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
-                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 10px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 11 }}>
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 44px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 700 }}>
                       {featuredPhoto.visit?.user_id === currentUserId
                         ? 'あなたの1枚'
@@ -871,7 +871,7 @@ export default function ManholeDetailPage() {
             {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
             {featuredPhoto && (() => {
               const isOwn = featuredPhoto.visit?.user_id === currentUserId;
-              const memo = featuredPhoto.visit?.note || featuredPhoto.visit?.comment;
+              const memo = (isOwn ? featuredPhoto.visit?.note : undefined) || featuredPhoto.visit?.comment;
               const isPublic = featuredPhoto.visit?.is_public;
               if (!memo && !isOwn) return null;
               return (
