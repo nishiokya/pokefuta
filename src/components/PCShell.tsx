@@ -3,14 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Info, LogOut, UserPlus } from 'lucide-react';
+import { Camera, Info, LogOut, UserPlus } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
 type NavTab = 'search' | 'post' | 'stamp' | 'mytrip';
 
 const GUEST_NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
   { key: 'search', label: '探す', href: '/nearby' },
-  { key: 'post', label: '投稿', href: '/' },
   { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
 ];
 
@@ -174,6 +173,32 @@ function PCTopNav({ active }: PCTopNavProps) {
       >
         X
       </a>
+
+      {/* 投稿する */}
+      {isLoggedIn && (
+        <Link
+          href="/upload"
+          aria-current={pathname === '/upload' || pathname.startsWith('/upload/') ? 'page' : undefined}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: '#bf5640',
+            color: '#fff',
+            borderRadius: 999,
+            padding: '9px 18px 9px 15px',
+            fontFamily: ROUND,
+            fontWeight: 800,
+            fontSize: 14,
+            textDecoration: 'none',
+            boxShadow: '0 2px 0 #a8462f, 0 7px 18px rgba(191,86,64,.38), 0 0 0 3px rgba(191,86,64,.13)',
+            flexShrink: 0,
+            opacity: pathname === '/upload' || pathname.startsWith('/upload/') ? 0.7 : 1,
+          }}
+        >
+          <Camera size={17} strokeWidth={2.5} />投稿する
+        </Link>
+      )}
 
       {/* ユーザー */}
       {authLoaded && (

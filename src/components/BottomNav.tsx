@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, CircleDot, Image, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen, Camera, CircleDot, Search } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -15,7 +15,7 @@ function isActivePath(pathname: string, href: string) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const { trackNavClick } = useAnalytics();
 
   useEffect(() => {
@@ -41,35 +41,109 @@ export default function BottomNav() {
     };
   }, []);
 
-  const items = useMemo(
-    () => isLoggedIn
-      ? [
-          { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
-          { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
-          { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
-        ]
-      : [
-          { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
-          { href: '/', label: '投稿', icon: <Image className="w-6 h-6 mb-1" /> },
-          { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
-        ],
-    [isLoggedIn]
-  );
+  const guestItems = [
+    { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+    { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
+    { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
+  ];
+
+  const leftItems = [
+    { href: '/nearby', label: '探す', icon: <Search className="w-6 h-6 mb-1" /> },
+    { href: '/visits', label: 'スタンプ帳', icon: <CircleDot className="w-6 h-6 mb-1" /> },
+  ];
+
+  const rightItems = [
+    { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
+  ];
+
+  if (isLoggedIn === null) return null;
+
+  if (!isLoggedIn) {
+    return (
+      <nav className="nav-rpg lg:hidden">
+        <div className="flex justify-around items-center max-w-md mx-auto py-2">
+          {guestItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+              onClick={() => trackNavClick(item.label)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="nav-rpg lg:hidden">
-      <div className="flex justify-around items-center max-w-md mx-auto py-2">
-        {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
-            onClick={() => trackNavClick(item.label)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </Link>
-        ))}
+      <div className="flex items-stretch max-w-md mx-auto" style={{ paddingBottom: 10, paddingTop: 8 }}>
+        {/* Left tabs */}
+        <div className="flex flex-1 justify-around">
+          {leftItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+              onClick={() => trackNavClick(item.label)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+
+        {/* Center FAB slot */}
+        <div style={{ width: 72, flexShrink: 0, position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Link
+              href="/upload"
+              onClick={() => trackNavClick('投稿')}
+              aria-current={isActivePath(pathname, '/upload') ? 'page' : undefined}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 3,
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{
+                width: 58,
+                height: 58,
+                borderRadius: 999,
+                border: '3px solid #fff',
+                background: 'radial-gradient(120% 120% at 30% 25%, #d06a4f, #bf5640)',
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 4px 0 #a8462f, 0 10px 22px rgba(191,86,64,.45)',
+                flexShrink: 0,
+              }}>
+                <Camera size={26} strokeWidth={2.4} />
+              </span>
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: '#bf5640', fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', lineHeight: 1 }}>投稿</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Right tabs */}
+        <div className="flex flex-1 justify-around">
+          {rightItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-rpg-item ${isActivePath(pathname, item.href) ? 'active' : ''}`}
+              onClick={() => trackNavClick(item.label)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
       </div>
     </nav>
   );

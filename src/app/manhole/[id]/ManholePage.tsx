@@ -585,26 +585,38 @@ export default function ManholeDetailPage() {
             別の構図を追加する
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
-            className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] py-3 font-pixelJp text-sm font-bold text-white shadow-[0_2px_0_#a8462f] transition-colors hover:bg-[#a84b36]"
-          >
-            {!isLoggedIn ? (
-              <Lock className="h-4 w-4" strokeWidth={2} />
-            ) : photoState === 'none' ? (
-              <Flag className="h-4 w-4" strokeWidth={2.5} />
-            ) : (
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+          <>
+            <button
+              type="button"
+              onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
+              className={`flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-pixelJp text-sm font-bold transition-colors ${
+                isLoggedIn
+                  ? 'border border-[#ecccc1] bg-white text-[#bf5640] hover:bg-[#fdeae2]'
+                  : 'bg-[#bf5640] text-white shadow-[0_2px_0_#a8462f] hover:opacity-90'
+              }`}
+            >
+              {!isLoggedIn ? (
+                <Lock className="h-4 w-4" strokeWidth={2} />
+              ) : photoState === 'none' ? (
+                <Flag className="h-4 w-4" strokeWidth={2.5} />
+              ) : (
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              )}
+              {!isLoggedIn
+                ? photoState === 'none'
+                  ? 'ログインして一番乗り'
+                  : 'ログインして投稿する'
+                : photoState === 'none'
+                ? '一番乗りで投稿する'
+                : 'あなたの1枚を加える'}
+            </button>
+            {isLoggedIn && (
+              <p className="flex items-center gap-1.5 font-pixelJp text-[11px] leading-snug text-[#9b917e]">
+                <Users className="h-3 w-3 shrink-0" strokeWidth={2} />
+                ナビの「投稿する」からいつでも追加できます
+              </p>
             )}
-            {!isLoggedIn
-              ? photoState === 'none'
-                ? 'ログインして一番乗り'
-                : 'ログインして投稿する'
-              : photoState === 'none'
-              ? '一番乗りで投稿する'
-              : 'あなたの1枚を加える'}
-          </button>
+          </>
         )}
 
         {/* Hints */}
