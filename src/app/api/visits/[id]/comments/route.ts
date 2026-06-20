@@ -201,7 +201,7 @@ export async function POST(
     const metadataDisplayName = session.user.user_metadata?.display_name;
 
     // ✅ Ensure app_user exists, auto-create if missing
-    await ensureAppUser(supabase, userId, session.user.email, metadataDisplayName);
+    await ensureAppUser(supabase, userId, metadataDisplayName);
 
     // ✅ 2. 入力検証
     if (!content || typeof content !== 'string' || content.trim() === '') {

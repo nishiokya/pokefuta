@@ -8,13 +8,11 @@ import type { Database } from '@/types/database';
  *
  * @param supabase - Supabase client (server or browser)
  * @param userId - Auth user ID (auth.uid())
- * @param email - Optional email for display_name fallback
- * @param displayName - Optional display_name from user metadata (preferred over email-derived name)
+ * @param displayName - Optional display_name from user metadata
  */
 export async function ensureAppUser(
   supabase: SupabaseClient<any>,
   userId: string,
-  email?: string,
   displayName?: string
 ): Promise<void> {
   try {
@@ -25,7 +23,7 @@ export async function ensureAppUser(
       .upsert(
         {
           auth_uid: userId,
-          display_name: displayName || email?.split('@')[0] || 'User'
+          display_name: displayName || null
         },
         {
           onConflict: 'auth_uid',
