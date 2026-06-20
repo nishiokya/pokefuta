@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Camera, Info, LogOut, UserPlus } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
-type NavTab = 'search' | 'post' | 'stamp' | 'mytrip';
+type NavTab = 'search' | 'stamp' | 'mytrip';
 
 const GUEST_NAV_ITEMS: { key: NavTab; label: string; href: string }[] = [
   { key: 'search', label: '探す', href: '/nearby' },

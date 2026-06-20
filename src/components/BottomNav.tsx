@@ -15,7 +15,7 @@ function isActivePath(pathname: string, href: string) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { trackNavClick } = useAnalytics();
 
   useEffect(() => {
@@ -55,8 +55,6 @@ export default function BottomNav() {
   const rightItems = [
     { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
   ];
-
-  if (isLoggedIn === null) return null;
 
   if (!isLoggedIn) {
     return (

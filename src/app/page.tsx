@@ -179,7 +179,7 @@ export default function HomePage() {
         <Header title="ポケふた写真館" />
       </div>
 
-      <PCShell active="post" rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
+      <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -298,7 +298,7 @@ export default function HomePage() {
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
 
-                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、いいね ${visit.likes_count}、コメント ${visit.comments_count}`;
+                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${visit.comments_count}`;
                     const cardContent = (
                       <>
                         {photo?.thumbnail_url ? (
