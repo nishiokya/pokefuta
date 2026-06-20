@@ -613,7 +613,7 @@ export default function ManholeDetailPage() {
             {isLoggedIn && (
               <p className="flex items-center gap-1.5 font-pixelJp text-[11px] leading-snug text-[#9b917e]">
                 <Users className="h-3 w-3 shrink-0" strokeWidth={2} />
-                ナビの「投稿する」からいつでも追加できます
+                ナビの「投稿」からいつでも追加できます
               </p>
             )}
           </>
