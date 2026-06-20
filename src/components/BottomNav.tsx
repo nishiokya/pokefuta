@@ -56,6 +56,8 @@ export default function BottomNav() {
     { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
   ];
 
+  if (isLoggedIn === null) return null;
+
   if (!isLoggedIn) {
     return (
       <nav className="nav-rpg lg:hidden">
