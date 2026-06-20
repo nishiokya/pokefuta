@@ -353,7 +353,7 @@ function LoginForm() {
         password,
         options: {
           emailRedirectTo: callbackUrl.toString(),
-          data: { display_name: email.split('@')[0] },
+          data: {},
         },
       });
       if (signUpError) throw signUpError;

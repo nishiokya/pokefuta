@@ -25,7 +25,7 @@ export async function ensureAppUser(
       .upsert(
         {
           auth_uid: userId,
-          display_name: displayName || email?.split('@')[0] || 'User'
+          display_name: displayName || null
         },
         {
           onConflict: 'auth_uid',
