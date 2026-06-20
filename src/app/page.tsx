@@ -6,7 +6,6 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
-  Heart,
   Lock,
   MapPin,
   MessageCircle,
@@ -326,10 +325,6 @@ export default function HomePage() {
                           </div>
                           <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
                           <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
-                            <span className="inline-flex items-center gap-1">
-                              <Heart className="h-4 w-4" />
-                              {visit.likes_count}
-                            </span>
                             <span className="inline-flex items-center gap-1">
                               <MessageCircle className="h-4 w-4" />
                               {visit.comments_count}
