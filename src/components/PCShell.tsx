@@ -175,9 +175,10 @@ function PCTopNav({ active }: PCTopNavProps) {
       </a>
 
       {/* 投稿する */}
-      {authLoaded && displayName && (
+      {isLoggedIn && (
         <Link
           href="/upload"
+          aria-current={pathname === '/upload' || pathname.startsWith('/upload/') ? 'page' : undefined}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -190,10 +191,9 @@ function PCTopNav({ active }: PCTopNavProps) {
             fontWeight: 800,
             fontSize: 14,
             textDecoration: 'none',
-            boxShadow: '0 2px 0 #a8462f, 0 7px 18px rgba(191,86,64,.38)',
-            outline: '3px solid rgba(191,86,64,.13)',
-            outlineOffset: 0,
+            boxShadow: '0 2px 0 #a8462f, 0 7px 18px rgba(191,86,64,.38), 0 0 0 3px rgba(191,86,64,.13)',
             flexShrink: 0,
+            opacity: pathname === '/upload' || pathname.startsWith('/upload/') ? 0.7 : 1,
           }}
         >
           <Camera size={17} strokeWidth={2.5} />投稿する

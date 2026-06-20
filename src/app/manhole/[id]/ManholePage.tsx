@@ -589,7 +589,11 @@ export default function ManholeDetailPage() {
             <button
               type="button"
               onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
-              className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#ecccc1] bg-white py-3 font-pixelJp text-sm font-bold text-[#bf5640] transition-colors hover:bg-[#fdeae2]"
+              className={`flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-pixelJp text-sm font-bold transition-colors ${
+                isLoggedIn
+                  ? 'border border-[#ecccc1] bg-white text-[#bf5640] hover:bg-[#fdeae2]'
+                  : 'bg-[#bf5640] text-white shadow-[0_2px_0_#a8462f] hover:opacity-90'
+              }`}
             >
               {!isLoggedIn ? (
                 <Lock className="h-4 w-4" strokeWidth={2} />

@@ -15,7 +15,7 @@ function isActivePath(pathname: string, href: string) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const { trackNavClick } = useAnalytics();
 
   useEffect(() => {
@@ -55,6 +55,8 @@ export default function BottomNav() {
   const rightItems = [
     { href: '/my-trip', label: 'マイ旅', icon: <BookOpen className="w-6 h-6 mb-1" /> },
   ];
+
+  if (isLoggedIn === null) return null;
 
   if (!isLoggedIn) {
     return (
@@ -96,11 +98,20 @@ export default function BottomNav() {
 
         {/* Center FAB slot */}
         <div style={{ width: 72, flexShrink: 0, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Link
               href="/upload"
               onClick={() => trackNavClick('投稿')}
+              aria-current={isActivePath(pathname, '/upload') ? 'page' : undefined}
               style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 3,
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{
                 width: 58,
                 height: 58,
                 borderRadius: 999,
@@ -110,14 +121,12 @@ export default function BottomNav() {
                 display: 'grid',
                 placeItems: 'center',
                 boxShadow: '0 4px 0 #a8462f, 0 10px 22px rgba(191,86,64,.45)',
-                textDecoration: 'none',
                 flexShrink: 0,
-              }}
-              aria-label="投稿する"
-            >
-              <Camera size={26} strokeWidth={2.4} />
+              }}>
+                <Camera size={26} strokeWidth={2.4} />
+              </span>
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: '#bf5640', fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', lineHeight: 1 }}>投稿</span>
             </Link>
-            <span style={{ fontSize: 10.5, fontWeight: 800, color: '#bf5640', fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', lineHeight: 1 }}>投稿</span>
           </div>
         </div>
 
