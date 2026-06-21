@@ -19,7 +19,7 @@ interface PhotoMetadata {
   datetime?: string;
   camera?: string;
   lens?: string;
-  rawExif?: Record<string, any>;
+  exifPayload?: Record<string, any>;
 }
 
 interface UploadedPhoto {
@@ -246,7 +246,7 @@ export default function UploadPage() {
         datetime: raw?.DateTimeOriginal || raw?.DateTime,
         camera: raw?.Make && raw?.Model ? `${raw.Make} ${raw.Model}` : undefined,
         lens: raw?.LensModel,
-        rawExif: exifPayload,
+        exifPayload,
       };
     } catch (error) {
       console.warn('Failed to extract EXIF data:', error);
@@ -487,8 +487,8 @@ export default function UploadPage() {
       // Add is_public setting
       formData.append('is_public', isPublic.toString());
 
-      if (photo.metadata.rawExif) {
-        formData.append('exif', JSON.stringify(photo.metadata.rawExif));
+      if (photo.metadata.exifPayload) {
+        formData.append('exif', JSON.stringify(photo.metadata.exifPayload));
       }
 
       // Upload to binary storage API
