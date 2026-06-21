@@ -34,6 +34,8 @@ type FeedVisit = {
   }>;
   likes_count: number;
   comments_count: number;
+  manhole_comments_count?: number;
+  display_name?: string | null;
 };
 
 export default function PopularPage() {
@@ -297,8 +299,9 @@ export default function PopularPage() {
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
+                    const commentCount = visit.manhole_comments_count ?? visit.comments_count;
 
-                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${visit.comments_count}`;
+                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${commentCount}`;
                     const cardContent = (
                       <>
                         {photo?.thumbnail_url ? (
@@ -324,10 +327,13 @@ export default function PopularPage() {
                             {locationLabel || 'ポケふた'}
                           </div>
                           <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
+                          {visit.display_name && (
+                            <div className="mt-0.5 text-xs font-medium opacity-80">{visit.display_name}</div>
+                          )}
                           <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1">
                               <MessageCircle className="h-4 w-4" />
-                              {visit.comments_count}
+                              {commentCount}
                             </span>
                           </div>
                         </div>

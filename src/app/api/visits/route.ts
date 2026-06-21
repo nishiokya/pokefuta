@@ -223,6 +223,13 @@ export async function GET(request: NextRequest) {
 
     // ✅ ソーシャル機能の情報を取得
     const visitIds = (visits || []).map(v => v.id);
+    const manholeIds = Array.from(
+      new Set(
+        (visits || [])
+          .map((visit: any) => visit.manhole_id)
+          .filter((id: any): id is number => typeof id === 'number' && Number.isFinite(id))
+      )
+    );
 
     // いいね数とユーザーのいいね状態を取得
     const { data: likes } = await supabase
@@ -230,11 +237,20 @@ export async function GET(request: NextRequest) {
       .select('visit_id, user_id')
       .in('visit_id', visitIds);
 
-    // コメント数を取得
+    // 訪問記録へのコメント数を取得
     const { data: commentCounts } = await supabase
       .from('visit_comment')
       .select('visit_id')
       .in('visit_id', visitIds);
+
+    // マンホール共有コメント数を取得
+    const { data: manholeCommentCounts } = manholeIds.length > 0
+      ? await supabase
+        .from('manhole_comment')
+        .select('manhole_id')
+        .in('manhole_id', manholeIds)
+        .is('parent_comment_id', null)
+      : { data: [] as any[] };
 
     // ユーザーのブックマーク状態を取得
     const { data: bookmarks } = viewerUserId
@@ -248,6 +264,7 @@ export async function GET(request: NextRequest) {
     // 各訪問記録のいいね数・コメント数・状態を集計
     const likesMap = new Map<string, { count: number; isLiked: boolean }>();
     const commentsMap = new Map<string, number>();
+    const manholeCommentsMap = new Map<number, number>();
     const bookmarksSet = new Set<string>();
 
     visitIds.forEach(id => {
@@ -269,6 +286,13 @@ export async function GET(request: NextRequest) {
       commentsMap.set(comment.visit_id, current + 1);
     });
 
+    (manholeCommentCounts || []).forEach(comment => {
+      const manholeId = comment.manhole_id;
+      if (typeof manholeId !== 'number') return;
+      const current = manholeCommentsMap.get(manholeId) || 0;
+      manholeCommentsMap.set(manholeId, current + 1);
+    });
+
     (bookmarks || []).forEach(bookmark => {
       bookmarksSet.add(bookmark.visit_id);
     });
@@ -278,6 +302,9 @@ export async function GET(request: NextRequest) {
       const photos = Array.isArray(visit.photos) ? visit.photos : [];
       const likeInfo = likesMap.get(visit.id) || { count: 0, isLiked: false };
       const commentCount = commentsMap.get(visit.id) || 0;
+      const manholeCommentCount = typeof visit.manhole_id === 'number'
+        ? manholeCommentsMap.get(visit.manhole_id) || 0
+        : 0;
       const isBookmarked = bookmarksSet.has(visit.id);
 
       return {
@@ -308,12 +335,30 @@ export async function GET(request: NextRequest) {
         likes_count: likeInfo.count,
         is_liked: likeInfo.isLiked,
         comments_count: commentCount,
+        manhole_comments_count: manholeCommentCount,
         is_bookmarked: isBookmarked
       };
     });
 
+    // Enrich with poster display_name
+    const uniqueUserIds = Array.from(new Set(processedVisits.map((v: any) => v.user_id).filter(Boolean)));
+    const displayNameMap = new Map<string, string | null>();
+    if (uniqueUserIds.length > 0) {
+      const { data: appUsers } = await supabase
+        .from('app_user')
+        .select('auth_uid, display_name')
+        .in('auth_uid', uniqueUserIds);
+      (appUsers || []).forEach((u: any) => {
+        if (u?.auth_uid) displayNameMap.set(u.auth_uid, u.display_name ?? null);
+      });
+    }
+    const enrichedVisits = processedVisits.map((v: any) => ({
+      ...v,
+      display_name: displayNameMap.get(v.user_id) ?? null,
+    }));
+
     // Apply client-side filters if needed
-    let filteredVisits = processedVisits;
+    let filteredVisits = enrichedVisits;
 
     if (prefecture) {
       filteredVisits = filteredVisits.filter(
