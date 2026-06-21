@@ -46,7 +46,7 @@ export default function PhotoDeleteButton({ visitId, manholeId }: PhotoDeleteBut
       <DeletePhotoModal
         isOpen={modalOpen}
         onConfirm={handleConfirm}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { if (!isDeleting) setModalOpen(false); }}
         isDeleting={isDeleting}
       />
     </>

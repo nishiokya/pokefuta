@@ -23,11 +23,11 @@ export default function DeletePhotoModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black bg-opacity-70"
-        onClick={onCancel}
+        onClick={isDeleting ? undefined : onCancel}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (!isDeleting && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();
             onCancel();
           }

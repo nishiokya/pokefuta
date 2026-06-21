@@ -165,9 +165,19 @@ export async function POST(request: NextRequest) {
 
     let photoExif: Record<string, any> | undefined;
     if (exifStr) {
+      const exifRaw = exifStr as string;
+      if (exifRaw.length > 51200) {
+        return NextResponse.json({ success: false, error: 'exif payload too large (max 50KB)' }, { status: 400 });
+      }
       try {
-        photoExif = JSON.parse(exifStr as string);
-      } catch {}
+        const parsed = JSON.parse(exifRaw);
+        if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+          return NextResponse.json({ success: false, error: 'exif must be a JSON object' }, { status: 400 });
+        }
+        photoExif = parsed;
+      } catch {
+        return NextResponse.json({ success: false, error: 'exif is not valid JSON' }, { status: 400 });
+      }
     }
 
     if (!file) {
