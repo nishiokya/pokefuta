@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 
 interface DeletePhotoModalProps {
   isOpen: boolean;
-  photoId: string;
   onConfirm: () => void;
   onCancel: () => void;
   isDeleting?: boolean;
@@ -12,7 +11,6 @@ interface DeletePhotoModalProps {
 
 export default function DeletePhotoModal({
   isOpen,
-  photoId,
   onConfirm,
   onCancel,
   isDeleting = false
@@ -62,13 +60,6 @@ export default function DeletePhotoModal({
           <div className="bg-rpg-red bg-opacity-10 border-2 border-rpg-red p-3">
             <p className="font-pixelJp text-xs text-rpg-textDark">
               <span className="font-bold text-rpg-red">注意:</span> この操作は取り消せません。同じ訪問記録に紐づく写真、コメント、いいね、ブックマークも削除されます。
-            </p>
-          </div>
-
-          {/* Photo ID */}
-          <div className="bg-white/70 border border-[#7B63A8]/15 p-2">
-            <p className="font-pixel text-[10px] text-rpg-textDark opacity-70">
-              Photo ID: {photoId.slice(0, 8)}...
             </p>
           </div>
 

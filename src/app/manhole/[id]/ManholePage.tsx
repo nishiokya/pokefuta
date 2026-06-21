@@ -749,6 +749,15 @@ export default function ManholeDetailPage() {
                         {formatPhotoDate(featuredPhoto.visit.shot_at)}
                       </span>
                     )}
+                    {featuredPhoto.visit?.user_id === currentUserId && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(featuredPhoto.id, featuredPhoto.visit?.id); }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(180,30,30,0.75)', borderRadius: 99, padding: '3px 9px', flexShrink: 0, border: 'none', cursor: 'pointer' }}
+                      >
+                        削除
+                      </button>
+                    )}
                   </div>
                 )}
               </button>
@@ -784,16 +793,6 @@ export default function ManholeDetailPage() {
                           <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1f9d63]">
                             <Camera className="h-2.5 w-2.5 text-white" strokeWidth={2.4} />
                           </span>
-                          {/* delete button — only reachable here since myPhotos excludes commPhotos */}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(p.id, p.visit?.id); }}
-                            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60"
-                            title="削除"
-                            style={{ color: '#fff' }}
-                          >
-                            <span className="text-[9px] leading-none">×</span>
-                          </button>
                         </button>
                       ))}
                       {/* add slot */}
@@ -1085,7 +1084,6 @@ export default function ManholeDetailPage() {
       {selectedPhotoId && (
         <DeletePhotoModal
           isOpen={deleteModalOpen}
-          photoId={selectedPhotoId}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
           isDeleting={isDeleting}

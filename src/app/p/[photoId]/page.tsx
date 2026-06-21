@@ -1,13 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import ShareButtons from '@/components/ShareButtons';
+import PhotoDeleteButton from '@/components/PhotoDeleteButton';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { photoShareText } from '@/lib/share';
+import { createServerClient } from '@/lib/supabase/server';
 import {
   getManholeLocationLabel,
   getSortedTitles,
@@ -69,6 +72,10 @@ export default async function SharedPhotoPage({ params }: PageProps) {
   const photo = await loadPublicSharedPhoto(params.photoId);
 
   if (!photo) notFound();
+
+  const supabase = createServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const isOwner = session?.user?.id === photo.visit.user_id;
 
   const titles = getSortedTitles(photo.manhole.titles);
   const locationLabel = getManholeLocationLabel(photo.manhole);
@@ -158,6 +165,12 @@ export default async function SharedPhotoPage({ params }: PageProps) {
               >
                 自分も記録する
               </Link>
+              {isOwner && (
+                <PhotoDeleteButton
+                  visitId={photo.visit.id}
+                  manholeId={photo.manhole.id}
+                />
+              )}
             </div>
           </div>
         </article>

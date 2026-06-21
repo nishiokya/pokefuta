@@ -161,6 +161,14 @@ export async function POST(request: NextRequest) {
     const isPublic = formData.get('is_public');  // 公開設定
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
+    const exifStr = formData.get('exif');
+
+    let photoExif: Record<string, any> | undefined;
+    if (exifStr) {
+      try {
+        photoExif = JSON.parse(exifStr as string);
+      } catch {}
+    }
 
     if (!file) {
       return NextResponse.json({
@@ -349,6 +357,7 @@ export async function POST(request: NextRequest) {
       if (fileSize) photoInsert.file_size = fileSize;
       if (file.type) photoInsert.content_type = file.type;
       if (file.name) photoInsert.original_name = file.name;
+      if (photoExif) photoInsert.exif = photoExif;
 
       const { data: photoData, error: photoError } = await supabase
         .from('photo')

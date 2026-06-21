@@ -1237,7 +1237,6 @@ export default function VisitsPage() {
       {selectedPhotoId && (
         <DeletePhotoModal
           isOpen={deleteModalOpen}
-          photoId={selectedPhotoId}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
           isDeleting={isDeleting}
