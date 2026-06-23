@@ -523,6 +523,8 @@ export default function VisitsPage() {
   const visitedPrefectureCount = prefectureProgress.filter((p) => p.visited > 0).length;
   const visitedFeaturesCount = hashtagProgress.length;
 
+  // TODO: handleDeleteClick は定義済みだが visits ページに削除ボタンが未配置。
+  // VisitPhotoCard に削除導線を追加する際にここを呼ぶ。
   const handleDeleteClick = (photoId: string, visitId: string) => {
     setSelectedPhotoId(photoId);
     setSelectedVisitId(visitId);
@@ -1237,7 +1239,6 @@ export default function VisitsPage() {
       {selectedPhotoId && (
         <DeletePhotoModal
           isOpen={deleteModalOpen}
-          photoId={selectedPhotoId}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
           isDeleting={isDeleting}

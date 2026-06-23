@@ -215,7 +215,6 @@ export interface Database {
           binary_data: ArrayBuffer | null;
           thumbnail_small: ArrayBuffer | null;
           thumbnail_medium: ArrayBuffer | null;
-          metadata: Record<string, any> | null;
         };
         Insert: {
           id?: string;
@@ -236,7 +235,6 @@ export interface Database {
           binary_data?: ArrayBuffer | null;
           thumbnail_small?: ArrayBuffer | null;
           thumbnail_medium?: ArrayBuffer | null;
-          metadata?: Record<string, any> | null;
         };
         Update: {
           visit_id?: string | null;
@@ -256,7 +254,6 @@ export interface Database {
           binary_data?: ArrayBuffer | null;
           thumbnail_small?: ArrayBuffer | null;
           thumbnail_medium?: ArrayBuffer | null;
-          metadata?: Record<string, any> | null;
         };
         Relationships: [];
       };

@@ -161,6 +161,24 @@ export async function POST(request: NextRequest) {
     const isPublic = formData.get('is_public');  // 公開設定
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
+    const exifStr = formData.get('exif');
+
+    let photoExif: Record<string, any> | undefined;
+    if (exifStr) {
+      const exifRaw = exifStr as string;
+      if (exifRaw.length > 51200) {
+        return NextResponse.json({ success: false, error: 'exif payload too large (max 50KB)' }, { status: 400 });
+      }
+      try {
+        const parsed = JSON.parse(exifRaw);
+        if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+          return NextResponse.json({ success: false, error: 'exif must be a JSON object' }, { status: 400 });
+        }
+        photoExif = parsed;
+      } catch {
+        return NextResponse.json({ success: false, error: 'exif is not valid JSON' }, { status: 400 });
+      }
+    }
 
     if (!file) {
       return NextResponse.json({
@@ -349,6 +367,7 @@ export async function POST(request: NextRequest) {
       if (fileSize) photoInsert.file_size = fileSize;
       if (file.type) photoInsert.content_type = file.type;
       if (file.name) photoInsert.original_name = file.name;
+      if (photoExif) photoInsert.exif = photoExif;
 
       const { data: photoData, error: photoError } = await supabase
         .from('photo')

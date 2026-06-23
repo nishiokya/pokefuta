@@ -19,6 +19,7 @@ interface PhotoMetadata {
   datetime?: string;
   camera?: string;
   lens?: string;
+  exifPayload?: Record<string, any>;
 }
 
 interface UploadedPhoto {
@@ -183,13 +184,69 @@ export default function UploadPage() {
 
   const extractMetadata = async (file: File): Promise<PhotoMetadata> => {
     try {
-      const metadata = await exifr.parse(file);
+      const raw = await exifr.parse(file, { gps: true, tiff: true, exif: true, xmp: false, icc: false, iptc: false });
+      // GPS詐称調査・不正検知に有用なフィールドを保存
+      // キーとなるGPS整合性フィールドは存在しない場合も null として明示記録（不在自体がシグナル）
+      const rawExif: Record<string, any> = {};
+      const required = (key: string) => { rawExif[key] = raw?.[key] ?? null; };
+      const optional = (key: string) => { if (raw?.[key] != null) rawExif[key] = raw[key]; };
+
+      // タイムスタンプ整合性（DateTimeOriginal vs GPSDateStamp のズレで詐称を検知）
+      required('DateTimeOriginal'); optional('DateTimeDigitized'); optional('ModifyDate');
+      optional('OffsetTime'); optional('OffsetTimeOriginal');
+      required('GPSDateStamp'); required('GPSTimeStamp');
+      // SubSecTimeOriginal: 本物撮影なら通常あり、後付けGPSでは消える傾向
+      required('SubSecTimeOriginal'); optional('SubSecTimeDigitized');
+
+      // GPS品質・出所シグナル（不在も記録）
+      required('GPSProcessingMethod'); // Android: "GPS"/"NETWORK"/"FUSED" — GPS出所の直接証拠
+      required('GPSVersionID');
+      required('GPSStatus');           // A=有効計測 / V=無効
+      required('GPSMeasureMode');      // "2"=2Dfix / "3"=3Dfix
+      required('GPSDOP');              // 精度指標
+      required('GPSHPositioningError'); // iOS: 水平誤差(m)
+      optional('GPSSatellites');
+      optional('GPSSpeed'); optional('GPSSpeedRef');
+      optional('GPSImgDirection'); optional('GPSImgDirectionRef');
+      optional('GPSAltitude'); optional('GPSAltitudeRef');
+
+      // 編集検知
+      optional('Software');
+
+      // デバイス・レンズ一貫性
+      optional('Make'); optional('Model');
+      optional('LensMake'); optional('LensModel'); optional('LensInfo');
+      optional('HostComputer'); // iOSで端末名が入ることがある
+
+      // カメラ動作（実際に撮影されたことを示す特徴量）
+      optional('ExifVersion'); optional('FlashPixVersion');
+      optional('FNumber'); optional('ExposureTime'); optional('ISO');
+      optional('Flash'); optional('FocalLength'); optional('FocalLengthIn35mmFormat');
+      optional('PixelXDimension'); optional('PixelYDimension');
+      optional('WhiteBalance'); optional('ExposureMode');
+      optional('MeteringMode'); optional('SceneCaptureType');
+      optional('BrightnessValue');
+
+      const hasGps = isValidCoordinates(raw?.latitude, raw?.longitude);
+      const method = rawExif.GPSProcessingMethod;
+      const gpsSource: string | null = !hasGps ? null
+        : method === 'GPS'     ? 'hardware_gps'
+        : method === 'NETWORK' ? 'network'
+        : method === 'FUSED'   ? 'fused'
+        : rawExif.GPSDateStamp != null ? 'camera'
+        : 'unknown';
+
+      const exifPayload = Object.keys(rawExif).length > 0
+        ? { raw: rawExif, judge: { gps_source: gpsSource } }
+        : undefined;
+
       return {
-        latitude: metadata?.latitude,
-        longitude: metadata?.longitude,
-        datetime: metadata?.DateTimeOriginal || metadata?.DateTime,
-        camera: metadata?.Make && metadata?.Model ? `${metadata.Make} ${metadata.Model}` : undefined,
-        lens: metadata?.LensModel
+        latitude: raw?.latitude,
+        longitude: raw?.longitude,
+        datetime: raw?.DateTimeOriginal || raw?.DateTime,
+        camera: raw?.Make && raw?.Model ? `${raw.Make} ${raw.Model}` : undefined,
+        lens: raw?.LensModel,
+        exifPayload,
       };
     } catch (error) {
       console.warn('Failed to extract EXIF data:', error);
@@ -430,16 +487,9 @@ export default function UploadPage() {
       // Add is_public setting
       formData.append('is_public', isPublic.toString());
 
-      // Add metadata
-      const metadata = {
-        metadata: {
-          ...photo.metadata,
-          originalFilename: photo.file.name,
-          uploadedAt: new Date().toISOString()
-        },
-        exif: photo.metadata
-      };
-      formData.append('metadata', JSON.stringify(metadata));
+      if (photo.metadata.exifPayload) {
+        formData.append('exif', JSON.stringify(photo.metadata.exifPayload));
+      }
 
       // Upload to binary storage API
       const uploadResponse = await fetch('/api/image-upload', {
