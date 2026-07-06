@@ -152,6 +152,22 @@ function PCTopNav({ active }: PCTopNavProps) {
             </Link>
           );
         })}
+        {/* 図鑑（data.pokefuta.com）への外部リンク。内部Link前提の GUEST/AUTH_NAV_ITEMS には混ぜない */}
+        {authLoaded && (
+          <a
+            href="https://data.pokefuta.com/"
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: '#6f6657',
+              padding: '7px 13px',
+              borderRadius: 9,
+              textDecoration: 'none',
+            }}
+          >
+            図鑑
+          </a>
+        )}
       </div>
 
       {/* スペーサー */}
