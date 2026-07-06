@@ -157,6 +157,24 @@ def to_gallery_entry(
     }
 
 
+def select_gallery_photos(
+    photos: list[dict[str, Any]],
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Pick gallery photos: public only, newest first, at most `limit` entries.
+
+    The spec (pokefuta-tracker docs/MANHOLE_DETAIL_SPEC.md) requires the
+    gallery to contain only is_public photos even when the export itself
+    runs with --include-private.
+    """
+    public_photos = [
+        photo
+        for photo in photos
+        if normalize_visit(photo.get("visit")).get("is_public")
+    ]
+    return sorted(public_photos, key=photo_sort_date, reverse=True)[:limit]
+
+
 def supabase_get(
     path: str,
     query: dict[str, str],
@@ -340,7 +358,7 @@ def build_payload(
         entry = to_photo_entry(manhole_photos[0], base_url, display_name_by_auth_uid)
         entry["gallery"] = [
             to_gallery_entry(photo, base_url, display_name_by_auth_uid)
-            for photo in manhole_photos[:gallery_limit]
+            for photo in select_gallery_photos(manhole_photos, gallery_limit)
         ]
         photos[str(manhole_id)] = entry
     manhole_comments = fetch_manhole_comments_by_display_name(
