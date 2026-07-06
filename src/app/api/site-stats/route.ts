@@ -15,22 +15,27 @@ export async function GET() {
     return NextResponse.json(stats);
   }
 
-  return NextResponse.json({
-    success: true,
-    users: null,
-    auth_users: null,
-    active_users_7d: null,
-    posts: null,
-    manholes: null,
-    manholes_with_photos: null,
-    latest_photo_at: null,
-    latest_user_at: null,
-    latest_visit_at: null,
-    posts_last_7d: null,
-    posts_last_30d: null,
-    manhole_comments: null,
-    public_posts: null,
-    private_posts: null,
-    source: 'unavailable',
-  });
+  // 他 API と同様、取得失敗は success: false + 5xx で返す
+  return NextResponse.json(
+    {
+      success: false,
+      users: null,
+      auth_users: null,
+      active_users_7d: null,
+      posts: null,
+      manholes: null,
+      manholes_with_photos: null,
+      latest_photo_at: null,
+      latest_user_at: null,
+      latest_visit_at: null,
+      posts_last_7d: null,
+      posts_last_30d: null,
+      manhole_comments: null,
+      public_posts: null,
+      private_posts: null,
+      error: 'Site statistics snapshot is unavailable',
+      source: 'unavailable',
+    },
+    { status: 503 }
+  );
 }

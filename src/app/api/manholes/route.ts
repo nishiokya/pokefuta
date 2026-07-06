@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : null;
     const radius = parseFloat(searchParams.get('radius') || '50'); // km, default 50km
     const limit = parseInt(searchParams.get('limit') || '500');
+    const actualLimit = Math.min(Number.isFinite(limit) ? limit : 500, 1000);
     const visited = searchParams.get('visited'); // 'true', 'false', or null for all
     const noPhotos = searchParams.get('no_photos') === 'true';
 
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
         .filter(matchesVisitedFilter)
         .filter(manhole => !noPhotos || manhole.photo_count === 0)
         .sort((a, b) => a.distance - b.distance)
-        .slice(0, limit);
+        .slice(0, actualLimit);
 
       return NextResponse.json({
         success: true,
@@ -143,7 +144,6 @@ export async function GET(request: NextRequest) {
     }
 
     // 通常一覧: id 降順で limit 件（従来の DB クエリと同じ挙動）
-    const actualLimit = Math.min(limit, 1000);
     const manholes = [...snapshot.manholes]
       .sort((a, b) => b.id - a.id)
       .slice(0, actualLimit)

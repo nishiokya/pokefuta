@@ -66,7 +66,13 @@ async function fetchSnapshotJson<T>(path: string): Promise<T | null> {
         next: { revalidate: REVALIDATE_SECONDS },
       });
       if (res.ok) {
-        return (await res.json()) as T;
+        const data = (await res.json()) as T & { success?: boolean };
+        // 生成側がエラー内容の JSON を返している場合は配信しない
+        if (data.success === true) {
+          return data;
+        }
+        console.error(`Snapshot payload not successful: ${base}${path}`);
+        continue;
       }
       console.error(`Snapshot fetch failed (${res.status}): ${base}${path}`);
     } catch (error) {
