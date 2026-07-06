@@ -7,9 +7,12 @@ import type { CookieOptionsWithName } from '@supabase/ssr';
 // 本番ではクッキーを親ドメイン (.pokefuta.com) スコープで発行する。
 // ローカル開発では domain を付けない（localhost に domain 指定を
 // 付けるとブラウザがクッキーを保存しない）。
+// 空文字・空白のみの環境変数は未指定として扱う
+const envCookieDomain = process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN?.trim();
+
 export const authCookieOptions: CookieOptionsWithName = {
   domain:
-    process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN ||
+    envCookieDomain ||
     (process.env.NODE_ENV === 'production' ? '.pokefuta.com' : undefined),
   path: '/',
   sameSite: 'lax',

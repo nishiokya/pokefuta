@@ -28,9 +28,15 @@ export function createRouteHandlerClient(
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {
-            // クッキーを書けない文脈では無視する
-            // （セッションのリフレッシュは middleware が担う）
+          } catch (error) {
+            // Server Component などクッキーを書けない文脈で呼ばれた場合。
+            // Route Handler で失敗すると Set-Cookie が反映されずログイン
+            // 状態が壊れる手掛かりになるため、握りつぶさずログに残す
+            // （セッションのリフレッシュ自体は middleware が担う）。
+            console.error(
+              `Failed to set auth cookies (${cookiesToSet.map((c) => c.name).join(', ')}):`,
+              error
+            );
           }
         },
       },
