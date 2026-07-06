@@ -1,6 +1,7 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { authCookieOptions } from '@/lib/supabase/cookies';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
@@ -11,7 +12,23 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
-    const supabase = createMiddlewareClient({ req, res });
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookieOptions: authCookieOptions,
+        cookies: {
+          getAll() {
+            return req.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              res.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
 
     // セッション更新
     const {
