@@ -16,6 +16,7 @@ import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { calculateDistance } from '@/lib/location';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { SITE_URL } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
@@ -80,6 +81,12 @@ const formatPhotoDate = (shot_at: string) => {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 };
 
+const relatedManholeLabel = (m: Manhole) => {
+  const muni = m.city || m.municipality || '';
+  const poke = (m.pokemons ?? []).slice(0, 3).join('・');
+  return `${m.prefecture}${muni}のポケふた${poke ? `（${poke}）` : ''}`;
+};
+
 interface ManholeComment {
   id: string;
   content: string;
@@ -96,6 +103,7 @@ export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [manhole, setManhole] = useState<Manhole | null>(null);
+  const [allManholes, setAllManholes] = useState<Manhole[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +225,7 @@ export default function ManholeDetailPage() {
       if (response.ok) {
         const data = await response.json();
         const manholesList: Manhole[] = data.manholes || [];
+        setAllManholes(manholesList);
         const foundManhole = manholesList.find((m: Manhole) => m.id.toString() === id);
         if (foundManhole) {
           setManhole(foundManhole);
@@ -398,6 +407,33 @@ export default function ManholeDetailPage() {
     return { shareText, shareUrl, hashtags: titleHashtags, analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture } };
   }, [manhole, photos, currentUserId]);
 
+  // 周辺・同ポケモン・県内の回遊リスト（docs/MANHOLE_DETAIL_SPEC.md セクション7-9）
+  const related = useMemo(() => {
+    if (!manhole || allManholes.length === 0) {
+      return { nearby: [] as Array<{ manhole: Manhole; distance: number }>, samePokemon: [] as Manhole[], samePref: [] as Manhole[] };
+    }
+    const others = allManholes.filter((m) => m.id !== manhole.id);
+    const nearby =
+      manhole.latitude && manhole.longitude
+        ? others
+            .filter((m) => m.latitude && m.longitude)
+            .map((m) => ({
+              manhole: m,
+              distance: calculateDistance(manhole.latitude!, manhole.longitude!, m.latitude!, m.longitude!),
+            }))
+            .filter((e) => e.distance <= 30)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 5)
+        : [];
+    const pokemonSet = new Set(manhole.pokemons ?? []);
+    const samePokemon =
+      pokemonSet.size > 0
+        ? others.filter((m) => (m.pokemons ?? []).some((p) => pokemonSet.has(p))).slice(0, 6)
+        : [];
+    const samePref = others.filter((m) => m.prefecture === manhole.prefecture).slice(0, 8);
+    return { nearby, samePokemon, samePref };
+  }, [manhole, allManholes]);
+
   if (loading) {
     return (
       <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
@@ -443,6 +479,29 @@ export default function ManholeDetailPage() {
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const titleBadges = getSortedTitles(manhole.titles);
+
+  const renderRelatedCards = (items: Array<{ manhole: Manhole; distance?: number }>) => (
+    <div className="flex flex-col gap-2">
+      {items.map(({ manhole: m, distance }) => (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => router.push(`/manhole/${m.id}`)}
+          className="flex items-center gap-2 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#fbf6ea]"
+        >
+          <MapPin className="h-4 w-4 shrink-0 text-[#9b917e]" strokeWidth={2} />
+          <span className="min-w-0 flex-1 truncate font-pixelJp text-xs font-bold text-[#2c2a26]">
+            {relatedManholeLabel(m)}
+          </span>
+          {distance !== undefined && (
+            <span className="shrink-0 font-['Outfit'] text-xs font-bold text-[#9b917e]">
+              {distance < 10 ? distance.toFixed(1) : Math.round(distance)} km
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
 
   // ── PromptCard (two copies: SP inline + PC rail) ────────────────────
   // PCShell renders `rail` on mobile BEFORE children (above gallery).
@@ -578,7 +637,7 @@ export default function ManholeDetailPage() {
         {photoState === 'mine' && isLoggedIn ? (
           <button
             type="button"
-            onClick={() => router.push('/upload')}
+            onClick={() => router.push(`/upload?manhole_id=${params.id}`)}
             className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#ecccc1] bg-white py-3 font-pixelJp text-sm font-bold text-[#bf5640] transition-colors hover:bg-[#fdeae2]"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
@@ -588,7 +647,7 @@ export default function ManholeDetailPage() {
           <>
             <button
               type="button"
-              onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
+              onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
               className={`flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-pixelJp text-sm font-bold transition-colors ${
                 isLoggedIn
                   ? 'border border-[#ecccc1] bg-white text-[#bf5640] hover:bg-[#fdeae2]'
@@ -843,7 +902,7 @@ export default function ManholeDetailPage() {
                     {(!isLoggedIn || myPhotos.length === 0) && (
                       <button
                         type="button"
-                        onClick={() => router.push(isLoggedIn ? '/upload' : '/login?redirect=/upload')}
+                        onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
                         className="flex h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
                         style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
                       >
@@ -906,9 +965,6 @@ export default function ManholeDetailPage() {
             })()}
           </div>
 
-          {/* ── PromptCard (SP only — lg:hidden) ── */}
-          <div className="lg:hidden">{promptCardContent}</div>
-
           {/* ── Rarity pills ── */}
           {photoState === 'community' && isLoggedIn ? (
             <div className="flex flex-wrap gap-1.5">
@@ -935,7 +991,37 @@ export default function ManholeDetailPage() {
             </div>
           ) : null}
 
+          {/* ── PromptCard (SP only — lg:hidden) ── */}
+          <div className="lg:hidden">{promptCardContent}</div>
+
           <hr className="border-[#e9dfc7]" />
+
+          {/* ── Map ── */}
+          <div>
+            <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+              <MapPin className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+              場所
+            </h3>
+            <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7]">
+              <div className="h-[140px]">
+                <MapComponent
+                  center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
+                  manholes={[manhole]}
+                  onManholeClick={handleManholeClick}
+                  userLocation={null}
+                />
+              </div>
+              <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
+                <button
+                  onClick={openInMaps}
+                  className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1f9d63] py-2.5 font-pixelJp text-sm font-bold text-white transition-colors hover:bg-[#1a8a56]"
+                >
+                  <Navigation className="h-4 w-4" strokeWidth={2.4} />
+                  経路案内
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* ── Building ── */}
           {manhole.building && (
@@ -975,32 +1061,38 @@ export default function ManholeDetailPage() {
             </div>
           )}
 
-          {/* ── Map ── */}
-          <div>
-            <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
-              <MapPin className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
-              場所
-            </h3>
-            <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7]">
-              <div className="h-[140px]">
-                <MapComponent
-                  center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
-                  manholes={[manhole]}
-                  onManholeClick={handleManholeClick}
-                  userLocation={null}
-                />
-              </div>
-              <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
-                <button
-                  onClick={openInMaps}
-                  className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1f9d63] py-2.5 font-pixelJp text-sm font-bold text-white transition-colors hover:bg-[#1a8a56]"
-                >
-                  <Navigation className="h-4 w-4" strokeWidth={2.4} />
-                  経路案内
-                </button>
-              </div>
+          {/* ── Nearby manholes ── */}
+          {related.nearby.length > 0 && (
+            <div>
+              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+                <Navigation className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                次に寄れるポケふた
+              </h3>
+              {renderRelatedCards(related.nearby)}
             </div>
-          </div>
+          )}
+
+          {/* ── Same Pokemon ── */}
+          {related.samePokemon.length > 0 && (
+            <div>
+              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+                <Sparkles className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                同じポケモンのポケふた
+              </h3>
+              {renderRelatedCards(related.samePokemon.map((m) => ({ manhole: m })))}
+            </div>
+          )}
+
+          {/* ── Same prefecture ── */}
+          {related.samePref.length > 0 && (
+            <div>
+              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+                <Flag className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
+                {manhole.prefecture}のポケふた
+              </h3>
+              {renderRelatedCards(related.samePref.map((m) => ({ manhole: m })))}
+            </div>
+          )}
 
           {/* ── Share ── */}
           {sharePayload && (

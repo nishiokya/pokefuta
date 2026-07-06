@@ -29,6 +29,7 @@ DEFAULT_OUTPUT = "public/data/latest-manhole-photos.json"
 DEFAULT_BATCH_SIZE = 1000
 DEFAULT_TIMEOUT = 30
 DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME = "tako"
+DEFAULT_GALLERY_LIMIT = 5
 
 
 def require_env(name: str) -> str:
@@ -131,6 +132,27 @@ def to_photo_entry(
         "created_at": photo.get("created_at"),
         "shot_at": visit.get("shot_at"),
         "comment": visit.get("comment"),
+        "display_name": display_name,
+    }
+
+
+def to_gallery_entry(
+    photo: dict[str, Any],
+    base_url: str,
+    display_name_by_auth_uid: dict[str, Optional[str]],
+) -> dict[str, Any]:
+    visit = normalize_visit(photo.get("visit"))
+    storage_key = photo["storage_key"]
+    user_id = visit.get("user_id")
+    display_name = display_name_by_auth_uid.get(user_id) if isinstance(user_id, str) else None
+
+    return {
+        "photo_id": photo["id"],
+        "url": build_original_url(storage_key, base_url),
+        "storage_key": storage_key,
+        "content_type": photo.get("content_type"),
+        "created_at": photo.get("created_at"),
+        "shot_at": visit.get("shot_at"),
         "display_name": display_name,
     }
 
@@ -292,10 +314,10 @@ def build_payload(
     batch_size: int,
     timeout: int,
     manhole_comment_display_name: str,
+    gallery_limit: int,
 ) -> dict[str, Any]:
     base_url = get_effective_r2_public_base_url()
-    latest_by_manhole_id: dict[int, dict[str, Any]] = {}
-    latest_dates: dict[int, datetime] = {}
+    photos_by_manhole_id: dict[int, list[dict[str, Any]]] = {}
     photo_user_ids: set[str] = set()
 
     for photo in iter_photos(include_private=include_private, batch_size=batch_size, timeout=timeout):
@@ -304,23 +326,23 @@ def build_payload(
         if isinstance(user_id, str):
             photo_user_ids.add(user_id)
 
-        manhole_id = int(photo["manhole_id"])
-        sort_date = photo_sort_date(photo)
-
-        if manhole_id not in latest_dates or sort_date > latest_dates[manhole_id]:
-            latest_dates[manhole_id] = sort_date
-            latest_by_manhole_id[manhole_id] = photo
+        photos_by_manhole_id.setdefault(int(photo["manhole_id"]), []).append(photo)
 
     display_name_by_auth_uid = fetch_display_names(photo_user_ids, batch_size, timeout)
 
-    photos = {
-        str(manhole_id): to_photo_entry(
-            latest_by_manhole_id[manhole_id],
-            base_url,
-            display_name_by_auth_uid,
+    photos: dict[str, dict[str, Any]] = {}
+    for manhole_id in sorted(photos_by_manhole_id):
+        manhole_photos = sorted(
+            photos_by_manhole_id[manhole_id],
+            key=photo_sort_date,
+            reverse=True,
         )
-        for manhole_id in sorted(latest_by_manhole_id)
-    }
+        entry = to_photo_entry(manhole_photos[0], base_url, display_name_by_auth_uid)
+        entry["gallery"] = [
+            to_gallery_entry(photo, base_url, display_name_by_auth_uid)
+            for photo in manhole_photos[:gallery_limit]
+        ]
+        photos[str(manhole_id)] = entry
     manhole_comments = fetch_manhole_comments_by_display_name(
         manhole_comment_display_name,
         batch_size,
@@ -377,6 +399,12 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("MANHOLE_COMMENT_DISPLAY_NAME", DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME),
         help=f"Include manhole comments posted by this display_name. Default: {DEFAULT_MANHOLE_COMMENT_DISPLAY_NAME}",
     )
+    parser.add_argument(
+        "--gallery-limit",
+        type=int,
+        default=int(os.environ.get("PHOTO_EXPORT_GALLERY_LIMIT", DEFAULT_GALLERY_LIMIT)),
+        help=f"Max public photos per manhole in the gallery array. Default: {DEFAULT_GALLERY_LIMIT}",
+    )
     return parser.parse_args()
 
 
@@ -387,6 +415,7 @@ def main() -> None:
         batch_size=args.batch_size,
         timeout=args.timeout,
         manhole_comment_display_name=args.manhole_comment_display_name,
+        gallery_limit=args.gallery_limit,
     )
 
     output_path = Path(args.output)
