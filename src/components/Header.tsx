@@ -119,6 +119,15 @@ export default function Header({
             </Link>
           )}
 
+          <a
+            href="https://data.pokefuta.com/"
+            className="flex h-10 flex-shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:text-sm"
+            aria-label="ポケふた図鑑（data.pokefuta.com）"
+            title="ポケふた図鑑（data.pokefuta.com）"
+          >
+            図鑑
+          </a>
+
           {showXLink && (
             <a
               href="https://x.com/pokemonmanhole"
