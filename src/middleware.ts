@@ -43,7 +43,8 @@ export async function middleware(req: NextRequest) {
 
     if (!session && isProtectedPath) {
       const redirectUrl = new URL('/login', req.url);
-      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname);
+      // クエリ（?manhole_id= 等）も保持してログイン後に復元する
+      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname + req.nextUrl.search);
       return NextResponse.redirect(redirectUrl);
     }
 

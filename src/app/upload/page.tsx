@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Navigation, History, Home } from 'lucide-react';
 import exifr from 'exifr';
@@ -41,9 +42,12 @@ interface AlertMessage {
   id: string;
 }
 
-export default function UploadPage() {
+function UploadPageInner() {
+  const searchParams = useSearchParams();
+  const hintManholeId = searchParams.get('manhole_id') ? Number(searchParams.get('manhole_id')) : null;
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
+  const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
   const [loading, setLoading] = useState(false);
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
@@ -134,6 +138,10 @@ export default function UploadPage() {
         const data = await response.json();
         if (data.success && data.manholes) {
           setManholes(data.manholes);
+          if (hintManholeId) {
+            const found = (data.manholes as Manhole[]).find(m => m.id === hintManholeId);
+            if (found) setHintManhole(found);
+          }
         }
       }
     } catch (error) {
@@ -620,6 +628,22 @@ export default function UploadPage() {
           </p>
         </div>
 
+        {/* Hint Manhole Card */}
+        {hintManhole && (
+          <div className="rpg-window border-l-4 border-l-rpg-blue bg-rpg-blue/5">
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-rpg-blue flex-shrink-0" />
+              <span className="font-pixelJp text-sm font-bold text-rpg-textDark">撮影対象マンホール</span>
+            </div>
+            <p className="font-pixelJp text-xs text-rpg-textDark">
+              {hintManhole.name}（{hintManhole.prefecture} {hintManhole.city}）
+            </p>
+            <p className="font-pixelJp text-[10px] text-rpg-textDark opacity-60 mt-1">
+              写真をアップロードすると、GPS位置でマンホールを確認します
+            </p>
+          </div>
+        )}
+
         {/* Upload Area */}
         <div className="space-y-4">
           <div
@@ -770,17 +794,21 @@ export default function UploadPage() {
                       )}
 
                       {/* Matched Manhole */}
-                      {photo.matchedManhole && (
-                        <div className="bg-rpg-green/20 border-2 border-rpg-green p-2">
-                          <div className="flex items-center gap-1 font-pixelJp text-xs text-rpg-green">
-                            <CheckCircle className="w-3 h-3" />
-                            <span>マンホール検出!</span>
+                      {photo.matchedManhole && (() => {
+                        const isHintMatch = hintManhole && photo.matchedManhole!.id === hintManhole.id;
+                        const isHintMismatch = hintManhole && photo.matchedManhole!.id !== hintManhole.id;
+                        return (
+                          <div className={`border-2 p-2 ${isHintMatch ? 'bg-rpg-green/20 border-rpg-green' : isHintMismatch ? 'bg-rpg-yellow/20 border-rpg-yellow' : 'bg-rpg-green/20 border-rpg-green'}`}>
+                            <div className={`flex items-center gap-1 font-pixelJp text-xs ${isHintMismatch ? 'text-rpg-yellow' : 'text-rpg-green'}`}>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>{isHintMatch ? 'ヒント一致!' : isHintMismatch ? '別のマンホールが検出されました' : 'マンホール検出!'}</span>
+                            </div>
+                            <p className="font-pixelJp text-xs text-rpg-textDark mt-1">
+                              {photo.matchedManhole!.name} ({photo.matchedManhole!.city})
+                            </p>
                           </div>
-                          <p className="font-pixelJp text-xs text-rpg-textDark mt-1">
-                            {photo.matchedManhole.name} ({photo.matchedManhole.city})
-                          </p>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Upload Status */}
                       <div className="pt-2">
@@ -916,5 +944,21 @@ export default function UploadPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function UploadPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F6EEDC] flex items-center justify-center">
+          <div className="font-pixelJp text-[#7B63A8]">
+            読み込み中<span className="rpg-loading" />
+          </div>
+        </div>
+      }
+    >
+      <UploadPageInner />
+    </Suspense>
   );
 }
