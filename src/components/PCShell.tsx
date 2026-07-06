@@ -152,7 +152,7 @@ function PCTopNav({ active }: PCTopNavProps) {
             </Link>
           );
         })}
-        {/* 図鑑（data.pokefuta.com）への外部リンク。内部Link前提のNAV_ITEMSには混ぜない */}
+        {/* 図鑑（data.pokefuta.com）への外部リンク。内部Link前提の GUEST/AUTH_NAV_ITEMS には混ぜない */}
         {authLoaded && (
           <a
             href="https://data.pokefuta.com/"
