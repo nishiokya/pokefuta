@@ -1,5 +1,6 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient as createSSRBrowserClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { authCookieOptions } from './cookies';
 
 // ==========================================
 // 環境変数チェック
@@ -33,7 +34,11 @@ export const createBrowserClient = () => {
     );
   }
 
-  return createClientComponentClient();
+  // クッキー保存（本番: Domain=.pokefuta.com）で data.pokefuta.com と
+  // セッションを共有する
+  return createSSRBrowserClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: authCookieOptions,
+  });
 };
 
 // ==========================================
