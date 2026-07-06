@@ -3,8 +3,13 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { SITE_URL } from '@/lib/constants';
 
+// data.pokefuta.com（静的サイト側）からの SSO ログインのみ外部リダイレクトを許可
+const DATA_SITE_PREFIX = 'https://data.pokefuta.com/';
+
 function getSafeRedirectPath(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  if (!value) return '/';
+  if (value.startsWith(DATA_SITE_PREFIX)) return value;
+  if (!value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, Camera, Lock, Mail, MapPin, Search, Sparkles, Stamp } from 'lucide-react';
@@ -28,8 +28,13 @@ type RarePreviewItem = {
   pokemon: string;
 };
 
-function getSafeRedirectPath(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+// data.pokefuta.com（静的サイト側）からの SSO ログインのみ外部リダイレクトを許可
+const DATA_SITE_PREFIX = 'https://data.pokefuta.com/';
+
+function getSafeRedirectPath(value: string | null | undefined) {
+  if (!value) return '/';
+  if (value.startsWith(DATA_SITE_PREFIX)) return value;
+  if (!value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
 }
 
@@ -158,10 +163,13 @@ function LoginForm() {
   const fromRegister = searchParams.get('from') === 'register';
   const fromEmailConfirmed = searchParams.get('from') === 'email_confirmed';
   const fromGoogleOAuth = searchParams.get('from') === 'google_oauth';
+  const fromDataSite = searchParams.get('from') === 'data' || redirectTo.startsWith(DATA_SITE_PREFIX);
   const conversion = searchParams.get('conversion');
   const authError = searchParams.get('auth_error');
 
-  const [mode, setMode] = useState<'signup' | 'login'>(hasRedirect ? 'login' : 'signup');
+  const [mode, setMode] = useState<'signup' | 'login'>(
+    hasRedirect || fromDataSite ? 'login' : 'signup',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -191,6 +199,19 @@ function LoginForm() {
     trackAuthError(authError, authErrorMessage);
   }, [authError, trackAuthError]);
 
+  // data.pokefuta.com へ戻る場合はフルページ遷移（Next のルーターは外部 URL を扱えない）
+  const navigateAfterAuth = useCallback(
+    (target: string) => {
+      if (target.startsWith(DATA_SITE_PREFIX)) {
+        window.location.assign(target);
+        return;
+      }
+      router.replace(target);
+      router.refresh();
+    },
+    [router],
+  );
+
   useEffect(() => {
     if (!fromEmailConfirmed || conversion !== 'signup_email_confirmed') return;
     let isMounted = true;
@@ -210,14 +231,13 @@ function LoginForm() {
         updateUserProperties({ registered_user: true });
         sessionStorage.setItem(storageKey, 'true');
       }
-      router.replace(redirectTo);
-      router.refresh();
+      navigateAfterAuth(redirectTo);
     };
     complete().catch((err) => console.error('メール確認後のログイン状態確認に失敗:', err));
     return () => {
       isMounted = false;
     };
-  }, [conversion, fromEmailConfirmed, redirectTo, router, setUser, supabase, trackSignupEmailConfirmed, updateUserProperties]);
+  }, [conversion, fromEmailConfirmed, navigateAfterAuth, redirectTo, setUser, supabase, trackSignupEmailConfirmed, updateUserProperties]);
 
   useEffect(() => {
     if (!fromGoogleOAuth) return;
@@ -278,14 +298,13 @@ function LoginForm() {
       }
 
       // Always redirect to destination regardless of whether analytics fired
-      router.replace(oauthNext);
-      router.refresh();
+      navigateAfterAuth(oauthNext);
     };
     complete().catch((err) => console.error('Google OAuth後のログイン状態確認に失敗:', err));
     return () => {
       isMounted = false;
     };
-  }, [fromGoogleOAuth, router, searchParams, setError, setUser, supabase, trackLoginSuccess, trackSignupComplete, updateUserProperties]);
+  }, [fromGoogleOAuth, navigateAfterAuth, searchParams, setError, setUser, supabase, trackLoginSuccess, trackSignupComplete, updateUserProperties]);
 
   useEffect(() => {
     let isMounted = true;
@@ -325,8 +344,7 @@ function LoginForm() {
         if (data.user?.id) setUser(data.user.id);
         trackLoginSuccess();
         updateUserProperties({ registered_user: true });
-        router.push(redirectTo);
-        router.refresh();
+        navigateAfterAuth(redirectTo);
       } else {
         setError('ログインに失敗しました。セッションが作成されませんでした。');
       }
@@ -561,7 +579,23 @@ function LoginForm() {
           </div>
         </div>
       )}
-      {hasRedirect && !fromRegister && (
+      {fromDataSite && (
+        <div className="px-4 pt-4 lg:px-6">
+          <div className="max-w-5xl mx-auto rounded-xl border border-[#7B63A8]/20 bg-white/70 p-3 flex items-start gap-2">
+            <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-[#7B63A8]" />
+            <div>
+              <p className="text-xs font-extrabold text-[#4F3828]">
+                ポケふたデータベース（data.pokefuta.com）から来た方へ
+              </p>
+              <p className="mt-1 text-[11px] font-medium leading-relaxed text-[#6A4D36]">
+                データベースと訪問記録アプリ（pokefuta.com）は共通アカウントです。
+                ここでログインすると両方のサイトでログイン状態になり、ログイン後は元のページに自動で戻ります。
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {hasRedirect && !fromRegister && !fromDataSite && (
         <div className="px-4 pt-4 lg:px-6">
           <div className="max-w-5xl mx-auto rounded-xl border border-[#7B63A8]/20 bg-white/70 p-3">
             <p className="text-xs font-bold leading-relaxed text-[#7B63A8]">
