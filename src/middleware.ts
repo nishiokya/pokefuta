@@ -45,6 +45,10 @@ export async function middleware(req: NextRequest) {
       const redirectUrl = new URL('/login', req.url);
       // クエリ（?manhole_id= 等）も保持してログイン後に復元する
       redirectUrl.searchParams.set('redirect', req.nextUrl.pathname + req.nextUrl.search);
+      // data.pokefuta.com からの導線では /login に文脈を引き継ぐ（fromDataSite 案内表示）
+      if (req.nextUrl.searchParams.get('from') === 'data') {
+        redirectUrl.searchParams.set('from', 'data');
+      }
       return NextResponse.redirect(redirectUrl);
     }
 
