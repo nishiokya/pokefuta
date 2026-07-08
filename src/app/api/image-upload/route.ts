@@ -3,7 +3,8 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
-import { storage, generateStorageKey } from '@/lib/storage';
+import sharp from 'sharp';
+import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 
 /**
@@ -296,6 +297,25 @@ export async function POST(request: NextRequest) {
       contentType: file.type,
       cacheControl: 'public, max-age=31536000, immutable',
     });
+
+    // Generate the small variant used by feed thumbnails (/api/photo?size=small).
+    // 失敗しても読み側がオリジナルへフォールバックするため、アップロード自体は成功させる。
+    const smallKey = deriveSmallKey(storageKey);
+    if (smallKey) {
+      try {
+        const smallBuffer = await sharp(Buffer.from(arrayBuffer))
+          .rotate()
+          .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 70 })
+          .toBuffer();
+        await storage.put(smallKey, smallBuffer, {
+          contentType: 'image/webp',
+          cacheControl: 'public, max-age=31536000, immutable',
+        });
+      } catch (thumbError) {
+        console.error(`Thumbnail generation failed for ${storageKey}:`, thumbError);
+      }
+    }
 
     // Get signed URL for the uploaded file
     const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour

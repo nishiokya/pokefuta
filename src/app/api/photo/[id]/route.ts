@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
-import { storage } from '@/lib/storage';
+import { storage, deriveSmallKey } from '@/lib/storage';
 
 /**
  * @swagger
@@ -113,14 +113,30 @@ export async function GET(
     // Determine which storage key to use based on size
     let storageKey = photo.storage_key;
 
-    // For now, we don't have separate thumbnails, so just use the main image
-    // TODO: Generate and store thumbnails
+    if (size === 'small') {
+      const smallKey = deriveSmallKey(photo.storage_key);
+      // Small variant may not exist for photos uploaded before the thumbnail
+      // pipeline (or if generation failed) — fall back to the original.
+      if (smallKey && (await storage.exists?.(smallKey))) {
+        storageKey = smallKey;
+      }
+    }
 
     // Get signed URL from storage provider
     const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour expiry
 
+    // Cache the redirect so browsers reuse the same signed URL (which lets the
+    // immutable R2 object hit the browser cache). max-age must stay well below
+    // the signed URL TTL (3600s) so a cached Location never points at an
+    // expired URL. Private photos must not enter shared caches.
+    const cacheControl = visit?.is_public === true
+      ? 'public, max-age=1800, stale-while-revalidate=600'
+      : 'private, max-age=600';
+
     // Redirect to the signed URL
-    return NextResponse.redirect(signedUrl.url);
+    return NextResponse.redirect(signedUrl.url, {
+      headers: { 'Cache-Control': cacheControl },
+    });
 
   } catch (error: any) {
     console.error('Error fetching photo:', error);
