@@ -192,6 +192,9 @@ async function main() {
     }
 
     if (LIMIT && processed >= LIMIT) break;
+    // 最終ページ(満杯未満)で終了。ちょうど総数で割り切れる場合に
+    // 次ページを要求すると Supabase REST が 416 を返すため。
+    if (rows.length < pageSize || offset + rows.length >= total) break;
     offset += pageSize;
   }
 
