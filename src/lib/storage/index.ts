@@ -36,6 +36,19 @@ export function generateStorageKey(type: 'original' | 'thumb', size?: number): s
   return `photos/original/${year}/${month}/${uuid}.jpg`;
 }
 
+// Derive the small-variant key from an original storage key.
+// photos/original/YYYY/MM/{uuid}.jpg -> photos/small/YYYY/MM/{uuid}.webp
+// Deterministic so the read path can re-derive it without a DB column.
+// Returns null for keys that don't follow the original-photo layout.
+export function deriveSmallKey(storageKey: string): string | null {
+  if (!storageKey.startsWith('photos/original/')) {
+    return null;
+  }
+  return storageKey
+    .replace('photos/original/', 'photos/small/')
+    .replace(/\.[^./]+$/, '.webp');
+}
+
 export function generateContextImageStorageKey(manholeId: number, contentType?: string): string {
   const date = new Date();
   const year = date.getFullYear();

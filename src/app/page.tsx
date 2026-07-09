@@ -309,7 +309,8 @@ export default function HomePage() {
                             src={photo.thumbnail_url}
                             alt=""
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            loading="lazy"
+                            loading={currentPage === 1 && index < 4 ? 'eager' : 'lazy'}
+                            fetchPriority={currentPage === 1 && index < 4 ? 'high' : undefined}
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-[#FFF8EB] text-[#7B63A8]">

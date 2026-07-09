@@ -231,35 +231,47 @@ export async function GET(request: NextRequest) {
       )
     );
 
-    // いいね数とユーザーのいいね状態を取得
-    const { data: likes } = await supabase
-      .from('visit_like')
-      .select('visit_id, user_id')
-      .in('visit_id', visitIds);
+    const uniqueUserIds = Array.from(
+      new Set((visits || []).map((visit: any) => visit.user_id).filter(Boolean))
+    );
 
-    // 訪問記録へのコメント数を取得
-    const { data: commentCounts } = await supabase
-      .from('visit_comment')
-      .select('visit_id')
-      .in('visit_id', visitIds);
-
-    // マンホール共有コメント数を取得
-    const { data: manholeCommentCounts } = manholeIds.length > 0
-      ? await supabase
-        .from('manhole_comment')
-        .select('manhole_id')
-        .in('manhole_id', manholeIds)
-        .is('parent_comment_id', null)
-      : { data: [] as any[] };
-
-    // ユーザーのブックマーク状態を取得
-    const { data: bookmarks } = viewerUserId
-      ? await supabase
-        .from('visit_bookmark')
+    // いいね数・コメント数・ブックマーク状態・投稿者表示名は互いに独立なので並列取得
+    const [
+      { data: likes },
+      { data: commentCounts },
+      { data: manholeCommentCounts },
+      { data: bookmarks },
+      { data: appUsers },
+    ] = await Promise.all([
+      supabase
+        .from('visit_like')
+        .select('visit_id, user_id')
+        .in('visit_id', visitIds),
+      supabase
+        .from('visit_comment')
         .select('visit_id')
-        .eq('user_id', viewerUserId)
-        .in('visit_id', visitIds)
-      : { data: [] as any[] };
+        .in('visit_id', visitIds),
+      manholeIds.length > 0
+        ? supabase
+          .from('manhole_comment')
+          .select('manhole_id')
+          .in('manhole_id', manholeIds)
+          .is('parent_comment_id', null)
+        : Promise.resolve({ data: [] as any[] }),
+      viewerUserId
+        ? supabase
+          .from('visit_bookmark')
+          .select('visit_id')
+          .eq('user_id', viewerUserId)
+          .in('visit_id', visitIds)
+        : Promise.resolve({ data: [] as any[] }),
+      uniqueUserIds.length > 0
+        ? supabase
+          .from('app_user')
+          .select('auth_uid, display_name')
+          .in('auth_uid', uniqueUserIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
 
     // 各訪問記録のいいね数・コメント数・状態を集計
     const likesMap = new Map<string, { count: number; isLiked: boolean }>();
@@ -341,17 +353,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Enrich with poster display_name
-    const uniqueUserIds = Array.from(new Set(processedVisits.map((v: any) => v.user_id).filter(Boolean)));
     const displayNameMap = new Map<string, string | null>();
-    if (uniqueUserIds.length > 0) {
-      const { data: appUsers } = await supabase
-        .from('app_user')
-        .select('auth_uid, display_name')
-        .in('auth_uid', uniqueUserIds);
-      (appUsers || []).forEach((u: any) => {
-        if (u?.auth_uid) displayNameMap.set(u.auth_uid, u.display_name ?? null);
-      });
-    }
+    (appUsers || []).forEach((u: any) => {
+      if (u?.auth_uid) displayNameMap.set(u.auth_uid, u.display_name ?? null);
+    });
     const enrichedVisits = processedVisits.map((v: any) => ({
       ...v,
       display_name: displayNameMap.get(v.user_id) ?? null,
@@ -406,6 +411,15 @@ export async function GET(request: NextRequest) {
         offset,
         total: filteredVisits.length
       }
+    }, {
+      headers: {
+        // 匿名レスポンスは全員同一(is_liked/is_bookmarked 常に false)なので
+        // CDN で共有キャッシュさせ、Lambda 起動ごと削減する。
+        // ログイン時はユーザー固有のためキャッシュ禁止。
+        'Cache-Control': viewerUserId
+          ? 'private, no-store'
+          : 'public, s-maxage=60, stale-while-revalidate=300',
+      },
     });
 
   } catch (error: any) {
