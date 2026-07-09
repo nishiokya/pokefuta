@@ -324,6 +324,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      design_manhole: {
+        Row: {
+          id: string;
+          title: string | null;
+          description: string | null;
+          submitter_name: string | null;
+          latitude: number;
+          longitude: number;
+          storage_provider: string;
+          storage_key: string;
+          content_type: string;
+          file_size: number | null;
+          width: number | null;
+          height: number | null;
+          exif: Record<string, any> | null;
+          status: 'published' | 'hidden';
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title?: string | null;
+          description?: string | null;
+          submitter_name?: string | null;
+          latitude: number;
+          longitude: number;
+          storage_provider?: string;
+          storage_key: string;
+          content_type: string;
+          file_size?: number | null;
+          width?: number | null;
+          height?: number | null;
+          exif?: Record<string, any> | null;
+          status?: 'published' | 'hidden';
+          created_by: string;
+        };
+        Update: {
+          title?: string | null;
+          description?: string | null;
+          status?: 'published' | 'hidden';
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       shared_link: {
         Row: {
           id: string;
@@ -614,6 +659,20 @@ export interface Weather {
   temperature?: number;
   humidity?: number;
   description?: string;
+}
+
+// デザインマンホール一覧 API (/api/design-manholes GET) が返す公開データ
+export interface DesignManhole {
+  id: string;
+  title: string | null;
+  description: string | null;
+  submitter_name: string | null;
+  latitude: number;
+  longitude: number;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  photo_url: string;
 }
 
 export interface ExifData {

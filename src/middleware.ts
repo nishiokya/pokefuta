@@ -38,7 +38,7 @@ export async function middleware(req: NextRequest) {
     // 認証が必要なページへのアクセス
     // upload ページは認証必須
     // visits ページはプレビューモードがあるため未認証でもアクセス可能
-    const protectedPaths = ['/upload'];
+    const protectedPaths = ['/upload', '/design-manholes/new'];
     const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname.startsWith(path));
 
     if (!session && isProtectedPath) {
@@ -60,5 +60,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/upload/:path*'],
+  matcher: ['/upload/:path*', '/design-manholes/new'],
 };
