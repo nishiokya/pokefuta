@@ -77,13 +77,20 @@ const s3 = new S3Client({
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const limitIdx = args.indexOf('--limit');
-const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 0;
+let LIMIT = 0;
+if (limitIdx !== -1) {
+  LIMIT = parseInt(args[limitIdx + 1], 10);
+  if (!Number.isInteger(LIMIT) || LIMIT <= 0) {
+    console.error('--limit requires a positive integer (e.g. --limit 10)');
+    process.exit(1);
+  }
+}
 const CONCURRENCY = 5;
 
 // Must match deriveSmallKey in src/lib/storage/index.ts
 function deriveSmallKey(storageKey) {
-  if (!storageKey.includes('/original/')) return null;
-  return storageKey.replace('/original/', '/small/').replace(/\.[^./]+$/, '.webp');
+  if (!storageKey.startsWith('photos/original/')) return null;
+  return storageKey.replace('photos/original/', 'photos/small/').replace(/\.[^./]+$/, '.webp');
 }
 
 // --- supabase REST (avoid extra deps) -----------------------------------
@@ -178,8 +185,9 @@ async function main() {
     if (rows.length === 0) break;
 
     for (let i = 0; i < rows.length; i += CONCURRENCY) {
-      const batch = rows.slice(i, i + CONCURRENCY)
-        .filter(() => !LIMIT || processed < LIMIT)
+      const remaining = LIMIT ? LIMIT - processed : Infinity;
+      if (remaining <= 0) break;
+      const batch = rows.slice(i, i + Math.min(CONCURRENCY, remaining))
         .map((photo) => {
           processed++;
           return processPhoto(photo, counters, failures);

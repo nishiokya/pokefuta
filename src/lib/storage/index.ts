@@ -41,11 +41,11 @@ export function generateStorageKey(type: 'original' | 'thumb', size?: number): s
 // Deterministic so the read path can re-derive it without a DB column.
 // Returns null for keys that don't follow the original-photo layout.
 export function deriveSmallKey(storageKey: string): string | null {
-  if (!storageKey.includes('/original/')) {
+  if (!storageKey.startsWith('photos/original/')) {
     return null;
   }
   return storageKey
-    .replace('/original/', '/small/')
+    .replace('photos/original/', 'photos/small/')
     .replace(/\.[^./]+$/, '.webp');
 }
 
