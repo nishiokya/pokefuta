@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/client';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { storage, deriveDesignSmallKey } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -31,18 +32,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'サーバー設定エラーが発生しました' },
-        { status: 500 }
-      );
-    }
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size');
 
     // hidden にした投稿は写真も 404 にする（status フィルタが本体）
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await supabase
       .from('design_manhole')
       .select('id, storage_key')
       .eq('id', params.id)
