@@ -59,6 +59,29 @@ export function generateContextImageStorageKey(manholeId: number, contentType?: 
   return `photos/context/original/${year}/${month}/manholes/${manholeId}/${uuid}.${extension}`;
 }
 
+// デザインマンホール投稿写真用キー。visit 写真の photos/original/ とは
+// プレフィックスを分け、モデレーション・一括削除をしやすくする。
+export function generateDesignManholeStorageKey(contentType?: string): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const uuid = crypto.randomUUID();
+  const extension = contentTypeToExtension(contentType);
+
+  return `photos/design/original/${year}/${month}/${uuid}.${extension}`;
+}
+
+// photos/design/original/YYYY/MM/{uuid}.{ext} -> photos/design/small/YYYY/MM/{uuid}.webp
+// deriveSmallKey と同じ規約（決定的・DBカラム不要）。対象外のキーは null。
+export function deriveDesignSmallKey(storageKey: string): string | null {
+  if (!storageKey.startsWith('photos/design/original/')) {
+    return null;
+  }
+  return storageKey
+    .replace('photos/design/original/', 'photos/design/small/')
+    .replace(/\.[^./]+$/, '.webp');
+}
+
 function contentTypeToExtension(contentType?: string): string {
   switch (contentType) {
     case 'image/png':
