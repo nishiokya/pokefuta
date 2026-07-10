@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import sharp from 'sharp';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { supabaseAdmin } from '@/lib/supabase/client';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import {
   storage,
@@ -68,14 +67,6 @@ export async function POST(request: NextRequest) {
   let uploadedStorageKey: string | null = null;
 
   try {
-    if (!supabaseAdmin) {
-      console.error('supabaseAdmin is not configured (SUPABASE_SERVICE_ROLE_KEY missing)');
-      return NextResponse.json(
-        { success: false, error: 'サーバー設定エラーが発生しました' },
-        { status: 500 }
-      );
-    }
-
     // 1. 認証（image-upload と同じ cookie セッション方式）
     const supabase = createRouteHandlerClient({ cookies });
     const { data: { session } } = await supabase.auth.getSession();
@@ -190,8 +181,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. DB 挿入（失敗時はアップロード済みオブジェクトを掃除）
-    const { data: inserted, error: insertError } = await supabaseAdmin
+    // 6. DB 挿入（ユーザーセッションで実行。RLS が created_by = auth.uid() を担保。
+    //    失敗時はアップロード済みオブジェクトを掃除）
+    const { data: inserted, error: insertError } = await supabase
       .from('design_manhole')
       .insert({
         title,
@@ -253,12 +245,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'サーバー設定エラーが発生しました' },
-        { status: 500 }
-      );
-    }
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { searchParams } = new URL(request.url);
     const limitParam = parseInt(searchParams.get('limit') ?? '', 10);
@@ -267,7 +254,7 @@ export async function GET(request: NextRequest) {
       : 100;
 
     // 公開カラムのみ返す（exif / storage_key / created_by は絶対に含めない）
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('design_manhole')
       .select('id, title, description, submitter_name, latitude, longitude, width, height, created_at')
       .eq('status', 'published')
