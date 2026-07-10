@@ -35,6 +35,10 @@ import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordina
  *               manhole_id:
  *                 type: integer
  *                 description: マンホールID（必須）
+ *               visit_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: 既存の訪問記録に写真を追加する場合に指定（自分の訪問記録かつmanhole_idが一致する場合のみ有効。指定時はnote/comment/is_publicは無視される）
  *               shot_at:
  *                 type: string
  *                 format: date-time
@@ -163,6 +167,7 @@ export async function POST(request: NextRequest) {
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
     const exifStr = formData.get('exif');
+    const existingVisitId = formData.get('visit_id');  // 既存visitへの写真追加（一括投稿用）
 
     let photoExif: Record<string, any> | undefined;
     if (exifStr) {
@@ -285,6 +290,26 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ✅ visit_id指定時: 自分のvisitで、かつ同じマンホールのものだけ許可（R2アップロード前に検証）
+    let reusedVisitId: string | null = null;
+    if (existingVisitId) {
+      const { data: existingVisit, error: existingVisitError } = await supabase
+        .from('visit')
+        .select('id, user_id, manhole_id')
+        .eq('id', existingVisitId as string)
+        .single();
+
+      if (existingVisitError || !existingVisit ||
+          existingVisit.user_id !== userId ||
+          existingVisit.manhole_id !== manholeIdInt) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid visit_id - visit not found, not yours, or belongs to a different manhole'
+        }, { status: 400 });
+      }
+      reusedVisitId = existingVisit.id;
+    }
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
@@ -325,55 +350,60 @@ export async function POST(request: NextRequest) {
     let imageId: string | null = null;
 
     try {
-      // ✅ 強制的にログインユーザーのIDを使用
-      // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
-      let shotAtDate: Date;
-      if (shotAt) {
-        shotAtDate = new Date(shotAt as string);
-        // Validate date
-        if (isNaN(shotAtDate.getTime())) {
-          shotAtDate = new Date(); // Fallback to current time
+      if (reusedVisitId) {
+        // ✅ 既存visitに写真を追加（一括投稿の2枚目以降）。visit本体は変更しない
+        visitId = reusedVisitId;
+      } else {
+        // ✅ 強制的にログインユーザーのIDを使用
+        // Parse shot_at timestamp properly - convert to Date object for PostgreSQL
+        let shotAtDate: Date;
+        if (shotAt) {
+          shotAtDate = new Date(shotAt as string);
+          // Validate date
+          if (isNaN(shotAtDate.getTime())) {
+            shotAtDate = new Date(); // Fallback to current time
+          }
+        } else {
+          shotAtDate = new Date();
         }
-      } else {
-        shotAtDate = new Date();
-      }
 
-      // Build shot_location from required, validated GPS coordinates
-      const shotLocationGeom = `POINT(${lng} ${lat})`;
+        // Build shot_location from required, validated GPS coordinates
+        const shotLocationGeom = `POINT(${lng} ${lat})`;
 
-      // Create visit record with proper Date type
-      const visitInsert: any = {
-        user_id: userId,  // ✅ 必ず自分のID
-        shot_at: shotAtDate, // Pass Date object, not string
-      };
+        // Create visit record with proper Date type
+        const visitInsert: any = {
+          user_id: userId,  // ✅ 必ず自分のID
+          shot_at: shotAtDate, // Pass Date object, not string
+        };
 
-      // Add optional fields only if they exist in schema
-      // manhole_id is now required (validated above)
-      visitInsert.manhole_id = manholeIdInt;
+        // Add optional fields only if they exist in schema
+        // manhole_id is now required (validated above)
+        visitInsert.manhole_id = manholeIdInt;
 
-      if (shotLocationGeom) {
-        visitInsert.shot_location = shotLocationGeom;
-      }
-      if (note) {
-        visitInsert.note = note as string;
-      }
-      if (comment) {
-        visitInsert.comment = comment as string;  // 訪問コメント
-      }
-      // is_public: デフォルトはtrue、明示的にfalseが送られた場合のみfalseにする
-      visitInsert.is_public = isPublic === 'false' ? false : true;
+        if (shotLocationGeom) {
+          visitInsert.shot_location = shotLocationGeom;
+        }
+        if (note) {
+          visitInsert.note = note as string;
+        }
+        if (comment) {
+          visitInsert.comment = comment as string;  // 訪問コメント
+        }
+        // is_public: デフォルトはtrue、明示的にfalseが送られた場合のみfalseにする
+        visitInsert.is_public = isPublic === 'false' ? false : true;
 
-      const { data: visitData, error: visitError } = await supabase
-        .from('visit')
-        .insert(visitInsert)
-        .select()
-        .single();
+        const { data: visitData, error: visitError } = await supabase
+          .from('visit')
+          .insert(visitInsert)
+          .select()
+          .single();
 
-      if (!visitError && visitData) {
-        visitId = visitData.id;
-      } else {
-        console.error('Failed to create visit record:', visitError?.message);
-        throw new Error(`Visit creation failed: ${visitError?.message}`);
+        if (!visitError && visitData) {
+          visitId = visitData.id;
+        } else {
+          console.error('Failed to create visit record:', visitError?.message);
+          throw new Error(`Visit creation failed: ${visitError?.message}`);
+        }
       }
 
       // Create photo record with required and optional fields

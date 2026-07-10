@@ -42,6 +42,9 @@ interface AlertMessage {
   id: string;
 }
 
+// 一括投稿の上限（マンホール詳細ギャラリーの表示上限と揃える）
+const MAX_PHOTOS = 5;
+
 function UploadPageInner() {
   const searchParams = useSearchParams();
   const hintManholeId = searchParams.get('manhole_id') ? Number(searchParams.get('manhole_id')) : null;
@@ -53,6 +56,7 @@ function UploadPageInner() {
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null); // 一括登録の進捗
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister } = useAnalytics();
 
@@ -282,11 +286,34 @@ function UploadPageInner() {
   }, [manholes]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    // 一括投稿: 既存の選択に追加していく（上限 MAX_PHOTOS 枚）
+    const remainingSlots = MAX_PHOTOS - photos.length;
+    if (remainingSlots <= 0) {
+      addAlert('warning', `一度に登録できるのは${MAX_PHOTOS}枚までです。登録するか、写真を削除してください。`);
+      return;
+    }
+
+    // 同じファイル（名前+サイズ一致）の二重追加を防ぐ
+    const uniqueFiles = acceptedFiles.filter(
+      f => !photos.some(p => p.file.name === f.name && p.file.size === f.size)
+    );
+    if (uniqueFiles.length < acceptedFiles.length) {
+      addAlert('warning', '選択済みと同じ写真はスキップしました。');
+    }
+
+    if (uniqueFiles.length > remainingSlots) {
+      addAlert('warning', `一度に登録できるのは${MAX_PHOTOS}枚までです。先頭の${remainingSlots}枚だけ追加しました。`);
+    }
+    const filesToAdd = uniqueFiles.slice(0, remainingSlots);
+    if (filesToAdd.length === 0) {
+      return;
+    }
+
     setLoading(true);
 
     const newPhotos: UploadedPhoto[] = [];
 
-    for (const file of acceptedFiles) {
+    for (const file of filesToAdd) {
       const id = Math.random().toString(36).substring(2, 11);
       const preview = URL.createObjectURL(file);
       const metadata = await extractMetadata(file);
@@ -350,23 +377,25 @@ function UploadPageInner() {
         const distanceM = Math.round(distance * 1000); // kmをmに変換
         noteLines.push(`マンホールまでの距離: 約${distanceM}m`);
       }
-      if (noteLines.length > 0) {
+      // 個人メモの自動生成は1枚だけのときのみ（複数枚では最後の1枚の情報で上書きされてしまうため）
+      if (noteLines.length > 0 && photos.length === 0 && filesToAdd.length === 1) {
         setVisitNote(noteLines.join('\n'));
       }
     }
 
-    // Replace existing photo with the new one (only 1 photo allowed)
-    setPhotos(newPhotos);
+    // 既存の選択に追加（最大 MAX_PHOTOS 枚）
+    setPhotos(prev => [...prev, ...newPhotos]);
     setLoading(false);
-  }, [manholes]);
+  }, [manholes, photos, addAlert]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.heic', '.heif']
     },
-    multiple: false,
-    maxFiles: 1
+    // 上限チェックは onDrop 内で行う（maxFiles を設定すると超過時にドロップ全体が
+    // 黙って拒否されてしまうため、ここでは制限せず先頭 N 枚を取り込む）
+    multiple: true
   });
 
   const removePhoto = (id: string) => {
@@ -379,12 +408,18 @@ function UploadPageInner() {
     });
   };
 
-  const uploadPhoto = async (photoId: string) => {
+  // 1枚アップロードする。一括登録で同じマンホールの visit にまとめるため、
+  // visitId を渡すと既存 visit に写真を追加し、成功時は作成/使用した visit_id を返す。
+  const uploadPhoto = async (
+    photoId: string,
+    opts?: { visitId?: string; silent?: boolean }
+  ): Promise<{ ok: boolean; visitId?: string }> => {
     const photo = photos.find(p => p.id === photoId);
-    if (!photo) return;
+    if (!photo) return { ok: false };
 
-    // ✅ GA: 検証・圧縮・アップロードを含む全体処理の開始時刻を記録
-    const uploadStartTime = Date.now();
+    const notify = (type: 'error' | 'success', message: string) => {
+      if (!opts?.silent) addAlert(type, message);
+    };
 
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
@@ -395,8 +430,8 @@ function UploadPageInner() {
           error: errorMsg
         } : p
       ));
-      addAlert('error', errorMsg);
-      return;
+      notify('error', errorMsg);
+      return { ok: false };
     }
 
     // ✅ マンホールが選択されているかチェック
@@ -408,8 +443,8 @@ function UploadPageInner() {
           error: errorMsg
         } : p
       ));
-      addAlert('error', errorMsg);
-      return;
+      notify('error', errorMsg);
+      return { ok: false };
     }
 
     // ✅ マンホール位置との距離チェック（50m以内）
@@ -424,8 +459,8 @@ function UploadPageInner() {
           error: errorMsg
         } : p
       ));
-      addAlert('error', errorMsg);
-      return;
+      notify('error', errorMsg);
+      return { ok: false };
     }
 
     const distance = calculateDistance(
@@ -444,8 +479,8 @@ function UploadPageInner() {
           error: errorMsg
         } : p
       ));
-      addAlert('error', errorMsg);
-      return;
+      notify('error', errorMsg);
+      return { ok: false };
     }
 
     setPhotos(prev => prev.map(p =>
@@ -482,18 +517,23 @@ function UploadPageInner() {
         formData.append('longitude', String(photo.metadata.longitude));
       }
 
-      // Add note (個人メモ) if provided
-      if (visitNote.trim()) {
-        formData.append('note', visitNote.trim());
-      }
+      if (opts?.visitId) {
+        // 同じマンホールの既存 visit に写真を追加（note/comment は visit 作成時のみ有効）
+        formData.append('visit_id', opts.visitId);
+      } else {
+        // Add note (個人メモ) if provided
+        if (visitNote.trim()) {
+          formData.append('note', visitNote.trim());
+        }
 
-      // Add comment if provided
-      if (visitComment.trim()) {
-        formData.append('comment', visitComment.trim());
-      }
+        // Add comment if provided
+        if (visitComment.trim()) {
+          formData.append('comment', visitComment.trim());
+        }
 
-      // Add is_public setting
-      formData.append('is_public', isPublic.toString());
+        // Add is_public setting
+        formData.append('is_public', isPublic.toString());
+      }
 
       if (photo.metadata.exifPayload) {
         formData.append('exif', JSON.stringify(photo.metadata.exifPayload));
@@ -531,7 +571,8 @@ function UploadPageInner() {
           uploadedImageId: uploadResult.image.id
         } : p
       ));
-      addAlert('success', '訪問記録を登録しました！');
+      notify('success', '訪問記録を登録しました！');
+      return { ok: true, visitId: uploadResult.visit_id ?? opts?.visitId };
 
     } catch (error: any) {
       console.error('Upload failed:', error);
@@ -553,14 +594,53 @@ function UploadPageInner() {
           error: errorMsg
         } : p
       ));
-      addAlert('error', `登録失敗: ${errorMsg}`);
+      notify('error', `登録失敗: ${errorMsg}`);
+      return { ok: false };
     }
   };
 
   const uploadAllPhotos = async () => {
     const unuploadedPhotos = photos.filter(p => !p.uploaded && !p.uploading);
-    for (const photo of unuploadedPhotos) {
-      await uploadPhoto(photo.id);
+    if (unuploadedPhotos.length === 0) return;
+
+    // 1枚だけなら従来どおり（個別アラートを出す）
+    if (unuploadedPhotos.length === 1) {
+      await uploadPhoto(unuploadedPhotos[0].id);
+      return;
+    }
+
+    // 複数枚: 同じマンホールの写真は最初の1枚で作った visit にまとめる
+    setBatchProgress({ done: 0, total: unuploadedPhotos.length });
+    const visitIdByManhole = new Map<number, string>();
+    let successCount = 0;
+
+    try {
+      for (let i = 0; i < unuploadedPhotos.length; i++) {
+        const photo = unuploadedPhotos[i];
+        const manholeId = photo.matchedManhole?.id;
+        const existingVisitId = manholeId != null ? visitIdByManhole.get(manholeId) : undefined;
+
+        const result = await uploadPhoto(photo.id, { visitId: existingVisitId, silent: true });
+
+        if (result.ok) {
+          successCount++;
+          if (manholeId != null && result.visitId) {
+            visitIdByManhole.set(manholeId, result.visitId);
+          }
+        }
+        setBatchProgress({ done: i + 1, total: unuploadedPhotos.length });
+      }
+    } finally {
+      setBatchProgress(null);
+    }
+
+    const failCount = unuploadedPhotos.length - successCount;
+    if (failCount === 0) {
+      addAlert('success', `${successCount}枚の訪問記録を登録しました！`);
+    } else if (successCount > 0) {
+      addAlert('warning', `${successCount}枚を登録しました。${failCount}枚は登録できませんでした（各写真のエラーを確認してください）。`);
+    } else {
+      addAlert('error', '登録できませんでした。各写真のエラーを確認してください。');
     }
   };
 
@@ -656,10 +736,10 @@ function UploadPageInner() {
             <div className="text-center py-8">
               <Upload className={`w-16 h-16 mx-auto mb-4 ${isDragActive ? 'text-rpg-yellow' : 'text-rpg-blue'}`} />
               <p className="font-pixelJp text-lg text-rpg-textDark mb-2">
-                {isDragActive ? '写真をドロップ!' : '写真を1枚選択またはドロップ'}
+                {isDragActive ? '写真をドロップ!' : '写真を選択またはドロップ'}
               </p>
               <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
-                JPEG, PNG, HEIC形式に対応
+                一度に最大{MAX_PHOTOS}枚まで / JPEG, PNG, HEIC形式に対応
               </p>
               <div className="flex gap-2 justify-center">
                 <button className="rpg-button text-xs">
@@ -741,16 +821,23 @@ function UploadPageInner() {
             <div className="rpg-window">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-pixelJp text-sm text-rpg-textDark font-bold">
-                  選択済み写真
+                  選択済み写真（{photos.length}/{MAX_PHOTOS}枚）
                 </h2>
                 <button
                   onClick={uploadAllPhotos}
                   className="rpg-button rpg-button-primary text-xs"
                   disabled={photos.every(p => p.uploaded || p.uploading)}
                 >
-                  <span className="font-pixelJp">登録</span>
+                  <span className="font-pixelJp">
+                    {batchProgress
+                      ? `登録中 ${batchProgress.done}/${batchProgress.total}`
+                      : `${photos.filter(p => !p.uploaded && !p.uploading).length}枚を登録`}
+                  </span>
                 </button>
               </div>
+              <p className="font-pixelJp text-[10px] text-rpg-textDark opacity-60">
+                コメント・公開設定は下で入力できます。同じマンホールの写真は1つの訪問記録にまとまります。
+              </p>
             </div>
 
             <div className="space-y-4">
@@ -773,12 +860,15 @@ function UploadPageInner() {
                         <h3 className="font-pixelJp text-xs text-rpg-textDark font-bold truncate">
                           {photo.file.name}
                         </h3>
-                        <button
-                          onClick={() => removePhoto(photo.id)}
-                          className="text-rpg-red hover:opacity-70"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        {!photo.uploaded && !photo.uploading && (
+                          <button
+                            onClick={() => removePhoto(photo.id)}
+                            className="text-rpg-red hover:opacity-70"
+                            aria-label="この写真を削除"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
 
                       {/* Location Info */}
@@ -805,6 +895,18 @@ function UploadPageInner() {
                             </div>
                             <p className="font-pixelJp text-xs text-rpg-textDark mt-1">
                               {photo.matchedManhole!.name} ({photo.matchedManhole!.city})
+                              {isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude) &&
+                                photo.matchedManhole!.latitude != null &&
+                                photo.matchedManhole!.longitude != null && (
+                                <span className="opacity-60">
+                                  {' '}・約{Math.round(calculateDistance(
+                                    photo.metadata.latitude as number,
+                                    photo.metadata.longitude as number,
+                                    photo.matchedManhole!.latitude,
+                                    photo.matchedManhole!.longitude
+                                  ) * 1000)}m
+                                </span>
+                              )}
                             </p>
                           </div>
                         );
@@ -921,10 +1023,14 @@ function UploadPageInner() {
                     <button
                       onClick={uploadAllPhotos}
                       className="rpg-button w-full py-3 text-base"
-                      disabled={photos.every(p => p.uploaded || p.uploading)}
+                      disabled={photos.every(p => p.uploaded || p.uploading) || batchProgress !== null}
                     >
                       <Upload className="w-5 h-5 inline mr-2" />
-                      <span className="font-pixelJp">訪問記録を登録</span>
+                      <span className="font-pixelJp">
+                        {batchProgress
+                          ? `登録中 ${batchProgress.done}/${batchProgress.total}...`
+                          : `${photos.filter(p => !p.uploaded && !p.uploading).length}枚の訪問記録を登録`}
+                      </span>
                     </button>
                   )}
                   {photos.some(p => p.uploaded) && (
@@ -932,6 +1038,16 @@ function UploadPageInner() {
                       <div className="flex items-center gap-2 text-rpg-success font-pixelJp text-sm">
                         <CheckCircle className="w-5 h-5" />
                         <span>登録完了しました！</span>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Link href="/visits" className="rpg-button text-xs flex items-center gap-1">
+                          <History className="w-4 h-4" />
+                          <span className="font-pixelJp">訪問記録を見る</span>
+                        </Link>
+                        <Link href="/" className="rpg-button text-xs flex items-center gap-1">
+                          <Home className="w-4 h-4" />
+                          <span className="font-pixelJp">トップへ</span>
+                        </Link>
                       </div>
                     </div>
                   )}
