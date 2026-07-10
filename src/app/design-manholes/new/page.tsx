@@ -45,14 +45,20 @@ export default function DesignManholeNewPage() {
     let cancelled = false;
     try {
       const supabase = createBrowserClient();
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (cancelled || !session?.user) return;
-        const displayName =
-          session.user.user_metadata?.display_name ||
-          session.user.email?.split('@')[0] ||
-          '';
-        setSubmitterName((prev) => prev || displayName);
-      });
+      supabase.auth
+        .getSession()
+        .then(({ data: { session } }) => {
+          if (cancelled || !session?.user) return;
+          const displayName =
+            session.user.user_metadata?.display_name ||
+            session.user.email?.split('@')[0] ||
+            '';
+          setSubmitterName((prev) => prev || displayName);
+        })
+        .catch((e) => {
+          // 表示名プレフィルは補助機能なので失敗しても投稿は続行できる
+          console.error('Failed to get session for display name:', e);
+        });
     } catch (e) {
       console.error('Supabase initialization error:', e);
     }
@@ -81,6 +87,16 @@ export default function DesignManholeNewPage() {
         setLat(raw.latitude);
         setLng(raw.longitude);
         setGpsSource('exif');
+      } else {
+        // 前の写真のEXIF座標を引きずらない（手動で置いたピンは維持する）
+        setGpsSource((prev) => {
+          if (prev === 'exif') {
+            setLat(null);
+            setLng(null);
+            return null;
+          }
+          return prev;
+        });
       }
       if (raw) {
         setExifPayload({
@@ -97,12 +113,27 @@ export default function DesignManholeNewPage() {
       }
     } catch {
       setExifPayload(null);
+      setGpsSource((prev) => {
+        if (prev === 'exif') {
+          setLat(null);
+          setLng(null);
+          return null;
+        }
+        return prev;
+      });
     }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': [] },
+    // サーバーが受けるのは JPEG/PNG/WebP。HEIC/HEIF は送信前に JPEG へ変換するので許可
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'image/heic': ['.heic'],
+      'image/heif': ['.heif'],
+    },
     maxFiles: 1,
     multiple: false,
   });

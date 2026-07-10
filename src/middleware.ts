@@ -60,5 +60,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/upload/:path*', '/design-manholes/new'],
+  matcher: ['/upload/:path*', '/design-manholes/new/:path*'],
 };
