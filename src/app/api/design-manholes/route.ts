@@ -275,6 +275,8 @@ export async function GET(request: NextRequest) {
       {
         headers: {
           'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
+          // data.pokefuta.com の投稿LPがギャラリー表示に読む（公開カラムのみの一覧なので許可できる）
+          'Access-Control-Allow-Origin': 'https://data.pokefuta.com',
         },
       }
     );
