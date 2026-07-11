@@ -18,6 +18,7 @@ type JourneyVisit = {
   manhole_id: number | null;
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> & { city?: string } | null;
   shot_at: string;
+  display_name?: string | null;
   photos: Array<{ id: string; thumbnail_url?: string }>;
 };
 
@@ -269,6 +270,7 @@ export default function MyTripPage() {
                           thumbnailUrl={visit.photos?.[0]?.thumbnail_url}
                           title={title}
                           date={dateStr}
+                          posterName={visit.display_name}
                           tags={getManholeTags(visit.manhole, 2)}
                         />
                       );

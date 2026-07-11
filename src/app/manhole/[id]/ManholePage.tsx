@@ -52,7 +52,8 @@ interface Photo {
 
 const getPhotoUserLabel = (photo: Photo) => {
   const name = photo.visit?.display_name;
-  if (name && name.trim().length > 0) return name;
+  const trimmedName = name?.trim();
+  if (trimmedName) return trimmedName;
   const uid = photo.visit?.user_id;
   if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
   return '名無しのトレーナー';
@@ -798,10 +799,8 @@ export default function ManholeDetailPage() {
                 {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 44px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700 }}>
-                      {featuredPhoto.visit?.user_id === currentUserId
-                        ? 'あなたの1枚'
-                        : `@${getPhotoUserLabel(featuredPhoto)}`}
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700 }}>
+                      @{getPhotoUserLabel(featuredPhoto)}
                     </span>
                     {featuredPhoto.visit?.shot_at && (
                       <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'Outfit,sans-serif', opacity: 0.9 }}>
