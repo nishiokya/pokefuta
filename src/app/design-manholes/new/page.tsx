@@ -235,6 +235,11 @@ export default function DesignManholeNewPage() {
           ポケふた以外の「オンリーワンなデザインマンホール」を見つけたら教えてください。
           写真1枚と位置情報が必須です。
         </p>
+        <p className="mt-2 text-right text-xs">
+          <Link href="/upload" className="text-[#7B63A8] underline hover:opacity-80">
+            ポケふた（ポケモンマンホール）の写真投稿はこちら →
+          </Link>
+        </p>
 
         {/* 写真 */}
         <section className="mt-6">
