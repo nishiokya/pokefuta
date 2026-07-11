@@ -242,6 +242,7 @@ export async function GET(request: NextRequest) {
       { data: manholeCommentCounts },
       { data: bookmarks },
       { data: appUsers },
+      publicUserIdsResult,
     ] = await Promise.all([
       supabase
         .from('visit_like')
@@ -268,9 +269,20 @@ export async function GET(request: NextRequest) {
       uniqueUserIds.length > 0
         ? supabase
           .from('app_user')
-          .select('id, auth_uid, display_name')
+          .select('auth_uid, display_name')
           .in('auth_uid', uniqueUserIds)
         : Promise.resolve({ data: [] as any[] }),
+      // ✅ public_user_id は「公開訪問を持つユーザー」限定のRPCで解決する
+      // (app_user.id への直接SELECT権限は削除済み。RPC自体が存在しなくても
+      // エンドポイント全体を落とさないよう、失敗時はログのみで空扱いにする)
+      uniqueUserIds.length > 0
+        ? supabase
+          .rpc('get_public_user_ids' as never, { p_auth_uids: uniqueUserIds } as never)
+          .then(
+            (result: any) => result,
+            (err: any) => ({ data: null, error: err })
+          )
+        : Promise.resolve({ data: [] as any[], error: null }),
     ]);
 
     // 各訪問記録のいいね数・コメント数・状態を集計
@@ -361,7 +373,15 @@ export async function GET(request: NextRequest) {
     (appUsers || []).forEach((u: any) => {
       if (u?.auth_uid) {
         displayNameMap.set(u.auth_uid, u.display_name ?? null);
-        publicUserIdMap.set(u.auth_uid, u.id ?? null);
+      }
+    });
+    if (publicUserIdsResult?.error) {
+      // RPC未適用/失敗時もエンドポイント自体は壊さず、public_user_id は null 扱いにする
+      console.warn('Failed to load public_user_id via get_public_user_ids RPC:', publicUserIdsResult.error);
+    }
+    ((publicUserIdsResult?.data as any[]) || []).forEach((row: any) => {
+      if (row?.auth_uid) {
+        publicUserIdMap.set(row.auth_uid, row.public_user_id ?? null);
       }
     });
     const enrichedVisits = processedVisits.map((v: any) => ({

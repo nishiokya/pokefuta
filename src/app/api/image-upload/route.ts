@@ -623,10 +623,20 @@ export async function GET(request: NextRequest) {
 
       if (visitUserIds.length > 0) {
         // A方針: app_user.display_name を公開SELECTで解決するため、通常のroute clientを使う
-        const { data: appUsers, error: appUserError } = await supabase
-          .from('app_user')
-          .select('id, auth_uid, display_name')
-          .in('auth_uid', visitUserIds);
+        // public_user_id (app_user.id) は「公開訪問を持つユーザー」限定のRPCで解決する
+        // (app_user.id への直接SELECT権限は削除済み)
+        const [{ data: appUsers, error: appUserError }, publicUserIdsResult] = await Promise.all([
+          supabase
+            .from('app_user')
+            .select('auth_uid, display_name')
+            .in('auth_uid', visitUserIds),
+          supabase
+            .rpc('get_public_user_ids' as never, { p_auth_uids: visitUserIds } as never)
+            .then(
+              (result: any) => result,
+              (err: any) => ({ data: null, error: err })
+            ),
+        ]);
 
         if (appUserError) {
           console.warn('Failed to load app_user for photo list:', appUserError);
@@ -634,7 +644,17 @@ export async function GET(request: NextRequest) {
           (appUsers || []).forEach((u: any) => {
             if (u?.auth_uid) {
               displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
-              publicUserIdByAuthUid.set(u.auth_uid, u.id ?? null);
+            }
+          });
+        }
+
+        if (publicUserIdsResult?.error) {
+          // RPC未適用/失敗時もエンドポイント自体は壊さず、public_user_id は null 扱いにする
+          console.warn('Failed to load public_user_id via get_public_user_ids RPC:', publicUserIdsResult.error);
+        } else {
+          ((publicUserIdsResult?.data as any[]) || []).forEach((row: any) => {
+            if (row?.auth_uid) {
+              publicUserIdByAuthUid.set(row.auth_uid, row.public_user_id ?? null);
             }
           });
         }
