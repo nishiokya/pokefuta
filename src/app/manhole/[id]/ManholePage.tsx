@@ -52,7 +52,8 @@ interface Photo {
 
 const getPhotoUserLabel = (photo: Photo) => {
   const name = photo.visit?.display_name;
-  if (name && name.trim().length > 0) return name;
+  const trimmedName = name?.trim();
+  if (trimmedName) return trimmedName;
   const uid = photo.visit?.user_id;
   if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
   return '名無しのトレーナー';
