@@ -803,7 +803,7 @@ export default function ManholeDetailPage() {
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 44px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
                     {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
                       <Link
-                        href={`/users/${featuredPhoto.visit.public_user_id}/visits`}
+                        href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
                         onClick={(e) => e.stopPropagation()}
                         style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700, color: '#fff', textDecoration: 'underline' }}
                       >

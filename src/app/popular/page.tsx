@@ -339,13 +339,13 @@ export default function PopularPage() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  router.push(`/users/${visit.public_user_id}/visits`);
+                                  router.push(`/users/${encodeURIComponent(visit.public_user_id!)}/visits`);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    router.push(`/users/${visit.public_user_id}/visits`);
+                                    router.push(`/users/${encodeURIComponent(visit.public_user_id!)}/visits`);
                                   }
                                 }}
                               >
