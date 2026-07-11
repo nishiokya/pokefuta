@@ -91,6 +91,12 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </div>
         </section>
 
+        {data.isTruncated && (
+          <p className="mt-4 text-xs font-bold text-[#6A4D36]">
+            最新500件を表示しています（全{data.totalVisits}件）
+          </p>
+        )}
+
         <section className="mt-6">
           {data.visits.length === 0 ? (
             <div className="rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 px-5 py-10 text-center text-sm font-bold text-[#6A4D36]">

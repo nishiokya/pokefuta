@@ -30,6 +30,7 @@ export type PublicUserVisits = {
   totalVisits: number;
   prefectureCount: number;
   visits: PublicVisit[];
+  isTruncated: boolean;
 };
 
 type VisitPublicRow = {
@@ -55,6 +56,12 @@ type VisitPublicRow = {
 };
 
 const VISIT_LIMIT = 500;
+// prefectureCount 集計用: カード一覧よりゆるい上限で全件に近い形を見る（写真joinなし・軽量）
+const PREFECTURE_SCAN_LIMIT = 2000;
+
+type PrefectureScanRow = {
+  manhole?: { prefecture: string | null } | Array<{ prefecture: string | null }> | null;
+};
 
 async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
   const supabase = getProgressClient();
@@ -83,42 +90,79 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
   // NOTE: note カラムは非公開情報のため絶対にSELECTしない
-  const { data: visits, error: visitsError } = await supabase
-    .from('visit')
-    .select(`
-      id,
-      manhole_id,
-      shot_at,
-      comment,
-      created_at,
-      manhole:manhole_id (
+  // カード一覧(500件上限)・正確な総数(head count)・都道府県数集計(写真joinなしの軽量スキャン)を並列取得。
+  // 500件上限だけで totalVisits/prefectureCount を計算すると、公開訪問が500件を超える
+  // ユーザーで数値が実態より小さく出てしまうため、別クエリで正確な値を出す。
+  const [
+    { data: visits, error: visitsError },
+    { count: totalCount, error: totalCountError },
+    { data: prefectureRows, error: prefectureScanError },
+  ] = await Promise.all([
+    supabase
+      .from('visit')
+      .select(`
         id,
-        title,
-        prefecture,
-        municipality,
-        pokemons
-      ),
-      photos:photo (
-        id
-      )
-    `)
-    .eq('user_id', appUserRow.auth_uid)
-    .eq('is_public', true)
-    .order('shot_at', { ascending: false })
-    .limit(VISIT_LIMIT);
+        manhole_id,
+        shot_at,
+        comment,
+        created_at,
+        manhole:manhole_id (
+          id,
+          title,
+          prefecture,
+          municipality,
+          pokemons
+        ),
+        photos:photo (
+          id
+        )
+      `)
+      .eq('user_id', appUserRow.auth_uid)
+      .eq('is_public', true)
+      .order('shot_at', { ascending: false })
+      .limit(VISIT_LIMIT)
+      // select 側のエイリアス(photos:photo)に対する modifier は
+      // PostgREST 上ではエイリアス名で参照する（テーブル実名の 'photo' ではない）
+      .limit(1, { referencedTable: 'photos' }),
+    supabase
+      .from('visit')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', appUserRow.auth_uid)
+      .eq('is_public', true),
+    supabase
+      .from('visit')
+      .select(`
+        manhole:manhole_id (
+          prefecture
+        )
+      `)
+      .eq('user_id', appUserRow.auth_uid)
+      .eq('is_public', true)
+      .limit(PREFECTURE_SCAN_LIMIT),
+  ]);
 
   if (visitsError) {
     throw new Error(visitsError.message);
+  }
+  if (totalCountError) {
+    throw new Error(totalCountError.message);
+  }
+  if (prefectureScanError) {
+    throw new Error(prefectureScanError.message);
   }
 
   const visitRows = ((visits || []) as unknown as VisitPublicRow[]);
 
   const prefectureSet = new Set<string>();
-  const publicVisits: PublicVisit[] = visitRows.map((visit) => {
-    const manhole = Array.isArray(visit.manhole) ? visit.manhole[0] : visit.manhole;
+  ((prefectureRows || []) as unknown as PrefectureScanRow[]).forEach((row) => {
+    const manhole = Array.isArray(row.manhole) ? row.manhole[0] : row.manhole;
     if (manhole?.prefecture) {
       prefectureSet.add(manhole.prefecture);
     }
+  });
+
+  const publicVisits: PublicVisit[] = visitRows.map((visit) => {
+    const manhole = Array.isArray(visit.manhole) ? visit.manhole[0] : visit.manhole;
     const photos = Array.isArray(visit.photos) ? visit.photos : [];
 
     return {
@@ -140,12 +184,15 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     };
   });
 
+  const totalVisits = totalCount ?? publicVisits.length;
+
   return {
     userId: trimmedUserId,
     displayName,
-    totalVisits: publicVisits.length,
+    totalVisits,
     prefectureCount: prefectureSet.size,
     visits: publicVisits,
+    isTruncated: totalVisits > publicVisits.length,
   };
 }
 
