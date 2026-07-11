@@ -619,7 +619,7 @@ export default function NearbyPage() {
                           {manhole.visit.photos.slice(0, 3).map((photo: any) => (
                             <div
                               key={photo.id}
-                              className="relative aspect-square overflow-hidden rounded-[6px] bg-white"
+                              className="relative aspect-[4/3] overflow-hidden rounded-[6px] bg-white"
                             >
                               <img
                                 src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
