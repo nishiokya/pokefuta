@@ -119,17 +119,15 @@ export default function Header({
             </Link>
           )}
 
-          {/* デザインマンホールは自分用機能なのでログイン時のみ導線を出す（URL直アクセスは可） */}
-          {user && (
-            <Link
-              href="/design-manholes"
-              className="flex h-10 flex-shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:text-sm"
-              aria-label="デザインマンホール（ポケふた以外の投稿）"
-              title="デザインマンホール（ポケふた以外の投稿）"
-            >
-              デザイン蓋
-            </Link>
-          )}
+          {/* PCでは常に導線を出す。スマフォはログイン時のみ（自分用機能・URL直アクセスは可） */}
+          <Link
+            href="/design-manholes"
+            className={`${user ? 'flex' : 'hidden'} h-10 flex-shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:flex sm:text-sm`}
+            aria-label="デザインマンホール（ポケふた以外の投稿）"
+            title="デザインマンホール（ポケふた以外の投稿）"
+          >
+            デザイン蓋
+          </Link>
 
           <a
             href="https://data.pokefuta.com/"
