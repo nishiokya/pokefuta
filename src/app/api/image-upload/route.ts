@@ -665,10 +665,13 @@ export async function GET(request: NextRequest) {
         if (visit && typeof visit === 'object' && !Array.isArray(visit)) {
           const displayName = displayNameByAuthUid.get(visit.user_id) ?? null;
           const publicUserId = publicUserIdByAuthUid.get(visit.user_id) ?? null;
+          // note は非公開メモ（GPS座標・撮影日時等を含む）のため本人の訪問以外には返さない
+          const isOwnVisit = viewerUserId && visit.user_id === viewerUserId;
           return {
             ...img,
             visit: {
               ...visit,
+              note: isOwnVisit ? visit.note : undefined,
               display_name: displayName,
               public_user_id: publicUserId
             }
