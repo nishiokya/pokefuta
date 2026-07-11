@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Camera, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
@@ -42,6 +43,7 @@ interface Photo {
     id: string;
     user_id: string;
     display_name?: string | null;
+    public_user_id?: string | null;
     shot_at: string;
     created_at?: string;
     note?: string;
@@ -799,9 +801,19 @@ export default function ManholeDetailPage() {
                 {/* caption — inline styles to prevent global CSS overrides */}
                 {featuredPhoto && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 44px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
-                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700 }}>
-                      @{getPhotoUserLabel(featuredPhoto)}
-                    </span>
+                    {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
+                      <Link
+                        href={`/users/${featuredPhoto.visit.public_user_id}/visits`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700, color: '#fff', textDecoration: 'underline' }}
+                      >
+                        @{getPhotoUserLabel(featuredPhoto)}
+                      </Link>
+                    ) : (
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700 }}>
+                        @{getPhotoUserLabel(featuredPhoto)}
+                      </span>
+                    )}
                     {featuredPhoto.visit?.shot_at && (
                       <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'Outfit,sans-serif', opacity: 0.9 }}>
                         {formatPhotoDate(featuredPhoto.visit.shot_at)}

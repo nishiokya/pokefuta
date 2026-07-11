@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Camera,
   ChevronLeft,
@@ -36,9 +37,11 @@ type FeedVisit = {
   comments_count: number;
   manhole_comments_count?: number;
   display_name?: string | null;
+  public_user_id?: string | null;
 };
 
 export default function PopularPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -328,7 +331,29 @@ export default function PopularPage() {
                           </div>
                           <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
                           {visit.display_name && (
-                            <div className="mt-0.5 text-xs font-medium opacity-80">{visit.display_name}</div>
+                            visit.public_user_id ? (
+                              <span
+                                role="link"
+                                tabIndex={0}
+                                className="mt-0.5 inline-block cursor-pointer text-xs font-medium underline decoration-white/60 underline-offset-2 opacity-80 hover:opacity-100"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/users/${visit.public_user_id}/visits`);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    router.push(`/users/${visit.public_user_id}/visits`);
+                                  }
+                                }}
+                              >
+                                {visit.display_name}
+                              </span>
+                            ) : (
+                              <div className="mt-0.5 text-xs font-medium opacity-80">{visit.display_name}</div>
+                            )
                           )}
                           <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1">
