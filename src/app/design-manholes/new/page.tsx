@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useDropzone } from 'react-dropzone';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
-import { Camera, CheckCircle } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle, Upload } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -118,6 +118,21 @@ export default function DesignManholeNewPage() {
     maxFiles: 1,
     multiple: false,
   });
+
+  // スマホの背面カメラで直接撮影する（/upload と同じ導線）
+  const captureFromCamera = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = async (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files.length > 0) {
+        await onDrop(Array.from(target.files));
+      }
+    };
+    input.click();
+  };
 
   const canSubmit = !!file && lat != null && lng != null && !exifChecking && !submitting;
 
@@ -232,18 +247,41 @@ export default function DesignManholeNewPage() {
           >
             <input {...getInputProps()} />
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={previewUrl}
-                alt="投稿する写真のプレビュー"
-                className="mx-auto max-h-64 rounded-lg object-contain"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="投稿する写真のプレビュー"
+                  className="mx-auto max-h-64 rounded-lg object-contain"
+                />
+                <p className="mt-2 text-xs text-[#2A2A2A]/50">タップして写真を変更できます</p>
+              </>
             ) : (
-              <p className="text-sm text-[#2A2A2A]/60">
-                タップして写真を選択（またはドラッグ&ドロップ）
-              </p>
+              <>
+                <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
+                <p className="text-sm text-[#2A2A2A]/60">
+                  {isDragActive ? '写真をドロップ！' : 'タップして写真を選択（またはドラッグ&ドロップ）'}
+                </p>
+                <p className="mt-1 text-xs text-[#2A2A2A]/50">
+                  JPEG, PNG, WebP, HEIC形式に対応
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    captureFromCamera();
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+                >
+                  <Camera className="h-4 w-4" />
+                  カメラで撮影
+                </button>
+              </>
             )}
           </div>
+          <p className="mt-2 text-xs text-[#2A2A2A]/60">
+            できるだけ「真上から・マンホール全体（ふたの縁まで）が入る」写真だと、とても助かります。
+          </p>
           {file && exifChecking && (
             <p className="mt-2 text-xs text-[#2A2A2A]/60">
               写真の位置情報を確認中...
@@ -260,6 +298,41 @@ export default function DesignManholeNewPage() {
             </p>
           )}
         </section>
+
+        {/* 撮影のコツ（/upload と同じガイド） */}
+        <details className="mt-4 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
+          <summary className="cursor-pointer text-sm font-bold">撮影のコツ（OK / NG例）</summary>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-[#4C9A57]/30 bg-[#4C9A57]/5 p-2">
+              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#4C9A57]">
+                <CheckCircle className="w-3 h-3" />
+                <span>OK</span>
+              </div>
+              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
+                <li>・マンホール全体が入っている</li>
+                <li>・真上に近い角度で撮れている</li>
+                <li>・絵柄や文字がはっきり見える</li>
+              </ul>
+            </div>
+
+            <div className="rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/5 p-2">
+              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#B5483C]">
+                <AlertCircle className="w-3 h-3" />
+                <span>NG</span>
+              </div>
+              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
+                <li>・斜めすぎて歪んでいる</li>
+                <li>・反射/影で見えにくい</li>
+                <li>・暗い/ブレている</li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="mt-2 text-xs text-[#2A2A2A]/60">
+            📍 <strong>位置情報（GPS）付きの写真が必要です。</strong> 設置場所は写真のEXIFから自動で読み取ります。ポケふた投稿と異なり登録済みマンホールとの照合はないため、どの場所のマンホールでも投稿できます。
+          </p>
+        </details>
 
         {/* 任意項目 */}
         <section className="mt-6 space-y-4">
