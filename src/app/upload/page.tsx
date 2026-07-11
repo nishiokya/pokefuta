@@ -357,9 +357,8 @@ function UploadPageInner() {
       const distanceM = Math.round(distance * 1000); // kmをmに変換
       noteLines.push(`マンホールまでの距離: 約${distanceM}m`);
     }
-    if (noteLines.length > 0) {
-      setVisitNote(noteLines.join('\n'));
-    }
+    // 写真を差し替えたとき前の写真の自動メモが残らないよう、空でも毎回更新する
+    setVisitNote(noteLines.join('\n'));
 
     setLoading(false);
   }, [manholes]);

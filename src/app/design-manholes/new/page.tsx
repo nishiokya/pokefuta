@@ -19,6 +19,7 @@ export default function DesignManholeNewPage() {
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [gpsSource, setGpsSource] = useState<GpsSource>(null);
+  const [exifChecking, setExifChecking] = useState(false);
   const [exifPayload, setExifPayload] = useState<Record<string, any> | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -66,6 +67,7 @@ export default function DesignManholeNewPage() {
     });
 
     // EXIF は圧縮前のオリジナルから読む（圧縮でGPSが失われるため）
+    setExifChecking(true);
     try {
       const raw = await exifr.parse(selected, {
         gps: true, tiff: true, exif: true, xmp: false, icc: false, iptc: false,
@@ -98,6 +100,8 @@ export default function DesignManholeNewPage() {
       setLat(null);
       setLng(null);
       setGpsSource(null);
+    } finally {
+      setExifChecking(false);
     }
   }, []);
 
@@ -115,7 +119,7 @@ export default function DesignManholeNewPage() {
     multiple: false,
   });
 
-  const canSubmit = !!file && lat != null && lng != null && !submitting;
+  const canSubmit = !!file && lat != null && lng != null && !exifChecking && !submitting;
 
   const handleSubmit = async () => {
     if (!file || lat == null || lng == null) return;
@@ -240,12 +244,17 @@ export default function DesignManholeNewPage() {
               </p>
             )}
           </div>
-          {file && gpsSource === 'exif' && lat != null && lng != null && (
+          {file && exifChecking && (
+            <p className="mt-2 text-xs text-[#2A2A2A]/60">
+              写真の位置情報を確認中...
+            </p>
+          )}
+          {file && !exifChecking && gpsSource === 'exif' && lat != null && lng != null && (
             <p className="mt-2 text-xs text-[#4C9A57]">
               写真から位置情報を取得しました（緯度 {lat.toFixed(6)} / 経度 {lng.toFixed(6)}）。
             </p>
           )}
-          {file && gpsSource !== 'exif' && (
+          {file && !exifChecking && gpsSource !== 'exif' && (
             <p className="mt-2 text-xs text-[#B5483C]">
               写真に位置情報がありません。位置情報（GPS）付きの写真を選んでください。
             </p>
