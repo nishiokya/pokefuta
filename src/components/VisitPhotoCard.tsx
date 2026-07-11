@@ -16,10 +16,13 @@ export interface VisitPhotoCardProps {
   thumbnailUrl?: string | null;
   title: string;
   date: string;
+  posterName?: string | null;
   tags: string[];
 }
 
-export default function VisitPhotoCard({ manholeId, thumbnailUrl, title, date, tags }: VisitPhotoCardProps) {
+export default function VisitPhotoCard({ manholeId, thumbnailUrl, title, date, posterName, tags }: VisitPhotoCardProps) {
+  const visiblePosterName = posterName?.trim();
+
   return (
     <Link href={`/manhole/${manholeId}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
       <div
@@ -71,7 +74,36 @@ export default function VisitPhotoCard({ manholeId, thumbnailUrl, title, date, t
             >
               {title}
             </div>
-            <div style={{ fontFamily: NUM, fontSize: 11, opacity: 0.9, marginTop: 2 }}>{date}</div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: NUM,
+                fontSize: 11,
+                lineHeight: 1.25,
+                opacity: 0.9,
+                marginTop: 2,
+                minWidth: 0,
+              }}
+            >
+              <span style={{ flexShrink: 0 }}>{date}</span>
+              {visiblePosterName && (
+                <>
+                  <span style={{ flexShrink: 0, opacity: 0.75 }}>/</span>
+                  <span
+                    style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {visiblePosterName}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
         {tags.length > 0 && (
