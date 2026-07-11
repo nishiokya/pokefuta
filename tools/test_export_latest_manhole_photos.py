@@ -93,7 +93,11 @@ class SelectGalleryPhotosTest(unittest.TestCase):
 class ToGalleryEntryTest(unittest.TestCase):
     def test_fields_and_display_name(self):
         photo = _photo("abc", shot_at="2026-01-02T03:04:05Z", user_id="uid-9")
-        entry = export.to_gallery_entry(photo, "https://images.example.com", {"uid-9": "tako"})
+        entry = export.to_gallery_entry(
+            photo,
+            "https://images.example.com",
+            {"uid-9": {"display_name": "tako", "public_user_id": "pub-uid-9"}},
+        )
         self.assertEqual(
             entry,
             {
@@ -104,13 +108,45 @@ class ToGalleryEntryTest(unittest.TestCase):
                 "created_at": "2026-01-01T00:00:00Z",
                 "shot_at": "2026-01-02T03:04:05Z",
                 "display_name": "tako",
+                "public_user_id": "pub-uid-9",
             },
         )
 
-    def test_unknown_user_gives_none_display_name(self):
+    def test_unknown_user_gives_none_display_name_and_public_user_id(self):
         photo = _photo("abc", user_id="unknown")
         entry = export.to_gallery_entry(photo, "https://images.example.com", {})
         self.assertIsNone(entry["display_name"])
+        self.assertIsNone(entry["public_user_id"])
+
+    def test_missing_public_user_id_key_is_safe(self):
+        # Older-shaped mapping entries that only carry display_name must not
+        # crash lookups; public_user_id should degrade to None.
+        photo = _photo("abc", user_id="uid-legacy")
+        entry = export.to_gallery_entry(
+            photo,
+            "https://images.example.com",
+            {"uid-legacy": {"display_name": "legacy"}},
+        )
+        self.assertEqual(entry["display_name"], "legacy")
+        self.assertIsNone(entry["public_user_id"])
+
+
+class ToPhotoEntryTest(unittest.TestCase):
+    def test_includes_public_user_id(self):
+        photo = _photo("abc", shot_at="2026-01-02T03:04:05Z", user_id="uid-9")
+        entry = export.to_photo_entry(
+            photo,
+            "https://images.example.com",
+            {"uid-9": {"display_name": "tako", "public_user_id": "pub-uid-9"}},
+        )
+        self.assertEqual(entry["display_name"], "tako")
+        self.assertEqual(entry["public_user_id"], "pub-uid-9")
+
+    def test_unknown_user_gives_none_public_user_id(self):
+        photo = _photo("abc", user_id="unknown")
+        entry = export.to_photo_entry(photo, "https://images.example.com", {})
+        self.assertIsNone(entry["display_name"])
+        self.assertIsNone(entry["public_user_id"])
 
 
 if __name__ == "__main__":

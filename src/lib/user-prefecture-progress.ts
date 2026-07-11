@@ -58,12 +58,12 @@ type VisitProgressRow = {
   }> | null;
 };
 
-type AppUserProgressRow = {
+export type AppUserProgressRow = {
   auth_uid: string;
   display_name: string | null;
 };
 
-const FALLBACK_DISPLAY_NAME = 'トレーナー';
+export const FALLBACK_DISPLAY_NAME = 'トレーナー';
 const JAPAN_PREFECTURE_COUNT = 47;
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
@@ -71,7 +71,7 @@ const toRate = (visited: number, total: number) => (total > 0 ? (visited / total
 const getVisitSortTime = (visit: Pick<VisitProgressRow, 'shot_at' | 'created_at'>) =>
   new Date(visit.shot_at || visit.created_at || 0).getTime();
 
-function createPublicReadClient(): SupabaseClient<Database> | null {
+export function createPublicReadClient(): SupabaseClient<Database> | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -85,7 +85,7 @@ function createPublicReadClient(): SupabaseClient<Database> | null {
   });
 }
 
-function getProgressClient(): SupabaseClient<Database> | null {
+export function getProgressClient(): SupabaseClient<Database> | null {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   const hasUsableServiceRoleKey =
     serviceRoleKey.length > 100 && !serviceRoleKey.toLowerCase().includes('placeholder');

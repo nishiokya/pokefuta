@@ -108,16 +108,26 @@ def photo_sort_date(photo: dict[str, Any]) -> datetime:
     return parse_datetime(visit.get("shot_at") or photo.get("created_at"))
 
 
+def _lookup_user_info(
+    user_info_by_auth_uid: dict[str, dict[str, Optional[str]]],
+    user_id: Any,
+) -> tuple[Optional[str], Optional[str]]:
+    info = user_info_by_auth_uid.get(user_id) if isinstance(user_id, str) else None
+    if not info:
+        return None, None
+    return info.get("display_name"), info.get("public_user_id")
+
+
 def to_photo_entry(
     photo: dict[str, Any],
     base_url: str,
-    display_name_by_auth_uid: dict[str, Optional[str]],
+    user_info_by_auth_uid: dict[str, dict[str, Optional[str]]],
 ) -> dict[str, Any]:
     visit = normalize_visit(photo.get("visit"))
     storage_key = photo["storage_key"]
     original_url = build_original_url(storage_key, base_url)
     user_id = visit.get("user_id")
-    display_name = display_name_by_auth_uid.get(user_id) if isinstance(user_id, str) else None
+    display_name, public_user_id = _lookup_user_info(user_info_by_auth_uid, user_id)
 
     return {
         "manhole_id": photo["manhole_id"],
@@ -133,18 +143,19 @@ def to_photo_entry(
         "shot_at": visit.get("shot_at"),
         "comment": visit.get("comment"),
         "display_name": display_name,
+        "public_user_id": public_user_id,
     }
 
 
 def to_gallery_entry(
     photo: dict[str, Any],
     base_url: str,
-    display_name_by_auth_uid: dict[str, Optional[str]],
+    user_info_by_auth_uid: dict[str, dict[str, Optional[str]]],
 ) -> dict[str, Any]:
     visit = normalize_visit(photo.get("visit"))
     storage_key = photo["storage_key"]
     user_id = visit.get("user_id")
-    display_name = display_name_by_auth_uid.get(user_id) if isinstance(user_id, str) else None
+    display_name, public_user_id = _lookup_user_info(user_info_by_auth_uid, user_id)
 
     return {
         "photo_id": photo["id"],
@@ -154,6 +165,7 @@ def to_gallery_entry(
         "created_at": photo.get("created_at"),
         "shot_at": visit.get("shot_at"),
         "display_name": display_name,
+        "public_user_id": public_user_id,
     }
 
 
@@ -244,26 +256,30 @@ def chunked(values: list[str], size: int) -> Iterator[list[str]]:
         yield values[index:index + size]
 
 
-def fetch_display_names(
+def fetch_user_info(
     auth_uids: set[str],
     batch_size: int,
     timeout: int,
-) -> dict[str, Optional[str]]:
-    display_name_by_auth_uid: dict[str, Optional[str]] = {}
+) -> dict[str, dict[str, Optional[str]]]:
+    """Map auth_uid -> {display_name, public_user_id (app_user.id)}."""
+    user_info_by_auth_uid: dict[str, dict[str, Optional[str]]] = {}
     ids = sorted(auth_uids)
 
     for id_batch in chunked(ids, 100):
         query = {
-            "select": "auth_uid,display_name",
+            "select": "id,auth_uid,display_name",
             "auth_uid": f"in.({','.join(id_batch)})",
         }
 
         for user in iter_supabase_rows("app_user", query, batch_size, timeout):
             auth_uid = user.get("auth_uid")
             if isinstance(auth_uid, str):
-                display_name_by_auth_uid[auth_uid] = user.get("display_name")
+                user_info_by_auth_uid[auth_uid] = {
+                    "display_name": user.get("display_name"),
+                    "public_user_id": user.get("id"),
+                }
 
-    return display_name_by_auth_uid
+    return user_info_by_auth_uid
 
 
 def fetch_auth_uids_by_display_name(
@@ -346,7 +362,7 @@ def build_payload(
 
         photos_by_manhole_id.setdefault(int(photo["manhole_id"]), []).append(photo)
 
-    display_name_by_auth_uid = fetch_display_names(photo_user_ids, batch_size, timeout)
+    user_info_by_auth_uid = fetch_user_info(photo_user_ids, batch_size, timeout)
 
     photos: dict[str, dict[str, Any]] = {}
     for manhole_id in sorted(photos_by_manhole_id):
@@ -355,9 +371,9 @@ def build_payload(
             key=photo_sort_date,
             reverse=True,
         )
-        entry = to_photo_entry(manhole_photos[0], base_url, display_name_by_auth_uid)
+        entry = to_photo_entry(manhole_photos[0], base_url, user_info_by_auth_uid)
         entry["gallery"] = [
-            to_gallery_entry(photo, base_url, display_name_by_auth_uid)
+            to_gallery_entry(photo, base_url, user_info_by_auth_uid)
             for photo in select_gallery_photos(manhole_photos, gallery_limit)
         ]
         photos[str(manhole_id)] = entry
