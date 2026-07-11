@@ -2,29 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { useDropzone } from 'react-dropzone';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
-import { Camera, CheckCircle, MapPin } from 'lucide-react';
+import { Camera, CheckCircle } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { isValidCoordinates } from '@/lib/location';
 
-const LocationPickerMap = dynamic(
-  () => import('@/components/DesignManhole/LocationPickerMap'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-72 w-full items-center justify-center rounded-lg bg-[#EFE5CE] sm:h-80">
-        <span className="text-sm text-[#7B63A8]">地図を読み込み中...</span>
-      </div>
-    ),
-  }
-);
-
-type GpsSource = 'exif' | 'manual' | null;
+type GpsSource = 'exif' | null;
 
 export default function DesignManholeNewPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -88,15 +75,10 @@ export default function DesignManholeNewPage() {
         setLng(raw.longitude);
         setGpsSource('exif');
       } else {
-        // 前の写真のEXIF座標を引きずらない（手動で置いたピンは維持する）
-        setGpsSource((prev) => {
-          if (prev === 'exif') {
-            setLat(null);
-            setLng(null);
-            return null;
-          }
-          return prev;
-        });
+        // 前の写真のEXIF座標を引きずらない
+        setLat(null);
+        setLng(null);
+        setGpsSource(null);
       }
       if (raw) {
         setExifPayload({
@@ -113,14 +95,9 @@ export default function DesignManholeNewPage() {
       }
     } catch {
       setExifPayload(null);
-      setGpsSource((prev) => {
-        if (prev === 'exif') {
-          setLat(null);
-          setLng(null);
-          return null;
-        }
-        return prev;
-      });
+      setLat(null);
+      setLng(null);
+      setGpsSource(null);
     }
   }, []);
 
@@ -137,12 +114,6 @@ export default function DesignManholeNewPage() {
     maxFiles: 1,
     multiple: false,
   });
-
-  const handleLocationChange = useCallback((newLat: number, newLng: number) => {
-    setLat(newLat);
-    setLng(newLng);
-    setGpsSource((prev) => (prev === 'exif' ? prev : 'manual'));
-  }, []);
 
   const canSubmit = !!file && lat != null && lng != null && !submitting;
 
@@ -269,33 +240,14 @@ export default function DesignManholeNewPage() {
               </p>
             )}
           </div>
-          {file && gpsSource === 'exif' && (
+          {file && gpsSource === 'exif' && lat != null && lng != null && (
             <p className="mt-2 text-xs text-[#4C9A57]">
-              写真から位置情報を取得しました。地図で微調整できます。
+              写真から位置情報を取得しました（緯度 {lat.toFixed(6)} / 経度 {lng.toFixed(6)}）。
             </p>
           )}
           {file && gpsSource !== 'exif' && (
             <p className="mt-2 text-xs text-[#B5483C]">
-              写真に位置情報がありません。地図で場所を指定するか、現在地を使ってください。
-            </p>
-          )}
-        </section>
-
-        {/* 位置 */}
-        <section className="mt-6">
-          <h2 className="flex items-center gap-1.5 text-sm font-bold">
-            <MapPin className="h-4 w-4 text-[#7B63A8]" />
-            位置 <span className="text-[#B5483C]">*</span>
-          </h2>
-          <p className="mt-1 text-xs text-[#2A2A2A]/60">
-            地図をタップしてピンを置き、ドラッグで微調整できます。
-          </p>
-          <div className="mt-2">
-            <LocationPickerMap lat={lat} lng={lng} onChange={handleLocationChange} />
-          </div>
-          {lat != null && lng != null && (
-            <p className="mt-1.5 text-xs text-[#2A2A2A]/60">
-              緯度 {lat.toFixed(6)} / 経度 {lng.toFixed(6)}
+              写真に位置情報がありません。位置情報（GPS）付きの写真を選んでください。
             </p>
           )}
         </section>
