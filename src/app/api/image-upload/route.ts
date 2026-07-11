@@ -619,12 +619,13 @@ export async function GET(request: NextRequest) {
       );
 
       let displayNameByAuthUid = new Map<string, string | null>();
+      let publicUserIdByAuthUid = new Map<string, string | null>();
 
       if (visitUserIds.length > 0) {
         // A方針: app_user.display_name を公開SELECTで解決するため、通常のroute clientを使う
         const { data: appUsers, error: appUserError } = await supabase
           .from('app_user')
-          .select('auth_uid, display_name')
+          .select('id, auth_uid, display_name')
           .in('auth_uid', visitUserIds);
 
         if (appUserError) {
@@ -633,6 +634,7 @@ export async function GET(request: NextRequest) {
           (appUsers || []).forEach((u: any) => {
             if (u?.auth_uid) {
               displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
+              publicUserIdByAuthUid.set(u.auth_uid, u.id ?? null);
             }
           });
         }
@@ -642,11 +644,13 @@ export async function GET(request: NextRequest) {
         const visit = img?.visit;
         if (visit && typeof visit === 'object' && !Array.isArray(visit)) {
           const displayName = displayNameByAuthUid.get(visit.user_id) ?? null;
+          const publicUserId = publicUserIdByAuthUid.get(visit.user_id) ?? null;
           return {
             ...img,
             visit: {
               ...visit,
-              display_name: displayName
+              display_name: displayName,
+              public_user_id: publicUserId
             }
           };
         }

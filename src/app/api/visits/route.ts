@@ -268,7 +268,7 @@ export async function GET(request: NextRequest) {
       uniqueUserIds.length > 0
         ? supabase
           .from('app_user')
-          .select('auth_uid, display_name')
+          .select('id, auth_uid, display_name')
           .in('auth_uid', uniqueUserIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
@@ -326,7 +326,10 @@ export async function GET(request: NextRequest) {
         manhole: visit.manhole,
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
-        note: 'note' in visit ? visit.note : null,
+        // 未ログイン(anon)レスポンスは note を select していないため、
+        // undefined にして JSON.stringify にキーごと落としてもらう（null だと
+        // キー自体は残ってしまい "note フィールドを返さない" 要件を満たせない）
+        note: 'note' in visit ? visit.note : undefined,
         comment: visit.comment,
         is_public: visit.is_public,
         created_at: visit.created_at,
@@ -352,14 +355,19 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Enrich with poster display_name
+    // Enrich with poster display_name / public_user_id
     const displayNameMap = new Map<string, string | null>();
+    const publicUserIdMap = new Map<string, string | null>();
     (appUsers || []).forEach((u: any) => {
-      if (u?.auth_uid) displayNameMap.set(u.auth_uid, u.display_name ?? null);
+      if (u?.auth_uid) {
+        displayNameMap.set(u.auth_uid, u.display_name ?? null);
+        publicUserIdMap.set(u.auth_uid, u.id ?? null);
+      }
     });
     const enrichedVisits = processedVisits.map((v: any) => ({
       ...v,
       display_name: displayNameMap.get(v.user_id) ?? null,
+      public_user_id: publicUserIdMap.get(v.user_id) ?? null,
     }));
 
     // Apply client-side filters if needed
