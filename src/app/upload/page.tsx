@@ -636,7 +636,7 @@ function UploadPageInner() {
 
     const failCount = unuploadedPhotos.length - successCount;
     if (failCount === 0) {
-      addAlert('success', `${successCount}枚の訪問記録を登録しました！`);
+      addAlert('success', `${successCount}枚の写真を訪問記録に登録しました！`);
     } else if (successCount > 0) {
       addAlert('warning', `${successCount}枚を登録しました。${failCount}枚は登録できませんでした（各写真のエラーを確認してください）。`);
     } else {
@@ -672,7 +672,7 @@ function UploadPageInner() {
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
-            {photos.length}枚の訪問記録を登録しました。
+            {photos.length}枚の写真を訪問記録に登録しました。
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Link
@@ -1041,7 +1041,7 @@ function UploadPageInner() {
               >
                 {batchProgress
                   ? `登録中 ${batchProgress.done}/${batchProgress.total}...`
-                  : `${photos.filter(p => !p.uploaded && !p.uploading).length}枚の訪問記録を登録`}
+                  : `${photos.filter(p => !p.uploaded && !p.uploading).length}枚の写真を登録`}
               </button>
               <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
                 公開設定がONの写真・コメントはすぐに公開されます。
