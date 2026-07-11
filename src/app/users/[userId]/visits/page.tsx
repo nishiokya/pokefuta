@@ -88,15 +88,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
               <HeroStat label="訪問数" value={`${data.totalVisits}`} />
               <HeroStat label="都道府県数" value={`${data.prefectureCount}`} />
             </div>
-
-            <div className="mt-5">
-              <Link
-                href={`/users/${encodeURIComponent(data.userId)}/prefectures`}
-                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#B5483C] underline underline-offset-2"
-              >
-                都道府県達成状況を見る
-              </Link>
-            </div>
           </div>
         </section>
 
