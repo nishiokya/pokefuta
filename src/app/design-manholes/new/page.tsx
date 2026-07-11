@@ -20,6 +20,12 @@ export default function DesignManholeNewPage() {
   const [lng, setLng] = useState<number | null>(null);
   const [gpsSource, setGpsSource] = useState<GpsSource>(null);
   const [exifChecking, setExifChecking] = useState(false);
+
+  // プレビューURLは差し替え時・アンマウント時に解放する
+  useEffect(() => {
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
   const [exifPayload, setExifPayload] = useState<Record<string, any> | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -61,10 +67,8 @@ export default function DesignManholeNewPage() {
 
     setFile(selected);
     setError(null);
-    setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(selected);
-    });
+    // プレビューURLの解放は useEffect クリーンアップが行う
+    setPreviewUrl(URL.createObjectURL(selected));
 
     // EXIF は圧縮前のオリジナルから読む（圧縮でGPSが失われるため）
     setExifChecking(true);

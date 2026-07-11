@@ -288,11 +288,8 @@ function UploadPageInner() {
 
     setLoading(true);
 
-    // 既存の選択は破棄してプレビューURLを解放
-    setPhotos(prev => {
-      prev.forEach(p => URL.revokeObjectURL(p.preview));
-      return [];
-    });
+    // 既存の選択は破棄（プレビューURLの解放は useEffect クリーンアップが行う）
+    setPhotos([]);
 
     const id = Math.random().toString(36).substring(2, 11);
     const preview = URL.createObjectURL(file);
@@ -343,14 +340,15 @@ function UploadPageInner() {
       const date = new Date(metadata.datetime);
       noteLines.push(`撮影日時: ${date.toLocaleString('ja-JP')}`);
     }
-    if (metadata.latitude && metadata.longitude) {
-      noteLines.push(`位置: ${metadata.latitude.toFixed(6)}, ${metadata.longitude.toFixed(6)}`);
+    if (isValidCoordinates(metadata.latitude, metadata.longitude)) {
+      noteLines.push(`位置: ${(metadata.latitude as number).toFixed(6)}, ${(metadata.longitude as number).toFixed(6)}`);
     }
     // マッチしたマンホールとの距離を追加
-    if (matchedManhole && metadata.latitude && metadata.longitude && matchedManhole.latitude && matchedManhole.longitude) {
+    if (matchedManhole && isValidCoordinates(metadata.latitude, metadata.longitude) &&
+        matchedManhole.latitude != null && matchedManhole.longitude != null) {
       const distance = calculateDistance(
-        metadata.latitude,
-        metadata.longitude,
+        metadata.latitude as number,
+        metadata.longitude as number,
         matchedManhole.latitude,
         matchedManhole.longitude
       );
@@ -575,6 +573,13 @@ function UploadPageInner() {
 
   // 1枚のみ投稿なので先頭が選択中の写真
   const selectedPhoto = photos[0];
+
+  // プレビューURLは差し替え時・アンマウント時に解放する
+  const previewUrlToRevoke = selectedPhoto?.preview;
+  useEffect(() => {
+    if (!previewUrlToRevoke) return;
+    return () => URL.revokeObjectURL(previewUrlToRevoke);
+  }, [previewUrlToRevoke]);
   // 有効な写真（GPSあり・マンホール検出済み）が選ばれるまで投稿ボタンは無効（/design-manholes/new と同じ）
   const canSubmit = !!selectedPhoto && selectedPhoto.photoStatus === 'valid' &&
     !selectedPhoto.uploaded && !selectedPhoto.uploading;
