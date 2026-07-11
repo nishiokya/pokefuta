@@ -168,6 +168,22 @@ function PCTopNav({ active }: PCTopNavProps) {
             図鑑
           </a>
         )}
+        {authLoaded && (
+          <Link
+            href="/design-manholes"
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: pathname === '/design-manholes' || pathname.startsWith('/design-manholes/') ? '#2c2a26' : '#6f6657',
+              padding: '7px 13px',
+              borderRadius: 9,
+              background: pathname === '/design-manholes' || pathname.startsWith('/design-manholes/') ? '#e9dfc7' : 'transparent',
+              textDecoration: 'none',
+            }}
+          >
+            デザイン蓋
+          </Link>
+        )}
       </div>
 
       {/* スペーサー */}

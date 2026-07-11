@@ -119,7 +119,7 @@ export default function Header({
             </Link>
           )}
 
-          {/* PCでは常に導線を出す。スマフォはログイン時のみ（自分用機能・URL直アクセスは可） */}
+          {/* SPではログイン時のみ。PCの常時導線は PCShell 側で出す（URL直アクセスは可） */}
           <Link
             href="/design-manholes"
             className={`${user ? 'flex' : 'hidden'} h-10 flex-shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:flex sm:text-sm`}
