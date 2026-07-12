@@ -25,6 +25,7 @@ Supabase SQL Editorで `database/migrations/` のSQLを番号順に実行しま�
 19. `021_restrict_app_user_public_id.sql`
 20. `022_upsert_app_user_fn.sql`
 21. `023_add_public_display_names_fn.sql`
+22. `024_backfill_app_user_display_names.sql`
 
 ## 注意
 

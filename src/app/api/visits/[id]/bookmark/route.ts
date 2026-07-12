@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 
 /**
  * @swagger
@@ -84,7 +85,7 @@ export async function POST(
 
     const visitId = params.id;
     const userId = session.user.id;
-    const displayName = session.user.user_metadata?.display_name;
+    const displayName = getAuthUserDisplayName(session.user);
 
     // ✅ Ensure app_user exists, auto-create if missing
     await ensureAppUser(supabase, userId, displayName);
