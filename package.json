@@ -8,7 +8,7 @@
     "postbuild": "node tools/copy-ogp-assets-to-build.js",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && node tools/check-public-display-name-source.js",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "capture": "node tools/capture/capture.js"
   },
