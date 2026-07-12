@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
-    const displayName = session.user.user_metadata?.display_name;
+    const displayName = getAuthUserDisplayName(session.user);
 
     // ✅ Ensure app_user exists, auto-create if missing
     await ensureAppUser(supabase, userId, displayName);

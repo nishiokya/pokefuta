@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import sharp from 'sharp';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import {
   storage,
   generateDesignManholeStorageKey,
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const userId = session.user.id;
-    const displayName = session.user.user_metadata?.display_name as string | undefined;
+    const displayName = getAuthUserDisplayName(session.user);
     await ensureAppUser(supabase, userId, displayName);
 
     const formData = await request.formData();
