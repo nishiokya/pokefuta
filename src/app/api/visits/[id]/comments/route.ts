@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 
 /**
  * @swagger
@@ -127,24 +128,7 @@ export async function GET(
       )
     );
 
-    const displayNameByAuthUid = new Map<string, string | null>();
-
-    if (userIds.length > 0) {
-      const { data: appUsers, error: appUserError } = await supabase
-        .from('app_user')
-        .select('auth_uid, display_name')
-        .in('auth_uid', userIds);
-
-      if (appUserError) {
-        console.warn('Failed to load app_user for comments:', appUserError);
-      } else {
-        (appUsers || []).forEach((u: any) => {
-          if (u?.auth_uid) {
-            displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
-          }
-        });
-      }
-    }
+    const displayNameByAuthUid = await loadPublicDisplayNameMap(supabase, userIds);
 
     const enriched = (comments || []).map((c: any) => {
       const uid = c.user_id;
@@ -255,14 +239,7 @@ export async function POST(
     // 表示用のユーザー情報を付与（ベストエフォート）
     let displayName: string | null = null;
     try {
-      const { data: appUser } = await supabase
-        .from('app_user')
-        .select('display_name')
-        .eq('auth_uid', userId)
-        .maybeSingle();
-      if (appUser) {
-        displayName = appUser.display_name ?? null;
-      }
+      displayName = (await loadPublicDisplayNameMap(supabase, [userId])).get(userId) ?? null;
     } catch {
       // ignore
     }

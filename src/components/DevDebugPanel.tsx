@@ -52,9 +52,9 @@ export default function DevDebugPanel() {
     try {
       const { data, error } = await supabase
         .from('app_user')
-        .select('auth_uid, display_name')
+        .select('auth_uid')
         .eq('auth_uid', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('app_user確認エラー:', error);

@@ -650,6 +650,15 @@ export interface Database {
           total_users: number;
         }[];
       };
+      get_public_display_names: {
+        Args: {
+          p_auth_uids: string[];
+        };
+        Returns: {
+          auth_uid: string;
+          display_name: string | null;
+        }[];
+      };
     };
   };
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 
 /**
  * @swagger
@@ -241,7 +242,7 @@ export async function GET(request: NextRequest) {
       { data: commentCounts },
       { data: manholeCommentCounts },
       { data: bookmarks },
-      { data: appUsers },
+      displayNameMap,
       publicUserIdsResult,
     ] = await Promise.all([
       supabase
@@ -266,12 +267,7 @@ export async function GET(request: NextRequest) {
           .eq('user_id', viewerUserId)
           .in('visit_id', visitIds)
         : Promise.resolve({ data: [] as any[] }),
-      uniqueUserIds.length > 0
-        ? supabase
-          .from('app_user')
-          .select('auth_uid, display_name')
-          .in('auth_uid', uniqueUserIds)
-        : Promise.resolve({ data: [] as any[] }),
+      loadPublicDisplayNameMap(supabase, uniqueUserIds),
       // ✅ public_user_id は「公開訪問を持つユーザー」限定のRPCで解決する
       // (app_user.id への直接SELECT権限は削除済み。RPC自体が存在しなくても
       // エンドポイント全体を落とさないよう、失敗時はログのみで空扱いにする)
@@ -368,13 +364,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Enrich with poster display_name / public_user_id
-    const displayNameMap = new Map<string, string | null>();
     const publicUserIdMap = new Map<string, string | null>();
-    (appUsers || []).forEach((u: any) => {
-      if (u?.auth_uid) {
-        displayNameMap.set(u.auth_uid, u.display_name ?? null);
-      }
-    });
     if (publicUserIdsResult?.error) {
       // RPC未適用/失敗時もエンドポイント自体は壊さず、public_user_id は null 扱いにする
       console.warn('Failed to load public_user_id via get_public_user_ids RPC:', publicUserIdsResult.error);

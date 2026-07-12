@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
@@ -622,14 +623,10 @@ export async function GET(request: NextRequest) {
       let publicUserIdByAuthUid = new Map<string, string | null>();
 
       if (visitUserIds.length > 0) {
-        // A方針: app_user.display_name を公開SELECTで解決するため、通常のroute clientを使う
         // public_user_id (app_user.id) は「公開訪問を持つユーザー」限定のRPCで解決する
         // (app_user.id への直接SELECT権限は削除済み)
-        const [{ data: appUsers, error: appUserError }, publicUserIdsResult] = await Promise.all([
-          supabase
-            .from('app_user')
-            .select('auth_uid, display_name')
-            .in('auth_uid', visitUserIds),
+        const [loadedDisplayNames, publicUserIdsResult] = await Promise.all([
+          loadPublicDisplayNameMap(supabase, visitUserIds),
           supabase
             .rpc('get_public_user_ids' as never, { p_auth_uids: visitUserIds } as never)
             .then(
@@ -638,15 +635,7 @@ export async function GET(request: NextRequest) {
             ),
         ]);
 
-        if (appUserError) {
-          console.warn('Failed to load app_user for photo list:', appUserError);
-        } else {
-          (appUsers || []).forEach((u: any) => {
-            if (u?.auth_uid) {
-              displayNameByAuthUid.set(u.auth_uid, u.display_name ?? null);
-            }
-          });
-        }
+        displayNameByAuthUid = loadedDisplayNames;
 
         if (publicUserIdsResult?.error) {
           // RPC未適用/失敗時もエンドポイント自体は壊さず、public_user_id は null 扱いにする

@@ -12,6 +12,7 @@ import {
   Sparkles,
   Stamp,
   TrendingUp,
+  UserRound,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
@@ -301,7 +302,13 @@ export default function HomePage() {
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
 
-                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${commentCount}`;
+                    const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
+                    const commonAriaLabel = [
+                      locationLabel,
+                      `撮影 ${formatDateJa(visit.shot_at)}`,
+                      posterLabel,
+                      `コメント ${commentCount}`,
+                    ].filter(Boolean).join('、');
                     const cardContent = (
                       <>
                         {photo?.thumbnail_url ? (
@@ -328,8 +335,11 @@ export default function HomePage() {
                             {locationLabel || 'ポケふた'}
                           </div>
                           <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
-                          {visit.display_name && (
-                            <div className="mt-0.5 text-xs font-medium opacity-80">{visit.display_name}</div>
+                          {posterLabel && (
+                            <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
+                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{posterLabel}</span>
+                            </div>
                           )}
                           <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1">
