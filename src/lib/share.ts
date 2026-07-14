@@ -36,6 +36,14 @@ export function visitsShareText(stampCount: number): string {
   return `ポケふた旅を続けています！\n${stampCount}枚のポケふたを巡りました`;
 }
 
+export function userVisitsShareText(
+  displayName: string,
+  stampCount: number,
+  prefectureCount: number
+): string {
+  return `${displayName}のポケふたスタンプ帳\n${stampCount}枚のスタンプ・${prefectureCount}都道府県を巡りました！`;
+}
+
 export function prefectureProgressShareText(
   completedPrefectureCount: number,
   totalPrefectureCount: number
