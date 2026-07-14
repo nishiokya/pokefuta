@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Camera, MapPin, Stamp } from 'lucide-react';
+import { ArrowLeft, Camera, ExternalLink, Instagram, MapPin, Stamp } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import PublicProfileEditor from '@/components/users/PublicProfileEditor';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
+import { createServerClient } from '@/lib/supabase/server';
 
 type PageProps = {
   params: {
@@ -53,9 +55,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const data = await loadPublicUserVisits(params.userId);
+  const [data, authResult] = await Promise.all([
+    loadPublicUserVisits(params.userId),
+    createServerClient().auth.getUser(),
+  ]);
 
   if (!data) notFound();
+  const isOwner = authResult.data.user?.id === data.authUid;
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
@@ -81,8 +87,24 @@ export default async function UserVisitsPage({ params }: PageProps) {
               {data.displayName}のスタンプ帳
             </h1>
             <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
-              公開設定の訪問記録のみを表示しています。
+              {data.bio || '公開設定の訪問記録のみを表示しています。'}
             </p>
+
+            {(data.xUrl || data.instagramUrl) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {data.xUrl && <SocialLink href={data.xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />}
+                {data.instagramUrl && <SocialLink href={data.instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />}
+              </div>
+            )}
+
+            {isOwner && (
+              <PublicProfileEditor
+                displayName={data.displayName}
+                bio={data.bio}
+                xUrl={data.xUrl}
+                instagramUrl={data.instagramUrl}
+              />
+            )}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <HeroStat label="訪問数" value={`${data.totalVisits}`} />
@@ -114,6 +136,16 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
       <BottomNav />
     </div>
+  );
+}
+
+function SocialLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#8C6A4A]/25 bg-white/75 px-3 py-1.5 text-xs font-extrabold text-[#4F3828] transition hover:bg-white">
+      {icon}
+      {label}
+      <ExternalLink className="h-3 w-3 opacity-60" />
+    </a>
   );
 }
 
