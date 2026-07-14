@@ -1,11 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Camera, MapPin, Stamp } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Map as MapIcon,
+  MapPin,
+  Search,
+  Sparkles,
+  Stamp,
+} from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import ShareButtons from '@/components/ShareButtons';
+import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
+import { userVisitsShareText } from '@/lib/share';
+import { loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
 
 type PageProps = {
@@ -17,6 +29,8 @@ type PageProps = {
 export const dynamic = 'force-dynamic';
 
 const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(userId)}/visits`;
+const getOgpImageUrl = (userId: string) =>
+  `${getPageUrl(userId)}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const data = await loadPublicUserVisits(params.userId);
@@ -28,6 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const pageUrl = getPageUrl(data.userId);
+  const ogpImageUrl = getOgpImageUrl(data.userId);
   const title = `${data.displayName}のスタンプ帳 | ${SITE_NAME}`;
   const description = `${data.displayName}さんが公開している訪問記録${data.totalVisits}件、${data.prefectureCount}都道府県分のポケふたスタンプ帳です。`;
 
@@ -43,22 +58,78 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: pageUrl,
       siteName: SITE_NAME,
       type: 'profile',
+      images: [
+        {
+          url: ogpImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${data.displayName}のポケふたスタンプ帳`,
+        },
+      ],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title,
       description,
+      images: [ogpImageUrl],
     },
   };
 }
 
+type PrefectureGroup = {
+  name: string;
+  visits: PublicVisit[];
+};
+
+// 訪問は shot_at 降順で来るので、挿入順 = 直近に訪れた都道府県が先頭になる
+function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
+  const groups = new Map<string, PublicVisit[]>();
+  visits.forEach((visit) => {
+    const name = visit.manhole?.prefecture || 'その他';
+    const list = groups.get(name);
+    if (list) {
+      list.push(visit);
+    } else {
+      groups.set(name, [visit]);
+    }
+  });
+  return Array.from(groups.entries()).map(([name, groupVisits]) => ({
+    name,
+    visits: groupVisits,
+  }));
+}
+
 export default async function UserVisitsPage({ params }: PageProps) {
-  const data = await loadPublicUserVisits(params.userId);
+  const [data, progress] = await Promise.all([
+    loadPublicUserVisits(params.userId),
+    loadPublicUserPrefectureProgress(params.userId).catch(() => null),
+  ]);
 
   if (!data) notFound();
 
+  const pageUrl = getPageUrl(data.userId);
+  const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
+  const totalPrefectures = progress?.totalPrefectureCount || 47;
+  const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
+  const prefectureGroups = groupVisitsByPrefecture(data.visits);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    name: `${data.displayName}のスタンプ帳`,
+    url: pageUrl,
+    mainEntity: {
+      '@type': 'Person',
+      name: data.displayName,
+    },
+  };
+
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header
         title={SITE_NAME}
         actions={
@@ -84,9 +155,37 @@ export default async function UserVisitsPage({ params }: PageProps) {
               公開設定の訪問記録のみを表示しています。
             </p>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <HeroStat label="訪問数" value={`${data.totalVisits}`} />
-              <HeroStat label="都道府県数" value={`${data.prefectureCount}`} />
+            <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+              <HeroStat label="訪問スタンプ" value={`${data.totalVisits}`} />
+              <HeroStat label="都道府県" value={`${data.prefectureCount}/${totalPrefectures}`} />
+              {completionRate !== null && (
+                <HeroStat label="全国達成率" value={`${completionRate.toFixed(1)}%`} />
+              )}
+            </div>
+
+            {completionRate !== null && (
+              <div className="mt-4">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-[#8C6A4A]/20">
+                  <div
+                    className="h-full rounded-full bg-[#B5483C] transition-all"
+                    style={{ width: `${Math.max(completionRate, 1.5)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] font-bold text-[#6A4D36]">
+                  全国のポケふた制覇まであと
+                  {progress ? Math.max(progress.totalManholeCount - progress.visitedManholeCount, 0) : 0}
+                  枚
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <ShareButtons
+                label="このスタンプ帳を自慢する"
+                shareText={shareText}
+                shareUrl={pageUrl}
+                hashtags={['ポケふたスタンプ帳']}
+              />
             </div>
           </div>
         </section>
@@ -97,18 +196,79 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </p>
         )}
 
-        <section className="mt-6">
-          {data.visits.length === 0 ? (
+        {prefectureGroups.length > 1 && (
+          <nav aria-label="都道府県で移動" className="mt-6 flex flex-wrap gap-2">
+            {prefectureGroups.map((group) => (
+              <a
+                key={group.name}
+                href={`#pref-${group.name}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#8C6A4A]/25 bg-white/70 px-3 py-1.5 text-xs font-bold text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
+              >
+                <MapPin className="h-3 w-3" />
+                {group.name}
+                <span className="text-[#B5483C]">{group.visits.length}</span>
+              </a>
+            ))}
+          </nav>
+        )}
+
+        {data.visits.length === 0 ? (
+          <section className="mt-6">
             <div className="rounded-[8px] border border-[#8C6A4A]/15 bg-white/70 px-5 py-10 text-center text-sm font-bold text-[#6A4D36]">
               公開中の訪問記録はまだありません。
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {data.visits.map((visit) => (
-                <VisitCard key={visit.id} visit={visit} />
-              ))}
-            </div>
-          )}
+          </section>
+        ) : (
+          prefectureGroups.map((group) => (
+            <section key={group.name} id={`pref-${group.name}`} className="mt-8 scroll-mt-20">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+                  <MapPin className="h-5 w-5 text-[#B5483C]" />
+                  {group.name}
+                </h2>
+                <p className="text-xs font-bold text-[#6A4D36]">{group.visits.length}枚</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {group.visits.map((visit) => (
+                  <VisitCard key={visit.id} visit={visit} />
+                ))}
+              </div>
+            </section>
+          ))
+        )}
+
+        <section className="mt-10">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+            <Sparkles className="h-5 w-5 text-[#B5483C]" />
+            あなたもポケふた旅へ
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <CtaCard
+              href="/visits"
+              icon={<Stamp className="h-5 w-5" />}
+              title="自分のスタンプ帳を作る"
+              description="無料ではじめて訪問を記録・公開しよう"
+              highlight
+            />
+            <CtaCard
+              href="/nearby"
+              icon={<Search className="h-5 w-5" />}
+              title="近くのポケふたを探す"
+              description="現在地から近い順に見つけられます"
+            />
+            <CtaCard
+              href="/map"
+              icon={<MapIcon className="h-5 w-5" />}
+              title="全国マップで見る"
+              description="都道府県ごとの設置状況をチェック"
+            />
+            <CtaCard
+              href="/popular"
+              icon={<Camera className="h-5 w-5" />}
+              title="人気のポケふた"
+              description="みんなが訪れているポケふたを見る"
+            />
+          </div>
         </section>
       </main>
 
@@ -123,6 +283,41 @@ function HeroStat({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-extrabold text-[#6A4D36]">{label}</p>
       <p className="mt-1 font-pixel text-2xl leading-none text-[#B5483C]">{value}</p>
     </div>
+  );
+}
+
+function CtaCard({
+  href,
+  icon,
+  title,
+  description,
+  highlight = false,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  highlight?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group flex flex-col rounded-[8px] border px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        highlight
+          ? 'border-[#B5483C]/35 bg-[#F8D9C4]'
+          : 'border-[#8C6A4A]/20 bg-[#FFF7E5]'
+      }`}
+    >
+      <div className={`flex items-center gap-2 font-extrabold ${highlight ? 'text-[#B5483C]' : 'text-[#4F3828]'}`}>
+        {icon}
+        <span className="text-sm leading-tight">{title}</span>
+      </div>
+      <p className="mt-2 flex-1 text-[11px] font-bold leading-snug text-[#6A4D36]">{description}</p>
+      <span className={`mt-3 inline-flex items-center gap-1 text-[11px] font-extrabold ${highlight ? 'text-[#B5483C]' : 'text-[#8C6A4A]'}`}>
+        ひらく
+        <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
+      </span>
+    </Link>
   );
 }
 
