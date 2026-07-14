@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import sharp from 'sharp';
+import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
 import { deriveSmallKey, storage } from '@/lib/storage';
 import { getProgressClient, loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
@@ -12,8 +12,16 @@ export const alt = 'ポケふたスタンプ帳';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-const PHOTO_COUNT = 3;
-const PHOTO_RENDER_SIZE = 420;
+// コラージュの配置スロット。写真は最大この数まで載る
+const PHOTO_PLACEMENTS = [
+  { top: 24, left: 60, rotate: '-6deg' },
+  { top: 180, left: 130, rotate: '5deg' },
+  { top: 320, left: 40, rotate: '-3deg' },
+] as const;
+const PHOTO_COUNT = PHOTO_PLACEMENTS.length;
+// satori は1倍でラスタライズするので描画サイズちょうどでよい
+const PHOTO_RENDER_SIZE = 230;
+const PHOTO_FETCH_TIMEOUT_MS = 4000;
 
 type RouteContext = {
   params: {
@@ -28,8 +36,7 @@ type PhotoKeyRow = {
 
 async function loadNotoSansCjk(): Promise<ArrayBuffer | null> {
   try {
-    const fontPath = join(process.cwd(), 'public/ogp/fonts/NotoSansCJKjp-Bold.otf');
-    const font = await readFile(fontPath);
+    const font = await readFile(getOgpFontPath());
     return new Uint8Array(font).buffer;
   } catch {
     return null;
@@ -56,11 +63,24 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[]): Promise<string[]>
     .in('id', photoIds)
     .eq('visit.is_public', true);
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) console.error('[OGP] users visits photo select failed:', error.message);
+    return [];
+  }
 
   const keyById = new Map(
     (data as unknown as PhotoKeyRow[]).map((row) => [row.id, row.storage_key])
   );
+
+  // 署名は手元で完結する軽い処理なので、exists() の HEAD を打たずに
+  // small を先に取りに行き、無ければ原本にフォールバックする
+  const fetchPhoto = async (key: string): Promise<Response | null> => {
+    const signed = await storage.getSignedUrl(key, 300);
+    const response = await fetch(signed.url, {
+      signal: AbortSignal.timeout(PHOTO_FETCH_TIMEOUT_MS),
+    });
+    return response.ok ? response : null;
+  };
 
   const results = await Promise.all(
     photoIds.map(async (photoId) => {
@@ -68,15 +88,12 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[]): Promise<string[]>
         const storageKey = keyById.get(photoId);
         if (!storageKey) return null;
 
-        let key = storageKey;
         const smallKey = deriveSmallKey(storageKey);
-        if (smallKey && (await storage.exists?.(smallKey))) {
-          key = smallKey;
+        let response = smallKey ? await fetchPhoto(smallKey).catch(() => null) : null;
+        if (!response) {
+          response = await fetchPhoto(storageKey);
         }
-
-        const signed = await storage.getSignedUrl(key, 300);
-        const response = await fetch(signed.url);
-        if (!response.ok) return null;
+        if (!response) return null;
 
         const input = Buffer.from(await response.arrayBuffer());
         const jpeg = await sharp(input)
@@ -110,10 +127,22 @@ export async function GET(_request: Request, { params }: RouteContext) {
       });
     }
 
+    if (!fontData) {
+      // フォントなしで satori に CJK を渡すと描画時に throw して 500 になるだけなので、
+      // 原因がわかる形で早期に落とす
+      console.error('[OGP] users visits: CJK font is missing, cannot render');
+      return new Response('Font unavailable', {
+        status: 500,
+        headers: { 'Cache-Control': 'public, max-age=60' },
+      });
+    }
+
     const photoUris = await loadRecentPhotoDataUris(visitsData.visits).catch(() => []);
 
     const totalPrefectures = progress?.totalPrefectureCount || 47;
     const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
+    // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
+    const barWidthPercent = completionRate ? Math.max(completionRate, 1.5) : 0;
 
     return new ImageResponse(
       (
@@ -214,7 +243,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
                     <div
                       style={{
                         display: 'flex',
-                        width: `${Math.max(completionRate, 1.5)}%`,
+                        width: `${barWidthPercent}%`,
                         height: '100%',
                         borderRadius: 999,
                         background: '#B5483C',
@@ -237,12 +266,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
           >
             {photoUris.length > 0 ? (
               photoUris.map((uri, index) => {
-                const placements = [
-                  { top: 24, left: 60, rotate: '-6deg' },
-                  { top: 180, left: 130, rotate: '5deg' },
-                  { top: 320, left: 40, rotate: '-3deg' },
-                ];
-                const place = placements[index] ?? placements[0];
+                const place = PHOTO_PLACEMENTS[index];
                 return (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -291,15 +315,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
       ),
       {
         ...size,
-        fonts: fontData
-          ? [
-              {
-                name: 'NotoSansCJK',
-                data: fontData,
-                weight: 700,
-              },
-            ]
-          : [],
+        fonts: [
+          {
+            name: 'NotoSansCJK',
+            data: fontData,
+            weight: 700 as const,
+          },
+        ],
         headers: {
           'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
         },

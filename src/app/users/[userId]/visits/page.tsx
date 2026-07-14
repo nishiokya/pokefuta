@@ -111,6 +111,11 @@ export default async function UserVisitsPage({ params }: PageProps) {
   const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
   const totalPrefectures = progress?.totalPrefectureCount || 47;
   const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
+  // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
+  const barWidthPercent = completionRate ? Math.max(completionRate, 1.5) : 0;
+  const remainingCount = progress
+    ? Math.max(progress.totalManholeCount - progress.visitedManholeCount, 0)
+    : null;
   const prefectureGroups = groupVisitsByPrefecture(data.visits);
 
   const jsonLd = {
@@ -128,7 +133,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // displayName はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
       <Header
         title={SITE_NAME}
@@ -168,13 +174,11 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 <div className="h-3 w-full overflow-hidden rounded-full bg-[#8C6A4A]/20">
                   <div
                     className="h-full rounded-full bg-[#B5483C] transition-all"
-                    style={{ width: `${Math.max(completionRate, 1.5)}%` }}
+                    style={{ width: `${barWidthPercent}%` }}
                   />
                 </div>
                 <p className="mt-1.5 text-[11px] font-bold text-[#6A4D36]">
-                  全国のポケふた制覇まであと
-                  {progress ? Math.max(progress.totalManholeCount - progress.visitedManholeCount, 0) : 0}
-                  枚
+                  全国のポケふた制覇まであと{remainingCount}枚
                 </p>
               </div>
             )}
