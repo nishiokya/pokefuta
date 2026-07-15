@@ -103,6 +103,16 @@ export default function ProfilePage() {
       instagramUrl: body.instagramUrl.trim() || null,
     });
     setSaved(true);
+
+    // ヘッダー(SP/PC)は user_metadata.display_name を表示しているため、
+    // auth 側にも同期して保存直後から新しい名前が出るようにする
+    // （公開表示のソースは app_user のまま。同期に失敗しても保存自体は成功）
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.updateUser({ data: { display_name: body.displayName.trim() } });
+    } catch {
+      // ignore
+    }
   }
 
   const handleLogout = async () => {
