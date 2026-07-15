@@ -25,6 +25,7 @@ import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
+import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
@@ -882,6 +883,9 @@ export default function VisitsPage() {
 
       <PCShell active="stamp" rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
+
+          {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
+          {isLoggedIn && <ProfileCard />}
 
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}
           <DexSummaryCard

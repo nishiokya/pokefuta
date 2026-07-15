@@ -83,18 +83,17 @@ BEGIN
     RAISE EXCEPTION 'Invalid Instagram URL';
   END IF;
 
-  UPDATE app_user
-  SET display_name = v_display_name,
-      bio = v_bio,
-      x_url = v_x_url,
-      instagram_url = v_instagram_url,
-      profile_is_customized = true,
-      updated_at = now()
-  WHERE auth_uid = auth.uid();
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Profile not found';
-  END IF;
+  -- app_user は投稿・いいね等の初回書き込み時に遅延作成されるため、
+  -- 行がまだ無いユーザーでもプロフィール保存できるよう upsert にする。
+  INSERT INTO app_user (auth_uid, display_name, bio, x_url, instagram_url, profile_is_customized)
+  VALUES (auth.uid(), v_display_name, v_bio, v_x_url, v_instagram_url, true)
+  ON CONFLICT (auth_uid) DO UPDATE
+    SET display_name = EXCLUDED.display_name,
+        bio = EXCLUDED.bio,
+        x_url = EXCLUDED.x_url,
+        instagram_url = EXCLUDED.instagram_url,
+        profile_is_customized = true,
+        updated_at = now();
 END;
 $$;
 
@@ -102,15 +101,23 @@ REVOKE ALL ON FUNCTION update_own_public_profile(text, text, text, text) FROM PU
 GRANT EXECUTE ON FUNCTION update_own_public_profile(text, text, text, text) TO authenticated;
 
 -- ログインメタデータ由来の名前で、ユーザーが明示的に編集した名前を上書きしない。
+-- SECURITY DEFINER かつ authenticated が直接呼べるため、p_auth_uid は auth.uid() と
+-- 一致必須にする（他ユーザーの行の作成・display_name 改変を防ぐ）。
+-- 呼び出し元(ensureAppUser)は全てユーザー自身のセッションクライアントなので互換性は保たれる。
 CREATE OR REPLACE FUNCTION upsert_app_user(
   p_auth_uid uuid,
   p_display_name text DEFAULT NULL
 )
 RETURNS void
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+BEGIN
+  IF auth.uid() IS NULL OR p_auth_uid IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+
   INSERT INTO app_user (auth_uid, display_name)
   VALUES (p_auth_uid, p_display_name)
   ON CONFLICT (auth_uid) DO UPDATE
@@ -118,4 +125,34 @@ AS $$
     WHERE NOT app_user.profile_is_customized
       AND p_display_name IS NOT NULL
       AND app_user.display_name IS DISTINCT FROM EXCLUDED.display_name;
+END;
 $$;
+
+REVOKE ALL ON FUNCTION upsert_app_user(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION upsert_app_user(uuid, text) TO authenticated;
+
+-- 自分自身のプロフィールと公開ID(app_user.id)を取得する。
+-- スタンプ帳(/visits)・マイ旅(/my-trip)のプロフィールカードが GET /api/user/profile 経由で利用する。
+-- auth.uid() で行を特定するため、他ユーザーの情報は取得できない。
+DROP FUNCTION IF EXISTS get_own_profile();
+CREATE FUNCTION get_own_profile()
+RETURNS TABLE (
+  public_user_id uuid,
+  display_name text,
+  bio text,
+  x_url text,
+  instagram_url text,
+  profile_is_customized boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT au.id, au.display_name, au.bio, au.x_url, au.instagram_url, au.profile_is_customized
+  FROM app_user au
+  WHERE au.auth_uid = auth.uid();
+$$;
+
+REVOKE ALL ON FUNCTION get_own_profile() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_own_profile() TO authenticated;

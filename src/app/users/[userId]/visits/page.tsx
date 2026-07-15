@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Camera,
-  ExternalLink,
   Instagram,
   Map as MapIcon,
   MapPin,
@@ -16,13 +15,12 @@ import {
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import ShareButtons from '@/components/ShareButtons';
-import PublicProfileEditor from '@/components/users/PublicProfileEditor';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { userVisitsShareText } from '@/lib/share';
+import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import { loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
-import { createServerClient } from '@/lib/supabase/server';
 
 type PageProps = {
   params: {
@@ -104,16 +102,16 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, authResult] = await Promise.all([
+  const [data, progress] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
-    createServerClient().auth.getUser(),
   ]);
 
   if (!data) notFound();
-  const isOwner = authResult.data.user?.id === data.authUid;
-  const xUrl = safeSocialUrl(data.xUrl, ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com']);
-  const instagramUrl = safeSocialUrl(data.instagramUrl, ['instagram.com', 'www.instagram.com']);
+
+  // プロフィール編集は自分のスタンプ帳(/visits)・マイ旅(/my-trip)側にあり、この公開ページは表示専用
+  const xUrl = safeSocialUrl(data.xUrl, X_HOSTS);
+  const instagramUrl = safeSocialUrl(data.instagramUrl, INSTAGRAM_HOSTS);
 
   const pageUrl = getPageUrl(data.userId);
   const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
@@ -176,18 +174,13 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
             {(xUrl || instagramUrl) && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {xUrl && <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />}
-                {instagramUrl && <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />}
+                {xUrl && (
+                  <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />
+                )}
+                {instagramUrl && (
+                  <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
+                )}
               </div>
-            )}
-
-            {isOwner && (
-              <PublicProfileEditor
-                displayName={data.editableDisplayName}
-                bio={data.bio}
-                xUrl={data.xUrl}
-                instagramUrl={data.instagramUrl}
-              />
             )}
 
             <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
@@ -312,22 +305,16 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
 function SocialLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#8C6A4A]/25 bg-white/75 px-3 py-1.5 text-xs font-extrabold text-[#4F3828] transition hover:bg-white">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 rounded-full border border-[#8C6A4A]/25 bg-white/75 px-3 py-1.5 text-xs font-extrabold text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
+    >
       {icon}
       {label}
-      <ExternalLink className="h-3 w-3 opacity-60" />
     </a>
   );
-}
-
-function safeSocialUrl(value: string | null, allowedHosts: string[]) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && allowedHosts.includes(url.hostname) ? url.toString() : null;
-  } catch {
-    return null;
-  }
 }
 
 function HeroStat({ label, value }: { label: string; value: string }) {

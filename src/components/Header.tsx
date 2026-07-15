@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
-import { Info, LogOut, User as UserIcon, UserPlus } from 'lucide-react';
+import { Info, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -34,10 +33,9 @@ export default function Header({
   showDescriptionLink = true,
   showXLink = true,
 }: HeaderProps) {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const { trackLogout, clearUser, trackXLinkClick } = useAnalytics();
+  const { trackXLinkClick } = useAnalytics();
 
   useEffect(() => {
     try {
@@ -77,21 +75,6 @@ export default function Header({
       subscription.unsubscribe();
     };
   }, [supabase]);
-
-  const handleLogout = async () => {
-    if (!supabase) return;
-
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      await supabase.auth.signOut();
-      trackLogout();
-      clearUser();
-      router.push('/');
-      router.refresh();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#7B63A8]/20 bg-[#FFF8EB]/95 backdrop-blur">
@@ -159,22 +142,16 @@ export default function Header({
           )}
 
           {user ? (
-            <div className="flex min-w-0 items-center gap-1.5">
-              <div className="flex max-w-[7rem] items-center gap-1 truncate rounded-lg border border-[#7B63A8]/15 bg-white/70 px-2 py-1.5 text-xs font-bold text-[#2A2A2A] sm:max-w-[9rem] sm:gap-1.5 sm:px-2.5 sm:py-2">
-                <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-[#7B63A8] sm:h-4 sm:w-4" />
-                <span className="truncate">{getDisplayName(user)}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[#B5483C] transition hover:bg-[#B5483C]/10 sm:w-auto sm:gap-2 sm:rounded-lg sm:px-3 sm:text-sm sm:font-bold"
-                aria-label="ログアウト"
-                title="ログアウト"
-              >
-                <LogOut className="h-5 w-5" />
-                <span className="hidden sm:inline">ログアウト</span>
-              </button>
-            </div>
+            // 名前クリック → /profile（プロフィール編集・ログアウトの唯一の場所）
+            <Link
+              href="/profile"
+              className="flex max-w-[7rem] items-center gap-1 truncate rounded-lg border border-[#7B63A8]/15 bg-white/70 px-2 py-1.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-white sm:max-w-[9rem] sm:gap-1.5 sm:px-2.5 sm:py-2"
+              aria-label="プロフィール"
+              title="プロフィール"
+            >
+              <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-[#7B63A8] sm:h-4 sm:w-4" />
+              <span className="truncate">{getDisplayName(user)}</span>
+            </Link>
           ) : (
             <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
               <Link
