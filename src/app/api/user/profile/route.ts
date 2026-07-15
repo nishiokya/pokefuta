@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 
+// Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
+// The API gives users friendly errors; the database constraints remain the final guard.
 const DISPLAY_NAME_MAX = 40;
 const BIO_MAX = 160;
 const URL_MAX = 300;
 
 type ProfileInput = {
-  displayName?: unknown;
-  bio?: unknown;
-  xUrl?: unknown;
-  instagramUrl?: unknown;
+  displayName: string;
+  bio: string;
+  xUrl: string;
+  instagramUrl: string;
 };
 
-function optionalText(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
+function isProfileInput(value: unknown): value is ProfileInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const input = value as Record<string, unknown>;
+  return ['displayName', 'bio', 'xUrl', 'instagramUrl'].every(
+    (key) => typeof input[key] === 'string'
+  );
 }
 
 function isSocialUrl(value: string, hosts: string[]) {
@@ -36,22 +42,26 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'ログインが必要です。' }, { status: 401 });
   }
 
-  let input: ProfileInput;
+  let input: unknown;
   try {
-    input = await request.json() as ProfileInput;
+    input = await request.json();
   } catch {
     return NextResponse.json({ error: '入力内容を読み取れませんでした。' }, { status: 400 });
   }
 
-  const displayName = optionalText(input.displayName);
-  const bio = optionalText(input.bio);
-  const xUrl = optionalText(input.xUrl);
-  const instagramUrl = optionalText(input.instagramUrl);
+  if (!isProfileInput(input)) {
+    return NextResponse.json({ error: 'プロフィールの全項目を送信してください。' }, { status: 400 });
+  }
 
-  if (!displayName || displayName.length > DISPLAY_NAME_MAX) {
+  const displayName = input.displayName.trim();
+  const bio = input.bio.trim();
+  const xUrl = input.xUrl.trim();
+  const instagramUrl = input.instagramUrl.trim();
+
+  if (!displayName || [...displayName].length > DISPLAY_NAME_MAX) {
     return NextResponse.json({ error: `表示名は1〜${DISPLAY_NAME_MAX}文字で入力してください。` }, { status: 400 });
   }
-  if (bio.length > BIO_MAX) {
+  if ([...bio].length > BIO_MAX) {
     return NextResponse.json({ error: `一言は${BIO_MAX}文字以内で入力してください。` }, { status: 400 });
   }
   if (xUrl.length > URL_MAX || !isSocialUrl(xUrl, ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'])) {

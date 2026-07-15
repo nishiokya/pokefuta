@@ -28,6 +28,7 @@ export type PublicUserVisits = {
   userId: string;
   authUid: string;
   displayName: string;
+  editableDisplayName: string;
   bio: string | null;
   xUrl: string | null;
   instagramUrl: string | null;
@@ -194,6 +195,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     userId: trimmedUserId,
     authUid: appUserRow.auth_uid,
     displayName,
+    editableDisplayName: appUserRow.display_name || '',
     bio: appUserRow.bio || null,
     xUrl: appUserRow.x_url || null,
     instagramUrl: appUserRow.instagram_url || null,

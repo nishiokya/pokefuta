@@ -1,5 +1,6 @@
 -- 公開スタンプ帳に表示する任意プロフィール項目を追加する。
 -- app_user 自体は公開せず、公開読み取りは get_public_user_info() に限定する。
+-- 文字数・URL制約を変更するときは src/app/api/user/profile/route.ts も同期する。
 
 ALTER TABLE app_user
   ADD COLUMN IF NOT EXISTS bio text,
@@ -24,6 +25,8 @@ ALTER TABLE app_user
     CHECK (instagram_url IS NULL OR char_length(instagram_url) <= 300);
 
 -- CREATE OR REPLACE では RETURNS TABLE の列を変更できないため、いったん削除する。
+-- auth_uid は公開 visit の絞り込みに既存のサーバーローダーが利用しているため、011 からの返却を維持する。
+-- 将来これを非公開化する場合は、公開 user id から visit/progress を取得する専用 RPC へ置き換える。
 DROP FUNCTION IF EXISTS get_public_user_info(uuid);
 CREATE FUNCTION get_public_user_info(p_user_id uuid)
 RETURNS TABLE (

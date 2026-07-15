@@ -112,6 +112,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
   if (!data) notFound();
   const isOwner = authResult.data.user?.id === data.authUid;
+  const xUrl = safeSocialUrl(data.xUrl, ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com']);
+  const instagramUrl = safeSocialUrl(data.instagramUrl, ['instagram.com', 'www.instagram.com']);
 
   const pageUrl = getPageUrl(data.userId);
   const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
@@ -163,20 +165,25 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
               {data.displayName}のスタンプ帳
             </h1>
-            <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
-              {data.bio || '公開設定の訪問記録のみを表示しています。'}
+            {data.bio && (
+              <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
+                {data.bio}
+              </p>
+            )}
+            <p className={`${data.bio ? 'mt-1' : 'mt-3'} max-w-2xl text-xs font-medium leading-5 text-[#6A4D36]/80 sm:text-sm`}>
+              公開設定の訪問記録のみを表示しています。
             </p>
 
-            {(data.xUrl || data.instagramUrl) && (
+            {(xUrl || instagramUrl) && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {data.xUrl && <SocialLink href={data.xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />}
-                {data.instagramUrl && <SocialLink href={data.instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />}
+                {xUrl && <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />}
+                {instagramUrl && <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />}
               </div>
             )}
 
             {isOwner && (
               <PublicProfileEditor
-                displayName={data.displayName}
+                displayName={data.editableDisplayName}
                 bio={data.bio}
                 xUrl={data.xUrl}
                 instagramUrl={data.instagramUrl}
@@ -311,6 +318,16 @@ function SocialLink({ href, label, icon }: { href: string; label: string; icon: 
       <ExternalLink className="h-3 w-3 opacity-60" />
     </a>
   );
+}
+
+function safeSocialUrl(value: string | null, allowedHosts: string[]) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && allowedHosts.includes(url.hostname) ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function HeroStat({ label, value }: { label: string; value: string }) {
