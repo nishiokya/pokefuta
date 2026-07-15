@@ -34,6 +34,47 @@ function isSocialUrl(value: string, hosts: string[]) {
   }
 }
 
+type OwnProfileRow = {
+  public_user_id: string | null;
+  display_name: string | null;
+  bio: string | null;
+  x_url: string | null;
+  instagram_url: string | null;
+  profile_is_customized: boolean;
+};
+
+export async function GET() {
+  const supabase = createRouteHandlerClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'ログインが必要です。' }, { status: 401 });
+  }
+
+  const { data, error } = await supabase.rpc('get_own_profile' as never);
+
+  if (error) {
+    // RPC未適用(migration 025前)でもカード側が壊れないよう、メタデータの名前だけ返す
+    console.warn('Failed to load own profile via get_own_profile RPC:', error);
+  }
+
+  const row = ((data as unknown as OwnProfileRow[] | null) || [])[0] ?? null;
+  const fallbackName =
+    (user.user_metadata?.display_name as string | undefined) ||
+    user.email?.split('@')[0] ||
+    'トレーナー';
+
+  return NextResponse.json({
+    profile: {
+      displayName: row?.display_name || fallbackName,
+      bio: row?.bio ?? null,
+      xUrl: row?.x_url ?? null,
+      instagramUrl: row?.instagram_url ?? null,
+      publicUserId: row?.public_user_id ?? null,
+    },
+  });
+}
+
 export async function PATCH(request: Request) {
   const supabase = createRouteHandlerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();

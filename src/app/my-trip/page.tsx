@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
+import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -189,6 +190,9 @@ export default function MyTripPage() {
 
       <PCShell active="mytrip" rail={myTripRail} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-6 max-w-2xl lg:max-w-none">
+
+          {/* トレーナー情報（スタンプ帳と同じUX） */}
+          <ProfileCard />
 
           {/* Slim PhotoDex header */}
           <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">

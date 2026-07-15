@@ -119,3 +119,29 @@ AS $$
       AND p_display_name IS NOT NULL
       AND app_user.display_name IS DISTINCT FROM EXCLUDED.display_name;
 $$;
+
+-- 自分自身のプロフィールと公開ID(app_user.id)を取得する。
+-- スタンプ帳(/visits)・マイ旅(/my-trip)のプロフィールカードが GET /api/user/profile 経由で利用する。
+-- auth.uid() で行を特定するため、他ユーザーの情報は取得できない。
+DROP FUNCTION IF EXISTS get_own_profile();
+CREATE FUNCTION get_own_profile()
+RETURNS TABLE (
+  public_user_id uuid,
+  display_name text,
+  bio text,
+  x_url text,
+  instagram_url text,
+  profile_is_customized boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT au.id, au.display_name, au.bio, au.x_url, au.instagram_url, au.profile_is_customized
+  FROM app_user au
+  WHERE au.auth_uid = auth.uid();
+$$;
+
+REVOKE ALL ON FUNCTION get_own_profile() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_own_profile() TO authenticated;

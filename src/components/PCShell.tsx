@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Camera, Info, LogOut, UserPlus } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Camera, Info, UserPlus } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 
 type NavTab = 'search' | 'stamp' | 'mytrip';
@@ -67,7 +67,6 @@ interface PCTopNavProps {
 
 function PCTopNav({ active }: PCTopNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
 
@@ -93,17 +92,6 @@ function PCTopNav({ active }: PCTopNavProps) {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      const supabase = createBrowserClient();
-      await fetch('/api/auth/logout', { method: 'POST' });
-      await supabase.auth.signOut();
-      setDisplayName(null);
-      router.push('/');
-      router.refresh();
-    } catch { /* ignore */ }
-  };
 
   const isLoggedIn = authLoaded && displayName !== null;
   const navItems = isLoggedIn ? AUTH_NAV_ITEMS : GUEST_NAV_ITEMS;
@@ -235,23 +223,30 @@ function PCTopNav({ active }: PCTopNavProps) {
       {/* ユーザー */}
       {authLoaded && (
         displayName ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#6f6657' }}>
-              <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
-                👤
-              </span>
-              {displayName}
+          // 名前クリック → /profile（プロフィール編集・ログアウトの唯一の場所）
+          <Link
+            href="/profile"
+            title="プロフィール"
+            aria-label="プロフィール"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#6f6657',
+              padding: '4px 10px 4px 4px',
+              borderRadius: 999,
+              textDecoration: 'none',
+              flexShrink: 0,
+              background: pathname === '/profile' ? '#e9dfc7' : 'transparent',
+            }}
+          >
+            <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
+              👤
             </span>
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={iconBtn}
-              title="ログアウト"
-              aria-label="ログアウト"
-            >
-              <LogOut size={16} strokeWidth={2} />
-            </button>
-          </span>
+            {displayName}
+          </Link>
         ) : (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <Link

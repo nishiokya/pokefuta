@@ -681,6 +681,17 @@ export interface Database {
           instagram_url: string | null;
         }[];
       };
+      get_own_profile: {
+        Args: Record<string, never>;
+        Returns: {
+          public_user_id: string;
+          display_name: string | null;
+          bio: string | null;
+          x_url: string | null;
+          instagram_url: string | null;
+          profile_is_customized: boolean;
+        }[];
+      };
       update_own_public_profile: {
         Args: {
           p_display_name: string;
