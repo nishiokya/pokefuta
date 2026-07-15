@@ -61,6 +61,9 @@ type VisitProgressRow = {
 export type AppUserProgressRow = {
   auth_uid: string;
   display_name: string | null;
+  bio?: string | null;
+  x_url?: string | null;
+  instagram_url?: string | null;
 };
 
 export const FALLBACK_DISPLAY_NAME = 'トレーナー';

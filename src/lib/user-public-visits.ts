@@ -26,7 +26,12 @@ export type PublicVisit = {
 
 export type PublicUserVisits = {
   userId: string;
+  authUid: string;
   displayName: string;
+  editableDisplayName: string;
+  bio: string | null;
+  xUrl: string | null;
+  instagramUrl: string | null;
   totalVisits: number;
   prefectureCount: number;
   visits: PublicVisit[];
@@ -188,7 +193,12 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
 
   return {
     userId: trimmedUserId,
+    authUid: appUserRow.auth_uid,
     displayName,
+    editableDisplayName: appUserRow.display_name || '',
+    bio: appUserRow.bio || null,
+    xUrl: appUserRow.x_url || null,
+    instagramUrl: appUserRow.instagram_url || null,
     totalVisits,
     prefectureCount: prefectureSet.size,
     visits: publicVisits,

@@ -27,6 +27,10 @@ export interface Database {
           auth_uid: string;
           display_name: string | null;
           avatar_url: string | null;
+          bio: string | null;
+          x_url: string | null;
+          instagram_url: string | null;
+          profile_is_customized: boolean;
           created_at: string;
           updated_at: string;
           all_prefectures_completed_at: string | null;
@@ -37,12 +41,20 @@ export interface Database {
           auth_uid: string;
           display_name?: string | null;
           avatar_url?: string | null;
+          bio?: string | null;
+          x_url?: string | null;
+          instagram_url?: string | null;
+          profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
         };
         Update: {
           display_name?: string | null;
           avatar_url?: string | null;
+          bio?: string | null;
+          x_url?: string | null;
+          instagram_url?: string | null;
+          profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
         };
@@ -658,6 +670,25 @@ export interface Database {
           auth_uid: string;
           display_name: string | null;
         }[];
+      };
+      get_public_user_info: {
+        Args: { p_user_id: string };
+        Returns: {
+          auth_uid: string;
+          display_name: string | null;
+          bio: string | null;
+          x_url: string | null;
+          instagram_url: string | null;
+        }[];
+      };
+      update_own_public_profile: {
+        Args: {
+          p_display_name: string;
+          p_bio: string | null;
+          p_x_url: string | null;
+          p_instagram_url: string | null;
+        };
+        Returns: undefined;
       };
     };
   };
