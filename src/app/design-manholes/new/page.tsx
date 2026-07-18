@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useDropzone } from 'react-dropzone';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
-import { AlertCircle, Camera, CheckCircle, Upload } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle, Share2, Upload } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { isValidCoordinates } from '@/lib/location';
+import { buildXShareUrl, designManholeShareText } from '@/lib/share';
+import { SITE_URL } from '@/lib/constants';
 
 type GpsSource = 'exif' | null;
 
@@ -33,6 +35,8 @@ export default function DesignManholeNewPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [postedId, setPostedId] = useState<string | null>(null);
+  const [postedTitle, setPostedTitle] = useState<string | null>(null);
 
   // ニックネーム初期値はログインユーザーの表示名（ページ自体は middleware が保護）
   useEffect(() => {
@@ -181,6 +185,8 @@ export default function DesignManholeNewPage() {
         throw new Error(data?.error || '投稿に失敗しました。時間をおいて再度お試しください');
       }
 
+      setPostedId(data?.design_manhole?.id ?? null);
+      setPostedTitle(data?.design_manhole?.title ?? null);
       setDone(true);
     } catch (err: any) {
       setError(err?.message || '投稿に失敗しました');
@@ -190,6 +196,16 @@ export default function DesignManholeNewPage() {
   };
 
   if (done) {
+    const postedPageUrl = postedId
+      ? `${SITE_URL}/design-manholes/${postedId}`
+      : `${SITE_URL}/design-manholes`;
+    const shareUrl = buildXShareUrl(
+      `${designManholeShareText(postedTitle)}\nみんなのデザインマンホールに投稿しました！`,
+      postedPageUrl,
+      ['デザインマンホール', 'マンホール'],
+      { includeDefaultHashtags: false }
+    );
+
     return (
       <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
         <Header title="デザインマンホール投稿" showDescriptionLink={false} />
@@ -198,14 +214,33 @@ export default function DesignManholeNewPage() {
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
             投稿されたデザインマンホールは公開されました。
+            翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラマンホールマップ</a> にも掲載されます。
           </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <Link
-              href="/design-manholes"
-              className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
-            >
-              一覧を見る
-            </Link>
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-[#2A2A2A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#444444]"
+          >
+            <Share2 className="h-4 w-4" />
+            Xでシェアする
+          </a>
+          <div className="mt-4 flex justify-center gap-3">
+            {postedId ? (
+              <Link
+                href={`/design-manholes/${postedId}`}
+                className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+              >
+                自分の投稿ページを見る
+              </Link>
+            ) : (
+              <Link
+                href="/design-manholes"
+                className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+              >
+                一覧を見る
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => window.location.reload()}
