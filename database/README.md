@@ -1,37 +1,69 @@
-# データベースマイグレーション
+# データベース
 
-Supabase SQL Editorで `database/migrations/` のSQLを番号順に実行します。
+スキーマの正は `supabase/migrations/` です。
 
-## 実行順
+- `supabase/migrations/20260718000000_prod_baseline.sql` — 本番スキーマの全量ダンプ（2026-07-18 取得）。「現在のスキーマ」のドキュメントを兼ねる
+- `database/migrations/archive/` — ベースラインに焼き込み済みの過去マイグレーション（003〜025）。経緯・意図の記録として保存。**再実行しないこと**
 
-1. `003_add_social_features.sql`
-2. `004_add_site_stats.sql`
-3. `005_add_prefecture_badge_system.sql`
-4. `006_extend_manhole_fields.sql`
-5. `006_fix_orphan_visits.sql`
-6. `007_backfill_app_user_from_auth_users.sql`
-7. `008_extend_site_stats.sql`
-8. `010_add_manhole_share_metadata.sql`
-9. `011_add_public_user_info_fn.sql`
-10. `012_drop_email_from_app_user.sql`
-11. `013_add_app_user_self_select_policy.sql`
-12. `014_add_get_my_app_user_id_fn.sql`
-13. `015_add_photo_context_images.sql`
-14. `016_remove_context_image_file_size_constraint.sql`
-15. `017_add_context_image_ml_metadata.sql`
-16. `018_add_design_manhole.sql`
-17. `019_design_manhole_rls_policies.sql`
-18. `020_expose_app_user_public_id.sql`
-19. `021_restrict_app_user_public_id.sql`
-20. `022_upsert_app_user_fn.sql`
-21. `023_add_public_display_names_fn.sql`
-22. `024_backfill_app_user_display_names.sql`
+データのバックアップはリポジトリに含まれません。シード（後述）は公開データから再生成できる参照データであり、ユーザーデータ（`auth.users` / `app_user` / `visit` / `photo` / コメント等）は本番にのみ存在します。バックアップは別途計画すること。
 
-## 注意
+## ローカル開発DB（Supabase CLI）
 
-- 本番反映前にバックアップを取得してください。
-- `006_` が2本あります。ファイル名の目的に沿って、上の順で実行してください。
-- 新しいマイグレーションを追加したら、この一覧も更新してください。
+WSL/ローカルでは Supabase CLI のローカルスタック（Docker）を使います。素のPostgresではなくローカルSupabaseを使うのは、スキーマが `auth.users` / `auth.uid()` / RLS に依存しているためです。
+
+```bash
+npx supabase start    # 起動（初回はDockerイメージ取得で数分）
+npx supabase stop     # 停止（データは保持される）
+npx supabase status   # 接続情報の確認
+npx supabase db reset # supabase/migrations + supabase/seed を再適用してDBを作り直す
+```
+
+| サービス | URL |
+|---|---|
+| API (アプリが接続する先) | http://127.0.0.1:54321 |
+| Studio (管理画面) | http://127.0.0.1:54323 |
+| Mailpit (認証メール受信) | http://127.0.0.1:54324 |
+| Postgres 直接続 | postgresql://postgres:postgres@127.0.0.1:54322/postgres |
+
+`.env.local` の `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` を `npx supabase status` が表示するローカル値に切り替えて `npm run dev` を実行します（クラウド値はコメントで温存してある）。
+
+- メール確認は無効化済み（`supabase/config.toml`）のため、ローカルではメール+パスワードで即サインアップできます。OAuthログインはローカル未設定です。
+- 写真ストレージは Cloudflare R2 のままなので、R2 の環境変数は変更不要です。
+
+## スキーマ変更のフロー
+
+CLI はログイン・`link` 済み（本番プロジェクト `kbwzwgsjqvflgfauzcpn`）。マイグレーション履歴はベースラインまで本番と同期済み。
+
+```bash
+npx supabase migration new <name>   # supabase/migrations/ に空ファイル生成
+# SQLを書く（テーブル・PostGIS関数はスキーマ修飾を推奨）
+npx supabase db reset               # ローカルで適用テスト
+npx supabase db push                # 本番へ適用
+```
+
+SQL Editor への手動コピペ運用は廃止。本番へ直接SQLを流した場合は、ベースラインを取り直して履歴を修復すること:
+
+```bash
+npx supabase db dump -f supabase/migrations/<新タイムスタンプ>_prod_baseline.sql
+npx supabase migration repair --status applied <新タイムスタンプ>
+# 古いベースラインと適用済みマイグレーションは削除し、履歴も repair で整理する
+```
+
+CLIトークン（`sbp_`、アカウント単位）は 2026-10-18 頃に失効します。https://supabase.com/dashboard/account/tokens で再発行し `npx supabase login --token <sbp_...>` を実行（控えは `.env.local` の `SUPABASE_ACCESS_TOKEN`）。
+
+## シードデータ
+
+`npx supabase db reset` 時に `supabase/seed/` が順に投入されます:
+
+1. `01_prefecture.sql` — 47都道府県（旧005の初期データと同一）
+2. `02_manhole.sql` — 実データ482件。`tools/build-local-seed.sh` で最新の pokefuta.ndjson から再生成できる
+3. `03_backfill.sql` — manhole の prefecture_id / region 補完（旧006と同一ロジック）
+
+注意: CLI のシード実行は search_path が空のため、シードSQL内ではテーブル・PostGIS関数を必ずスキーマ修飾する（`public.manhole`, `extensions.ST_GeogFromText`）。
+
+## 型定義との乖離
+
+`src/types/database.ts` には本番に存在しないテーブル（`image`, `shared_link`）や存在しないカラム（`manhole.updated_at`, `photo.storage_provider` 等）が定義されています。本番ダンプが実態です。`npx supabase gen types typescript --local` で実スキーマから自動生成した型への置き換えを検討。
 
 ## app_user テーブルの ID について
 
