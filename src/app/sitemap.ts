@@ -51,6 +51,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/design-manholes`,
+      lastModified,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
   ];
 
   let dynamicPages: MetadataRoute.Sitemap = [];
@@ -85,5 +91,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Error fetching manholes for sitemap:', error);
   }
 
-  return [...staticPages, ...dynamicPages];
+  let designManholePages: MetadataRoute.Sitemap = [];
+
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey && !supabaseUrl.includes('dummy')) {
+      const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+
+      const { data: designManholes, error } = await supabase
+        .from('design_manhole')
+        .select('id, updated_at')
+        .eq('status', 'published')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      if (designManholes && designManholes.length > 0) {
+        designManholePages = designManholes.map((dm: { id: string; updated_at: string }) => ({
+          url: `${baseUrl}/design-manholes/${dm.id}`,
+          lastModified: new Date(dm.updated_at),
+          changeFrequency: 'monthly' as const,
+          priority: 0.7,
+        }));
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching design manholes for sitemap:', error);
+  }
+
+  return [...staticPages, ...dynamicPages, ...designManholePages];
 }

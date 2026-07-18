@@ -268,6 +268,87 @@ export async function renderPokefutaOgpTemplate(input: PokefutaOgpTemplateInput)
   return sharp(base).composite(textLayers).png().toBuffer();
 }
 
+// デザインマンホール投稿用OGP。ポケふた用テンプレート（「◯◯のポケふた」等の
+// 文言焼き込み）は流用できないため、写真+テキストの専用レイアウトで合成する
+export async function renderDesignManholeOgpTemplate(input: {
+  photoBuffer: Buffer;
+  title: string;
+  submitterName?: string | null;
+}): Promise<Buffer> {
+  const photoBuffer = await sharp(input.photoBuffer)
+    .resize(470, 470, { fit: 'cover' })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+
+  const baseSvg = `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${WIDTH}" height="${HEIGHT}" fill="#F6EEDC"/>
+    <rect x="40" y="40" width="1120" height="550" rx="28" fill="#FFF8EB" stroke="#7B63A8" stroke-opacity="0.22" stroke-width="4"/>
+    <rect x="76" y="76" width="486" height="486" rx="20" fill="#EFE5CE"/>
+    <rect x="600" y="96" width="420" height="56" rx="28" fill="#7B63A8"/>
+  </svg>`;
+  const base = await sharp(Buffer.from(baseSvg)).png().toBuffer();
+
+  const overlays: sharp.OverlayOptions[] = [
+    { input: photoBuffer, left: 84, top: 84 },
+  ];
+
+  const submitterLine = input.submitterName ? `${truncate(input.submitterName, 16)}さんの投稿` : 'みんなの投稿';
+  const textLayers = await buildTextLayers([
+    {
+      text: 'みんなのデザインマンホール',
+      left: 628,
+      top: textTopFromBaseline(138, 26),
+      width: 370,
+      height: 44,
+      fontSize: 26,
+      color: '#FFFFFF',
+    },
+    {
+      // 長いタイトルは幅520px内で2行に折り返す想定。投稿者行と重ならないよう
+      // 高さを2行分確保し、投稿者行は baseline 390 まで離す
+      text: truncate(input.title, 22),
+      left: 604,
+      top: textTopFromBaseline(235, 52),
+      width: 520,
+      height: 140,
+      fontSize: 52,
+      minFontSize: 36,
+      color: '#4F3828',
+    },
+    {
+      text: submitterLine,
+      left: 606,
+      top: textTopFromBaseline(390, 30),
+      width: 520,
+      height: 52,
+      fontSize: 30,
+      color: '#17614F',
+    },
+    {
+      text: 'ご当地デザインマンホールをみんなで集めよう',
+      left: 606,
+      top: textTopFromBaseline(470, 28),
+      width: 540,
+      height: 50,
+      fontSize: 28,
+      minFontSize: 22,
+      color: '#2F241C',
+    },
+    {
+      text: 'pokefuta.com',
+      left: 900,
+      top: textTopFromBaseline(560, 25),
+      width: 224,
+      height: 44,
+      fontSize: 23,
+      color: '#17614F',
+      align: 'center',
+    },
+  ]);
+
+  return sharp(base).composite([...overlays, ...textLayers]).png().toBuffer();
+}
+
 export async function renderOgpFallback(input: {
   title: string;
   subtitle: string;

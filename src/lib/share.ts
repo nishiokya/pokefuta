@@ -4,12 +4,26 @@ function normalizeHashtag(tag: string): string {
   return tag.replace(/^#+/, '').trim();
 }
 
-export function buildXShareUrl(text: string, pageUrl: string, hashtags: string[] = []): string {
-  const mergedHashtags = [...hashtags, ...DEFAULT_HASHTAGS]
+export function buildXShareUrl(
+  text: string,
+  pageUrl: string,
+  hashtags: string[] = [],
+  options: { includeDefaultHashtags?: boolean } = {}
+): string {
+  // デザインマンホール等ポケふた以外の文脈では includeDefaultHashtags: false で
+  // 「ポケふた」タグの強制付与を外せる
+  const includeDefaults = options.includeDefaultHashtags ?? true;
+  const mergedHashtags = [...hashtags, ...(includeDefaults ? DEFAULT_HASHTAGS : [])]
     .map(normalizeHashtag)
     .filter(Boolean);
 
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}&hashtags=${encodeURIComponent(mergedHashtags.join(','))}`;
+}
+
+export function designManholeShareText(title: string | null): string {
+  return title
+    ? `「${title}」のデザインマンホールを見つけました！`
+    : `素敵なデザインマンホールを見つけました！`;
 }
 
 export function buildLineShareUrl(pageUrl: string): string {
