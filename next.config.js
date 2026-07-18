@@ -62,6 +62,13 @@ const nextConfig = {
       '/users/[userId]/prefectures/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
       ],
+      // フォントに加えテンプレート一式を含める（pokefuta-ogp-template の
+      // モジュールロード時に template/background を読むため）
+      '/design-manholes/[id]/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+        './public/ogp/pokefuta_ogp_template.svg',
+        './public/ogp/pokefuta_ogp_background_1200x630.png',
+      ],
     },
   },
   images: {

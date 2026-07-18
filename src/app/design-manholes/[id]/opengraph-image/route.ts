@@ -39,7 +39,8 @@ export async function GET(
     return new Response(png as unknown as BodyInit, {
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        // hidden 化した投稿の写真がCDNに残り続けないよう短めにする（モデレーション優先）
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=900',
       },
     });
   } catch (error) {
