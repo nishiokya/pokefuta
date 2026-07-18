@@ -7,6 +7,7 @@ import BottomNav from '@/components/BottomNav';
 import MapSection from '../MapSection';
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
+import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import type { DesignManhole } from '@/types/database';
 
@@ -15,6 +16,9 @@ type Props = {
 };
 
 export const dynamic = 'force-dynamic';
+// supabase-js の GET が Data Cache に乗ると hidden 化した投稿のページが
+// 404 にならず残り続けるため無効化（/api/design-manholes と同じ理由）
+export const fetchCache = 'force-no-store';
 
 const NOT_FOUND_METADATA: Metadata = {
   title: `投稿が見つかりません | ${SITE_NAME}`,
@@ -22,11 +26,6 @@ const NOT_FOUND_METADATA: Metadata = {
 };
 
 const displayTitle = (title: string | null) => title || 'デザインマンホール';
-
-const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const designManhole = await loadDesignManholeForOgp(params.id);
@@ -161,7 +160,7 @@ export default async function Page({ params }: Props) {
             <h1 className="text-lg font-bold sm:text-xl">{title}</h1>
             <p className="mt-1 text-xs text-[#2A2A2A]/50">
               {designManhole.submitter_name ? `${designManhole.submitter_name} ・ ` : ''}
-              {formatDate(designManhole.created_at)}
+              {formatDateJaJst(designManhole.created_at)}
             </p>
             {designManhole.description && (
               <p className="mt-3 whitespace-pre-wrap text-sm text-[#2A2A2A]/80">

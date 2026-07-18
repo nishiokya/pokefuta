@@ -26,8 +26,11 @@ export function isValidDesignManholeId(id: string): boolean {
 
 // 一覧ページのSSR用。/api/design-manholes GET と同じ公開カラムのみを返す
 // （exif / storage_key / created_by は絶対に含めない）
+// 全クライアントで失敗した場合は throw する。空配列を返すと障害時に
+// 「まだ投稿がありません」と誤表示してしまうため、失敗と0件を区別する
 export async function loadPublishedDesignManholes(limit = 200): Promise<DesignManhole[]> {
   const clients = createOgpSupabaseClients();
+  let lastError: unknown = new Error('Supabase client is not configured');
 
   for (const supabase of clients) {
     const { data, error } = await supabase
@@ -37,7 +40,10 @@ export async function loadPublishedDesignManholes(limit = 200): Promise<DesignMa
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error || !data) continue;
+    if (error || !data) {
+      lastError = error ?? lastError;
+      continue;
+    }
 
     return (data as any[]).map((row) => ({
       ...row,
@@ -45,7 +51,7 @@ export async function loadPublishedDesignManholes(limit = 200): Promise<DesignMa
     }));
   }
 
-  return [];
+  throw lastError;
 }
 
 export async function loadDesignManholeForOgp(

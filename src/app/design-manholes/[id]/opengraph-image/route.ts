@@ -2,6 +2,8 @@ import { renderDesignManholeOgpTemplate, renderOgpFallback } from '@/lib/pokefut
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
 
 export const runtime = 'nodejs';
+// hidden 化した投稿のOGPが Data Cache 経由で配信され続けないようにする
+export const fetchCache = 'force-no-store';
 
 function buildFallback(): Promise<Buffer> {
   return renderOgpFallback({

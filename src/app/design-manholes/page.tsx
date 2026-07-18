@@ -5,11 +5,16 @@ import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
+import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
+import type { DesignManhole } from '@/types/database';
 
 // Amplify ではビルド時静的化で内容が凍結する事故があるため（/api/site-stats と同じ）、
 // 常にサーバーレンダリングする。キャッシュは CDN 側に任せる
 export const dynamic = 'force-dynamic';
+// supabase-js の PostgREST GET が Next の Data Cache に乗ると新規投稿が一覧に
+// 反映されず hidden 行も消えない（/api/design-manholes と同じ理由）
+export const fetchCache = 'force-no-store';
 
 const PAGE_URL = `${SITE_URL}/design-manholes`;
 const PAGE_TITLE = `みんなのデザインマンホール | ${SITE_NAME}`;
@@ -34,11 +39,6 @@ export const metadata: Metadata = {
     description: PAGE_DESCRIPTION,
     images: [OGP_IMAGE_URL],
   },
-};
-
-const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
 };
 
 // tracker (data.pokefuta.com/design_manhole.html) の「こんな1枚を待っています」と同じ文言
@@ -78,7 +78,14 @@ function WantedSection() {
 }
 
 export default async function DesignManholesPage() {
-  const designManholes = await loadPublishedDesignManholes(200);
+  let designManholes: DesignManhole[] = [];
+  let loadError = false;
+  try {
+    designManholes = await loadPublishedDesignManholes(200);
+  } catch (error) {
+    console.error('Failed to load design manholes for listing:', error);
+    loadError = true;
+  }
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -121,7 +128,11 @@ export default async function DesignManholesPage() {
           </Link>
         </div>
 
-        {designManholes.length === 0 ? (
+        {loadError ? (
+          <p className="mt-5 rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/10 p-3 text-sm text-[#B5483C]">
+            一覧の取得に失敗しました。時間をおいて再度お試しください。
+          </p>
+        ) : designManholes.length === 0 ? (
           <div className="mt-5 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-8 text-center">
             <p className="text-sm text-[#2A2A2A]/70">
               まだ投稿がありません。最初の1枚を投稿してみませんか？
@@ -161,7 +172,7 @@ export default async function DesignManholesPage() {
                     </p>
                     <p className="mt-0.5 truncate text-xs text-[#2A2A2A]/50">
                       {dm.submitter_name ? `${dm.submitter_name} ・ ` : ''}
-                      {formatDate(dm.created_at)}
+                      {formatDateJaJst(dm.created_at)}
                     </p>
                   </div>
                 </Link>
