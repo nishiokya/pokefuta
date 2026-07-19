@@ -841,31 +841,46 @@ function UploadPageInner() {
               </div>
 
               {/* 公開設定 */}
-              <div className="flex items-center justify-between rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
-                <div>
-                  <h3 className="text-sm font-bold">公開設定</h3>
-                  <p className="mt-0.5 text-xs text-[#2A2A2A]/60">
-                    {isPublic ? '他のユーザーも閲覧できます' : '自分だけが閲覧できます'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newValue = !isPublic;
-                    setIsPublic(newValue);
-                    setCookie('pokefuta_is_public', newValue.toString());
-                  }}
-                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                    isPublic ? 'bg-[#7B63A8]' : 'bg-[#2A2A2A]/25'
-                  }`}
-                  aria-label="公開設定を切り替える"
-                >
-                  <span
-                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                      isPublic ? 'translate-x-7' : 'translate-x-1'
+              <div
+                className={`rounded-lg border p-3 ${
+                  isPublic ? 'border-[#7B63A8]/15 bg-white/70' : 'border-amber-300 bg-amber-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold">公開設定</h3>
+                    <p className="mt-0.5 text-xs text-[#2A2A2A]/60">
+                      {isPublic ? '他のユーザーも閲覧できます' : '自分だけが閲覧できます'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = !isPublic;
+                      setIsPublic(newValue);
+                      setCookie('pokefuta_is_public', newValue.toString());
+                    }}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                      isPublic ? 'bg-[#7B63A8]' : 'bg-[#2A2A2A]/25'
                     }`}
-                  />
-                </button>
+                    aria-label="公開設定を切り替える"
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        isPublic ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {!isPublic && (
+                  <div className="mt-3 rounded-md bg-amber-100/70 p-2.5 text-xs text-amber-900">
+                    <p className="font-bold">⚠️ 非公開にすると…</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      <li>トップページや写真館の「最新の投稿」に掲載されません</li>
+                      <li>他のユーザーはこの写真・コメントを見られません</li>
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -897,11 +912,17 @@ function UploadPageInner() {
                 className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canSubmit}
               >
-                {selectedPhoto?.uploading ? '投稿中...' : '投稿する'}
+                {selectedPhoto?.uploading ? '投稿中...' : isPublic ? '投稿する' : '非公開で投稿する'}
               </button>
-              <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
-                公開設定がONの写真・コメントはすぐに公開されます。
-              </p>
+              {isPublic ? (
+                <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
+                  公開設定がONの写真・コメントはすぐに公開されます。
+                </p>
+              ) : (
+                <p className="mt-2 text-center text-xs font-bold text-amber-700">
+                  ⚠️ 非公開のまま投稿します。写真館には掲載されません。
+                </p>
+              )}
             </div>
         </section>
       </main>
