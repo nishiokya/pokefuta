@@ -878,7 +878,6 @@ function UploadPageInner() {
                     <ul className="mt-1 list-disc space-y-0.5 pl-4">
                       <li>トップページや写真館の「最新の投稿」に掲載されません</li>
                       <li>他のユーザーはこの写真・コメントを見られません</li>
-                      <li>投稿後に公開へ変更することはできません</li>
                     </ul>
                   </div>
                 )}
@@ -921,7 +920,7 @@ function UploadPageInner() {
                 </p>
               ) : (
                 <p className="mt-2 text-center text-xs font-bold text-amber-700">
-                  ⚠️ 非公開のまま投稿します。写真館には掲載されず、あとから公開に変更できません。
+                  ⚠️ 非公開のまま投稿します。写真館には掲載されません。
                 </p>
               )}
             </div>
