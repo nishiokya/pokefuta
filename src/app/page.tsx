@@ -19,7 +19,7 @@ import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
-import { formatDateJa } from '@/lib/date';
+import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 type FeedVisit = {
@@ -38,14 +38,6 @@ type FeedVisit = {
   manhole_comments_count?: number;
   display_name?: string | null;
 };
-
-const formatFeedDate = (value: string) =>
-  new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  }).format(new Date(value));
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
@@ -343,7 +335,7 @@ export default function HomePage() {
                             {locationLabel || 'ポケふた'}
                           </div>
                           <div className="mt-1 text-sm font-semibold text-white/90">
-                            {formatFeedDate(visit.shot_at)}撮影
+                            {formatDateJaJst(visit.shot_at)}撮影
                           </div>
                           {posterLabel && (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
