@@ -23,9 +23,9 @@
 
 既存マンホールデータに prefecture_id と prefecture_code を埋めるヘルパースクリプト。
 
-### `export_latest_manhole_photos.py`
+### ~~`export_latest_manhole_photos.py`~~（移管済み）
 
-`photo` テーブルから、マンホールIDごとの最新公開写真URLをJSONとして出力するPythonスクリプト。Python 3.9以上の標準ライブラリだけで動きます。
+`pokefuta-tracker` の `apps/scraper/export_latest_manhole_photos.py` へ移管（2026-07-19、tracker PR #352）。現在は tracker の日次ワークフロー `import-manhole-photos.yml` が自動実行しています。
 
 ## 🚀 使い方
 
@@ -97,102 +97,11 @@ export DATABASE_URL="postgresql://user:password@host:port/database"
 python tools/generate_manhole_sql.py 2>/dev/null | psql $DATABASE_URL
 ```
 
-### 3. 最新写真JSONの生成
+### 3. 最新写真JSONの生成（pokefuta-tracker へ移管済み）
 
-ローカルで以下の環境変数を設定します。
+`export_latest_manhole_photos.py` は 2026-07-19 に `pokefuta-tracker` の `apps/scraper/` へ移管しました（tracker PR #352）。tracker の日次ワークフロー `import-manhole-photos.yml`（05:30 JST）が Supabase からの取得〜写真取込〜スナップショット生成〜デプロイまでを自動実行するため、このリポジトリでの手動エクスポートは不要です。
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=xxxxx
-R2_PUBLIC_BASE_URL=https://images.pokefuta.com
-```
-
-`SUPABASE_SERVICE_ROLE_KEY` はRLSをバイパスできる強い権限の鍵です。コミット・共有せず、信頼できるローカル/管理環境でのみ使ってください。公開データだけで実行できる環境では、必要なSELECT権限に絞ったキーを使うのがおすすめです。
-
-`R2_PUBLIC_BASE_URL` には公開カスタムドメインを推奨します。`https://xxxxx.r2.cloudflarestorage.com` 形式のR2 endpointを使う場合は、URLにbucket名を含めるため `R2_BUCKET` も設定してください。`R2_PUBLIC_BASE_URL` にすでにbucket pathが含まれている場合、スクリプトはそのURLをそのまま使います。
-
-マンホール口コミは、デフォルトで `display_name` が `tako` の投稿だけを `manhole_comments` に出力します。対象ユーザー名を変える場合は `MANHOLE_COMMENT_DISPLAY_NAME` または `--manhole-comment-display-name` を指定してください。
-
-```bash
-python3 tools/export_latest_manhole_photos.py \
-  --output public/data/latest-manhole-photos.json
-```
-
-出力JSONは `photos` オブジェクトのキーがマンホールIDです。最新判定は `visit.shot_at` があればそれを優先し、なければ `photo.created_at` を使います。実際の出力スキーマは以下の形です。
-
-```json
-{
-  "generated_at": "2026-05-12T00:00:00.000Z",
-  "source": "pokefuta photo table",
-  "image": {
-    "r2_public_base_url": "https://images.pokefuta.com"
-  },
-  "count": 1,
-  "photos": {
-    "279": {
-      "manhole_id": 279,
-      "photo_id": "photo-record-uuid",
-      "url": "https://images.pokefuta.com/photos/original/2026/05/storage-object-uuid.jpg",
-      "original_url": "https://images.pokefuta.com/photos/original/2026/05/storage-object-uuid.jpg",
-      "storage_key": "photos/original/2026/05/storage-object-uuid.jpg",
-      "content_type": "image/jpeg",
-      "width": null,
-      "height": null,
-      "file_size": 123456,
-      "created_at": "2026-05-12T00:00:00.000Z",
-      "shot_at": "2026-05-12T00:00:00.000Z",
-      "comment": "訪問時の口コミ",
-      "display_name": "投稿者名"
-    }
-  },
-  "manhole_comments": {
-    "279": [
-      {
-        "id": "comment-record-uuid",
-        "manhole_id": 279,
-        "content": "マンホールへの口コミ",
-        "created_at": "2026-05-12T00:00:00.000Z",
-        "updated_at": "2026-05-12T00:00:00.000Z",
-        "display_name": "tako"
-      }
-    ]
-  }
-}
-```
-
-`photo_id` はDB上の `photo.id`、`storage_key` はR2 object keyです。通常は別の識別子になります。`comment` は写真に紐づく訪問記録の公開コメント、`display_name` は写真投稿者の `app_user.display_name` です。
-
-このリポジトリでは画像URLとして元画像URLだけを出力します。あわせて検索サイト側で使えるように、storage keyやcontent typeなどの写真メタデータも含めます。画像変換URLの生成は検索サイト側のリポジトリで行います。R2側は本番用途では `r2.dev` ではなく、Cloudflare管理下のカスタムドメインを `R2_PUBLIC_BASE_URL` に設定するのがおすすめです。カスタムドメインが未設定の場合はR2 endpoint形式でも出力できます。
-
-将来自動化する場合は、Amplify のビルド/バッチ用環境に同じ環境変数を置き、`python3 tools/export_latest_manhole_photos.py` を実行する方針で移行できます。R2へ直接アップロードまで自動化したい場合は、Amplify/CodeBuild側で AWS CLI 互換の `aws s3 cp --endpoint-url "$R2_ENDPOINT"`、または `boto3` を追加して `data/latest-manhole-photos.json` に配置します。
-
-#### Cloudflare / R2 パス設計
-
-推奨構成:
-
-```text
-R2 bucket
-├── photos/original/YYYY/MM/<uuid>.jpg
-└── data/latest-manhole-photos.json
-```
-
-公開ドメイン:
-
-```text
-https://images.pokefuta.com/photos/original/YYYY/MM/<uuid>.jpg
-https://images.pokefuta.com/data/latest-manhole-photos.json
-```
-
-R2 endpointを直接使う場合:
-
-```text
-https://<account-id>.r2.cloudflarestorage.com/<bucket>/photos/original/YYYY/MM/<uuid>.jpg
-https://<account-id>.r2.cloudflarestorage.com/<bucket>/data/latest-manhole-photos.json
-```
-
-検索サイト側では、このJSONの `url` / `original_url` を入力として必要なサイズの画像URLへ変換します。
-
-写真が大きく増えた場合は、PostgreSQL側に `DISTINCT ON (manhole_id)` などで最新写真だけを返すview/RPCを作り、このスクリプトの取得元を置き換えると転送量を抑えられます。
+出力スキーマや手動実行の手順は tracker 側の `apps/scraper/export_latest_manhole_photos.py` と `pokefuta-tracker` のドキュメントを参照してください。
 
 ## 📊 出力形式
 

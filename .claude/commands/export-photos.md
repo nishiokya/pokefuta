@@ -1,12 +1,10 @@
-Export the latest manhole photos from Supabase and generate `public/data/latest-manhole-photos.json`.
+This command is retired. The export script has moved to the `pokefuta-tracker` repository.
 
-Steps:
-1. Load env vars from `.env.local` with: `set -a && source .env.local && set +a`
-2. Run `python3 tools/export_latest_manhole_photos.py`
-3. Show the stderr output (exported count and output path)
-4. Show the first few lines of the generated JSON as a sanity check (generated_at and count fields)
+Tell the user:
 
-Notes:
-- The script uses `SUPABASE_SERVICE_ROLE_KEY` if set, or falls back to `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The anon key works because exported photos are all public.
-- `R2_PUBLIC_URL` and `R2_BUCKET` from `.env.local` are used for image URLs.
-- Output goes to `public/data/latest-manhole-photos.json` by default.
+- `tools/export_latest_manhole_photos.py` は 2026-07-19 に `pokefuta-tracker` の `apps/scraper/export_latest_manhole_photos.py` へ移管された（tracker PR #352）
+- 現在は tracker の GitHub Actions `import-manhole-photos.yml`（毎日 05:30 JST）が自動実行しており、手動エクスポートは不要
+- 手動で実行したい場合は tracker リポジトリ側で行う:
+  `cd ~/projects/pokefuta-tracker && set -a && source .env.local && set +a && python3 apps/scraper/export_latest_manhole_photos.py`
+
+Do not attempt to run `tools/export_latest_manhole_photos.py` in this repository — the file no longer exists.
