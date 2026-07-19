@@ -39,6 +39,14 @@ type FeedVisit = {
   display_name?: string | null;
 };
 
+const formatFeedDate = (value: string) =>
+  new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Asia/Tokyo',
+  }).format(new Date(value));
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<FeedVisit[]>([]);
@@ -307,7 +315,7 @@ export default function HomePage() {
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
-                      `コメント ${commentCount}`,
+                      commentCount > 0 ? `口コミ ${commentCount}件` : null,
                     ].filter(Boolean).join('、');
                     const cardContent = (
                       <>
@@ -327,26 +335,30 @@ export default function HomePage() {
 
                         {currentPage === 1 && index < 3 && (
                           <span className="absolute left-2 top-2 rounded-[6px] bg-[#7B63A8] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
-                            NEW
+                            新着投稿
                           </span>
                         )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
                           </div>
-                          <div className="mt-1 text-sm font-semibold">{formatDateJa(visit.shot_at)}</div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">
+                            {formatFeedDate(visit.shot_at)}撮影
+                          </div>
                           {posterLabel && (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{posterLabel}</span>
                             </div>
                           )}
-                          <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
-                            <span className="inline-flex items-center gap-1">
-                              <MessageCircle className="h-4 w-4" />
-                              {commentCount}
-                            </span>
-                          </div>
+                          {commentCount > 0 && (
+                            <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-white/85">
+                              <span className="inline-flex items-center gap-1">
+                                <MessageCircle className="h-4 w-4" />
+                                口コミ {commentCount}件
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </>
                     );
