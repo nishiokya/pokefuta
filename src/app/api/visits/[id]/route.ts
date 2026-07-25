@@ -4,6 +4,136 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage } from '@/lib/storage';
 
+/**
+ * @swagger
+ * /api/visits/{id}:
+ *   patch:
+ *     summary: 訪問記録の公開設定を変更
+ *     tags: [visits]
+ *     description: 自分の訪問記録の is_public を更新します。他人の記録は変更できません。
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 訪問記録ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [is_public]
+ *             properties:
+ *               is_public:
+ *                 type: boolean
+ *                 description: true で公開、false で非公開
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ *       400:
+ *         description: is_public が boolean でない
+ *       401:
+ *         description: 認証が必要
+ *       403:
+ *         description: 他人の訪問記録は変更できない
+ *       404:
+ *         description: 訪問記録が見つからない
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    const visitId = params.id;
+
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required'
+      }, { status: 401 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid JSON body'
+      }, { status: 400 });
+    }
+
+    const isPublic = (body as { is_public?: unknown } | null)?.is_public;
+
+    if (typeof isPublic !== 'boolean') {
+      return NextResponse.json({
+        success: false,
+        error: 'is_public must be a boolean'
+      }, { status: 400 });
+    }
+
+    const { data: visit, error: visitError } = await supabase
+      .from('visit')
+      .select('id, user_id')
+      .eq('id', visitId)
+      .single();
+
+    if (visitError || !visit) {
+      return NextResponse.json({
+        success: false,
+        error: 'Visit not found'
+      }, { status: 404 });
+    }
+
+    if (visit.user_id !== session.user.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Permission denied: You can only update your own visits'
+      }, { status: 403 });
+    }
+
+    // visit には updated_at トリガーが無いので明示的に更新する。
+    // RLS(users_update_own_visits) に加えて user_id でも絞り、DELETE と同じ多層防御にする。
+    const { data: updated, error: updateError } = await supabase
+      .from('visit')
+      .update({ is_public: isPublic, updated_at: new Date().toISOString() })
+      .eq('id', visitId)
+      .eq('user_id', session.user.id)
+      .select('id, is_public')
+      .single();
+
+    if (updateError || !updated) {
+      console.error('Error updating visit visibility:', updateError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to update visit visibility',
+        details: updateError?.message
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      visit_id: updated.id,
+      is_public: updated.is_public
+    });
+  } catch (error: any) {
+    console.error('Unexpected error updating visit visibility:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Unexpected error',
+      details: error?.message || 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
 // Delete a visit and all photos attached to it.
 export async function DELETE(
   request: NextRequest,

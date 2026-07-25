@@ -8,9 +8,12 @@ import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
+import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
+import { EyeOff } from 'lucide-react';
 
 const TOTAL_MANHOLES = 470;
 
@@ -20,6 +23,7 @@ type JourneyVisit = {
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> & { city?: string } | null;
   shot_at: string;
   display_name?: string | null;
+  is_public?: boolean;
   photos: Array<{ id: string; thumbnail_url?: string }>;
 };
 
@@ -43,7 +47,10 @@ export default function MyTripPage() {
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [visits, setVisits] = useState<JourneyVisit[]>([]);
-  const { trackView } = useAnalytics();
+  const [showPrivateOnly, setShowPrivateOnly] = useState(false);
+  const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
+  const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+  const { trackView, trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
   useEffect(() => {
     document.title = 'マイ旅 - ポケふたマップ';
@@ -105,11 +112,49 @@ export default function MyTripPage() {
     return { thisMonthCount: mc, thisYearCount: yc };
   }, [visits]);
 
+  // 非公開件数は dedup 前の生データから数える（dedup すると取りこぼす）
+  const privateCount = useMemo(
+    () => visits.filter((v) => v.is_public === false).length,
+    [visits]
+  );
+
+  // 公開/非公開の切り替え。楽観更新し、失敗したら元に戻す。
+  const applyVisitVisibility = async (visitId: string, nextIsPublic: boolean) => {
+    setVisibilitySavingVisitId(visitId);
+    const setLocal = (value: boolean) =>
+      setVisits((prev) =>
+        prev.map((v) => (v.id === visitId ? { ...v, is_public: value } : v))
+      );
+
+    setLocal(nextIsPublic);
+    const ok = await updateVisitVisibility(visitId, nextIsPublic);
+
+    if (ok) {
+      trackVisitVisibilityChange({ is_public: nextIsPublic, source: 'my_trip' });
+      showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
+    } else {
+      setLocal(!nextIsPublic);
+      showVisibilityToast('公開設定の変更に失敗しました', false);
+    }
+    setVisibilitySavingVisitId(null);
+  };
+
+  const handleVisibilityToggle = (visitId: string, currentIsPublic: boolean) => {
+    if (visibilitySavingVisitId) return;
+    // 公開は望ましい操作なので即時。非公開に戻すときだけ、何を失うかを確認する。
+    if (currentIsPublic) {
+      setUnpublishModalVisitId(visitId);
+    } else {
+      void applyVisitVisibility(visitId, true);
+    }
+  };
+
   // Dedup by manholeId × date, then group by month
   const visitsByMonth = useMemo(() => {
     const seen = new Set<string>();
     const groups = new Map<string, JourneyVisit[]>();
-    const sorted = [...visits].sort(
+    const source = showPrivateOnly ? visits.filter((v) => v.is_public === false) : visits;
+    const sorted = [...source].sort(
       (a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime()
     );
     for (const visit of sorted) {
@@ -126,7 +171,7 @@ export default function MyTripPage() {
       else groups.set(monthKey, [visit]);
     }
     return Array.from(groups.entries()).map(([label, vs]) => ({ label, visits: vs }));
-  }, [visits]);
+  }, [visits, showPrivateOnly]);
 
   const completionRate = (uniqueVisitedCount / TOTAL_MANHOLES) * 100;
 
@@ -238,6 +283,40 @@ export default function MyTripPage() {
             </p>
           </div>
 
+          {/* 非公開の記録があることを知らせるバナー。
+              絞り込み中は privateCount が 0 になっても出し続ける（最後の1件を公開した直後に
+              「すべての記録を表示」ボタンごと消えて空リストで詰むのを防ぐ）。 */}
+          {(privateCount > 0 || showPrivateOnly) && (
+            <div className="space-y-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-[#7B63A8]" strokeWidth={2.2} />
+                <div className="min-w-0">
+                  <p className="font-pixelJp text-sm font-bold text-[#7B63A8]">
+                    {privateCount > 0
+                      ? `非公開の記録が${privateCount}件あります`
+                      : '非公開の記録はなくなりました'}
+                  </p>
+                  <p className="mt-1 font-pixelJp text-xs leading-relaxed text-[#8C6A4A]">
+                    {privateCount > 0
+                      ? '公開すると、みんなのマンホール詳細ページとあなたの公開スタンプ帳に載ります。個人メモは公開されません。'
+                      : 'すべての記録が公開されています。'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showPrivateOnly;
+                  setShowPrivateOnly(next);
+                  if (next) trackPrivateVisitsBannerClick({ private_count: privateCount });
+                }}
+                className="w-full rounded-[10px] border border-[#e9dfc7] bg-[#efe6cf] px-4 py-2.5 font-pixelJp text-xs font-bold text-[#4F3828]"
+              >
+                {showPrivateOnly ? 'すべての記録を表示' : '非公開の記録だけ表示する →'}
+              </button>
+            </div>
+          )}
+
           {/* Monthly diary */}
           {visitsByMonth.length === 0 ? (
             <div className="py-16 text-center">
@@ -275,6 +354,11 @@ export default function MyTripPage() {
                           title={title}
                           date={dateStr}
                           posterName={visit.display_name}
+                          isPublic={visit.is_public !== false}
+                          isVisibilitySaving={visibilitySavingVisitId === visit.id}
+                          onToggleVisibility={() =>
+                            handleVisibilityToggle(visit.id, visit.is_public !== false)
+                          }
                           tags={getManholeTags(visit.manhole, 2)}
                         />
                       );
@@ -289,6 +373,18 @@ export default function MyTripPage() {
       </PCShell>
 
       <BottomNav />
+
+      <VisitVisibilityModal
+        isOpen={unpublishModalVisitId !== null}
+        isSaving={visibilitySavingVisitId !== null}
+        onCancel={() => setUnpublishModalVisitId(null)}
+        onConfirm={async () => {
+          const visitId = unpublishModalVisitId;
+          if (!visitId) return;
+          setUnpublishModalVisitId(null);
+          await applyVisitVisibility(visitId, false);
+        }}
+      />
     </div>
   );
 }

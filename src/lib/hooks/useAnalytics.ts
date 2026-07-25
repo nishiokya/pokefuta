@@ -58,6 +58,8 @@ export function useAnalytics() {
   // --- 訪問記録系 ---
   const trackVisitRegister = useCallback((p?: PokefutaEventParams) => pokefutaEvents.visitRegister(p), []);
   const trackVisitDelete   = useCallback((p?: PokefutaEventParams) => pokefutaEvents.visitDelete(p), []);
+  const trackVisitVisibilityChange    = useCallback((p?: PokefutaEventParams) => pokefutaEvents.visitVisibilityChange(p), []);
+  const trackPrivateVisitsBannerClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.privateVisitsBannerClick(p), []);
   const trackPassportOpen  = useCallback((p?: PokefutaEventParams) => pokefutaEvents.passportOpen(p), []);
   const trackCollectionOpen= useCallback((p?: PokefutaEventParams) => pokefutaEvents.collectionOpen(p), []);
 
@@ -133,6 +135,8 @@ export function useAnalytics() {
     // 訪問記録系
     trackVisitRegister,
     trackVisitDelete,
+    trackVisitVisibilityChange,
+    trackPrivateVisitsBannerClick,
     trackPassportOpen,
     trackCollectionOpen,
 
