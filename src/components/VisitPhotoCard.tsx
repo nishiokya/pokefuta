@@ -39,12 +39,15 @@ export default function VisitPhotoCard({
 }: VisitPhotoCardProps) {
   const visiblePosterName = posterName?.trim();
   const isPrivate = isPublic === false;
+  // isPublic を渡さないまま描画すると、実際の公開状態と無関係に「公開中」と
+  // 表示してしまう。両方揃っているときだけバッジを出す。
+  const showVisibilityToggle = typeof isPublic === 'boolean' && Boolean(onToggleVisibility);
 
   return (
     // カード全体が Link なのでボタンを入れ子にできない。relative なラッパを噛ませ、
     // トグルは Link の兄弟として absolute で重ねる。
     <div style={{ position: 'relative' }}>
-      {onToggleVisibility && (
+      {showVisibilityToggle && (
         <button
           type="button"
           onClick={onToggleVisibility}
