@@ -7,11 +7,12 @@ import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Camera, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
-  Star, Sparkles, ChevronDown, ChevronUp,
+  Star, Sparkles, ChevronDown, ChevronUp, Eye, EyeOff,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
+import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ShareButtons from '@/components/ShareButtons';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
@@ -19,6 +20,7 @@ import PCShell from '@/components/PCShell';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { calculateDistance } from '@/lib/location';
 import { manholeShareText, photoShareText } from '@/lib/share';
+import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { SITE_URL } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
 
@@ -125,7 +127,10 @@ export default function ManholeDetailPage() {
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newManholeComment, setNewManholeComment] = useState('');
 
-  const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete } = useAnalytics();
+  const [publishModalVisitId, setPublishModalVisitId] = useState<string | null>(null);
+  const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+
+  const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
   useEffect(() => {
     const manholeId = params.id;
@@ -384,6 +389,44 @@ export default function ManholeDetailPage() {
       alert('削除中にエラーが発生しました');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // 公開/非公開の切り替え。楽観更新し、失敗したら元に戻す（visits ページの
+  // handleLikeToggle と同じパターン）。
+  const applyVisitVisibility = async (visitId: string, nextIsPublic: boolean) => {
+    setVisibilitySavingVisitId(visitId);
+    const setLocal = (value: boolean) =>
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.visit?.id === visitId ? { ...p, visit: { ...p.visit, is_public: value } } : p
+        )
+      );
+
+    setLocal(nextIsPublic);
+    const ok = await updateVisitVisibility(visitId, nextIsPublic);
+
+    if (ok) {
+      trackVisitVisibilityChange({
+        manhole_id: manhole?.id,
+        is_public: nextIsPublic,
+        source: 'manhole_detail',
+      });
+      showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
+    } else {
+      setLocal(!nextIsPublic);
+      showVisibilityToast('公開設定の変更に失敗しました', false);
+    }
+    setVisibilitySavingVisitId(null);
+  };
+
+  const handleVisibilityToggle = (visitId: string, currentIsPublic: boolean) => {
+    if (visibilitySavingVisitId) return;
+    // 公開は外向きの操作なので確認を挟む。非公開に戻すのは即時。
+    if (currentIsPublic) {
+      void applyVisitVisibility(visitId, false);
+    } else {
+      setPublishModalVisitId(visitId);
     }
   };
 
@@ -962,14 +1005,32 @@ export default function ManholeDetailPage() {
                     {memo && (
                       <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
                     )}
-                    {isOwn && (
-                      <span
-                        className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold"
-                        style={{ background: isPublic === false ? '#f3e8dc' : '#e2f2e9', color: isPublic === false ? '#9a5c2a' : '#1f9d63' }}
-                      >
-                        {isPublic === false ? '非公開' : '公開中'}
-                      </span>
-                    )}
+                    {isOwn && featuredPhoto.visit?.id && (() => {
+                      const visitId = featuredPhoto.visit!.id;
+                      const isPrivate = isPublic === false;
+                      const saving = visibilitySavingVisitId === visitId;
+                      return (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleVisibilityToggle(visitId, !isPrivate)}
+                            disabled={saving}
+                            aria-pressed={!isPrivate}
+                            aria-label={isPrivate ? 'この記録を公開する' : 'この記録を非公開にする'}
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold disabled:opacity-50"
+                            style={{ background: isPrivate ? '#f3e8dc' : '#e2f2e9', color: isPrivate ? '#9a5c2a' : '#1f9d63' }}
+                          >
+                            {isPrivate
+                              ? <EyeOff className="h-[11px] w-[11px]" strokeWidth={2.4} />
+                              : <Eye className="h-[11px] w-[11px]" strokeWidth={2.4} />}
+                            {saving ? '変更中…' : isPrivate ? '非公開' : '公開中'}
+                          </button>
+                          <span className="font-pixelJp text-[10px] text-[#9b917e]">
+                            {isPrivate ? 'タップで公開できます' : 'タップで非公開にできます'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -1192,6 +1253,18 @@ export default function ManholeDetailPage() {
           isDeleting={isDeleting}
         />
       )}
+
+      <VisitVisibilityModal
+        isOpen={publishModalVisitId !== null}
+        isSaving={visibilitySavingVisitId !== null}
+        onCancel={() => setPublishModalVisitId(null)}
+        onConfirm={async () => {
+          const visitId = publishModalVisitId;
+          if (!visitId) return;
+          setPublishModalVisitId(null);
+          await applyVisitVisibility(visitId, true);
+        }}
+      />
     </div>
   );
 }

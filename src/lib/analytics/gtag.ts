@@ -204,6 +204,10 @@ export const pokefutaEvents = {
   // --- 訪問記録系 ---
   visitRegister:       (p?: PokefutaEventParams) => trackEvent('p_visit_register', p),
   visitDelete:         (p?: PokefutaEventParams) => trackEvent('p_visit_delete', p),
+  /** 登録後の公開/非公開切り替え。params: is_public(切替後), source */
+  visitVisibilityChange:    (p?: PokefutaEventParams) => trackEvent('p_visit_visibility_change', p),
+  /** 非公開バナーのタップ。params: private_count */
+  privateVisitsBannerClick: (p?: PokefutaEventParams) => trackEvent('p_private_visits_banner_click', p),
   passportOpen:        (p?: PokefutaEventParams) => trackEvent('p_passport_open', p),
   collectionOpen:      (p?: PokefutaEventParams) => trackEvent('p_collection_open', p),
 

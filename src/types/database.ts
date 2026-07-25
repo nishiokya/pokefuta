@@ -199,6 +199,7 @@ export interface Database {
           manhole_id?: number | null;
           shot_location?: string | null;
           shot_at?: string;
+          updated_at?: string;  // visit には更新トリガーが無いので呼び出し側で設定する
           note?: string | null;
           comment?: string | null;  // 訪問コメント（公開可能）
           is_public?: boolean;  // 公開/非公開フラグ

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 const NUM = '"Outfit", "M PLUS Rounded 1c", system-ui, sans-serif';
@@ -18,13 +19,64 @@ export interface VisitPhotoCardProps {
   date: string;
   posterName?: string | null;
   tags: string[];
+  /** 自分の記録の公開状態。onToggleVisibility と併せて渡したときだけバッジが出る。 */
+  isPublic?: boolean;
+  /** 未指定ならバッジを描画しない（他ページからの利用に影響を出さないため）。 */
+  onToggleVisibility?: () => void;
+  isVisibilitySaving?: boolean;
 }
 
-export default function VisitPhotoCard({ manholeId, thumbnailUrl, title, date, posterName, tags }: VisitPhotoCardProps) {
+export default function VisitPhotoCard({
+  manholeId,
+  thumbnailUrl,
+  title,
+  date,
+  posterName,
+  tags,
+  isPublic,
+  onToggleVisibility,
+  isVisibilitySaving = false,
+}: VisitPhotoCardProps) {
   const visiblePosterName = posterName?.trim();
+  const isPrivate = isPublic === false;
 
   return (
-    <Link href={`/manhole/${manholeId}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+    // カード全体が Link なのでボタンを入れ子にできない。relative なラッパを噛ませ、
+    // トグルは Link の兄弟として absolute で重ねる。
+    <div style={{ position: 'relative' }}>
+      {onToggleVisibility && (
+        <button
+          type="button"
+          onClick={onToggleVisibility}
+          disabled={isVisibilitySaving}
+          aria-pressed={!isPrivate}
+          aria-label={isPrivate ? 'この記録を公開する' : 'この記録を非公開にする'}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '4px 8px',
+            borderRadius: 999,
+            border: 'none',
+            cursor: isVisibilitySaving ? 'default' : 'pointer',
+            opacity: isVisibilitySaving ? 0.5 : 1,
+            fontFamily: ROUND,
+            fontWeight: 700,
+            fontSize: 10,
+            background: isPrivate ? '#f3e8dc' : '#e2f2e9',
+            color: isPrivate ? '#9a5c2a' : '#1f9d63',
+            boxShadow: '0 1px 3px rgba(30,22,10,.25)',
+          }}
+        >
+          {isPrivate ? <EyeOff size={11} strokeWidth={2.4} /> : <Eye size={11} strokeWidth={2.4} />}
+          {isPrivate ? '非公開' : '公開中'}
+        </button>
+      )}
+      <Link href={`/manhole/${manholeId}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
       <div
         style={{
           background: '#fffdf7',
@@ -132,6 +184,7 @@ export default function VisitPhotoCard({ manholeId, thumbnailUrl, title, date, p
           </div>
         )}
       </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
