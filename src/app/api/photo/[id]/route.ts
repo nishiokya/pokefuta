@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage, deriveSmallKey } from '@/lib/storage';
+import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 
 /**
  * @swagger
@@ -122,16 +123,20 @@ export async function GET(
       }
     }
 
+    // 公開設定は PATCH /api/visits/[id] で後から変更できる。公開 → 非公開に戻したとき、
+    // 共有キャッシュに残った 307 とその先の署名URLがどれだけ生き延びるかが
+    // そのまま「非公開にしたのにまだ見える」時間になる。
     // Get signed URL from storage provider
-    const signedUrl = await storage.getSignedUrl(storageKey, 3600); // 1 hour expiry
+    const signedUrl = await storage.getSignedUrl(storageKey, PHOTO_SIGNED_URL_TTL_SECONDS);
 
     // Cache the redirect so browsers reuse the same signed URL (which lets the
-    // immutable R2 object hit the browser cache). max-age must stay well below
-    // the signed URL TTL (3600s) so a cached Location never points at an
-    // expired URL. Private photos must not enter shared caches.
+    // immutable R2 object hit the browser cache). max-age は署名URLの寿命より
+    // 十分短くして、キャッシュされた Location が期限切れURLを指さないようにする
+    // （stale-while-revalidate は寿命を超えて配り続けるため公開写真でも使わない）。
+    // Private photos must not enter shared caches.
     const cacheControl = visit?.is_public === true
-      ? 'public, max-age=1800, stale-while-revalidate=600'
-      : 'private, max-age=600';
+      ? 'public, max-age=300'
+      : 'private, max-age=300';
 
     // Redirect to the signed URL
     return NextResponse.redirect(signedUrl.url, {

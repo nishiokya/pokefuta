@@ -8,6 +8,7 @@ import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
+import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 
 /**
  * @swagger
@@ -559,8 +560,9 @@ export async function GET(request: NextRequest) {
         }, { status: 404 });
       }
 
-      // Redirect to signed URL for the specific image
-      const signedUrl = await storage.getSignedUrl(storageKey, 3600);
+      // Redirect to signed URL for the specific image.
+      // is_public は後から変更できるので、/api/photo/[id] と同じ短い寿命を使う。
+      const signedUrl = await storage.getSignedUrl(storageKey, PHOTO_SIGNED_URL_TTL_SECONDS);
       return NextResponse.redirect(signedUrl.url);
     } else {
       // Build query based on filters

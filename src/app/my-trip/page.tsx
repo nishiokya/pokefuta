@@ -283,17 +283,23 @@ export default function MyTripPage() {
             </p>
           </div>
 
-          {/* 非公開の記録があることを知らせるバナー */}
-          {privateCount > 0 && (
+          {/* 非公開の記録があることを知らせるバナー。
+              絞り込み中は privateCount が 0 になっても出し続ける（最後の1件を公開した直後に
+              「すべての記録を表示」ボタンごと消えて空リストで詰むのを防ぐ）。 */}
+          {(privateCount > 0 || showPrivateOnly) && (
             <div className="space-y-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
               <div className="flex items-start gap-2.5">
                 <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-[#7B63A8]" strokeWidth={2.2} />
                 <div className="min-w-0">
                   <p className="font-pixelJp text-sm font-bold text-[#7B63A8]">
-                    非公開の記録が{privateCount}件あります
+                    {privateCount > 0
+                      ? `非公開の記録が${privateCount}件あります`
+                      : '非公開の記録はなくなりました'}
                   </p>
                   <p className="mt-1 font-pixelJp text-xs leading-relaxed text-[#8C6A4A]">
-                    公開すると、みんなのマンホール詳細ページとあなたの公開スタンプ帳に載ります。個人メモは公開されません。
+                    {privateCount > 0
+                      ? '公開すると、みんなのマンホール詳細ページとあなたの公開スタンプ帳に載ります。個人メモは公開されません。'
+                      : 'すべての記録が公開されています。'}
                   </p>
                 </div>
               </div>
