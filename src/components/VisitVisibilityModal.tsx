@@ -10,8 +10,11 @@ interface VisitVisibilityModalProps {
 }
 
 /**
- * 非公開 → 公開 に切り替えるときの確認ダイアログ。
- * 公開は外向きの操作なので確認を挟む（公開 → 非公開 は確認なしで即時）。
+ * 公開 → 非公開 に戻すときの確認ダイアログ。
+ *
+ * 非公開の投稿は写真館にもマンホール詳細にも出ず、UGC としての価値が失われる。
+ * そのため摩擦は「非公開にする側」だけに置き、何を失うかを /upload の警告（#192）と
+ * 同じ文言で明示する。逆方向（公開する）は望ましい操作なので確認を挟まず即時に行う。
  */
 export default function VisitVisibilityModal({
   isOpen,
@@ -52,28 +55,23 @@ export default function VisitVisibilityModal({
 
         {/* Header */}
         <h2 className="rpg-window-title text-base mb-4">
-          この記録を公開しますか？
+          この記録を非公開にしますか？
         </h2>
 
         {/* Content */}
         <div className="space-y-4">
-          <p className="font-pixelJp text-sm text-rpg-textDark">
-            公開すると、写真とコメントが他のユーザーにも見えるようになります。
+          <div className="bg-amber-100/70 border-2 border-amber-300 p-3">
+            <p className="font-pixelJp text-xs font-bold text-amber-900">⚠️ 非公開にすると…</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 font-pixelJp text-xs text-amber-900">
+              <li>トップページや写真館の「最新の投稿」に掲載されません</li>
+              <li>マンホール詳細ページで他のユーザーに見てもらえません</li>
+              <li>あなたの公開スタンプ帳からも消えます</li>
+            </ul>
+          </div>
+
+          <p className="font-pixelJp text-xs text-rpg-textDark">
+            記録そのものは残ります。あとから公開に戻すこともできます。
           </p>
-
-          <div className="bg-[#e2f2e9] border-2 border-[#1f9d63] p-3">
-            <p className="font-pixelJp text-xs text-rpg-textDark">
-              <span className="font-bold text-[#1f9d63]">公開されるもの:</span>{' '}
-              写真・コメント・訪問したポケふた。マンホール詳細ページと、あなたの公開スタンプ帳に掲載されます。
-            </p>
-          </div>
-
-          <div className="bg-[#fbf6ea] border-2 border-[#e9dfc7] p-3">
-            <p className="font-pixelJp text-xs text-rpg-textDark">
-              <span className="font-bold">個人メモは公開されません。</span>{' '}
-              あとから非公開に戻すこともできます。
-            </p>
-          </div>
 
           {/* Action buttons */}
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -82,7 +80,7 @@ export default function VisitVisibilityModal({
               className="rpg-button"
               disabled={isSaving}
             >
-              <span className="font-pixelJp text-xs">キャンセル</span>
+              <span className="font-pixelJp text-xs">公開のままにする</span>
             </button>
             <button
               onClick={onConfirm}
@@ -90,7 +88,7 @@ export default function VisitVisibilityModal({
               disabled={isSaving}
             >
               <span className="font-pixelJp text-xs">
-                {isSaving ? '公開中...' : '公開する'}
+                {isSaving ? '変更中...' : '非公開にする'}
               </span>
             </button>
           </div>

@@ -48,7 +48,7 @@ export default function MyTripPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [visits, setVisits] = useState<JourneyVisit[]>([]);
   const [showPrivateOnly, setShowPrivateOnly] = useState(false);
-  const [publishModalVisitId, setPublishModalVisitId] = useState<string | null>(null);
+  const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
   const { trackView, trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
@@ -141,11 +141,11 @@ export default function MyTripPage() {
 
   const handleVisibilityToggle = (visitId: string, currentIsPublic: boolean) => {
     if (visibilitySavingVisitId) return;
-    // 公開は外向きの操作なので確認を挟む。非公開に戻すのは即時。
+    // 公開は望ましい操作なので即時。非公開に戻すときだけ、何を失うかを確認する。
     if (currentIsPublic) {
-      void applyVisitVisibility(visitId, false);
+      setUnpublishModalVisitId(visitId);
     } else {
-      setPublishModalVisitId(visitId);
+      void applyVisitVisibility(visitId, true);
     }
   };
 
@@ -375,14 +375,14 @@ export default function MyTripPage() {
       <BottomNav />
 
       <VisitVisibilityModal
-        isOpen={publishModalVisitId !== null}
+        isOpen={unpublishModalVisitId !== null}
         isSaving={visibilitySavingVisitId !== null}
-        onCancel={() => setPublishModalVisitId(null)}
+        onCancel={() => setUnpublishModalVisitId(null)}
         onConfirm={async () => {
-          const visitId = publishModalVisitId;
+          const visitId = unpublishModalVisitId;
           if (!visitId) return;
-          setPublishModalVisitId(null);
-          await applyVisitVisibility(visitId, true);
+          setUnpublishModalVisitId(null);
+          await applyVisitVisibility(visitId, false);
         }}
       />
     </div>

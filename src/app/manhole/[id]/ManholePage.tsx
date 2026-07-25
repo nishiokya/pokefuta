@@ -127,7 +127,7 @@ export default function ManholeDetailPage() {
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newManholeComment, setNewManholeComment] = useState('');
 
-  const [publishModalVisitId, setPublishModalVisitId] = useState<string | null>(null);
+  const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
@@ -422,11 +422,11 @@ export default function ManholeDetailPage() {
 
   const handleVisibilityToggle = (visitId: string, currentIsPublic: boolean) => {
     if (visibilitySavingVisitId) return;
-    // 公開は外向きの操作なので確認を挟む。非公開に戻すのは即時。
+    // 公開は望ましい操作なので即時。非公開に戻すときだけ、何を失うかを確認する。
     if (currentIsPublic) {
-      void applyVisitVisibility(visitId, false);
+      setUnpublishModalVisitId(visitId);
     } else {
-      setPublishModalVisitId(visitId);
+      void applyVisitVisibility(visitId, true);
     }
   };
 
@@ -1026,7 +1026,9 @@ export default function ManholeDetailPage() {
                             {saving ? '変更中…' : isPrivate ? '非公開' : '公開中'}
                           </button>
                           <span className="font-pixelJp text-[10px] text-[#9b917e]">
-                            {isPrivate ? 'タップで公開できます' : 'タップで非公開にできます'}
+                            {isPrivate
+                              ? 'タップで公開 — みんなに見てもらえます'
+                              : 'タップで公開設定を変更'}
                           </span>
                         </div>
                       );
@@ -1255,14 +1257,14 @@ export default function ManholeDetailPage() {
       )}
 
       <VisitVisibilityModal
-        isOpen={publishModalVisitId !== null}
+        isOpen={unpublishModalVisitId !== null}
         isSaving={visibilitySavingVisitId !== null}
-        onCancel={() => setPublishModalVisitId(null)}
+        onCancel={() => setUnpublishModalVisitId(null)}
         onConfirm={async () => {
-          const visitId = publishModalVisitId;
+          const visitId = unpublishModalVisitId;
           if (!visitId) return;
-          setPublishModalVisitId(null);
-          await applyVisitVisibility(visitId, true);
+          setUnpublishModalVisitId(null);
+          await applyVisitVisibility(visitId, false);
         }}
       />
     </div>
