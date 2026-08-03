@@ -114,6 +114,10 @@ async function main() {
   }
   pass('SVG template does not contain @font-face');
 
+  // ここは素の includes のまま厳格に保つ。ルール形(@font-face {)だけを見に行くと
+  // @font-face/**/{...} やエスケープされた改行を挟む書き方を見逃すため。
+  // ガード側(pokefuta-ogp-template.ts)は正規表現エスケープでこのトークンの literal を
+  // 出さないようにしてあるので、ここで引っかかるのは実際に混入したときだけ。
   const builtRoute = readRequired(BUILT_ROUTE_PATH);
   if (builtRoute.includes('@font-face')) {
     fail('Built OGP route still contains @font-face');

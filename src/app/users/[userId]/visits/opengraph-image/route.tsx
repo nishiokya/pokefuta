@@ -3,7 +3,11 @@ import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
 import { deriveSmallKey, storage } from '@/lib/storage';
-import { getProgressClient, loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
+import {
+  FALLBACK_INSTALLED_PREFECTURE_COUNT,
+  getProgressClient,
+  loadPublicUserPrefectureProgress,
+} from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
 
 export const runtime = 'nodejs';
@@ -139,7 +143,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const photoUris = await loadRecentPhotoDataUris(visitsData.visits).catch(() => []);
 
-    const totalPrefectures = progress?.totalPrefectureCount || 47;
+    const totalPrefectures =
+      progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
     const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
     // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
     const barWidthPercent = completionRate ? Math.max(completionRate, 1.5) : 0;

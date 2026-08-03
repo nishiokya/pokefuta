@@ -15,11 +15,16 @@ import {
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
 import ShareButtons from '@/components/ShareButtons';
+import PokedexPanel from '@/components/users/PokedexPanel';
+import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { userVisitsShareText } from '@/lib/share';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
-import { loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
+import {
+  FALLBACK_INSTALLED_PREFECTURE_COUNT,
+  loadPublicUserPrefectureProgress,
+} from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
 
 type PageProps = {
@@ -115,7 +120,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
   const pageUrl = getPageUrl(data.userId);
   const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
-  const totalPrefectures = progress?.totalPrefectureCount || 47;
+  const totalPrefectures = progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
   const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
   // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
   const barWidthPercent = completionRate ? Math.max(completionRate, 1.5) : 0;
@@ -215,6 +220,16 @@ export default async function UserVisitsPage({ params }: PageProps) {
             </div>
           </div>
         </section>
+
+        {progress && (
+          <PrefectureBadgeShelf
+            userId={data.userId}
+            prefectures={progress.prefectures}
+            totalPrefectureCount={progress.totalPrefectureCount}
+          />
+        )}
+
+        {progress && <PokedexPanel pokedex={progress.pokedex} />}
 
         {data.isTruncated && (
           <p className="mt-4 text-xs font-bold text-[#6A4D36]">

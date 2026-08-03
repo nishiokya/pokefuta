@@ -15,7 +15,10 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
 
-const TOTAL_MANHOLES = 470;
+// 全国のポケふた総数と、ポケふたが1枚以上設置されている都道府県数。
+// 47県のうち群馬・山梨・広島・熊本・大分には設置がないため分母は42
+const TOTAL_MANHOLES = 482;
+const TOTAL_PREFECTURES = 42;
 
 type JourneyVisit = {
   id: string;
@@ -279,7 +282,7 @@ export default function MyTripPage() {
               className="mt-2 pt-2 border-t border-[#e9dfc7]"
               style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, color: '#9b917e' }}
             >
-              達成率 全国 {uniqueVisitedCount}/{TOTAL_MANHOLES} · 都道府県 {visitedPrefectureCount}/47
+              達成率 全国 {uniqueVisitedCount}/{TOTAL_MANHOLES} · 都道府県 {visitedPrefectureCount}/{TOTAL_PREFECTURES}
             </p>
           </div>
 

@@ -90,7 +90,7 @@ type NearCompleteItem = {
   rate: number;
 };
 
-const TOTAL_MANHOLES = 470;
+const TOTAL_MANHOLES = 482;
 
 const KIND_COLOR: Record<NearCompleteItem['kind'], { badge: string; bar: string; bg: string }> = {
   pref:    { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
@@ -714,15 +714,15 @@ export default function VisitsPage() {
                 {/* Stats row */}
                 <div className="mt-3 flex flex-wrap gap-4 sm:mt-4">
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#7B63A8]">{totalManholes ?? '470'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#7B63A8]">{totalManholes ?? '482'}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">全国のポケふた</span>
                   </div>
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '41'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '42'}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">都道府県</span>
                   </div>
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#FFB347]">{pokemonCount ?? '534'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#FFB347]">{pokemonCount ?? '549'}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">種類のポケモン</span>
                   </div>
                 </div>
@@ -757,19 +757,19 @@ export default function VisitsPage() {
               <div className="rounded-lg bg-[#F5F0FF] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">全国</p>
                 <p className="font-pixel text-xl font-extrabold text-[#7B63A8]">
-                  80<span className="text-[11px] font-bold text-[#C0B8D0]">/{totalManholes ?? '470'}</span>
+                  80<span className="text-[11px] font-bold text-[#C0B8D0]">/{totalManholes ?? '482'}</span>
                 </p>
               </div>
               <div className="rounded-lg bg-[#EDFAF5] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">都道府県</p>
                 <p className="font-pixel text-xl font-extrabold text-[#2C765E]">
-                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '41'}</span>
+                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '42'}</span>
                 </p>
               </div>
               <div className="rounded-lg bg-[#FFF8EB] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">ポケモン</p>
                 <p className="font-pixel text-xl font-extrabold text-[#C87C2A]">
-                  104<span className="text-[11px] font-bold text-[#D4BC8A]">/{pokemonCount ?? '534'}</span>
+                  104<span className="text-[11px] font-bold text-[#D4BC8A]">/{pokemonCount ?? '549'}</span>
                 </p>
               </div>
             </div>
@@ -977,7 +977,7 @@ export default function VisitsPage() {
                       <div className="mb-2 flex items-center justify-between">
                         <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">都道府県コレクション</h2>
                         <button type="button" onClick={() => setSegmentTab('prefectures')} className="font-pixelJp text-xs text-[#8C6A4A]">
-                          47都道府県 ›
+                          全{prefectureProgress.length}都道府県 ›
                         </button>
                       </div>
                       <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7]">
