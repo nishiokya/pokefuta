@@ -114,11 +114,16 @@ async function main() {
   }
   pass('SVG template does not contain @font-face');
 
+  // バンドルには「SVGが @font-face に依存していたら throw する」ガードのメッセージ文字列も
+  // 含まれる。素の includes だとそのガード自体を違反として誤検知するため、
+  // 実際の CSS ルール(@font-face { ... )の形になっているものだけを不合格にする。
+  // ガード側は ['@font','face'].join('-') と分割して literal を避けているが、
+  // import 元が増えると minifier が定数畳み込みして literal に戻すことがあり、当てにできない。
   const builtRoute = readRequired(BUILT_ROUTE_PATH);
-  if (builtRoute.includes('@font-face')) {
-    fail('Built OGP route still contains @font-face');
+  if (/@font-face\s*\{/.test(builtRoute)) {
+    fail('Built OGP route still contains an @font-face rule');
   }
-  pass('Built OGP route does not contain @font-face');
+  pass('Built OGP route does not contain an @font-face rule');
 
   await verifyJapaneseTextPixels();
 }

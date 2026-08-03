@@ -56,11 +56,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { progress, prefecture } = found;
   const pageUrl = getPageUrl(progress.userId, prefecture.name);
   const ogpImageUrl = `${pageUrl}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
-  const title = prefecture.complete
+  const earned = Boolean(prefecture.earnedAt);
+  const title = earned
     ? `${progress.displayName}の${prefecture.name}制覇バッジ | ${SITE_NAME}`
     : `${progress.displayName}の${prefecture.name}のポケふた | ${SITE_NAME}`;
-  const description = prefecture.complete
-    ? `${progress.displayName}さんは${prefecture.name}のポケふた${prefecture.total}枚をすべて制覇しました。`
+  const description = earned
+    ? `${progress.displayName}さんは${prefecture.name}のポケふた${prefecture.earnedTotal}枚をすべて制覇しました。`
     : `${progress.displayName}さんは${prefecture.name}のポケふたを${prefecture.visited}/${prefecture.total}枚記録中です。`;
 
   return {
@@ -98,11 +99,12 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
   const { progress, prefecture } = found;
   const pageUrl = getPageUrl(progress.userId, prefecture.name);
   const stampBookUrl = `/users/${encodeURIComponent(progress.userId)}/visits`;
+  const earned = Boolean(prefecture.earnedAt);
   const shareText = prefectureBadgeShareText(
     prefecture.name,
     prefecture.visited,
-    prefecture.total,
-    prefecture.complete
+    earned ? prefecture.earnedTotal : prefecture.total,
+    earned
   );
   const visitedManholes = prefecture.manholes.filter((manhole) => manhole.visited);
   const remainingManholes = prefecture.manholes.filter((manhole) => !manhole.visited);
@@ -127,7 +129,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
 
         <div className="mt-6">
           <ShareButtons
-            label={prefecture.complete ? 'この制覇バッジを自慢する' : '進捗を共有する'}
+            label={earned ? 'この制覇バッジを自慢する' : '進捗を共有する'}
             shareText={shareText}
             shareUrl={pageUrl}
             hashtags={['ポケふた制覇']}
@@ -189,7 +191,7 @@ function BadgeHero({
 }) {
   const barWidthPercent = prefecture.rate > 0 ? Math.max(prefecture.rate, 1.5) : 0;
 
-  if (prefecture.complete) {
+  if (prefecture.earnedAt) {
     return (
       <section className="relative overflow-hidden rounded-[10px] border-2 border-[#C9992F] bg-gradient-to-b from-[#FFF6DA] to-[#F5DFA8] px-6 py-8 text-center shadow-[0_14px_34px_rgba(160,120,40,0.25)]">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
@@ -202,11 +204,16 @@ function BadgeHero({
           {prefecture.name}制覇
         </h1>
         <p className="mt-2 font-pixel text-3xl leading-none text-[#B5483C]">
-          {prefecture.total}/{prefecture.total}
+          {prefecture.earnedTotal}/{prefecture.earnedTotal}
         </p>
+        {prefecture.total > prefecture.earnedTotal && (
+          <p className="mt-1 font-pixelJp text-xs font-bold text-[#8C6A4A]">
+            制覇後に{prefecture.total - prefecture.earnedTotal}枚 追加されました
+          </p>
+        )}
         <p className="mt-3 font-pixelJp text-sm font-bold text-[#6A4D36]">
           {displayName}
-          {prefecture.completedAt && ` ・ ${formatDateJaJst(prefecture.completedAt)} 制覇`}
+          {prefecture.earnedAt && ` ・ ${formatDateJaJst(prefecture.earnedAt)} 制覇`}
         </p>
       </section>
     );

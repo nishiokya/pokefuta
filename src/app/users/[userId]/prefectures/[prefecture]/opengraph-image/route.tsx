@@ -60,7 +60,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
       });
     }
 
-    const complete = prefecture.complete;
+    // バッジは獲得済みかで描き分ける。制覇後の新設で進捗表示に戻さない
+    const complete = Boolean(prefecture.earnedAt);
     const accent = complete ? '#C9992F' : '#B5483C';
     const barWidthPercent = prefecture.rate > 0 ? Math.max(prefecture.rate, 1.5) : 0;
 
@@ -146,7 +147,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
               zIndex: 1,
             }}
           >
-            {`${prefecture.visited}/${prefecture.total}`}
+            {complete
+              ? `${prefecture.earnedTotal}/${prefecture.earnedTotal}`
+              : `${prefecture.visited}/${prefecture.total}`}
           </div>
 
           {!complete && (
@@ -184,13 +187,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
               zIndex: 1,
             }}
           >
-            {complete && prefecture.completedAt
+            {complete && prefecture.earnedAt
               ? `${progress.displayName} ・ ${new Intl.DateTimeFormat('ja-JP', {
                   timeZone: 'Asia/Tokyo',
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
-                }).format(new Date(prefecture.completedAt))} 制覇`
+                }).format(new Date(prefecture.earnedAt))} 制覇`
               : progress.displayName}
           </div>
 

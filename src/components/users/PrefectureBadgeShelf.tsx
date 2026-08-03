@@ -21,25 +21,22 @@ export default function PrefectureBadgeShelf({
   prefectures,
   totalPrefectureCount,
 }: PrefectureBadgeShelfProps) {
-  const completed = prefectures.filter((prefecture) => prefecture.complete);
+  // 獲得済みバッジは剥奪しない。制覇後にポケふたが新設された県も棚に残す
+  const earned = prefectures.filter((prefecture) => prefecture.earnedAt);
   const nearComplete = prefectures
     .filter(
       (prefecture) =>
-        !prefecture.complete &&
+        !prefecture.earnedAt &&
         prefecture.visited > 0 &&
         prefecture.remaining <= NEAR_COMPLETE_THRESHOLD
     )
     .sort((a, b) => a.remaining - b.remaining)
     .slice(0, NEAR_COMPLETE_LIMIT);
 
-  // 制覇もリーチもない段階では、一番進んでいる県を「次の目標」として1枚だけ見せる
+  // リーチ候補が無いときだけ、一番進んでいる県を「次の目標」に使う
   const nextTarget = prefectures.find(
-    (prefecture) => !prefecture.complete && prefecture.visited > 0
+    (prefecture) => !prefecture.earnedAt && prefecture.visited > 0
   );
-
-  if (completed.length === 0 && nearComplete.length === 0 && !nextTarget) {
-    return null;
-  }
 
   return (
     <section className="mt-8">
@@ -49,19 +46,20 @@ export default function PrefectureBadgeShelf({
           制覇した都道府県
         </h2>
         <p className="font-pixel text-sm text-[#B5483C]">
-          {completed.length}
+          {earned.length}
           <span className="text-[#8C6A4A]">/{totalPrefectureCount}</span>
         </p>
       </div>
 
-      {completed.length > 0 ? (
+      {earned.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {completed.map((prefecture) => (
-            <CompletedBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
+          {earned.map((prefecture) => (
+            <EarnedBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
           ))}
         </div>
       ) : (
-        <EmptyShelf target={nextTarget ?? nearComplete[0] ?? null} />
+        // 「最初のバッジ」の候補なので、残り枚数が最小のリーチ県を優先する
+        <EmptyShelf target={nearComplete[0] ?? nextTarget ?? null} />
       )}
 
       {nearComplete.length > 0 && (
@@ -80,13 +78,16 @@ export default function PrefectureBadgeShelf({
   );
 }
 
-function CompletedBadge({
+function EarnedBadge({
   userId,
   prefecture,
 }: {
   userId: string;
   prefecture: PublicPrefectureProgress;
 }) {
+  // 制覇後に増えた枚数。バッジは残したうえで、増えた事実だけ静かに伝える
+  const addedSinceEarned = Math.max(prefecture.total - prefecture.earnedTotal, 0);
+
   return (
     <Link
       href={badgeUrl(userId, prefecture.name)}
@@ -99,11 +100,16 @@ function CompletedBadge({
         {prefecture.name}
       </p>
       <p className="mt-1 font-pixel text-base leading-none text-[#B5483C]">
-        {prefecture.total}/{prefecture.total}
+        {prefecture.earnedTotal}/{prefecture.earnedTotal}
       </p>
       <p className="mt-2 rounded-full bg-[#C9992F]/15 px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#8A6A1E]">
-        {prefecture.completedAt ? `${formatDateJaJst(prefecture.completedAt)} 制覇` : '制覇済み'}
+        {prefecture.earnedAt ? `${formatDateJaJst(prefecture.earnedAt)} 制覇` : '制覇済み'}
       </p>
+      {addedSinceEarned > 0 && (
+        <p className="mt-1 font-pixelJp text-[10px] font-bold text-[#8C6A4A]">
+          その後{addedSinceEarned}枚 追加
+        </p>
+      )}
     </Link>
   );
 }

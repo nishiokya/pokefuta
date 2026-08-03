@@ -10,9 +10,15 @@ export type PublicPrefectureProgress = {
   visited: number;
   remaining: number;
   rate: number;
+  /** 現時点で全枚数を訪問済みか */
   complete: boolean;
-  /** 制覇が成立した日(=最後の1枚を初めて訪れた日)。未制覇なら null */
-  completedAt: string | null;
+  /**
+   * 過去に一度でも制覇が成立した日。成立後にポケふたが追加されても null に戻さない。
+   * 「制覇したのに新設で剥奪される」と自慢の逆になるため、達成は履歴として保持する
+   */
+  earnedAt: string | null;
+  /** 制覇成立時点でのその県の設置枚数。成立後に増えた分は含まない */
+  earnedTotal: number;
   manholes: PublicPrefectureManhole[];
 };
 
@@ -57,6 +63,7 @@ type ManholeProgressRow = {
   title: string | null;
   municipality: string | null;
   pokemons: string[] | null;
+  created_at: string | null;
 };
 
 type VisitProgressRow = {
@@ -94,6 +101,59 @@ const toRate = (visited: number, total: number) => (total > 0 ? (visited / total
 
 const getVisitSortTime = (visit: Pick<VisitProgressRow, 'shot_at' | 'created_at'>) =>
   new Date(visit.shot_at || visit.created_at || 0).getTime();
+
+/**
+ * 「その時点で存在していたポケふたを全て訪問済みだった瞬間」があったかを判定し、
+ * 最初にそれが成立した日時と、その時点の設置枚数を返す。
+ *
+ * 現在の枚数と訪問数を比べるだけだと、制覇後にポケふたが新設された県で
+ * 制覇の事実そのものが消えてしまう(実際に初回一括投入422件のあと60件が追加されている)。
+ * 制覇は履歴上の出来事なので、カタログの追加時刻(manhole.created_at)と
+ * 各マンホールの初回訪問時刻から遡って復元する。
+ *
+ * 制覇が成立しうるのは訪問した瞬間だけなので、候補時刻は初回訪問時刻に限ってよい。
+ */
+function findEarnedCompletion(
+  manholes: ManholeProgressRow[],
+  firstVisitTimeByManhole: Map<number, number>,
+  catalogBaselineTime: number
+): { earnedAt: string | null; earnedTotal: number } {
+  if (manholes.length === 0) return { earnedAt: null, earnedTotal: 0 };
+
+  const createdTimes = manholes.map((manhole) => {
+    const time = new Date(manhole.created_at || 0).getTime();
+    // created_at が欠けている行は「最初から存在していた」とみなす
+    if (Number.isNaN(time) || time <= 0) return 0;
+    // 一括投入分の created_at は「DBに入れた日」であって設置日ではない。
+    // これを設置時刻として扱うと、投入日より前に訪問していたユーザーが
+    // 「当時0枚」と判定されて制覇を失うため、ベースライン以前は常に存在した扱いにする
+    return time <= catalogBaselineTime ? 0 : time;
+  });
+
+  const visitTimes = manholes
+    .map((manhole) => firstVisitTimeByManhole.get(manhole.id))
+    .filter((time): time is number => typeof time === 'number' && time > 0)
+    .sort((a, b) => a - b);
+
+  if (visitTimes.length === 0) return { earnedAt: null, earnedTotal: 0 };
+
+  for (const candidate of visitTimes) {
+    let existing = 0;
+    let visitedExisting = 0;
+    manholes.forEach((manhole, index) => {
+      if (createdTimes[index] > candidate) return;
+      existing++;
+      const visitedAt = firstVisitTimeByManhole.get(manhole.id);
+      if (visitedAt && visitedAt <= candidate) visitedExisting++;
+    });
+
+    if (existing > 0 && visitedExisting >= existing) {
+      return { earnedAt: new Date(candidate).toISOString(), earnedTotal: existing };
+    }
+  }
+
+  return { earnedAt: null, earnedTotal: 0 };
+}
 
 export function createPublicReadClient(): SupabaseClient<Database> | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -134,7 +194,7 @@ async function loadPublicUserPrefectureProgressImpl(
       supabase.rpc('get_public_user_info' as never, { p_user_id: trimmedUserId } as never),
       supabase
         .from('manhole')
-        .select('id, title, prefecture, municipality, pokemons')
+        .select('id, title, prefecture, municipality, pokemons, created_at')
         .order('prefecture', { ascending: true })
         .order('municipality', { ascending: true })
         .order('id', { ascending: true }),
@@ -181,6 +241,12 @@ async function loadPublicUserPrefectureProgressImpl(
     (name) => name !== UNKNOWN_PREFECTURE
   ).length;
   const totalPokemonCount = allPokemonNames.size;
+  // カタログ一括投入のタイムスタンプ。これ以前に作られた行は「元から存在した」扱いにする
+  const catalogBaselineTime = manholeRows.reduce((min, manhole) => {
+    const time = new Date(manhole.created_at || 0).getTime();
+    if (Number.isNaN(time) || time <= 0) return min;
+    return time < min ? time : min;
+  }, Number.POSITIVE_INFINITY);
 
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
@@ -278,17 +344,11 @@ async function loadPublicUserPrefectureProgressImpl(
       const rate = toRate(visited, total);
       const complete = total > 0 && visited >= total;
 
-      // 制覇日 = 県内の各マンホールの「初回訪問日」のうち最も遅い日
-      // (=最後の1枚を埋めた日)。時刻が取れない訪問は無視する
-      let completedAt: string | null = null;
-      if (complete) {
-        let latestFirstVisit = 0;
-        for (const id of totalIds) {
-          const firstVisit = firstVisitTimeByManhole.get(id);
-          if (firstVisit && firstVisit > latestFirstVisit) latestFirstVisit = firstVisit;
-        }
-        completedAt = latestFirstVisit > 0 ? new Date(latestFirstVisit).toISOString() : null;
-      }
+      const { earnedAt, earnedTotal } = findEarnedCompletion(
+        manholesByPrefecture.get(name) || [],
+        firstVisitTimeByManhole,
+        catalogBaselineTime
+      );
 
       return {
         name,
@@ -297,7 +357,8 @@ async function loadPublicUserPrefectureProgressImpl(
         remaining: Math.max(total - visited, 0),
         rate,
         complete,
-        completedAt,
+        earnedAt,
+        earnedTotal,
         manholes: (manholesByPrefecture.get(name) || [])
           .map((manhole) => ({
             id: manhole.id,
@@ -315,13 +376,17 @@ async function loadPublicUserPrefectureProgressImpl(
       };
     })
     .sort((a, b) => {
-      if (Number(b.complete) !== Number(a.complete)) return Number(b.complete) - Number(a.complete);
+      // バッジ棚は「獲得済みか」で並ぶ。新設で現在は未達でも、獲得済みは前に出す
+      const aEarned = a.earnedAt ? 1 : 0;
+      const bEarned = b.earnedAt ? 1 : 0;
+      if (bEarned !== aEarned) return bEarned - aEarned;
       if (b.rate !== a.rate) return b.rate - a.rate;
       if (b.visited !== a.visited) return b.visited - a.visited;
       return a.name.localeCompare(b.name, 'ja');
     });
 
-  const completedPrefectureCount = prefectures.filter((prefecture) => prefecture.complete).length;
+  // 棚に並ぶバッジ枚数と一致させるため、現在の達成状況ではなく獲得済みで数える
+  const completedPrefectureCount = prefectures.filter((prefecture) => prefecture.earnedAt).length;
   const totalManholeCount = manholeRows.length;
   const allManholeIds = new Set(manholeRows.map((manhole) => manhole.id));
   const visitedManholeIds = new Set(
