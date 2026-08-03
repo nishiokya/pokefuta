@@ -11,7 +11,21 @@ export type PublicPrefectureProgress = {
   remaining: number;
   rate: number;
   complete: boolean;
+  /** 制覇が成立した日(=最後の1枚を初めて訪れた日)。未制覇なら null */
+  completedAt: string | null;
   manholes: PublicPrefectureManhole[];
+};
+
+/**
+ * ポケモン図鑑。ポケふたは78%が1枚しか設置されていないため「コンプリート」だと
+ * 1枚訪問した瞬間に達成扱いになってしまう。分母を埋める指標ではなく
+ * 「何種類に会えたか」という収集数の指標として扱う。
+ */
+export type PublicPokedex = {
+  collected: number;
+  total: number;
+  rate: number;
+  collectedNames: string[];
 };
 
 export type PublicPrefectureManhole = {
@@ -29,10 +43,12 @@ export type PublicUserPrefectureProgress = {
   displayName: string;
   prefectures: PublicPrefectureProgress[];
   completedPrefectureCount: number;
+  /** ポケふたが1枚以上設置されている都道府県数。47ではない(未設置が5県ある) */
   totalPrefectureCount: number;
   visitedManholeCount: number;
   totalManholeCount: number;
   completionRate: number;
+  pokedex: PublicPokedex;
 };
 
 type ManholeProgressRow = {
@@ -67,7 +83,12 @@ export type AppUserProgressRow = {
 };
 
 export const FALLBACK_DISPLAY_NAME = 'トレーナー';
-const JAPAN_PREFECTURE_COUNT = 47;
+/**
+ * 進捗の取得に失敗したときだけ使う表示用フォールバック。
+ * ポケふたは47都道府県のうち42県にしか設置されていない(群馬・山梨・広島・熊本・大分が0枚)
+ */
+export const FALLBACK_INSTALLED_PREFECTURE_COUNT = 42;
+const UNKNOWN_PREFECTURE = '都道府県未設定';
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
 
@@ -135,16 +156,31 @@ async function loadPublicUserPrefectureProgressImpl(
   const manholeRows = (manholes || []) as ManholeProgressRow[];
   const totalIdsByPrefecture = new Map<string, Set<number>>();
   const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();
+  const pokemonsByManhole = new Map<number, string[]>();
+  const allPokemonNames = new Set<string>();
 
   manholeRows.forEach((manhole) => {
-    const prefecture = manhole.prefecture || '都道府県未設定';
+    const prefecture = manhole.prefecture || UNKNOWN_PREFECTURE;
     const ids = totalIdsByPrefecture.get(prefecture) || new Set<number>();
     ids.add(manhole.id);
     totalIdsByPrefecture.set(prefecture, ids);
     const list = manholesByPrefecture.get(prefecture) || [];
     list.push(manhole);
     manholesByPrefecture.set(prefecture, list);
+
+    const pokemons = (Array.isArray(manhole.pokemons) ? manhole.pokemons : [])
+      .map((name) => name?.trim())
+      .filter((name): name is string => Boolean(name));
+    pokemonsByManhole.set(manhole.id, pokemons);
+    pokemons.forEach((name) => allPokemonNames.add(name));
   });
+
+  // 分母は47ではなく「ポケふたが1枚以上ある都道府県数」。
+  // 未設置県(群馬・山梨・広島・熊本・大分)を含めると誰も100%に到達できない
+  const totalPrefectureCount = Array.from(totalIdsByPrefecture.keys()).filter(
+    (name) => name !== UNKNOWN_PREFECTURE
+  ).length;
+  const totalPokemonCount = allPokemonNames.size;
 
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
@@ -176,23 +212,34 @@ async function loadPublicUserPrefectureProgressImpl(
       displayName,
       prefectures: [],
       completedPrefectureCount: 0,
-      totalPrefectureCount: JAPAN_PREFECTURE_COUNT,
+      totalPrefectureCount,
       visitedManholeCount: 0,
       totalManholeCount: manholeRows.length,
       completionRate: 0,
+      pokedex: { collected: 0, total: totalPokemonCount, rate: 0, collectedNames: [] },
     };
   }
 
   const visitedIdsByPrefecture = new Map<string, Set<number>>();
   const latestPublicPhotoIdByManhole = new Map<number, { photoId: string; sortTime: number }>();
+  // 制覇日の算出用: そのマンホールを「初めて」訪れた時刻
+  const firstVisitTimeByManhole = new Map<number, number>();
 
   ((visits || []) as unknown as VisitProgressRow[]).forEach((visit) => {
     if (typeof visit.manhole_id !== 'number') return;
     const manhole = Array.isArray(visit.manhole) ? visit.manhole[0] : visit.manhole;
-    const prefecture = manhole?.prefecture || '都道府県未設定';
+    const prefecture = manhole?.prefecture || UNKNOWN_PREFECTURE;
     const ids = visitedIdsByPrefecture.get(prefecture) || new Set<number>();
     ids.add(visit.manhole_id);
     visitedIdsByPrefecture.set(prefecture, ids);
+
+    const visitTime = getVisitSortTime(visit);
+    if (visitTime > 0) {
+      const currentFirst = firstVisitTimeByManhole.get(visit.manhole_id);
+      if (currentFirst === undefined || visitTime < currentFirst) {
+        firstVisitTimeByManhole.set(visit.manhole_id, visitTime);
+      }
+    }
 
     const photos = Array.isArray(visit.photos) ? visit.photos : [];
     const latestPhoto = photos
@@ -229,6 +276,19 @@ async function loadPublicUserPrefectureProgressImpl(
       }
       const total = totalIds.size;
       const rate = toRate(visited, total);
+      const complete = total > 0 && visited >= total;
+
+      // 制覇日 = 県内の各マンホールの「初回訪問日」のうち最も遅い日
+      // (=最後の1枚を埋めた日)。時刻が取れない訪問は無視する
+      let completedAt: string | null = null;
+      if (complete) {
+        let latestFirstVisit = 0;
+        for (const id of totalIds) {
+          const firstVisit = firstVisitTimeByManhole.get(id);
+          if (firstVisit && firstVisit > latestFirstVisit) latestFirstVisit = firstVisit;
+        }
+        completedAt = latestFirstVisit > 0 ? new Date(latestFirstVisit).toISOString() : null;
+      }
 
       return {
         name,
@@ -236,7 +296,8 @@ async function loadPublicUserPrefectureProgressImpl(
         visited,
         remaining: Math.max(total - visited, 0),
         rate,
-        complete: total > 0 && visited >= total,
+        complete,
+        completedAt,
         manholes: (manholesByPrefecture.get(name) || [])
           .map((manhole) => ({
             id: manhole.id,
@@ -266,19 +327,31 @@ async function loadPublicUserPrefectureProgressImpl(
   const visitedManholeIds = new Set(
     Array.from(visitedIdsByPrefecture.values()).flatMap((ids) => Array.from(ids))
   );
-  const validVisitedManholeCount = Array.from(visitedManholeIds).filter((id) =>
+  const validVisitedManholeIds = Array.from(visitedManholeIds).filter((id) =>
     allManholeIds.has(id)
-  ).length;
+  );
+  const validVisitedManholeCount = validVisitedManholeIds.length;
+
+  const collectedPokemonNames = new Set<string>();
+  validVisitedManholeIds.forEach((id) => {
+    (pokemonsByManhole.get(id) || []).forEach((name) => collectedPokemonNames.add(name));
+  });
 
   return {
     userId: trimmedUserId,
     displayName,
     prefectures,
     completedPrefectureCount,
-    totalPrefectureCount: JAPAN_PREFECTURE_COUNT,
+    totalPrefectureCount,
     visitedManholeCount: validVisitedManholeCount,
     totalManholeCount,
     completionRate: toRate(validVisitedManholeCount, totalManholeCount),
+    pokedex: {
+      collected: collectedPokemonNames.size,
+      total: totalPokemonCount,
+      rate: toRate(collectedPokemonNames.size, totalPokemonCount),
+      collectedNames: Array.from(collectedPokemonNames).sort((a, b) => a.localeCompare(b, 'ja')),
+    },
   };
 }
 

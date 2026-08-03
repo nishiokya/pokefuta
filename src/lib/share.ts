@@ -65,6 +65,23 @@ export function prefectureProgressShareText(
   return `${completedPrefectureCount}/${totalPrefectureCount}都道府県のポケふたを制覇しました！`;
 }
 
+/** 県バッジ単位の共有文。制覇済みは枚数を添えて実績として言い切る */
+export function prefectureBadgeShareText(
+  prefectureName: string,
+  visited: number,
+  total: number,
+  complete: boolean
+): string {
+  return complete
+    ? `${prefectureName}のポケふた${total}枚、全部まわりました！`
+    : `${prefectureName}のポケふた、あと${Math.max(total - visited, 0)}枚でコンプリートです！`;
+}
+
+/** 図鑑は分母(総種類数)を出すと数字が小さく見えるので、集めた種類数だけを言う */
+export function pokedexShareText(collectedCount: number): string {
+  return `ポケふた巡りで${collectedCount}種類のポケモンに会いました！`;
+}
+
 export function prefectureCardShareText(
   prefectureName: string,
   visited: number,
