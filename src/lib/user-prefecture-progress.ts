@@ -96,6 +96,12 @@ export const FALLBACK_DISPLAY_NAME = 'トレーナー';
  */
 export const FALLBACK_INSTALLED_PREFECTURE_COUNT = 42;
 const UNKNOWN_PREFECTURE = '都道府県未設定';
+/**
+ * カタログ初回投入とみなす時間幅。最古の created_at からこの範囲内に作られた行は
+ * 「元から設置されていた」扱いにする。実データの次バッチは26日後なので誤って
+ * 巻き込むことはない
+ */
+const CATALOG_BASELINE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
 
@@ -104,55 +110,72 @@ const getVisitSortTime = (visit: Pick<VisitProgressRow, 'shot_at' | 'created_at'
 
 /**
  * 「その時点で存在していたポケふたを全て訪問済みだった瞬間」があったかを判定し、
- * 最初にそれが成立した日時と、その時点の設置枚数を返す。
+ * 最初に成立した日時と、最後に成立していた時点の設置枚数を返す。
  *
  * 現在の枚数と訪問数を比べるだけだと、制覇後にポケふたが新設された県で
  * 制覇の事実そのものが消えてしまう(実際に初回一括投入422件のあと60件が追加されている)。
- * 制覇は履歴上の出来事なので、カタログの追加時刻(manhole.created_at)と
- * 各マンホールの初回訪問時刻から遡って復元する。
+ * 制覇は履歴上の出来事なので、カタログへの登場時刻とユーザーの初回訪問時刻を
+ * 時系列に並べ、両方をイベントとして走査して復元する。
  *
- * 制覇が成立しうるのは訪問した瞬間だけなので、候補時刻は初回訪問時刻に限ってよい。
+ * 候補を訪問時刻だけに絞ると、カタログ登録より先に現地訪問していたポケふた
+ * (v < created_at)で成立時刻を取りこぼすため、登場時刻もイベントに含める。
+ *
+ * earnedAt は最初の成立時刻(=実績としての制覇日)、earnedTotal は最後に成立して
+ * いた時点の枚数を返す。後から増えた分を訪問済みなら現在の枚数に追いつき、
+ * 未訪問なら制覇時の枚数のまま残るので「その後N枚 追加」の判定に使える。
  */
 function findEarnedCompletion(
   manholes: ManholeProgressRow[],
   firstVisitTimeByManhole: Map<number, number>,
-  catalogBaselineTime: number
+  catalogBaselineCutoff: number
 ): { earnedAt: string | null; earnedTotal: number } {
   if (manholes.length === 0) return { earnedAt: null, earnedTotal: 0 };
 
-  const createdTimes = manholes.map((manhole) => {
+  // 各ポケふたが「存在するようになった時刻」。0 は最初から存在していた扱い
+  const existsFrom = manholes.map((manhole) => {
     const time = new Date(manhole.created_at || 0).getTime();
-    // created_at が欠けている行は「最初から存在していた」とみなす
+    // created_at が欠けている行は最初から存在していたとみなす
     if (Number.isNaN(time) || time <= 0) return 0;
     // 一括投入分の created_at は「DBに入れた日」であって設置日ではない。
     // これを設置時刻として扱うと、投入日より前に訪問していたユーザーが
-    // 「当時0枚」と判定されて制覇を失うため、ベースライン以前は常に存在した扱いにする
-    return time <= catalogBaselineTime ? 0 : time;
+    // 「当時0枚」と判定されて制覇を失うため、投入バッチ内は常在扱いにする
+    return time <= catalogBaselineCutoff ? 0 : time;
   });
+  const visitedAt = manholes.map((manhole) => firstVisitTimeByManhole.get(manhole.id) ?? null);
 
-  const visitTimes = manholes
-    .map((manhole) => firstVisitTimeByManhole.get(manhole.id))
-    .filter((time): time is number => typeof time === 'number' && time > 0)
-    .sort((a, b) => a - b);
+  if (visitedAt.every((time) => time === null)) return { earnedAt: null, earnedTotal: 0 };
 
-  if (visitTimes.length === 0) return { earnedAt: null, earnedTotal: 0 };
+  const candidates = Array.from(
+    new Set([
+      ...existsFrom.filter((time) => time > 0),
+      ...visitedAt.filter((time): time is number => typeof time === 'number' && time > 0),
+    ])
+  ).sort((a, b) => a - b);
 
-  for (const candidate of visitTimes) {
+  let earnedAt: number | null = null;
+  let earnedTotal = 0;
+
+  for (const candidate of candidates) {
     let existing = 0;
     let visitedExisting = 0;
-    manholes.forEach((manhole, index) => {
-      if (createdTimes[index] > candidate) return;
+    for (let index = 0; index < manholes.length; index++) {
+      if (existsFrom[index] > candidate) continue;
       existing++;
-      const visitedAt = firstVisitTimeByManhole.get(manhole.id);
-      if (visitedAt && visitedAt <= candidate) visitedExisting++;
-    });
+      const visited = visitedAt[index];
+      if (visited !== null && visited <= candidate) visitedExisting++;
+    }
 
     if (existing > 0 && visitedExisting >= existing) {
-      return { earnedAt: new Date(candidate).toISOString(), earnedTotal: existing };
+      if (earnedAt === null) earnedAt = candidate;
+      // 成立していた最後の時点の枚数を残す
+      earnedTotal = existing;
     }
   }
 
-  return { earnedAt: null, earnedTotal: 0 };
+  return {
+    earnedAt: earnedAt === null ? null : new Date(earnedAt).toISOString(),
+    earnedTotal,
+  };
 }
 
 export function createPublicReadClient(): SupabaseClient<Database> | null {
@@ -241,12 +264,16 @@ async function loadPublicUserPrefectureProgressImpl(
     (name) => name !== UNKNOWN_PREFECTURE
   ).length;
   const totalPokemonCount = allPokemonNames.size;
-  // カタログ一括投入のタイムスタンプ。これ以前に作られた行は「元から存在した」扱いにする
-  const catalogBaselineTime = manholeRows.reduce((min, manhole) => {
-    const time = new Date(manhole.created_at || 0).getTime();
-    if (Number.isNaN(time) || time <= 0) return min;
-    return time < min ? time : min;
-  }, Number.POSITIVE_INFINITY);
+  // カタログ初回投入バッチの終端。ここまでに作られた行は「元から存在した」扱いにする。
+  // 最古の1点だけを見ると、投入処理が行ごとに時刻を振っていた場合に
+  // 最古の1行以外が全て「後から追加」と誤判定されるため、幅を持たせて丸ごと包む。
+  // 実データでは初回422件が同一タイムスタンプで、次のバッチは26日後なので十分に分離できる
+  const catalogBaselineCutoff =
+    manholeRows.reduce((min, manhole) => {
+      const time = new Date(manhole.created_at || 0).getTime();
+      if (Number.isNaN(time) || time <= 0) return min;
+      return time < min ? time : min;
+    }, Number.POSITIVE_INFINITY) + CATALOG_BASELINE_WINDOW_MS;
 
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
@@ -347,7 +374,7 @@ async function loadPublicUserPrefectureProgressImpl(
       const { earnedAt, earnedTotal } = findEarnedCompletion(
         manholesByPrefecture.get(name) || [],
         firstVisitTimeByManhole,
-        catalogBaselineTime
+        catalogBaselineCutoff
       );
 
       return {

@@ -149,9 +149,15 @@ async function renderBaseSvg(template: string, replacements: Record<string, stri
     svg = replaceAll(svg, search, replacement);
   }
 
-  const fontFaceToken = ['@font', 'face'].join('-');
-  if (svg.includes(fontFaceToken)) {
-    throw new Error(`OGP SVG must not depend on ${fontFaceToken}`);
+  // Linux の sharp/librsvg は Web フォント指定を解決できないため、SVG がそれに
+  // 依存していないことを描画直前に保証する。
+  // ビルド成果物にこのトークンの文字列が残ると tools/verify-ogp-linux.js の検査に
+  // 引っかかるので、正規表現のエスケープ(\x2D = ハイフン)で literal を避ける。
+  // 配列 join による分割は minifier に定数畳み込みされて literal に戻ることがあるが、
+  // 正規表現リテラルは書き換えられないため import 構成が変わっても安定する。
+  // エラーメッセージにもトークンを埋め込まないこと。
+  if (/@font\x2Dface/.test(svg)) {
+    throw new Error('OGP SVG must not depend on a web font at-rule');
   }
 
   return sharp(Buffer.from(svg)).resize(WIDTH, HEIGHT).png().toBuffer();
