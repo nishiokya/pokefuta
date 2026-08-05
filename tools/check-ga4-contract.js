@@ -8,23 +8,39 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const analytics = read('src/lib/analytics/gtag.ts');
 const provider = read('src/components/GoogleAnalytics.tsx');
-const eventCallers = [
-  read('src/app/my-trip/page.tsx'),
-  read('src/app/manhole/[id]/ManholePage.tsx'),
-].join('\n');
+
+function sourceFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(fullPath);
+    return /\.(ts|tsx)$/.test(entry.name) ? [fullPath] : [];
+  });
+}
+
+const analyticsCallers = sourceFiles(path.join(root, 'src'))
+  .map((file) => ({ file, text: fs.readFileSync(file, 'utf8') }))
+  .filter(({ text }) => /useAnalytics|analytics\/gtag/.test(text));
 
 const failures = [];
 const expect = (condition, message) => {
   if (!condition) failures.push(message);
 };
 
-expect(analytics.includes("new Set(['pokefuta.com', 'www.pokefuta.com'])"), 'production hostname allowlist is missing');
-expect(provider.includes("window.gtag('event', 'page_view'"), 'standard page_view tracking is missing');
-expect(analytics.includes("trackEvent('page_view'"), 'page-view helper must use the standard event name');
-expect(provider.includes('page_location: `${window.location.origin}${pathname}`'), 'page_location must exclude query parameters');
+const hostAllowlist = analytics.match(/ANALYTICS_HOSTS\s*=\s*new Set\(\[([^\]]+)\]\)/)?.[1] || '';
+expect(hostAllowlist.includes("'pokefuta.com'"), 'pokefuta.com is missing from the production hostname allowlist');
+expect(hostAllowlist.includes("'www.pokefuta.com'"), 'www.pokefuta.com is missing from the production hostname allowlist');
+expect(!/localhost|127\.0\.0\.1/.test(hostAllowlist), 'development hosts must not be in the production allowlist');
+expect(/window\.gtag!?\('event', 'page_view'/.test(provider), 'standard page_view tracking is missing');
+expect(analytics.includes("trackEvent('p_page_view'"), 'legacy helper must not emit another standard page_view');
+expect(provider.includes("'code'") && provider.includes("'access_token'"), 'sensitive query filtering is missing');
+expect(provider.includes("get('from') === 'data'"), 'data-site referral tracking is missing');
+expect(provider.includes("'p_data_referral'"), 'data-site referral event is missing');
+expect(provider.includes('page_location: analyticsPageLocation'), 'sanitized page_location must be configured globally');
 expect(!analytics.includes("trackEvent('error_event'"), 'legacy key event error_event must not be emitted');
 expect(!analytics.includes("trackEvent('auth_error'"), 'legacy key event auth_error must not be emitted');
-expect(!eventCallers.match(/\bsource\s*:/), 'analytics callers must use surface instead of GA reserved source');
+for (const { file, text } of analyticsCallers) {
+  expect(!text.match(/\bsource\s*:/), `${path.relative(root, file)} must use surface instead of GA reserved source`);
+}
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));

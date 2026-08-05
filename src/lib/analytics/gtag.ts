@@ -133,7 +133,7 @@ export function trackPageView(
   pageType?: string,
   isLoggedIn: boolean = false
 ): void {
-  trackEvent('page_view', {
+  trackEvent('p_page_view', {
     page_path: pagePath,
     page_title: pageTitle,
     page_type: pageType,
