@@ -36,6 +36,11 @@ expect(provider.includes("'code'") && provider.includes("'access_token'"), 'sens
 expect(provider.includes("get('from') === 'data'"), 'data-site referral tracking is missing');
 expect(provider.includes("'p_data_referral'"), 'data-site referral event is missing');
 expect(provider.includes('page_location: analyticsPageLocation'), 'sanitized page_location must be configured globally');
+expect(provider.includes('(function() {'), 'analytics bootstrap must not leak variables to window');
+expect(
+  provider.includes("document.visibilityState === 'hidden'") && provider.includes('window.setTimeout(send, 0)'),
+  'hidden tabs must send page_view without waiting for requestAnimationFrame'
+);
 expect(!analytics.includes("trackEvent('error_event'"), 'legacy key event error_event must not be emitted');
 expect(!analytics.includes("trackEvent('auth_error'"), 'legacy key event auth_error must not be emitted');
 for (const { file, text } of analyticsCallers) {
