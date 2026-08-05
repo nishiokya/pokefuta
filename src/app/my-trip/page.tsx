@@ -133,7 +133,7 @@ export default function MyTripPage() {
     const ok = await updateVisitVisibility(visitId, nextIsPublic);
 
     if (ok) {
-      trackVisitVisibilityChange({ is_public: nextIsPublic, source: 'my_trip' });
+      trackVisitVisibilityChange({ is_public: nextIsPublic, surface: 'my_trip' });
       showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
     } else {
       setLocal(!nextIsPublic);

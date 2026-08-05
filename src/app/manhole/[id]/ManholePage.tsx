@@ -410,7 +410,7 @@ export default function ManholeDetailPage() {
       trackVisitVisibilityChange({
         manhole_id: manhole?.id,
         is_public: nextIsPublic,
-        source: 'manhole_detail',
+        surface: 'manhole_detail',
       });
       showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
     } else {
