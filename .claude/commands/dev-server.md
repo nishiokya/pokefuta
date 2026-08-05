@@ -7,7 +7,7 @@ Steps:
 
 2. If not running, start the server in the background:
    Use the Bash tool with `run_in_background: true` to run: `npm run dev`
-   Working directory: /Users/nishiokya/git/pokefuta
+   Working directory: the repository root (do not hardcode an absolute path — use the current project directory)
 
 3. Wait for the server to become ready by polling:
    Retry `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000` up to 15 times with 2-second intervals until it returns 200.
