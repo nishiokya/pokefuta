@@ -619,7 +619,7 @@ function UploadPageInner() {
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
-        <div className="fixed left-0 right-0 top-[calc(env(safe-area-body-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
+        <div className="fixed left-0 right-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
           {alerts.map(alert => (
             <div
               key={alert.id}

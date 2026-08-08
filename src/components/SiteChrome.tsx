@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -90,6 +90,117 @@ type ChromeState = {
 };
 
 // ─────────────────────────────────────────────
+// サイトスイッチャー（写真館 ⇄ 図鑑）
+// ─────────────────────────────────────────────
+
+/**
+ * 同じモンスターボールなのに別サイト、という状態を解消するための導線。
+ *
+ * 図鑑側（pokefuta-tracker の inject_site_header.py / site-header.css）と
+ * 見た目・文言・項目順を揃えている。片方だけ変えないこと。
+ *
+ * SP はページタイトルが横幅を占めるのでボール＋キャレットだけを出す。
+ * そのぶんホームへは1タップで行けなくなるが、メニューの先頭が「写真館」＝ `/` なので
+ * 到達性は保たれる（図鑑側も同じ扱い）。
+ */
+function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ページ遷移したら閉じる（メニュー内の Link は SPA 遷移なので閉じ忘れる）
+  useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const itemStyle = (current: boolean): React.CSSProperties => ({
+    display: 'block',
+    padding: '9px 10px',
+    borderRadius: 8,
+    color: 'var(--chrome-ink)',
+    textDecoration: 'none',
+    background: current ? 'var(--chrome-pc-nav-active-bg)' : 'transparent',
+  });
+
+  return (
+    <div ref={containerRef} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="サイトを切り替える"
+        className="flex items-center gap-2 rounded-lg px-1.5 transition hover:bg-[var(--chrome-accent-soft)]"
+        style={{
+          minHeight: 'var(--chrome-tap-min)',
+          fontWeight: 700,
+          color: variant === 'pc' ? 'var(--chrome-ink-pc)' : 'var(--chrome-ink)',
+          fontFamily: ROUND,
+        }}
+      >
+        <PokeballMark size={variant === 'pc' ? 28 : 30} />
+        {variant === 'pc' && (
+          <span style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
+            ポケふた
+            <span aria-hidden="true" style={{ margin: '0 4px', opacity: 0.45, fontWeight: 600 }}>
+              ｜
+            </span>
+            写真館
+          </span>
+        )}
+        <span
+          aria-hidden="true"
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: '4px solid transparent',
+            borderRight: '4px solid transparent',
+            borderTop: '5px solid currentColor',
+            opacity: 0.55,
+            transform: open ? 'rotate(180deg)' : undefined,
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-[calc(100%+6px)] min-w-[220px] rounded-xl bg-white p-1.5"
+          style={{
+            border: '1px solid var(--chrome-accent-border)',
+            boxShadow: '0 12px 30px rgba(60, 45, 25, .18)',
+            zIndex: 1,
+          }}
+        >
+          <Link href="/" role="menuitem" aria-current="page" style={itemStyle(true)}>
+            <b style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>写真館</b>
+            <small style={{ display: 'block', fontSize: 11, color: 'var(--chrome-pc-nav)' }}>撮る・記録する</small>
+          </Link>
+          <a href={DATA_SITE_URL} role="menuitem" style={itemStyle(false)}>
+            <b style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>図鑑</b>
+            <small style={{ display: 'block', fontSize: 11, color: 'var(--chrome-pc-nav)' }}>調べる・探す</small>
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // SP ヘッダー（<1024px）
 // ─────────────────────────────────────────────
 
@@ -121,14 +232,7 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
         className="mx-auto flex max-w-6xl items-center gap-2 px-3"
         style={{ minHeight: 'calc(var(--chrome-height) - 1px)' }}
       >
-        <Link
-          href="/"
-          aria-label="ホームに戻る"
-          className="flex flex-shrink-0 items-center justify-center"
-          style={{ minWidth: 'var(--chrome-tap-min)', minHeight: 'var(--chrome-tap-min)' }}
-        >
-          <PokeballMark size={30} />
-        </Link>
+        <SiteSwitcher variant="sp" />
 
         <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ fontFamily: ROUND }}>
           {title}
@@ -230,13 +334,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         borderBottom: '1px solid var(--chrome-pc-border)',
       }}
     >
-      <Link href="/" className="flex shrink-0 items-center gap-2" style={{ textDecoration: 'none' }}>
-        <PokeballMark size={28} />
-        <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--chrome-ink-pc)', fontFamily: ROUND }}>
-          {/* TODO(ステップ6): ここを `ポケふた ｜ 写真館 ▾` のサイトスイッチャーにする */}
-          ポケふた写真館
-        </span>
-      </Link>
+      <SiteSwitcher variant="pc" />
 
       {/*
         ナビ項目は認証の解決を待たずに出す。
