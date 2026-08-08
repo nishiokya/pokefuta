@@ -84,7 +84,7 @@ export default function ManholesPage() {
   const prefectureCount = new Set(manholes.map((manhole) => manhole.prefecture).filter(Boolean)).size;
 
   return (
-    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
 
       <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
         <section className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">

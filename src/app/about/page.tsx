@@ -86,7 +86,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-7 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-10">

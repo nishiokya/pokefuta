@@ -109,7 +109,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
   const remainingManholes = prefecture.manholes.filter((manhole) => !manhole.visited);
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <main className="mx-auto max-w-3xl px-4 pb-8 pt-3 sm:pt-6">
         <Breadcrumb href={stampBookUrl} label="スタンプ帳へ" />
         <BadgeHero prefecture={prefecture} displayName={progress.displayName} />

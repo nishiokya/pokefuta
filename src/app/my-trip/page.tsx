@@ -230,7 +230,7 @@ export default function MyTripPage() {
   );
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#efe6cf]">
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
       <PCShell rail={myTripRail} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-6 max-w-2xl lg:max-w-none">

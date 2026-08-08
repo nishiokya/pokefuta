@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -29,20 +29,6 @@ const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 // ─────────────────────────────────────────────
 
 const TitleOverrideContext = createContext<((title: string | null) => void) | null>(null);
-
-/**
- * このタブでアプリ内遷移を1回以上したか。
- *
- * `document.referrer` は **SPA 遷移では空のまま**なので、これだけで判定すると
- * 「/ を開いて Link で /manhole/209 へ移動」を直接着地と誤判定する。
- * SiteChrome は layout 側にあってページ遷移でアンマウントされないので、
- * ここで pathname の変化を数えるのが唯一の正確な判定になる。
- */
-const InAppNavigationContext = createContext(false);
-
-export function useHasNavigatedInApp() {
-  return useContext(InAppNavigationContext);
-}
 
 /**
  * ルート表で決まらないタイトル（`${市町村}のポケふた` など）を上書きする。
@@ -124,6 +110,11 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
         WebkitBackdropFilter: 'blur(8px)',
         borderBottom: '1px solid var(--chrome-sp-border)',
         color: 'var(--chrome-ink)',
+        // ヘッダーは本文の外側にあるので、上の safe-area はここが持つ。
+        // 本文側は .safe-area-body（左右のみ）で、二重適用にならないようにしている
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
       }}
     >
       <div
@@ -522,17 +513,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
-  const [hasNavigatedInApp, setHasNavigatedInApp] = useState(false);
-  const previousPathRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    // 初回マウントでは記録するだけ。2回目以降の pathname 変化が「アプリ内遷移」
-    if (previousPathRef.current !== null && previousPathRef.current !== pathname) {
-      setHasNavigatedInApp(true);
-    }
-    previousPathRef.current = pathname;
-  }, [pathname]);
-
   useEffect(() => {
     let supabase: SupabaseClient;
     try {
@@ -575,7 +555,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
 
   return (
     <TitleOverrideContext.Provider value={setOverride}>
-      <InAppNavigationContext.Provider value={hasNavigatedInApp}>
       {route.bare ? (
         children
       ) : (
@@ -587,7 +566,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
           <BottomNav {...state} />
         </>
       )}
-      </InAppNavigationContext.Provider>
     </TitleOverrideContext.Provider>
   );
 }

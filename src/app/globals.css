@@ -317,6 +317,19 @@
   }
 
   /*
+   * 本文用の safe-area。左右のみ。
+   *
+   * ヘッダーは layout.tsx の SiteChrome が本文の外側に描くので、上の inset は
+   * ヘッダー自身が持つ。本文にも padding-top を付けると、ノッチ端末や PWA で
+   * 「ヘッダーがステータスバーに潜り、ヘッダー下に同じ幅の空白ができる」二重適用になる。
+   * 下は .pb-nav-safe が env(safe-area-inset-bottom) 込みで面倒を見る。
+   */
+  .safe-area-body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /*
    * Fixed bottom navigation spacing.
    *
    * Note: We intentionally compute padding-bottom in one rule to avoid

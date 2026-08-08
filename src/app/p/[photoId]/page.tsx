@@ -82,7 +82,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
   const shareUrl = `${SITE_URL}/p/${photo.id}`;
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <main className="mx-auto max-w-4xl px-4 pb-5 pt-3 sm:pb-8 sm:pt-6">
         <Breadcrumb href={`/manhole/${photo.manhole.id}`} label="マンホール詳細へ" />
         <article className="overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">

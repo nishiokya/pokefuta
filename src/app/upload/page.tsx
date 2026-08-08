@@ -588,7 +588,7 @@ function UploadPageInner() {
 
   if (allUploaded) {
     return (
-      <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
@@ -616,10 +616,10 @@ function UploadPageInner() {
   }
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
-        <div className="fixed left-0 right-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
+        <div className="fixed left-0 right-0 top-[calc(env(safe-area-body-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
           {alerts.map(alert => (
             <div
               key={alert.id}

@@ -380,7 +380,7 @@ export default function NearbyPage() {
   const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
 
   return (
-    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
 
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
       <main className="relative px-0 lg:px-0">
@@ -711,7 +711,7 @@ export default function NearbyPage() {
 
       <Link
         href={uploadHref}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-3 z-40 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7B63A8] px-4 py-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#6A5299] sm:bottom-6 sm:right-6 sm:gap-2 sm:px-5 sm:py-4 sm:text-sm"
+        className="fixed bottom-[calc(env(safe-area-body-bottom)+5.75rem)] right-3 z-40 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7B63A8] px-4 py-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#6A5299] sm:bottom-6 sm:right-6 sm:gap-2 sm:px-5 sm:py-4 sm:text-sm"
       >
         <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
         写真を投稿

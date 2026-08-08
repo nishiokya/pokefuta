@@ -176,7 +176,7 @@ export default function HomePage() {
   ) : undefined;
 
   return (
-    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
 
       <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
       <main>

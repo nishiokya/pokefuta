@@ -128,7 +128,7 @@ export default async function Page({ params }: Props) {
   };
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <script
         type="application/ld+json"
         // title 等はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする

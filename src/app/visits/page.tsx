@@ -651,7 +651,7 @@ export default function VisitsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-content safe-area-inset bg-[#F3E7CC] flex items-center justify-center">
+      <div className="min-h-content safe-area-body bg-[#F3E7CC] flex items-center justify-center">
         <div className="text-center">
           <div className="font-pixelJp text-[#6A4D36]">
             パスポート準備中<span className="rpg-loading"></span>
@@ -689,7 +689,7 @@ export default function VisitsPage() {
     );
 
     return (
-      <div className="min-h-content safe-area-inset bg-[#F3E7CC] pb-nav-safe">
+      <div className="min-h-content safe-area-body bg-[#F3E7CC] pb-nav-safe">
 
         <PCShell rail={unAuthRail} className="pb-32 pt-5 lg:pt-6">
         <main className="space-y-4">
@@ -871,7 +871,7 @@ export default function VisitsPage() {
   );
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#efe6cf]">
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
       <PCShell rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">

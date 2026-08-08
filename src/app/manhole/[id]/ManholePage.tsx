@@ -487,7 +487,7 @@ export default function ManholeDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-content safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] flex items-center justify-center">
         <div className="font-pixelJp text-[#7B63A8]">
           読み込み中<span className="rpg-loading" />
         </div>
@@ -497,7 +497,7 @@ export default function ManholeDetailPage() {
 
   if (error || !manhole) {
     return (
-      <div className="min-h-content safe-area-inset bg-[#F6EEDC]">
+      <div className="min-h-content safe-area-body bg-[#F6EEDC]">
         <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4">
           <button onClick={() => router.back()} className="rpg-button p-2">
             <ArrowLeft className="w-5 h-5" />
@@ -751,12 +751,10 @@ export default function ManholeDetailPage() {
   const promptCard = <div className="hidden lg:block">{promptCardContent}</div>;
 
   return (
-    <div className="min-h-content safe-area-inset bg-[#f1e8d4]">
+    <div className="min-h-content safe-area-body bg-[#f1e8d4]">
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={promptCard}>
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
-          {/* 遷移元が定まらないので履歴を戻る。X・OGP からの直接着地では
-              履歴が無いので、その場合は「探す」へ逃がす */}
-          <Breadcrumb label="戻る" fallbackHref="/nearby" />
+          <Breadcrumb href="/nearby" label="ポケふたを探す" />
 
           {/* ── Gallery ── */}
           {photoState === 'none' ? (
