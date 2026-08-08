@@ -10,6 +10,12 @@ import {
   deriveDesignSmallKey,
 } from '@/lib/storage';
 import { isValidCoordinates } from '@/lib/location';
+import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
+import {
+  buildOfficialManholeConflict,
+  findNearbyOfficialManhole,
+  getOfficialManholeProximityDecision,
+} from '@/lib/design-manhole-proximity';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -59,10 +65,15 @@ function optionalText(value: FormDataEntryValue | null, maxLength: number): stri
  *               description: { type: string, maxLength: 1000 }
  *               submitterName: { type: string, maxLength: 50 }
  *               exif: { type: string, description: JSON string }
+ *               confirmedNearbyOfficialManholeId:
+ *                 type: integer
+ *                 description: 近接する公式ポケふたとは別の蓋であることを確認した場合の候補ID
  *     responses:
  *       201: { description: 投稿成功 }
  *       400: { description: バリデーションエラー }
  *       401: { description: 認証が必要 }
+ *       409: { description: 50m以内に未確認の公式ポケふた候補がある }
+ *       503: { description: 公式ポケふたとの照合を実行できない }
  */
 export async function POST(request: NextRequest) {
   let uploadedStorageKey: string | null = null;
@@ -123,7 +134,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. テキスト項目（すべて任意・長さ上限で切り詰め）
+    // 4. 公式ポケふたとの近接判定。失敗時はアップロード前に閉じる。
+    const snapshot = await fetchManholeSnapshot();
+    if (!snapshot?.manholes) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'OFFICIAL_MANHOLE_CHECK_UNAVAILABLE',
+          error: '公式ポケふたとの照合に失敗しました。時間をおいて再度お試しください',
+        },
+        { status: 503 }
+      );
+    }
+
+    const nearbyOfficialManhole = findNearbyOfficialManhole(snapshot.manholes, lat, lng);
+    const confirmationRaw = formData.get('confirmedNearbyOfficialManholeId');
+    const confirmedNearbyOfficialManholeId =
+      typeof confirmationRaw === 'string' && /^\d+$/.test(confirmationRaw)
+        ? Number(confirmationRaw)
+        : null;
+    const proximityDecision = getOfficialManholeProximityDecision(
+      nearbyOfficialManhole,
+      confirmedNearbyOfficialManholeId
+    );
+
+    if (proximityDecision.result === 'conflict') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '近くに公式ポケふたがあります。訪問写真として登録するか、別のマンホールであることを確認してください',
+          ...buildOfficialManholeConflict(proximityDecision.official_manhole),
+        },
+        { status: 409 }
+      );
+    }
+
+    // 5. テキスト項目（すべて任意・長さ上限で切り詰め）
     const title = optionalText(formData.get('title'), MAX_TITLE_LENGTH);
     const description = optionalText(formData.get('description'), MAX_DESCRIPTION_LENGTH);
     const submitterName =
@@ -143,7 +189,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. R2 アップロード + サムネイル生成
+    // 6. R2 アップロード + サムネイル生成
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const storageKey = generateDesignManholeStorageKey(file.type);
@@ -182,7 +228,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. DB 挿入（ユーザーセッションで実行。RLS が created_by = auth.uid() を担保。
+    // 7. DB 挿入（ユーザーセッションで実行。RLS が created_by = auth.uid() を担保。
     //    失敗時はアップロード済みオブジェクトを掃除）
     const { data: inserted, error: insertError } = await supabase
       .from('design_manhole')
@@ -209,7 +255,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, design_manhole: inserted },
+      {
+        success: true,
+        design_manhole: inserted,
+        official_manhole_check: proximityDecision,
+      },
       { status: 201 }
     );
   } catch (error: any) {
