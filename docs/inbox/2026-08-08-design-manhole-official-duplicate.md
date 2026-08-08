@@ -135,6 +135,24 @@ pokefuta #198 の `confirmed_different` は、現行差分ではPOST成功レス
 - `create-pull-request` の無条件実行、concurrency、timeout追加も妥当。
 - 上記2件を修正し、公開データとレビューキューの両方を統合テストした後にマージする。
 
+## 相互監視・最終確認結果
+
+### pokefuta-tracker
+
+- PR #394 は、公開抽出を `status == "active"` かつ既知の公開許可 `review_status` に限定するallowlist方式へ修正した。
+- 非公開候補は `dataset/design_manhole_review_queue.ndjson` へ残し、投稿ID、近接候補、距離、レビュー状態、投稿URLを確認できるようにした。
+- ID 157が公開NDJSONへ入らず、レビューキューへ `pokefuta:157` と約1mで残る回帰テストを含む14テストとGitHub CIが成功した。
+- PR #394 は最終HEAD `9f42fcb84378e8944a1025d4fe16625d40d4fdfd`、merge commit `b44d88b80274b795661e0eedc49944a5b4d38c8b` で2026-08-08にsquash merge済み。上記の敵対的レビュー指摘は解消済み。
+- 後続の日次データPR #395も成功し、2026-08-08にmerge済み。PR #392は誤投稿を含む旧PRとしてclosed・未mergeのまま。
+
+### pokefuta PR #198
+
+- 最新実装HEAD `4cdfd76eb28e6b03c1ccc3924f885760e48b5b36` を再レビューし、追加の品質問題は見つからなかった。
+- 近接確認済み投稿の `needs_review` 永続化、公開API・写真APIからの除外、50m以内の直接INSERTを抑止するDBトリガーとRLSを確認した。
+- 写真差替え時のEXIF解析・近接検索・例外処理・`finally` は同じ写真世代でガードされ、古い非同期結果が新しい写真へ反映されないことを確認した。
+- GitHub ActionsはNode 20で `npm run test:design-manhole` を実行し、追加テストを含めて成功。PRは競合なし・mergeableであり、Draft解除とsquash mergeへ進めてよい。
+- 本番DBへのmigration適用とデプロイは、このPRのマージ作業には含めない。
+
 ## 関連
 
 - pokefuta-tracker PR: https://github.com/nishiokya/pokefuta-tracker/pull/392
