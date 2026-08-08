@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
 import ApiErrorAnalytics from '@/components/ApiErrorAnalytics';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 
 import { SITE_NAME, SITE_URL, OGP_IMAGE_URL } from '@/lib/constants';
 
@@ -68,35 +68,13 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        {/* Google Analytics 4 - 環境変数がある場合のみ読み込み */}
-        {gaId && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
-            />
-            <Script
-              id="google-analytics"
-              strategy="afterInteractive"
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', ${JSON.stringify(gaId)}, { send_page_view: false });
-                `,
-              }}
-            />
-          </>
-        )}
-        {/* End Google Analytics 4 */}
-
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="ポケふた" />
       </head>
       <body className={`${inter.className} antialiased`}>
+        {gaId && <GoogleAnalytics measurementId={gaId} />}
         <div id="app" className="min-h-screen bg-[#F6EEDC]">
           <ApiErrorAnalytics />
           {children}

@@ -23,6 +23,7 @@ export interface PokefutaEventParams extends GAEventParams {
   pokemon_ids?: string;    // カンマ区切り文字列 (GA4は配列非対応)
   is_logged_in?: boolean;
   source_app?: 'tracker' | 'map';
+  surface?: string;        // イベント発生箇所。GA予約語の source は使用しない
 }
 
 export interface ApiErrorEventParams extends GAEventParams {
@@ -55,8 +56,18 @@ function isClientSide(): boolean {
   return typeof window !== 'undefined';
 }
 
+const ANALYTICS_HOSTS = new Set(['pokefuta.com', 'www.pokefuta.com']);
+
+export function isProductionAnalyticsHost(hostname: string): boolean {
+  return ANALYTICS_HOSTS.has(hostname.toLowerCase());
+}
+
 function isGtagAvailable(): boolean {
-  return isClientSide() && typeof window.gtag === 'function';
+  return (
+    isClientSide() &&
+    isProductionAnalyticsHost(window.location.hostname) &&
+    typeof window.gtag === 'function'
+  );
 }
 
 // ==========================================
@@ -204,7 +215,7 @@ export const pokefutaEvents = {
   // --- 訪問記録系 ---
   visitRegister:       (p?: PokefutaEventParams) => trackEvent('p_visit_register', p),
   visitDelete:         (p?: PokefutaEventParams) => trackEvent('p_visit_delete', p),
-  /** 登録後の公開/非公開切り替え。params: is_public(切替後), source */
+  /** 登録後の公開/非公開切り替え。params: is_public(切替後), surface */
   visitVisibilityChange:    (p?: PokefutaEventParams) => trackEvent('p_visit_visibility_change', p),
   /** 非公開バナーのタップ。params: private_count */
   privateVisitsBannerClick: (p?: PokefutaEventParams) => trackEvent('p_private_visits_banner_click', p),
@@ -239,7 +250,7 @@ export const pokefutaEvents = {
 };
 
 // ==========================================
-// 内部エラー追跡 (prefix なし、内部用)
+// 内部エラー追跡。旧イベント名は GA4 でキーイベント登録されているため使用しない。
 // ==========================================
 
 export const errorEvents = {
@@ -250,7 +261,7 @@ export const errorEvents = {
     errorMessage?: string,
     additionalParams?: Pick<ApiErrorEventParams, 'is_logged_in' | 'page_type' | 'component'>
   ) =>
-    trackEvent('error_event', {
+    trackEvent('p_api_error', {
       error_type: 'api_error',
       api_path: endpoint,
       endpoint,
@@ -261,10 +272,10 @@ export const errorEvents = {
     } satisfies ApiErrorEventParams),
 
   auth: (errorCode: string) =>
-    trackEvent('auth_error', { error_code: errorCode }),
+    trackEvent('p_auth_error', { error_code: errorCode }),
 
   app: (errorCode: string, errorType: string = 'unknown') =>
-    trackEvent('app_error', { error_code: errorCode, error_type: errorType }),
+    trackEvent('p_app_error', { error_code: errorCode, error_type: errorType }),
 };
 
 // ==========================================
