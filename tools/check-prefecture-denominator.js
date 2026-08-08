@@ -20,6 +20,10 @@ const root = path.resolve(__dirname, '..');
 
 // 「都道府県の総数」として47を書いている箇所を拾う。
 // 47 という数字そのものは日付や座標にも出るので、分母として使われる形に絞る。
+// 47 を定数に逃がしてから分母に使う形（`const T = 47; total = T`）を捕まえる。
+// リテラルが同じ行に無いので行単位の走査では拾えない
+const CONST_47 = /\b(?:const|let|var)\s+([A-Z_][A-Z0-9_]*|[a-z][A-Za-z0-9_]*)\s*(?::\s*number\s*)?=\s*47\s*;/;
+
 const PATTERNS = [
   // total: 47 / total={47} / totalPrefectures = 47 など
   /\btotal(?:Prefecture(?:Count|s)?)?\s*[:=]\s*\{?\s*47\b/i,
@@ -44,15 +48,35 @@ function* walk(dir) {
   }
 }
 
+// 都道府県の分母を作りうる名前。`PREFECTURES.length` のように47件の配列から
+// 数える形はリテラル47が現れないので、名前側で捕まえる
+const PREFECTURE_LENGTH = /\bPREFECTURES\s*\.\s*length\b/;
+
 const problems = [];
 for (const file of walk(path.join(root, 'src'))) {
   const lines = fs.readFileSync(file, 'utf8').split('\n');
+
+  // 47 を保持している定数名を先に集める
+  const constNames = new Set();
+  for (const line of lines) {
+    if (/allow-47/.test(line)) continue;
+    const match = line.match(CONST_47);
+    if (match) constNames.add(match[1]);
+  }
+  const constUse = constNames.size
+    ? new RegExp(`\\btotal(?:Prefecture(?:Count|s)?)?\\s*[:=]\\s*\\{?\\s*(?:${[...constNames].join('|')})\\b`, 'i')
+    : null;
+
   lines.forEach((line, index) => {
     // 「47都道府県のうち42県」のような説明文は落とさない。
     // 意図的に47を使う箇所は `allow-47:` と理由をその行か直前行に書く
     const previous = index > 0 ? lines[index - 1] : '';
     if (/allow-47|42県|42都道府県/.test(line) || /allow-47/.test(previous)) return;
-    if (!PATTERNS.some((pattern) => pattern.test(line))) return;
+    const hit =
+      PATTERNS.some((pattern) => pattern.test(line)) ||
+      PREFECTURE_LENGTH.test(line) ||
+      (constUse !== null && constUse.test(line));
+    if (!hit) return;
     problems.push(`${path.relative(root, file)}:${index + 1} ${line.trim()}`);
   });
 }

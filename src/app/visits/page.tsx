@@ -120,6 +120,8 @@ export default function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
+  // 全国の設置県数。API がスナップショット全件から数えた権威ある値で、limit に依存しない
+  const [apiPrefectureCount, setApiPrefectureCount] = useState<number | null>(null);
   const [segmentTab, setSegmentTab] = useState<SegmentTab>('all');
   const [loading, setLoading] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -177,6 +179,7 @@ export default function VisitsPage() {
           : [];
         setManholes(apiManholes);
         setTotalManholes(typeof data.total === 'number' ? data.total : apiManholes.length || null);
+        setApiPrefectureCount(typeof data.prefecture_count === 'number' ? data.prefecture_count : null);
       }
       if (visitsRes.ok) {
         const data = await visitsRes.json();
@@ -259,6 +262,7 @@ export default function VisitsPage() {
 
         setManholes(apiManholes);
         setTotalManholes(typeof data.total === 'number' ? data.total : apiManholes.length || null);
+        setApiPrefectureCount(typeof data.prefecture_count === 'number' ? data.prefecture_count : null);
       }
     } catch (error) {
       console.error('Failed to load passport:', error);
@@ -531,10 +535,17 @@ export default function VisitsPage() {
    * 都道府県の分母は47ではなく「ポケふたが1枚以上設置されている県の数」（実データで42）。
    * 未設置の5県(群馬・山梨・広島・熊本・大分)を含めると誰も100%に到達できない。
    * 公開スタンプ帳の totalPrefectureCount と同じ数え方に揃えてある。
+   *
+   * ⚠️ 正は API の `prefecture_count`（スナップショット全件から算出）。
+   * `prefectureProgress` からの算出はフォールバックに留めること。あちらは
+   * `/api/manholes?limit=1000` の結果とユーザーの訪問先の和集合なので、
+   * カタログが limit を超えると **ユーザーごとに分母が変わる**（未訪問県は
+   * 分母から消えるのに、その県を訪問済みのユーザーだけ訪問データ経由で戻る）。
    */
   const installedPrefectureCount =
-    prefectureProgress.filter((p) => p.name !== UNKNOWN_PREFECTURE).length
-    || FALLBACK_INSTALLED_PREFECTURE_COUNT;
+    apiPrefectureCount
+    ?? (prefectureProgress.filter((p) => p.name !== UNKNOWN_PREFECTURE).length
+      || FALLBACK_INSTALLED_PREFECTURE_COUNT);
 
   // TODO: handleDeleteClick は定義済みだが visits ページに削除ボタンが未配置。
   // VisitPhotoCard に削除導線を追加する際にここを呼ぶ。

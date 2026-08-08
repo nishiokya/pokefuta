@@ -3,9 +3,26 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { calculateDistance } from '@/lib/location';
 import {
+  ManholeSnapshot,
   fetchManholeSnapshot,
   SnapshotManhole,
 } from '@/lib/manhole-snapshot';
+
+/**
+ * ポケふたが1枚以上設置されている都道府県数。
+ *
+ * **必ずスナップショット全件から数えること。** レスポンスの `manholes` は
+ * `limit` で切ったあとの配列なので、そちらから数えると分母がページサイズに
+ * 依存し、クライアントごとに全国の設置県数が変わってしまう。
+ */
+function countInstalledPrefectures(snapshot: ManholeSnapshot): number {
+  const names = new Set<string>();
+  for (const manhole of snapshot.manholes) {
+    const name = typeof manhole.prefecture === 'string' ? manhole.prefecture.trim() : '';
+    if (name) names.add(name);
+  }
+  return names.size;
+}
 
 /**
  * @swagger
@@ -139,6 +156,7 @@ export async function GET(request: NextRequest) {
         success: true,
         manholes: manholesWithDistance,
         total: snapshot.total,
+        prefecture_count: countInstalledPrefectures(snapshot),
         with_photos: snapshot.with_photos
       });
     }
@@ -155,6 +173,7 @@ export async function GET(request: NextRequest) {
       success: true,
       manholes,
       total: snapshot.total,
+      prefecture_count: countInstalledPrefectures(snapshot),
       with_photos: snapshot.with_photos
     });
 
