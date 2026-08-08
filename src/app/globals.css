@@ -326,6 +326,17 @@
   .pb-nav-safe {
     padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
   }
+
+  /*
+   * ページ本文の最低高さ。
+   *
+   * ヘッダーは layout.tsx の SiteChrome が本文の外側に描くので、本文に
+   * min-h-screen を付けると「ヘッダー + 100vh」になって短いページに
+   * 余分なスクロールが出る。本文にはこちらを使うこと。
+   */
+  .min-h-content {
+    min-height: calc(100svh - var(--chrome-height));
+  }
 }
 
 /* Leaflet map overrides for Pokemon theme */

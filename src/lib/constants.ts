@@ -1,4 +1,12 @@
-export const SITE_NAME = 'ポケふたスタンプ帳';
+/**
+ * サイト名。タブ・OGP・ヘッダーすべてこれを使う。
+ *
+ * 「スタンプ帳」はサイト名ではなく機能名（下タブの項目・図鑑からの導線ラベル）。
+ * サイト名に昇格させると `写真館 > スタンプ帳` の入れ子が壊れ、
+ * data.pokefuta.com（図鑑）とのサイト切替でも「調べる/撮る」の対比が立たないため
+ * 2026-08-08 に「ポケふた写真館」へ統一した。
+ */
+export const SITE_NAME = 'ポケふた写真館';
 export const SITE_URL = 'https://pokefuta.com';
 export const OGP_IMAGE_VERSION = '20260522-ogp-layout';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;

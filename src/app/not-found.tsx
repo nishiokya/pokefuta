@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Home, List, MapPin, Navigation } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import { SITE_NAME } from '@/lib/constants';
 
 export const metadata: Metadata = {
@@ -12,8 +10,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header title={SITE_NAME} />
+    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto flex min-h-[calc(100vh-9rem)] w-full max-w-3xl items-center px-4 py-10">
         <section className="w-full overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
@@ -59,7 +56,6 @@ export default function NotFound() {
         </section>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

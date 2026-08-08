@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Plus, Share2 } from 'lucide-react';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import MapSection from '../MapSection';
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
@@ -130,13 +128,12 @@ export default async function Page({ params }: Props) {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <script
         type="application/ld+json"
         // title 等はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
-      <Header title="デザインマンホール" showDescriptionLink={false} />
 
       <main className="mx-auto max-w-3xl px-4 pb-8 pt-5 sm:pt-8">
         <nav className="text-xs text-[#2A2A2A]/60">
@@ -208,7 +205,6 @@ export default async function Page({ params }: Props) {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

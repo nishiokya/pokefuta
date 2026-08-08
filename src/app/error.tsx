@@ -3,8 +3,6 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { MapPin, Camera, Navigation, History, Home, AlertCircle, RefreshCw } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 
 export default function Error({
   error,
@@ -19,8 +17,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
-      <Header title="エラー" />
+    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#F6EEDC]">
 
       <main className="flex min-h-[calc(100vh-9rem)] items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -112,7 +109,6 @@ export default function Error({
       </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

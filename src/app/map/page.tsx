@@ -5,8 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import { useHeaderTitle } from '@/components/SiteChrome';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
@@ -113,6 +112,8 @@ export default function MapPage() {
   const [showPrefectureList, setShowPrefectureList] = useState(true);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
   const { trackFilterApply } = useAnalytics();
+
+  useHeaderTitle(isLoggedIn ? '訪問マップ' : 'ポケふたマップ');
 
   useEffect(() => {
     // ページタイトル設定
@@ -280,8 +281,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
-      <Header title={isLoggedIn ? '訪問マップ' : 'ポケふたマップ'} />
+    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#F6EEDC]">
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
@@ -432,7 +432,6 @@ export default function MapPage() {
         )}
       </div>
 
-      <BottomNav />
     </div>
   );
 }

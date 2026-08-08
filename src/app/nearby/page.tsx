@@ -14,8 +14,6 @@ import {
   Stamp,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -381,12 +379,9 @@ export default function NearbyPage() {
   const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
-      <div className="lg:hidden">
-        <Header title="ポケふたを探す" />
-      </div>
+    <div className="min-h-content safe-area-inset pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
 
-      <PCShell active="search" className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
+      <PCShell className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
       <main className="relative px-0 lg:px-0">
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="relative max-w-3xl">
@@ -721,7 +716,6 @@ export default function NearbyPage() {
         写真を投稿
       </Link>
 
-      <BottomNav />
     </div>
   );
 }

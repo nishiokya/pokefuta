@@ -16,8 +16,6 @@ import {
   Twitter,
   UserPlus,
 } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
@@ -87,8 +85,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header title="このアプリについて" showDescriptionLink={false} />
+    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-7 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-10">
@@ -241,7 +238,6 @@ export default function AboutPage() {
         </section>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

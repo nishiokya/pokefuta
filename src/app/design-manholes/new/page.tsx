@@ -6,8 +6,6 @@ import { useDropzone } from 'react-dropzone';
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { AlertCircle, Camera, CheckCircle, Share2, Upload } from 'lucide-react';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { isValidCoordinates } from '@/lib/location';
 import { buildXShareUrl, designManholeShareText } from '@/lib/share';
@@ -207,8 +205,7 @@ export default function DesignManholeNewPage() {
     );
 
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-        <Header title="デザインマンホール投稿" showDescriptionLink={false} />
+      <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
@@ -250,14 +247,12 @@ export default function DesignManholeNewPage() {
             </button>
           </div>
         </main>
-        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header title="デザインマンホール投稿" showDescriptionLink={false} />
+    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
         <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
@@ -441,7 +436,6 @@ export default function DesignManholeNewPage() {
         </section>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

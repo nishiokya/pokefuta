@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Camera, MapPin, Sparkles } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import { Camera, MapPin, Sparkles } from 'lucide-react';
+import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import PhotoDeleteButton from '@/components/PhotoDeleteButton';
 import { formatDateJa } from '@/lib/date';
@@ -83,18 +82,9 @@ export default async function SharedPhotoPage({ params }: PageProps) {
   const shareUrl = `${SITE_URL}/p/${photo.id}`;
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header
-        title={SITE_NAME}
-        actions={
-          <Link href={`/manhole/${photo.manhole.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[#4F3828]">
-            <ArrowLeft className="h-4 w-4" />
-            マンホール詳細へ
-          </Link>
-        }
-      />
-
-      <main className="mx-auto max-w-4xl px-4 py-5 sm:py-8">
+    <div className="min-h-content safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <main className="mx-auto max-w-4xl px-4 pb-5 pt-3 sm:pb-8 sm:pt-6">
+        <Breadcrumb href={`/manhole/${photo.manhole.id}`} label="マンホール詳細へ" />
         <article className="overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
           <div className="relative bg-[#E9DEC9]">
             <img
@@ -175,7 +165,6 @@ export default async function SharedPhotoPage({ params }: PageProps) {
         </article>
       </main>
 
-      <BottomNav />
     </div>
   );
 }
