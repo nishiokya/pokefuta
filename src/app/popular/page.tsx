@@ -19,6 +19,7 @@ import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 type FeedVisit = {
   id: string;
@@ -54,7 +55,7 @@ export default function PopularPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = '全国のポケふた写真館 - ポケふた訪問記録';
+    document.title = pageTitle('人気のポケふた写真');
 
     (async () => {
       try {

@@ -9,10 +9,11 @@ import {
   loadPublicUserPrefectureProgress,
 } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
+import { SITE_NAME } from '@/lib/constants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const alt = 'ポケふたスタンプ帳';
+export const alt = SITE_NAME;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -205,7 +206,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
                   fontWeight: 800,
                 }}
               >
-                ポケふたスタンプ帳
+                {SITE_NAME}
               </div>
               <div style={{ fontSize: 64, fontWeight: 900, lineHeight: 1.15 }}>
                 {`${visitsData.displayName}のスタンプ帳`}

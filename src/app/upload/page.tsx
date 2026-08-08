@@ -11,6 +11,7 @@ import { Manhole } from '@/types/database';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -92,7 +93,7 @@ function UploadPageInner() {
 
   useEffect(() => {
     // ページタイトル設定
-    document.title = '写真登録 - ポケふた訪問記録';
+    document.title = pageTitle('写真を投稿');
 
     // ✅ GA: ページビュー追跡
     (async () => {

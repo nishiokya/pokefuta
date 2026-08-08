@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 const journeySteps = [
   {
@@ -72,7 +73,7 @@ export default function AboutPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'このアプリについて - ポケふた訪問記録';
+    document.title = pageTitle('このアプリについて');
     (async () => {
       try {
         const supabase = createBrowserClient();

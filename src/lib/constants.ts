@@ -7,6 +7,15 @@
  * 2026-08-08 に「ポケふた写真館」へ統一した。
  */
 export const SITE_NAME = 'ポケふた写真館';
+
+/**
+ * ブラウザタブのタイトル。サイト名の表記ゆれをここ1箇所に閉じる。
+ *
+ * クライアント側の `document.title` は以前ページごとに直書きされており、
+ * 接尾辞が「ポケふた訪問記録」「ポケふたマップ」の2通りに割れていた。
+ * GA4 は `page_title` に `document.title` を送るので、割れると計測も汚れる。
+ */
+export const pageTitle = (label: string) => `${label} | ${SITE_NAME}`;
 export const SITE_URL = 'https://pokefuta.com';
 export const OGP_IMAGE_VERSION = '20260522-ogp-layout';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;

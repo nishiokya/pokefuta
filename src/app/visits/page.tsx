@@ -27,6 +27,7 @@ import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
+import { pageTitle } from '@/lib/constants';
 
 interface Visit {
   id: string;
@@ -127,7 +128,7 @@ export default function VisitsPage() {
   const { trackView, trackPassportOpen } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'スタンプ帳 - ポケふたマップ';
+    document.title = pageTitle('スタンプ帳');
     trackPassportOpen();
     checkAuth();
   }, []);

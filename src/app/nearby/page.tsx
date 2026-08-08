@@ -17,6 +17,7 @@ import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -56,7 +57,7 @@ export default function NearbyPage() {
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   useEffect(() => {
-    document.title = 'ポケふたを探す - ポケふた訪問記録';
+    document.title = pageTitle('ポケふたを探す');
     trackNearbyOpen();
 
     const tab = new URLSearchParams(window.location.search).get('tab');

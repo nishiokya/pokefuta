@@ -6,6 +6,7 @@ import { Camera, MapPin, Search } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 export default function ManholesPage() {
   const [manholes, setManholes] = useState<Manhole[]>([]);
@@ -16,7 +17,7 @@ export default function ManholesPage() {
   const lastTrackedPrefecture = useRef<string | null>(null);
 
   useEffect(() => {
-    document.title = '全国ポケふた一覧 - ポケふた訪問記録';
+    document.title = pageTitle('全国ポケふた一覧');
 
     (async () => {
       try {

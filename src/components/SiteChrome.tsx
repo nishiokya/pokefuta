@@ -267,7 +267,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         style={{ ...pcIconBtn, fontSize: 15, fontWeight: 900 }}
         title="公式X @pokemonmanhole"
         aria-label="公式X @pokemonmanhole"
-        onClick={() => trackXLinkClick({ location: 'header', source_app: 'tracker', is_logged_in: isLoggedIn })}
+        onClick={() => trackXLinkClick({ surface: 'header', source_app: 'tracker', is_logged_in: isLoggedIn })}
       >
         X
       </a>
@@ -369,18 +369,34 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
 // SP ユーティリティフッター（<1024px）
 // ─────────────────────────────────────────────
 
-/** SP ヘッダーから外した Info・X の受け皿。下タブの上、本文の末尾に置く */
+/**
+ * SP ヘッダーから外した導線の受け皿。下タブの上、本文の末尾に置く。
+ *
+ * 「図鑑」「デザイン蓋」は下タブに入れる枠が無い（4枠は 探す/スタンプ帳/マイ旅＋投稿FAB で
+ * 埋まっている）が、SP から到達できなくなると PC にしかない導線になってしまうので、
+ * Info・X と同じくここで必ず出す。**この2つを消さないこと。**
+ */
+const footerLinkStyle: React.CSSProperties = {
+  color: 'var(--chrome-pc-nav)',
+  minHeight: 'var(--chrome-tap-min)',
+};
+
 function SpUtilityFooter({ user, authLoaded }: ChromeState) {
   const { trackXLinkClick } = useAnalytics();
 
   return (
     <footer className="lg:hidden" style={{ borderTop: '1px solid var(--chrome-sp-border)' }}>
-      <div className="mx-auto flex max-w-md items-center justify-center gap-4 px-4 py-4 text-xs font-bold">
-        <Link
-          href="/about"
-          className="inline-flex items-center gap-1.5 px-2 py-2"
-          style={{ color: 'var(--chrome-pc-nav)' }}
-        >
+      <nav
+        aria-label="サイト内リンク"
+        className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-3 text-xs font-bold"
+      >
+        <a href={DATA_SITE_URL} className="inline-flex items-center px-2" style={footerLinkStyle}>
+          図鑑
+        </a>
+        <Link href="/design-manholes" className="inline-flex items-center px-2" style={footerLinkStyle}>
+          デザイン蓋
+        </Link>
+        <Link href="/about" className="inline-flex items-center gap-1.5 px-2" style={footerLinkStyle}>
           <Info className="h-4 w-4" />
           このアプリについて
         </Link>
@@ -388,14 +404,14 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
           href={X_ACCOUNT_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-2 py-2"
-          style={{ color: 'var(--chrome-pc-nav)' }}
-          onClick={() => trackXLinkClick({ location: 'footer', source_app: 'tracker', is_logged_in: authLoaded && user !== null })}
+          className="inline-flex items-center gap-1.5 px-2"
+          style={footerLinkStyle}
+          onClick={() => trackXLinkClick({ surface: 'footer', source_app: 'tracker', is_logged_in: authLoaded && user !== null })}
         >
           <span className="font-sans text-base font-black">X</span>
           @pokemonmanhole
         </a>
-      </div>
+      </nav>
     </footer>
   );
 }

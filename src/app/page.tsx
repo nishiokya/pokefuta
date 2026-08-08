@@ -19,6 +19,7 @@ import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { SITE_NAME } from '@/lib/constants';
 
 type FeedVisit = {
   id: string;
@@ -52,7 +53,7 @@ export default function HomePage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'ポケふた写真館 - ポケふた訪問記録';
+    document.title = SITE_NAME;
 
     (async () => {
       try {

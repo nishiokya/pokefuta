@@ -7,6 +7,7 @@ import { AlertCircle, Camera, Lock, Mail, MapPin, Search, Sparkles, Stamp } from
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import type { ManholeTitle } from '@/types/database';
+import { pageTitle } from '@/lib/constants';
 
 type RarePreviewManhole = {
   id: number;
@@ -189,7 +190,7 @@ function LoginForm() {
   } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'ログイン / 新規登録 - ポケふた訪問記録';
+    document.title = pageTitle('ログイン / 新規登録');
   }, []);
 
   useEffect(() => {

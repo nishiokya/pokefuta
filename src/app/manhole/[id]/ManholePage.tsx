@@ -21,7 +21,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { calculateDistance } from '@/lib/location';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
-import { SITE_URL } from '@/lib/constants';
+import { SITE_URL, pageTitle } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
@@ -167,9 +167,11 @@ export default function ManholeDetailPage() {
       const municipality = manhole.city || manhole.municipality || '場所未設定';
       const pokemonList = manhole.pokemons?.length > 0 ? manhole.pokemons.join('・') : '';
 
-      document.title = pokemonList
-        ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}｜ポケふたマップ`
-        : `${manhole.prefecture}${municipality}のポケふた｜ポケふたマップ`;
+      document.title = pageTitle(
+        pokemonList
+          ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}`
+          : `${manhole.prefecture}${municipality}のポケふた`
+      );
 
       const descriptionText = pokemonList
         ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。経路案内や写真登録にも対応。`
@@ -752,8 +754,9 @@ export default function ManholeDetailPage() {
     <div className="min-h-content safe-area-inset bg-[#f1e8d4]">
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={promptCard}>
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
-          {/* 検索・マップ・共有リンクなど遷移元が定まらないので履歴を戻る */}
-          <Breadcrumb label="戻る" />
+          {/* 遷移元が定まらないので履歴を戻る。X・OGP からの直接着地では
+              履歴が無いので、その場合は「探す」へ逃がす */}
+          <Breadcrumb label="戻る" fallbackHref="/nearby" />
 
           {/* ── Gallery ── */}
           {photoState === 'none' ? (

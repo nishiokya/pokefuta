@@ -7,6 +7,7 @@ import { Check, ExternalLink, Loader2, LogOut, UserRound } from 'lucide-react';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 // アカウント管理の唯一の場所。ヘッダーの名前クリックからここに来る。
 // プロフィール編集・公開スタンプ帳への導線・ログアウトを集約し、
@@ -32,7 +33,7 @@ export default function ProfilePage() {
   const { trackView, trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'プロフィール - ポケふたマップ';
+    document.title = pageTitle('プロフィール');
     let cancelled = false;
     (async () => {
       try {

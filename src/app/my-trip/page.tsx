@@ -12,6 +12,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
+import { pageTitle } from '@/lib/constants';
 
 // 全国のポケふた総数と、ポケふたが1枚以上設置されている都道府県数。
 // 47県のうち群馬・山梨・広島・熊本・大分には設置がないため分母は42
@@ -54,7 +55,7 @@ export default function MyTripPage() {
   const { trackView, trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'マイ旅 - ポケふたマップ';
+    document.title = pageTitle('マイ旅');
     (async () => {
       try {
         const supabase = createBrowserClient();

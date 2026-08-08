@@ -7,6 +7,7 @@ import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, M
 import { Manhole } from '@/types/database';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -117,7 +118,7 @@ export default function MapPage() {
 
   useEffect(() => {
     // ページタイトル設定
-    document.title = 'マップ - ポケふた訪問記録';
+    document.title = pageTitle('ポケふたマップ');
 
     // Get user location
     if (navigator.geolocation) {
