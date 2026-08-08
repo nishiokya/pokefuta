@@ -46,11 +46,14 @@ function* walk(dir) {
 const problems = [];
 for (const file of walk(path.join(root, 'src'))) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const [, name] of text.matchAll(ENV_CALL)) {
-    if (!VALID.has(name)) {
-      const line = text.slice(0, text.indexOf(`env(${name}`)).split('\n').length;
-      problems.push(`${path.relative(root, file)}:${line} env(${name}) は存在しない safe-area 変数`);
-    }
+  for (const match of text.matchAll(ENV_CALL)) {
+    const name = match[1];
+    if (VALID.has(name)) continue;
+    // 正規表現は env( と名前のあいだの空白を許すので、indexOf で探し直すと
+    // 見つからず(-1)ファイル末尾を報告してしまう。同じ誤記が複数あるときも
+    // 全件が最初の行になる。マッチ位置をそのまま使う
+    const line = text.slice(0, match.index).split('\n').length;
+    problems.push(`${path.relative(root, file)}:${line} env(${name}) は存在しない safe-area 変数`);
   }
 }
 

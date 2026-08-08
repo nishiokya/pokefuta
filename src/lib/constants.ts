@@ -17,7 +17,12 @@ export const SITE_NAME = 'ポケふた写真館';
  */
 export const pageTitle = (label: string) => `${label} | ${SITE_NAME}`;
 export const SITE_URL = 'https://pokefuta.com';
-export const OGP_IMAGE_VERSION = '20260522-ogp-layout';
+/**
+ * OGP 画像のキャッシュキー。**画像の中身を変えたら必ず更新すること。**
+ * URL が変わらないと SNS のクローラが古い画像を配り続ける。
+ * 20260808: 画像に焼いていたサイト名を「ポケふた写真館」に変更したため更新
+ */
+export const OGP_IMAGE_VERSION = '20260808-site-name';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
 /**
