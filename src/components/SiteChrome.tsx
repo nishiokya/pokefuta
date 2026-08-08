@@ -258,7 +258,7 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
           ) : (
             <div className="flex flex-shrink-0 items-center gap-1.5">
               <Link
-                href="/login"
+                href="/login?mode=login"
                 className="flex items-center rounded-lg border px-3 text-xs font-bold"
                 style={{
                   minHeight: 'var(--chrome-tap-min)',
@@ -269,7 +269,7 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
                 ログイン
               </Link>
               <Link
-                href="/login"
+                href="/login?mode=signup"
                 aria-label="新規登録"
                 className="flex items-center justify-center rounded-full text-white shadow-sm"
                 style={{
@@ -429,7 +429,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         ) : (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <Link
-              href="/login"
+              href="/login?mode=login"
               style={{
                 fontSize: 13,
                 fontWeight: 600,
@@ -444,7 +444,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
               ログイン
             </Link>
             <Link
-              href="/login"
+              href="/login?mode=signup"
               aria-label="新規登録"
               className="flex items-center gap-1.5"
               style={{
