@@ -26,6 +26,19 @@ export const OGP_IMAGE_VERSION = '20260808-site-name';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
 /**
+ * 進捗の分母をデータ取得前に出すときだけ使うフォールバック。**正は常に DB / API の実数。**
+ *
+ * ⚠️ 都道府県の分母に 47 を使ってはいけない。ポケふたは47都道府県のうち42県にしか
+ * 設置されておらず（群馬・山梨・広島・熊本・大分が0枚）、47を分母にすると
+ * 誰も100%に到達できない。
+ */
+export const FALLBACK_INSTALLED_PREFECTURE_COUNT = 42;
+export const FALLBACK_TOTAL_MANHOLE_COUNT = 482;
+
+/** prefecture が空のマンホールをまとめる先。分母から除外する対象でもある */
+export const UNKNOWN_PREFECTURE = '都道府県未設定';
+
+/**
  * 訪問写真を配信する署名URLの寿命（秒）。
  * 公開設定は PATCH /api/visits/[id] で後から変更できるため、これがそのまま
  * 「非公開に戻したのにまだ見える」最大時間になる。伸ばすときは注意すること。

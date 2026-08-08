@@ -27,7 +27,12 @@ import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
-import { pageTitle } from '@/lib/constants';
+import {
+  FALLBACK_INSTALLED_PREFECTURE_COUNT,
+  FALLBACK_TOTAL_MANHOLE_COUNT,
+  UNKNOWN_PREFECTURE,
+  pageTitle,
+} from '@/lib/constants';
 
 interface Visit {
   id: string;
@@ -88,8 +93,6 @@ type NearCompleteItem = {
   total: number;
   rate: number;
 };
-
-const TOTAL_MANHOLES = 482;
 
 const KIND_COLOR: Record<NearCompleteItem['kind'], { badge: string; bar: string; bg: string }> = {
   pref:    { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
@@ -288,7 +291,9 @@ export default function VisitsPage() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
-  const completionRate = (visitedManholesCount / TOTAL_MANHOLES) * 100;
+  // 分母は API の実数。ハードコードするとポケふたが追加された日に黙ってズレる
+  const totalManholeCount = totalManholes ?? (manholes.length || FALLBACK_TOTAL_MANHOLE_COUNT);
+  const completionRate = totalManholeCount > 0 ? (visitedManholesCount / totalManholeCount) * 100 : 0;
 
   const visitedMunicipalityCount = useMemo(() => {
     return new Set(
@@ -334,7 +339,7 @@ export default function VisitsPage() {
     const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number>; representativeManholeId: number | null }>();
 
     passportManholes.forEach((manhole) => {
-      const prefecture = manhole.prefecture || '都道府県未設定';
+      const prefecture = manhole.prefecture || UNKNOWN_PREFECTURE;
       const current = progress.get(prefecture) || { totalIds: new Set<number>(), visitedIds: new Set<number>(), representativeManholeId: null };
       current.totalIds.add(manhole.id);
 
@@ -522,6 +527,14 @@ export default function VisitsPage() {
 
   const visitedPrefectureCount = prefectureProgress.filter((p) => p.visited > 0).length;
   const visitedFeaturesCount = hashtagProgress.length;
+  /**
+   * 都道府県の分母は47ではなく「ポケふたが1枚以上設置されている県の数」（実データで42）。
+   * 未設置の5県(群馬・山梨・広島・熊本・大分)を含めると誰も100%に到達できない。
+   * 公開スタンプ帳の totalPrefectureCount と同じ数え方に揃えてある。
+   */
+  const installedPrefectureCount =
+    prefectureProgress.filter((p) => p.name !== UNKNOWN_PREFECTURE).length
+    || FALLBACK_INSTALLED_PREFECTURE_COUNT;
 
   // TODO: handleDeleteClick は定義済みだが visits ページに削除ボタンが未配置。
   // VisitPhotoCard に削除導線を追加する際にここを呼ぶ。
@@ -710,11 +723,11 @@ export default function VisitsPage() {
                 {/* Stats row */}
                 <div className="mt-3 flex flex-wrap gap-4 sm:mt-4">
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#7B63A8]">{totalManholes ?? '482'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#7B63A8]">{totalManholes ?? FALLBACK_TOTAL_MANHOLE_COUNT}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">全国のポケふた</span>
                   </div>
                   <div>
-                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? '42'}</span>
+                    <span className="font-pixel text-2xl font-extrabold text-[#2C765E]">{prefectureCount ?? FALLBACK_INSTALLED_PREFECTURE_COUNT}</span>
                     <span className="ml-1 text-xs font-bold text-[#9B9B9B]">都道府県</span>
                   </div>
                   <div>
@@ -753,13 +766,13 @@ export default function VisitsPage() {
               <div className="rounded-lg bg-[#F5F0FF] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">全国</p>
                 <p className="font-pixel text-xl font-extrabold text-[#7B63A8]">
-                  80<span className="text-[11px] font-bold text-[#C0B8D0]">/{totalManholes ?? '482'}</span>
+                  80<span className="text-[11px] font-bold text-[#C0B8D0]">/{totalManholes ?? FALLBACK_TOTAL_MANHOLE_COUNT}</span>
                 </p>
               </div>
               <div className="rounded-lg bg-[#EDFAF5] px-3 py-3 text-center">
                 <p className="text-[10px] font-bold text-[#9B9B9B]">都道府県</p>
                 <p className="font-pixel text-xl font-extrabold text-[#2C765E]">
-                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? '42'}</span>
+                  10<span className="text-[11px] font-bold text-[#A8D5C4]">/{prefectureCount ?? FALLBACK_INSTALLED_PREFECTURE_COUNT}</span>
                 </p>
               </div>
               <div className="rounded-lg bg-[#FFF8EB] px-3 py-3 text-center">
@@ -826,10 +839,10 @@ export default function VisitsPage() {
       {/* PHOTO DEX — collection dashboard (A案: 二極ヘッダー) */}
       <DexSummaryCard
         got={visitedManholesCount}
-        total={TOTAL_MANHOLES}
+        total={totalManholeCount}
         completionRate={completionRate}
-        remain={TOTAL_MANHOLES - visitedManholesCount}
-        pref={{ cur: visitedPrefectureCount, total: 47 }}
+        remain={Math.max(totalManholeCount - visitedManholesCount, 0)}
+        pref={{ cur: visitedPrefectureCount, total: installedPrefectureCount }}
         poke={{ cur: visitedPokemonSpecies, total: totalPokemonSpecies }}
         feat={{ cur: visitedFeaturesCount, total: totalAllHashtags }}
       />
@@ -882,10 +895,10 @@ export default function VisitsPage() {
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}
           <DexSummaryCard
             got={visitedManholesCount}
-            total={TOTAL_MANHOLES}
+            total={totalManholeCount}
             completionRate={completionRate}
-            remain={TOTAL_MANHOLES - visitedManholesCount}
-            pref={{ cur: visitedPrefectureCount, total: 47 }}
+            remain={Math.max(totalManholeCount - visitedManholesCount, 0)}
+            pref={{ cur: visitedPrefectureCount, total: installedPrefectureCount }}
             poke={{ cur: visitedPokemonSpecies, total: totalPokemonSpecies }}
             feat={{ cur: visitedFeaturesCount, total: totalAllHashtags }}
             className="lg:hidden"
@@ -1296,7 +1309,7 @@ function PrefectureProgressCard({ prefecture }: { prefecture: PrefectureProgress
           <div className="min-w-0">
             <h2 className="font-pixelJp text-base font-bold text-[#4F3828]">{prefecture.name}</h2>
             <p className="mt-1 font-pixelJp text-xs text-[#6A4D36]">
-              {complete ? '制覇済み' : `あと${prefecture.remaining}件`}
+              {complete ? '制覇済み' : `あと${prefecture.remaining}枚`}
             </p>
           </div>
           <div className={`flex-shrink-0 rounded-md px-3 py-2 text-center ${complete ? 'bg-[#DFF1E9]' : 'bg-[#F8D9C4]'}`}>
@@ -1339,7 +1352,7 @@ function PokemonProgressCard({ pokemon }: { pokemon: PokemonProgress }) {
           <div className="min-w-0">
             <h2 className="font-pixelJp text-base font-bold text-[#4F3828]">{pokemon.pokemonName}</h2>
             <p className="mt-1 font-pixelJp text-xs text-[#6A4D36]">
-              {complete ? '制覇済み' : `あと${pokemon.remaining}件`}
+              {complete ? '制覇済み' : `あと${pokemon.remaining}枚`}
             </p>
           </div>
           <div className={`flex-shrink-0 rounded-md px-3 py-2 text-center ${complete ? 'bg-[#DFF1E9]' : 'bg-[#F8D9C4]'}`}>

@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { UNKNOWN_PREFECTURE } from '@/lib/constants';
 import type { Database } from '@/types/database';
 
 export type PublicPrefectureProgress = {
@@ -90,12 +91,8 @@ export type AppUserProgressRow = {
 };
 
 export const FALLBACK_DISPLAY_NAME = 'トレーナー';
-/**
- * 進捗の取得に失敗したときだけ使う表示用フォールバック。
- * ポケふたは47都道府県のうち42県にしか設置されていない(群馬・山梨・広島・熊本・大分が0枚)
- */
-export const FALLBACK_INSTALLED_PREFECTURE_COUNT = 42;
-const UNKNOWN_PREFECTURE = '都道府県未設定';
+// クライアントコンポーネント(/visits)からも参照するため server-only のこのファイルには置けない
+export { FALLBACK_INSTALLED_PREFECTURE_COUNT } from '@/lib/constants';
 /**
  * カタログ初回投入とみなす時間幅。最古の created_at からこの範囲内に作られた行は
  * 「元から設置されていた」扱いにする。実データの次バッチは26日後なので誤って

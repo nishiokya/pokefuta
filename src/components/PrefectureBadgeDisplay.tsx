@@ -140,10 +140,11 @@ interface GlobalBadgeDisplayProps {
 }
 
 /**
- * グローバルバッジ（全47都道府県制覇）表示
+ * グローバルバッジ（全国制覇）表示。
+ * 分母はポケふたが設置されている都道府県のみ（実データで42県）で、47ではない。
  */
 export function GlobalBadgeDisplay({ className = '' }: GlobalBadgeDisplayProps) {
-  const { isComplete, activeCount, status, loading, error, completedAt } =
+  const { isComplete, activeCount, totalPrefectures, remainingCount, status, loading, error, completedAt } =
     useGlobalBadge();
 
   if (loading) {
@@ -171,7 +172,7 @@ export function GlobalBadgeDisplay({ className = '' }: GlobalBadgeDisplayProps) 
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <p className="font-pixelJp text-sm font-bold text-rpg-textDark">
-            都道府県：{activeCount}/47
+            都道府県：{activeCount}/{totalPrefectures}
           </p>
           {isComplete && (
             <Trophy className="w-6 h-6 text-rpg-yellow animate-pulse" />
@@ -183,7 +184,9 @@ export function GlobalBadgeDisplay({ className = '' }: GlobalBadgeDisplayProps) 
             className={`h-full transition-all ${
               isComplete ? 'bg-rpg-yellow' : 'bg-rpg-cyan'
             }`}
-            style={{ width: `${(activeCount / 47) * 100}%` }}
+            style={{
+              width: `${totalPrefectures > 0 ? Math.min((activeCount / totalPrefectures) * 100, 100) : 0}%`,
+            }}
           />
         </div>
       </div>
@@ -214,7 +217,7 @@ export function GlobalBadgeDisplay({ className = '' }: GlobalBadgeDisplayProps) 
         {status === 'in-progress' && (
           <div className="p-2 bg-rpg-cyan/20 border-2 border-rpg-cyan">
             <p className="font-pixelJp text-xs font-bold text-rpg-textDark">
-              {47 - activeCount}都道府県をあと訪問...
+              {remainingCount}都道府県をあと訪問...
             </p>
           </div>
         )}

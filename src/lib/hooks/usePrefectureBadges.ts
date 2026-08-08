@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FALLBACK_INSTALLED_PREFECTURE_COUNT } from '@/lib/constants';
 import { useCallback } from 'react';
 
 export interface PrefectureBadge {
@@ -114,14 +115,18 @@ export interface UseGlobalBadgeReturn {
 }
 
 /**
- * Hook: Get global badge status (all 47 prefectures)
+ * Hook: Get global badge status (ポケふたが設置されている全都道府県)
+ *
+ * 分母は47ではなく API が返す totalPrefectures（設置県のみ・実データで42）。
+ * 以前はここで 47 を直書きし、API の値を捨てていた。
  */
 export function useGlobalBadge(): UseGlobalBadgeReturn {
   const [isComplete, setIsComplete] = useState(false);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [outdatedAt, setOutdatedAt] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(0);
-  const [remainingCount, setRemainingCount] = useState(47);
+  const [totalPrefectures, setTotalPrefectures] = useState(FALLBACK_INSTALLED_PREFECTURE_COUNT);
+  const [remainingCount, setRemainingCount] = useState(FALLBACK_INSTALLED_PREFECTURE_COUNT);
   const [remainingPrefectures, setRemainingPrefectures] = useState<string[]>([]);
   const [status, setStatus] = useState<'complete' | 'outdated' | 'in-progress'>(
     'in-progress'
@@ -145,6 +150,7 @@ export function useGlobalBadge(): UseGlobalBadgeReturn {
       setCompletedAt(data.completedAt);
       setOutdatedAt(data.outdatedAt);
       setActiveCount(data.activeCount);
+      setTotalPrefectures(data.totalPrefectures);
       setRemainingCount(data.remainingCount);
       setRemainingPrefectures(data.remainingPrefectures);
       setStatus(data.status);
@@ -167,7 +173,7 @@ export function useGlobalBadge(): UseGlobalBadgeReturn {
     completedAt,
     outdatedAt,
     activeCount,
-    totalPrefectures: 47,
+    totalPrefectures,
     remainingCount,
     remainingPrefectures,
     status,

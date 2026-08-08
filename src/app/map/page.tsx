@@ -332,6 +332,7 @@ export default function MapPage() {
                       <div className="sticky top-0 bg-white/70 border-b border-[#7B63A8]/15 px-1.5 py-1">
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <h3 className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
+                            {/* allow-47: ここは進捗の分母ではなく「47都道府県のうち何県にポケふたがあるか」を示す事実表示 */}
                             都道府県 ({prefectureCounts.filter(p => p.count > 0).length}/47)
                           </h3>
                           <button

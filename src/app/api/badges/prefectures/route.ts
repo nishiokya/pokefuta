@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
+import { loadInstalledPrefectureNames } from '@/lib/installed-prefectures';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -119,21 +120,26 @@ export async function GET(request: NextRequest) {
       snapshotCompletion: row.completion_percentage,
     }));
 
+    // 分母はポケふたが設置されている県のみ（実データで42）。
+    // 47を分母にすると activeCount が到達できず全国制覇が永久に成立しない
+    const totalPrefectures = (await loadInstalledPrefectureNames(supabase)).size;
+
     const globalBadge = {
       completedAt: userData?.all_prefectures_completed_at || null,
       outdatedAt: userData?.all_prefectures_outdated_at || null,
       totalActiveCount: activeCount,
-      isComplete: activeCount === 47,
+      isComplete: totalPrefectures > 0 && activeCount >= totalPrefectures,
     };
 
     return NextResponse.json({
       badges,
       globalBadge,
+      totalPrefectures,
       summary: {
         total: badges.length,
         active: activeCount,
         outdated: badges.filter((b) => b.status === 'outdated').length,
-        unearned: 47 - badges.length,
+        unearned: Math.max(totalPrefectures - badges.length, 0),
       },
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
+import { loadInstalledPrefectureNames } from '@/lib/installed-prefectures';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -66,10 +67,11 @@ export async function GET(request: NextRequest) {
     );
 
     // Get list of remaining prefectures
-    const { data: allPrefectures, error: prefError } = await supabase
-      .from('prefecture')
-      .select('id, name')
-      .order('display_order', { ascending: true });
+    const [{ data: allPrefectures, error: prefError }, installedPrefectureNames] =
+      await Promise.all([
+        supabase.from('prefecture').select('id, name').order('display_order', { ascending: true }),
+        loadInstalledPrefectureNames(supabase),
+      ]);
 
     if (prefError) {
       console.error('Error fetching prefectures:', prefError);
@@ -79,12 +81,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const remainingPrefectures = (allPrefectures || [])
+    // 分母は `prefecture` の47行ではなく設置県のみ。47だと制覇が永久に成立しない
+    const installedPrefectures = (allPrefectures || []).filter((p) =>
+      installedPrefectureNames.has(p.name)
+    );
+    const totalPrefectures = installedPrefectures.length;
+
+    const remainingPrefectures = installedPrefectures
       .filter((p) => !completedPrefectureIds.has(p.id))
       .map((p) => p.name);
 
     const isComplete =
-      activeCount === 47 && userData?.all_prefectures_completed_at !== null;
+      totalPrefectures > 0 &&
+      activeCount >= totalPrefectures &&
+      userData?.all_prefectures_completed_at !== null;
 
     return NextResponse.json({
       isComplete,
@@ -92,8 +102,8 @@ export async function GET(request: NextRequest) {
       outdatedAt: userData?.all_prefectures_outdated_at || null,
       activeCount,
       totalBadges: badges?.length || 0,
-      totalPrefectures: 47,
-      remainingCount: 47 - activeCount,
+      totalPrefectures,
+      remainingCount: Math.max(totalPrefectures - activeCount, 0),
       remainingPrefectures,
       status: isComplete ? 'complete' : userData?.all_prefectures_outdated_at ? 'outdated' : 'in-progress',
     });
