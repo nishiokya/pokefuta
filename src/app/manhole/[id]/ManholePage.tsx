@@ -14,14 +14,14 @@ import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ShareButtons from '@/components/ShareButtons';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import Breadcrumb from '@/components/Breadcrumb';
+import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { calculateDistance } from '@/lib/location';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
-import { SITE_URL } from '@/lib/constants';
+import { SITE_URL, pageTitle } from '@/lib/constants';
 import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
@@ -167,9 +167,11 @@ export default function ManholeDetailPage() {
       const municipality = manhole.city || manhole.municipality || '場所未設定';
       const pokemonList = manhole.pokemons?.length > 0 ? manhole.pokemons.join('・') : '';
 
-      document.title = pokemonList
-        ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}｜ポケふたマップ`
-        : `${manhole.prefecture}${municipality}のポケふた｜ポケふたマップ`;
+      document.title = pageTitle(
+        pokemonList
+          ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}`
+          : `${manhole.prefecture}${municipality}のポケふた`
+      );
 
       const descriptionText = pokemonList
         ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。経路案内や写真登録にも対応。`
@@ -480,9 +482,12 @@ export default function ManholeDetailPage() {
     return { nearby, samePokemon, samePref };
   }, [manhole, allManholes]);
 
+  // 早期 return より前に呼ぶ（フックの呼び出し順を固定するため）
+  useHeaderTitle(manhole ? `${manhole.city || manhole.municipality || '場所未設定'}のポケふた` : undefined);
+
   if (loading) {
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] flex items-center justify-center">
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] flex items-center justify-center">
         <div className="font-pixelJp text-[#7B63A8]">
           読み込み中<span className="rpg-loading" />
         </div>
@@ -492,7 +497,7 @@ export default function ManholeDetailPage() {
 
   if (error || !manhole) {
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F6EEDC]">
+      <div className="min-h-content safe-area-body bg-[#F6EEDC]">
         <div className="bg-[#F6EEDC] border-b border-[#7B63A8]/20 p-4">
           <button onClick={() => router.back()} className="rpg-button p-2">
             <ArrowLeft className="w-5 h-5" />
@@ -746,25 +751,10 @@ export default function ManholeDetailPage() {
   const promptCard = <div className="hidden lg:block">{promptCardContent}</div>;
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#f1e8d4]">
-      {/* Mobile header */}
-      <div className="lg:hidden">
-        <Header
-          title={`${municipality}のポケふた`}
-          actions={
-            <button
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#2A2A2A] transition hover:bg-[#7B63A8]/10"
-              aria-label="戻る"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          }
-        />
-      </div>
-
-      <PCShell active="search" className="pb-32 pt-4 lg:pt-6" rail={promptCard}>
+    <div className="min-h-content safe-area-body bg-[#f1e8d4]">
+      <PCShell className="pb-32 pt-3 lg:pt-6" rail={promptCard}>
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
+          <Breadcrumb href="/nearby" label="ポケふたを探す" />
 
           {/* ── Gallery ── */}
           {photoState === 'none' ? (
@@ -1245,7 +1235,6 @@ export default function ManholeDetailPage() {
         </div>
       </PCShell>
 
-      <BottomNav />
 
       {selectedPhotoId && (
         <DeletePhotoModal

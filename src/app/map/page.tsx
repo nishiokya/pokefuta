@@ -5,9 +5,9 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import { useHeaderTitle } from '@/components/SiteChrome';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -114,9 +114,11 @@ export default function MapPage() {
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
   const { trackFilterApply } = useAnalytics();
 
+  useHeaderTitle(isLoggedIn ? '訪問マップ' : 'ポケふたマップ');
+
   useEffect(() => {
     // ページタイトル設定
-    document.title = 'マップ - ポケふた訪問記録';
+    document.title = pageTitle('ポケふたマップ');
 
     // Get user location
     if (navigator.geolocation) {
@@ -280,8 +282,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
-      <Header title={isLoggedIn ? '訪問マップ' : 'ポケふたマップ'} />
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC]">
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {loading ? (
@@ -432,7 +433,6 @@ export default function MapPage() {
         )}
       </div>
 
-      <BottomNav />
     </div>
   );
 }

@@ -4,11 +4,10 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, ExternalLink, Loader2, LogOut, UserRound } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 // アカウント管理の唯一の場所。ヘッダーの名前クリックからここに来る。
 // プロフィール編集・公開スタンプ帳への導線・ログアウトを集約し、
@@ -34,7 +33,7 @@ export default function ProfilePage() {
   const { trackView, trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'プロフィール - ポケふたマップ';
+    document.title = pageTitle('プロフィール');
     let cancelled = false;
     (async () => {
       try {
@@ -131,17 +130,14 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#efe6cf]">
+      <div className="flex min-h-content items-center justify-center bg-[#efe6cf]">
         <div className="font-pixelJp text-[#6A4D36]">読み込み中<span className="rpg-loading" /></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#efe6cf]">
-      <div className="lg:hidden">
-        <Header title="プロフィール" />
-      </div>
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
       <PCShell className="pb-32 pt-4 lg:pt-6">
         <div className="mx-auto max-w-2xl space-y-4">
@@ -252,7 +248,6 @@ export default function ProfilePage() {
         </div>
       </PCShell>
 
-      <BottomNav />
     </div>
   );
 }

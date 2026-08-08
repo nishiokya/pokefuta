@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useHeaderTitle } from '@/components/SiteChrome';
 import Link from 'next/link';
 import { MapPin, Camera, Navigation, History, Home, AlertCircle, RefreshCw } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 
 export default function Error({
   error,
@@ -13,14 +12,17 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // クロムはエラーバウンダリの外側にあるので、そのままだと遷移前の
+  // ページタイトル（/nearby なら「ポケふたを探す」）が残る
+  useHeaderTitle('エラー');
+
   useEffect(() => {
     // Log the error to an error reporting service
     console.error('Error occurred:', error);
   }, [error]);
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC]">
-      <Header title="エラー" />
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC]">
 
       <main className="flex min-h-[calc(100vh-9rem)] items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -112,7 +114,6 @@ export default function Error({
       </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

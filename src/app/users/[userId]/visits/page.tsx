@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
-  ArrowLeft,
   ArrowRight,
   Camera,
   Instagram,
@@ -12,8 +11,7 @@ import {
   Sparkles,
   Stamp,
 } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
@@ -141,23 +139,14 @@ export default async function UserVisitsPage({ params }: PageProps) {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <script
         type="application/ld+json"
         // displayName はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
-      <Header
-        title={SITE_NAME}
-        actions={
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-[#4F3828]">
-            <ArrowLeft className="h-4 w-4" />
-            ホームへ
-          </Link>
-        }
-      />
-
-      <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-5xl px-4 pb-8 pt-3 sm:pt-6">
+        <Breadcrumb href="/" label="ホームへ" />
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-8">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
@@ -313,7 +302,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
         </section>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

@@ -8,11 +8,10 @@ import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X } from 'lucide-reac
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -94,7 +93,7 @@ function UploadPageInner() {
 
   useEffect(() => {
     // ページタイトル設定
-    document.title = '写真登録 - ポケふた訪問記録';
+    document.title = pageTitle('写真を投稿');
 
     // ✅ GA: ページビュー追跡
     (async () => {
@@ -589,8 +588,7 @@ function UploadPageInner() {
 
   if (allUploaded) {
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-        <Header title="写真を投稿" />
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
@@ -613,13 +611,12 @@ function UploadPageInner() {
             </button>
           </div>
         </main>
-        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       {/* ✅ アラートバナー */}
       {alerts.length > 0 && (
         <div className="fixed left-0 right-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] space-y-2 px-4 pb-4">
@@ -655,7 +652,6 @@ function UploadPageInner() {
         </div>
       )}
 
-      <Header title="写真を投稿" />
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
         <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
@@ -927,7 +923,6 @@ function UploadPageInner() {
         </section>
       </main>
 
-      <BottomNav />
     </div>
   );
 }
@@ -936,7 +931,7 @@ export default function UploadPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#F6EEDC] flex items-center justify-center">
+        <div className="min-h-content bg-[#F6EEDC] flex items-center justify-center">
           <span className="text-sm text-[#7B63A8]">読み込み中...</span>
         </div>
       }

@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
+import { SITE_NAME } from '@/lib/constants';
 
 export const runtime = 'edge';
-export const alt = 'ポケふたスタンプ帳';
+export const alt = SITE_NAME;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -105,7 +106,7 @@ export default async function Image() {
               textAlign: 'center',
             }}
           >
-            ポケふたスタンプ帳
+            {SITE_NAME}
           </div>
 
           {/* サブテキスト */}

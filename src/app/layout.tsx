@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import './site-chrome-tokens.css';
 import './globals.css';
 import DevDebugPanel from '@/components/DevDebugPanel';
 import ApiErrorAnalytics from '@/components/ApiErrorAnalytics';
+import SiteChrome from '@/components/SiteChrome';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 
 import { SITE_NAME, SITE_URL, OGP_IMAGE_URL } from '@/lib/constants';
@@ -77,7 +79,8 @@ export default function RootLayout({
         {gaId && <GoogleAnalytics measurementId={gaId} />}
         <div id="app" className="min-h-screen bg-[#F6EEDC]">
           <ApiErrorAnalytics />
-          {children}
+          {/* ヘッダー・下タブはここが唯一の描画箇所。ページ側には書かない */}
+          <SiteChrome>{children}</SiteChrome>
           <DevDebugPanel />
         </div>
       </body>

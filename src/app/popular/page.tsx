@@ -15,12 +15,11 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pageTitle } from '@/lib/constants';
 
 type FeedVisit = {
   id: string;
@@ -56,7 +55,7 @@ export default function PopularPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = '全国のポケふた写真館 - ポケふた訪問記録';
+    document.title = pageTitle('人気のポケふた写真');
 
     (async () => {
       try {
@@ -179,10 +178,7 @@ export default function PopularPage() {
   ) : undefined;
 
   return (
-    <div className="min-h-screen safe-area-inset pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
-      <div className="lg:hidden">
-        <Header title="ポケふた写真館" />
-      </div>
+    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
 
       <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
       <main>
@@ -454,7 +450,6 @@ export default function PopularPage() {
       </main>
       </PCShell>
 
-      <BottomNav />
     </div>
   );
 }

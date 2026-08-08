@@ -2,8 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Award, Camera, Lock, MapPin } from 'lucide-react';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
+import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJaJst } from '@/lib/date';
@@ -110,21 +109,9 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
   const remainingManholes = prefecture.manholes.filter((manhole) => !manhole.visited);
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header
-        title={SITE_NAME}
-        actions={
-          <Link
-            href={stampBookUrl}
-            className="inline-flex items-center gap-2 text-sm font-bold text-[#4F3828]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            スタンプ帳へ
-          </Link>
-        }
-      />
-
-      <main className="mx-auto max-w-3xl px-4 pb-8 pt-5 sm:pt-8">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <main className="mx-auto max-w-3xl px-4 pb-8 pt-3 sm:pt-6">
+        <Breadcrumb href={stampBookUrl} label="スタンプ帳へ" />
         <BadgeHero prefecture={prefecture} displayName={progress.displayName} />
 
         <div className="mt-6">
@@ -177,7 +164,6 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 }

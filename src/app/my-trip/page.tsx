@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
@@ -14,6 +12,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
+import { pageTitle } from '@/lib/constants';
 
 // 全国のポケふた総数と、ポケふたが1枚以上設置されている都道府県数。
 // 47県のうち群馬・山梨・広島・熊本・大分には設置がないため分母は42
@@ -56,7 +55,7 @@ export default function MyTripPage() {
   const { trackView, trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'マイ旅 - ポケふたマップ';
+    document.title = pageTitle('マイ旅');
     (async () => {
       try {
         const supabase = createBrowserClient();
@@ -185,7 +184,7 @@ export default function MyTripPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#efe6cf]">
+      <div className="flex min-h-content items-center justify-center bg-[#efe6cf]">
         <div className="font-pixelJp text-[#6A4D36]">読み込み中<span className="rpg-loading" /></div>
       </div>
     );
@@ -231,12 +230,9 @@ export default function MyTripPage() {
   );
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#efe6cf]">
-      <div className="lg:hidden">
-        <Header title="マイ旅" />
-      </div>
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
-      <PCShell active="mytrip" rail={myTripRail} className="pb-32 pt-4 lg:pt-6">
+      <PCShell rail={myTripRail} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-6 max-w-2xl lg:max-w-none">
 
           {/* トレーナー情報（スタンプ帳と同じUX） */}
@@ -375,7 +371,6 @@ export default function MyTripPage() {
         </div>
       </PCShell>
 
-      <BottomNav />
 
       <VisitVisibilityModal
         isOpen={unpublishModalVisitId !== null}

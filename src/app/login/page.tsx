@@ -7,6 +7,7 @@ import { AlertCircle, Camera, Lock, Mail, MapPin, Search, Sparkles, Stamp } from
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import type { ManholeTitle } from '@/types/database';
+import { pageTitle } from '@/lib/constants';
 
 type RarePreviewManhole = {
   id: number;
@@ -167,8 +168,16 @@ function LoginForm() {
   const conversion = searchParams.get('conversion');
   const authError = searchParams.get('auth_error');
 
+  // 明示指定が最優先。ヘッダーの[ログイン]/[新規登録]はどちらも /login へ来るので、
+  // これが無いと「ラベルと開くタブが食い違う」（写真館では両方が新規登録タブ、
+  // 図鑑からは from=data のせいで両方がログインタブになっていた）
+  const modeParam = searchParams.get('mode');
   const [mode, setMode] = useState<'signup' | 'login'>(
-    hasRedirect || fromDataSite ? 'login' : 'signup',
+    modeParam === 'signup' || modeParam === 'login'
+      ? modeParam
+      : hasRedirect || fromDataSite
+        ? 'login'
+        : 'signup',
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -189,7 +198,7 @@ function LoginForm() {
   } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'ログイン / 新規登録 - ポケふた訪問記録';
+    document.title = pageTitle('ログイン / 新規登録');
   }, []);
 
   useEffect(() => {

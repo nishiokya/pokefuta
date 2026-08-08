@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
 import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
 import { loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
+import { SITE_NAME } from '@/lib/constants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -208,7 +209,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
               zIndex: 1,
             }}
           >
-            ポケふたスタンプ帳
+            {SITE_NAME}
           </div>
         </div>
       ),

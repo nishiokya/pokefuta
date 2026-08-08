@@ -1,0 +1,39 @@
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+
+/**
+ * 本文先頭の戻る導線。
+ *
+ * ヘッダー（SiteChrome）は全ページ共通の固定内容なので戻るボタンを持たない。
+ * `/p/[photoId]` や `/manhole/[id]` は OGP 経由の共有リンクで深い階層に直接
+ * 着地する入口なので、ここが唯一の文脈復帰導線になる。
+ * **必ずファーストビュー内（本文の最上部）に置くこと。**
+ *
+ * ## router.back() を使わない理由
+ *
+ * 「履歴があれば戻り、無ければリンク」を試したが、ブラウザAPIでは正確に判定できない:
+ *
+ * - `document.referrer` は **SPA 遷移では空のまま**。アプリ内遷移を直接着地と誤判定する
+ * - アプリ内の遷移回数を数える方式は「直接着地 → 別ページ → ブラウザBackで戻る」で
+ *   後ろにアプリ内履歴が無いのに true のままになる
+ * - 履歴の深さを push/pop で追う方式も、**進むボタン**が popstate を発火させるため
+ *   深度がずれる（Navigation API の currentEntry.index は Safari / Firefox に無い）
+ *
+ * 誤判定すると「押しても何も起きない」「外部サイトへ出てしまう」という最悪の結果になる。
+ * 行き先を固定してラベルにもそう書くほうが、予測可能で壊れようがない。
+ * ブラウザの戻るボタンは当然そのまま使える。
+ */
+export default function Breadcrumb({ href, label }: { href: string; label: string }) {
+  return (
+    <nav aria-label="パンくず" className="mb-1">
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1.5 py-2 text-sm font-bold text-[#4F3828] transition hover:opacity-70"
+        style={{ minHeight: 'var(--chrome-tap-min)' }}
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {label}
+      </Link>
+    </nav>
+  );
+}

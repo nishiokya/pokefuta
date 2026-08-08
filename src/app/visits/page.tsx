@@ -20,8 +20,6 @@ import {
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
-import BottomNav from '@/components/BottomNav';
-import Header from '@/components/Header';
 import PCShell from '@/components/PCShell';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
@@ -29,6 +27,7 @@ import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
+import { pageTitle } from '@/lib/constants';
 
 interface Visit {
   id: string;
@@ -129,7 +128,7 @@ export default function VisitsPage() {
   const { trackView, trackPassportOpen } = useAnalytics();
 
   useEffect(() => {
-    document.title = 'スタンプ帳 - ポケふたマップ';
+    document.title = pageTitle('スタンプ帳');
     trackPassportOpen();
     checkAuth();
   }, []);
@@ -652,7 +651,7 @@ export default function VisitsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F3E7CC] flex items-center justify-center">
+      <div className="min-h-content safe-area-body bg-[#F3E7CC] flex items-center justify-center">
         <div className="text-center">
           <div className="font-pixelJp text-[#6A4D36]">
             パスポート準備中<span className="rpg-loading"></span>
@@ -690,12 +689,9 @@ export default function VisitsPage() {
     );
 
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F3E7CC] pb-nav-safe">
-        <div className="lg:hidden">
-          <Header title="スタンプ帳" />
-        </div>
+      <div className="min-h-content safe-area-body bg-[#F3E7CC] pb-nav-safe">
 
-        <PCShell active="stamp" rail={unAuthRail} className="pb-32 pt-5 lg:pt-6">
+        <PCShell rail={unAuthRail} className="pb-32 pt-5 lg:pt-6">
         <main className="space-y-4">
           {/* Hero */}
           <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-3 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-7">
@@ -821,7 +817,6 @@ export default function VisitsPage() {
         </main>
         </PCShell>
 
-        <BottomNav />
       </div>
     );
   }
@@ -876,12 +871,9 @@ export default function VisitsPage() {
   );
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#efe6cf]">
-      <div className="lg:hidden">
-        <Header title="スタンプ帳" />
-      </div>
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
-      <PCShell active="stamp" rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
+      <PCShell rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
           {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
@@ -1238,7 +1230,6 @@ export default function VisitsPage() {
         </div>
       </div>
 
-      <BottomNav />
 
       {selectedPhotoId && (
         <DeletePhotoModal

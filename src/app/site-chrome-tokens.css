@@ -1,0 +1,52 @@
+/*
+ * サイト共通クロム（ヘッダー／下タブ）のデザイントークン。
+ *
+ * ⚠️ このファイルが色・寸法の唯一の正。
+ * data.pokefuta.com 側（pokefuta-tracker の apps/web/assets/site-header.css）は
+ * ここからコピーした値を使う。片方だけ px / hex を直書きすると両サイトが黙ってズレる
+ * ので、クロムの見た目を変えるときは必ずこのファイルを起点にすること。
+ *
+ * 経緯: 以前は「pokefuta の実測px を site-header.css に書き写す」運用で、
+ * 写真館側を変更するたびに図鑑側が取り残されていた。
+ */
+:root {
+  /* PC/SP の境目。CSS からは値として参照できないので、
+     Tailwind の lg (1024px) と必ず一致させること。 */
+  --chrome-breakpoint-pc: 1024px;
+
+  /* バーの実高。SP ヘッダー・PC ナビ・下タブ回避量がすべてこれを基準にする */
+  --chrome-height: 56px;
+  /* タップ領域の下限（WCAG 2.5.8 相当）。これ以下のヒット領域を作らない */
+  --chrome-tap-min: 44px;
+
+  /* SP: クリームの sticky バー */
+  --chrome-sp-bg: rgba(255, 248, 235, 0.95);
+  --chrome-sp-border: rgba(123, 99, 168, 0.2);
+
+  /* PC: ベージュの非 sticky バー */
+  --chrome-pc-bg: #f4ecda;
+  --chrome-pc-border: #e9dfc7;
+  --chrome-pc-nav: #6f6657;
+  --chrome-pc-nav-active: #2c2a26;
+  --chrome-pc-nav-active-bg: #e9dfc7;
+
+  --chrome-ink: #2a2a2a;
+  --chrome-ink-pc: #38414f;
+
+  --chrome-accent: #7b63a8;
+  --chrome-accent-hover: #6a5299;
+  --chrome-accent-soft: rgba(123, 99, 168, 0.1);
+  --chrome-accent-border: #d7d0ef;
+
+  /* 投稿ボタン（唯一の主要CTA） */
+  --chrome-cta: #bf5640;
+  --chrome-cta-shadow: #a8462f;
+
+  --chrome-ball-red: #e85046;
+
+  --chrome-radius-nav: 9px;
+  --chrome-radius-pill: 999px;
+
+  --chrome-z-header: 50;
+  --chrome-z-bottomnav: 40;
+}

@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import { formatDateJaJst } from '@/lib/date';
@@ -103,13 +101,12 @@ export default async function DesignManholesPage() {
   };
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <script
         type="application/ld+json"
         // title はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
-      <Header title="デザインマンホール" showDescriptionLink={false} />
 
       <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -184,7 +181,6 @@ export default async function DesignManholesPage() {
         <WantedSection />
       </main>
 
-      <BottomNav />
     </div>
   );
 }
