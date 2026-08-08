@@ -10,7 +10,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit && node tools/check-public-display-name-source.js && node tools/check-ga4-contract.js",
     "verify:analytics": "node tools/check-ga4-contract.js",
-    "test:design-manhole": "node --experimental-strip-types --test tests/design-manhole-proximity.test.ts",
+    "test:design-manhole": "tsx --test tests/design-manhole-*.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "capture": "node tools/capture/capture.js"
   },
@@ -52,7 +52,8 @@
     "eslint-config-next": "^14.0.0",
     "playwright": "^1.60.0",
     "puppeteer": "^24.15.0",
-    "supabase": "^2.109.1"
+    "supabase": "^2.109.1",
+    "tsx": "^4.23.11"
   },
   "engines": {
     "node": ">=18.0.0"

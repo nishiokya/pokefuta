@@ -42,7 +42,7 @@
 - `POST /api/design-manholes` でも、ストレージへのアップロード前に公式ポケふたとの距離を検証する。
 - 公式候補が近い場合は `409 OFFICIAL_MANHOLE_NEARBY` と候補情報、訪問投稿URLを返す。
 - UIを迂回した直接リクエストでも自動公開できないことを保証する。
-- 近接する別デザインの蓋も存在するため、50m以内を一律削除・拒否しない。明示確認された投稿は将来的にレビュー待ち状態へ送る。
+- 近接する別デザインの蓋も存在するため、50m以内を一律削除・拒否しない。明示確認された投稿はレビュー待ち状態へ送る。
 
 ### DB・権限
 
@@ -66,11 +66,79 @@
 - APIはストレージアップロード前に公式データを再照合する。未確認または候補IDと異なる確認は `409 OFFICIAL_MANHOLE_NEARBY` にする。
 - 公式データを取得できない場合は `503 OFFICIAL_MANHOLE_CHECK_UNAVAILABLE` とし、照合できない状態では投稿を受け付けない。
 - APIの成功レスポンスは `official_manhole_check.result` で、50m超の通常投稿 (`clear`) と確認済みの近接する別デザイン蓋 (`confirmed_different`) を区別する。
-- 今回は既存の公開フローを維持し、DB migration・RLS変更は追加しない。レビュー待ち状態とPostgREST直接INSERTの制限は、モデレーション設計と合わせて別途検討する。
+- 近接確認済みの投稿は `pending` または `needs_review` として永続化し、公開一覧から除外する。
+- PostgREST直接INSERTでこの制約を迂回できないよう、限定RPCまたはDBトリガーへ検証を集約する。
+
+## PR #198 レビューでの追加修正（マージ前に必須）
+
+1. **近接確認済み投稿を即時公開しない**
+   - `confirmed_different` をレスポンスに返すだけでなくDBへ保存する。
+   - 50m以内の投稿は `pending` / `needs_review` として永続化し、公開一覧から除外する。
+   - APIを迂回した直接INSERTでも即時公開できないよう、限定RPCまたはDBトリガーで保証する。
+2. **写真差替え時の古いEXIF結果を破棄する**
+   - `onDrop` 冒頭で世代IDを採番する。
+   - EXIF解析後、近接検索後、`finally` の状態更新を同じ世代IDでガードし、古い写真の座標や判定で新しい写真を上書きしない。
+3. **追加テストをNode 20のCIで実行する**
+   - Node 22.6以降専用の `--experimental-strip-types` に依存しない実行方法へ変更する。
+   - GitHub Actionsで `npm run test:design-manhole` を実行し、CIの緑が追加テストの成功も保証するようにする。
+
+修正後は、追加テスト、type-check、buildを実行し、PR #198へpushして再レビューを依頼する。
+
+## PR #198 レビュー指摘への対応結果
+
+- `design_manhole.status` に `needs_review` を追加し、近接候補ID・距離・明示確認日時を永続化するmigrationを追加した。
+- `public.manhole.location` を使う `BEFORE INSERT` トリガーで50m以内を再計算し、`published` の直接INSERTも `needs_review` へ強制する。RLSは本人名義の `published` / `needs_review` のみ許可する。
+- APIは `confirmed_different` を `needs_review` でINSERTし、成功画面も「確認待ち」表示にして、公開前の詳細ページやX共有へ誘導しない。
+- 写真選択ごとの世代IDを `onDrop` 冒頭で採番し、EXIF解析後、近接検索後、例外処理、`finally` の全更新を同じ世代でガードした。
+- テスト実行を `tsx --test` へ変更し、Node 20の既存GitHub Actionsに `npm run test:design-manhole` を追加した。
+- 検証: Node 20.20.2を含む自動テスト12件、`npm run type-check`、CI相当のダミー環境変数を使った `npm run build` が成功した。
+- migrationの追加のみで、本番DBへの適用・デプロイ・マージは行っていない。
+
+## tracker Draft PR #394 の敵対的レビュー
+
+対象: https://github.com/nishiokya/pokefuta-tracker/pull/394
+
+結論: 近接候補を公開データから外す方向は正しい。ただし、以下2点を直すまでは Draft のままにする。
+
+### [P1] 公開抽出を fail-closed にする
+
+`select_public_records()` は現在 `review_status != "needs_review"` だけで抽出している。このdenylist方式では、`status="pending"` / `hidden` の行や、将来追加された未知のレビュー状態が `docs/design_manholes.ndjson` に入る。地図側が `status == "active"` で再度絞っていても、NDJSON自体は公開・配布されるため境界として不十分。
+
+公開条件は少なくとも次の両方を満たすallowlistにする。
+
+- `status == "active"`
+- `review_status` が公開を許可した既知の状態である（または最低限 `needs_review` でないことを追加条件にする）
+
+テストには `pending`、`hidden`、未知の `review_status` が公開出力へ入らないケースを追加する。
+
+### [P1] 非公開にした候補をレビューキューへ残す
+
+現在の `normalized_records` はメモリ上にしか存在せず、`needs_review` 行は `docs/design_manholes.ndjson` から消える。ステージされるraw snapshotには投稿ID・座標はあるが、`nearby_refs`、距離、候補名、レビュー理由がない。そのためFamily BのPRを人が見ても、何と重複しそうなのか、どのoverrideを追加すべきか判断できない。
+
+公開出力とは別に、例えば `dataset/design_manhole_review_queue.ndjson` を生成・ステージし、少なくとも次を残す。
+
+- `source_id`
+- `nearby_refs`（ref、距離、候補名）
+- `review_status`
+- `status`
+- 投稿写真・投稿詳細へのURL
+
+テストには「ID 157は公開NDJSONへ入らないが、レビューキューには `pokefuta:157` と約1mで残る」ことを追加する。
+
+### pokefuta #198 との引き渡し条件
+
+pokefuta #198 の `confirmed_different` は、現行差分ではPOST成功レスポンス上の区別に留まり、DBや公開GET APIへ永続化されていない。したがって、公式ポケふた50m以内の正当な別デザイン蓋もtrackerでは `needs_review` になる。これは安全側の挙動として許容できるが、上記レビューキューがないと正当投稿を復帰させる運用が成立しない。
+
+### マージ判断
+
+- ID 157を公開対象から外す回帰テストは妥当。
+- `create-pull-request` の無条件実行、concurrency、timeout追加も妥当。
+- 上記2件を修正し、公開データとレビューキューの両方を統合テストした後にマージする。
 
 ## 関連
 
 - pokefuta-tracker PR: https://github.com/nishiokya/pokefuta-tracker/pull/392
+- pokefuta-tracker 再発防止 Draft PR: https://github.com/nishiokya/pokefuta-tracker/pull/394
 - 投稿API: `src/app/api/design-manholes/route.ts`
 - 投稿UI: `src/app/design-manholes/new/page.tsx`
 - 訪問写真API: `src/app/api/image-upload/route.ts`

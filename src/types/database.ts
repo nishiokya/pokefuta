@@ -352,7 +352,10 @@ export interface Database {
           width: number | null;
           height: number | null;
           exif: Record<string, any> | null;
-          status: 'published' | 'hidden';
+          status: 'published' | 'needs_review' | 'hidden';
+          nearby_official_manhole_id: number | null;
+          nearby_official_manhole_distance_m: number | null;
+          nearby_official_manhole_confirmed_at: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -371,13 +374,19 @@ export interface Database {
           width?: number | null;
           height?: number | null;
           exif?: Record<string, any> | null;
-          status?: 'published' | 'hidden';
+          status?: 'published' | 'needs_review' | 'hidden';
+          nearby_official_manhole_id?: number | null;
+          nearby_official_manhole_distance_m?: number | null;
+          nearby_official_manhole_confirmed_at?: string | null;
           created_by: string;
         };
         Update: {
           title?: string | null;
           description?: string | null;
-          status?: 'published' | 'hidden';
+          status?: 'published' | 'needs_review' | 'hidden';
+          nearby_official_manhole_id?: number | null;
+          nearby_official_manhole_distance_m?: number | null;
+          nearby_official_manhole_confirmed_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];

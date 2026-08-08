@@ -25,6 +25,8 @@ export type OfficialManholeProximityDecision =
   | { result: 'conflict'; official_manhole: OfficialManholeCandidate }
   | { result: 'confirmed_different'; official_manhole: OfficialManholeCandidate };
 
+export type DesignManholePublicationStatus = 'published' | 'needs_review';
+
 interface SubmissionGateInput {
   hasFile: boolean;
   hasCoordinates: boolean;
@@ -123,6 +125,14 @@ export function getOfficialManholeProximityDecision(
     return { result: 'confirmed_different', official_manhole: candidate };
   }
   return { result: 'conflict', official_manhole: candidate };
+}
+
+export function getDesignManholePublicationStatus(
+  decision: OfficialManholeProximityDecision
+): DesignManholePublicationStatus {
+  return decision.result === 'confirmed_different'
+    ? 'needs_review'
+    : 'published';
 }
 
 export function isDesignManholeSubmissionReady(input: SubmissionGateInput): boolean {

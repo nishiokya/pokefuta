@@ -4,6 +4,7 @@ import {
   OFFICIAL_MANHOLE_NEARBY_CODE,
   buildOfficialManholeConflict,
   findNearbyOfficialManhole,
+  getDesignManholePublicationStatus,
   getOfficialManholeProximityDecision,
   hasConfirmedDifferentManhole,
   isDesignManholeSubmissionReady,
@@ -64,13 +65,18 @@ test('API policy: サーバーが検出した候補IDの明示確認だけを許
 });
 
 test('API policy: 通常投稿と確認済みの近接する別デザイン蓋を区別する', () => {
-  assert.equal(
-    getOfficialManholeProximityDecision(null, null).result,
-    'clear'
+  const clear = getOfficialManholeProximityDecision(null, null);
+  const confirmedDifferent = getOfficialManholeProximityDecision(
+    nearbyCandidate,
+    157
   );
+
+  assert.equal(clear.result, 'clear');
+  assert.equal(getDesignManholePublicationStatus(clear), 'published');
+  assert.equal(confirmedDifferent.result, 'confirmed_different');
   assert.equal(
-    getOfficialManholeProximityDecision(nearbyCandidate, 157).result,
-    'confirmed_different'
+    getDesignManholePublicationStatus(confirmedDifferent),
+    'needs_review'
   );
   assert.equal(
     getOfficialManholeProximityDecision(nearbyCandidate, null).result,

@@ -12,6 +12,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { isValidCoordinates } from '@/lib/location';
 import { buildXShareUrl, designManholeShareText } from '@/lib/share';
 import { SITE_URL } from '@/lib/constants';
+import { createLatestGenerationGuard } from '@/lib/latest-generation';
 import {
   OFFICIAL_MANHOLE_NEARBY_CODE,
   OFFICIAL_MANHOLE_NEARBY_RADIUS_KM,
@@ -37,6 +38,7 @@ export default function DesignManholeNewPage() {
   const [proximityCheckStatus, setProximityCheckStatus] =
     useState<ProximityCheckStatus>('idle');
   const proximityCheckSequenceRef = useRef(0);
+  const photoGenerationGuardRef = useRef(createLatestGenerationGuard());
 
   // プレビューURLは差し替え時・アンマウント時に解放する
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function DesignManholeNewPage() {
   const [done, setDone] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
   const [postedTitle, setPostedTitle] = useState<string | null>(null);
+  const [postedNeedsReview, setPostedNeedsReview] = useState(false);
 
   // ニックネーム初期値はログインユーザーの表示名（ページ自体は middleware が保護）
   useEffect(() => {
@@ -82,8 +85,10 @@ export default function DesignManholeNewPage() {
 
   const checkNearbyOfficialManhole = useCallback(async (
     latitude: number,
-    longitude: number
+    longitude: number,
+    photoGeneration: number
   ) => {
+    if (!photoGenerationGuardRef.current.isCurrent(photoGeneration)) return;
     const sequence = ++proximityCheckSequenceRef.current;
     setProximityCheckStatus('checking');
     setNearbyOfficialManhole(null);
@@ -105,12 +110,18 @@ export default function DesignManholeNewPage() {
         ? toOfficialManholeCandidate(nearest, nearest.distance)
         : null;
 
-      if (sequence !== proximityCheckSequenceRef.current) return;
+      if (
+        sequence !== proximityCheckSequenceRef.current ||
+        !photoGenerationGuardRef.current.isCurrent(photoGeneration)
+      ) return;
       setNearbyOfficialManhole(candidate);
       setProximityCheckStatus('ready');
     } catch (lookupError) {
       console.error('Official manhole proximity check failed:', lookupError);
-      if (sequence !== proximityCheckSequenceRef.current) return;
+      if (
+        sequence !== proximityCheckSequenceRef.current ||
+        !photoGenerationGuardRef.current.isCurrent(photoGeneration)
+      ) return;
       setNearbyOfficialManhole(null);
       setProximityCheckStatus('error');
       setError('近くの公式ポケふたを確認できませんでした。再確認してください');
@@ -127,10 +138,15 @@ export default function DesignManholeNewPage() {
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const selected = acceptedFiles[0];
     if (!selected) return;
+    const photoGeneration = photoGenerationGuardRef.current.begin();
 
     setFile(selected);
     setError(null);
     resetProximityCheck();
+    setLat(null);
+    setLng(null);
+    setGpsSource(null);
+    setExifPayload(null);
     // プレビューURLの解放は useEffect クリーンアップが行う
     setPreviewUrl(URL.createObjectURL(selected));
 
@@ -140,11 +156,17 @@ export default function DesignManholeNewPage() {
       const raw = await exifr.parse(selected, {
         gps: true, tiff: true, exif: true, xmp: false, icc: false, iptc: false,
       });
+      if (!photoGenerationGuardRef.current.isCurrent(photoGeneration)) return;
       if (isValidCoordinates(raw?.latitude, raw?.longitude)) {
         setLat(raw.latitude);
         setLng(raw.longitude);
         setGpsSource('exif');
-        await checkNearbyOfficialManhole(raw.latitude, raw.longitude);
+        await checkNearbyOfficialManhole(
+          raw.latitude,
+          raw.longitude,
+          photoGeneration
+        );
+        if (!photoGenerationGuardRef.current.isCurrent(photoGeneration)) return;
       } else {
         // 前の写真のEXIF座標を引きずらない
         setLat(null);
@@ -165,12 +187,15 @@ export default function DesignManholeNewPage() {
         setExifPayload(null);
       }
     } catch {
+      if (!photoGenerationGuardRef.current.isCurrent(photoGeneration)) return;
       setExifPayload(null);
       setLat(null);
       setLng(null);
       setGpsSource(null);
     } finally {
-      setExifChecking(false);
+      if (photoGenerationGuardRef.current.isCurrent(photoGeneration)) {
+        setExifChecking(false);
+      }
     }
   }, [checkNearbyOfficialManhole, resetProximityCheck]);
 
@@ -274,6 +299,7 @@ export default function DesignManholeNewPage() {
 
       setPostedId(data?.design_manhole?.id ?? null);
       setPostedTitle(data?.design_manhole?.title ?? null);
+      setPostedNeedsReview(data?.design_manhole?.status === 'needs_review');
       setDone(true);
     } catch (err: any) {
       setError(err?.message || '投稿に失敗しました');
@@ -300,20 +326,25 @@ export default function DesignManholeNewPage() {
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
-            投稿されたデザインマンホールは公開されました。
-            翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラマンホールマップ</a> にも掲載されます。
+            {postedNeedsReview ? (
+              <>近くの公式ポケふたとは別の蓋として、確認待ちで受け付けました。確認後に公開されます。</>
+            ) : (
+              <>投稿されたデザインマンホールは公開されました。翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラマンホールマップ</a> にも掲載されます。</>
+            )}
           </p>
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-[#2A2A2A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#444444]"
-          >
-            <Share2 className="h-4 w-4" />
-            Xでシェアする
-          </a>
+          {!postedNeedsReview && (
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-[#2A2A2A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#444444]"
+            >
+              <Share2 className="h-4 w-4" />
+              Xでシェアする
+            </a>
+          )}
           <div className="mt-4 flex justify-center gap-3">
-            {postedId ? (
+            {postedId && !postedNeedsReview ? (
               <Link
                 href={`/design-manholes/${postedId}`}
                 className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
@@ -438,7 +469,11 @@ export default function DesignManholeNewPage() {
                 type="button"
                 onClick={() => {
                   setError(null);
-                  void checkNearbyOfficialManhole(lat, lng);
+                  void checkNearbyOfficialManhole(
+                    lat,
+                    lng,
+                    photoGenerationGuardRef.current.current()
+                  );
                 }}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[#B5483C]/40 bg-white/60 px-3 py-1.5 text-xs font-bold"
               >
@@ -589,10 +624,16 @@ export default function DesignManholeNewPage() {
             disabled={!canSubmit}
             className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? '投稿中...' : '投稿する'}
+            {submitting
+              ? '投稿中...'
+              : nearbyOfficialManhole
+                ? '確認待ちで投稿する'
+                : '投稿する'}
           </button>
           <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
-            投稿された写真と位置情報はすぐに公開されます。
+            {nearbyOfficialManhole
+              ? '近くに公式ポケふたがある投稿は、確認が完了するまで公開されません。'
+              : '投稿された写真と位置情報はすぐに公開されます。'}
           </p>
         </section>
       </main>

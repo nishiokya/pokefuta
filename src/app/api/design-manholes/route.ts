@@ -14,6 +14,7 @@ import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import {
   buildOfficialManholeConflict,
   findNearbyOfficialManhole,
+  getDesignManholePublicationStatus,
   getOfficialManholeProximityDecision,
 } from '@/lib/design-manhole-proximity';
 
@@ -47,7 +48,7 @@ function optionalText(value: FormDataEntryValue | null, maxLength: number): stri
  *   post:
  *     summary: デザインマンホールを投稿
  *     tags: [design-manholes]
- *     description: ポケふた以外のデザインマンホールを写真+位置情報付きで投稿します。要ログイン。
+ *     description: ポケふた以外のデザインマンホールを写真+位置情報付きで投稿します。公式ポケふた50m以内で別の蓋と確認された投稿はneeds_reviewになります。要ログイン。
  *     security:
  *       - cookieAuth: []
  *     requestBody:
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    const publicationStatus = getDesignManholePublicationStatus(proximityDecision);
 
     // 5. テキスト項目（すべて任意・長さ上限で切り詰め）
     const title = optionalText(formData.get('title'), MAX_TITLE_LENGTH);
@@ -228,7 +230,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7. DB 挿入（ユーザーセッションで実行。RLS が created_by = auth.uid() を担保。
+    // 7. DB 挿入（ユーザーセッションで実行。RLS が本人名義と許可statusを担保し、
+    //    DBトリガーも50m以内をneeds_reviewへ強制する。
     //    失敗時はアップロード済みオブジェクトを掃除）
     const { data: inserted, error: insertError } = await supabase
       .from('design_manhole')
@@ -245,9 +248,18 @@ export async function POST(request: NextRequest) {
         width,
         height,
         exif,
+        status: publicationStatus,
+        nearby_official_manhole_id:
+          proximityDecision.official_manhole?.id ?? null,
+        nearby_official_manhole_distance_m:
+          proximityDecision.official_manhole?.distance_m ?? null,
+        nearby_official_manhole_confirmed_at:
+          proximityDecision.result === 'confirmed_different'
+            ? new Date().toISOString()
+            : null,
         created_by: userId,
       })
-      .select('id, title, latitude, longitude, created_at')
+      .select('id, title, latitude, longitude, status, created_at')
       .single();
 
     if (insertError || !inserted) {
