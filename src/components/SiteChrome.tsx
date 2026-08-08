@@ -233,7 +233,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
 
 /**
  * 要素は「ロゴ / ページタイトル / 認証」の3つだけ。
- * Info・X・図鑑・デザイン蓋をヘッダーに並べていた頃はタップ領域が潰れていたので、
+ * Info・X・図鑑・デザインふたをヘッダーに並べていた頃はタップ領域が潰れていたので、
  * ナビは下タブ、ユーティリティはフッターへ分けている。
  */
 function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) {
@@ -384,7 +384,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
           図鑑
         </a>
         <Link href="/design-manholes" style={pcNavLinkStyle(activeNav === 'design')}>
-          デザイン蓋
+          デザインふた
         </Link>
       </div>
 
@@ -506,7 +506,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
 /**
  * SP ヘッダーから外した導線の受け皿。下タブの上、本文の末尾に置く。
  *
- * 「図鑑」「デザイン蓋」は下タブに入れる枠が無い（4枠は 探す/スタンプ帳/マイ旅＋投稿FAB で
+ * 「図鑑」「デザインふた」は下タブに入れる枠が無い（4枠は 探す/スタンプ帳/マイ旅＋投稿FAB で
  * 埋まっている）が、SP から到達できなくなると PC にしかない導線になってしまうので、
  * Info・X と同じくここで必ず出す。**この2つを消さないこと。**
  */
@@ -531,7 +531,7 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
           図鑑
         </a>
         <Link href="/design-manholes" className="inline-flex items-center px-2" style={footerLinkStyle}>
-          デザイン蓋
+          デザインふた
         </Link>
         <Link href="/about" className="inline-flex items-center gap-1.5 px-2" style={footerLinkStyle}>
           <Info className="h-4 w-4" />

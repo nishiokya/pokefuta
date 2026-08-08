@@ -326,7 +326,7 @@ export default function DesignManholeNewPage() {
             {postedNeedsReview ? (
               <>近くの公式ポケふたとは別の蓋として、確認待ちで受け付けました。確認後に公開されます。</>
             ) : (
-              <>投稿されたデザインマンホールは公開されました。翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラマンホールマップ</a> にも掲載されます。</>
+              <>投稿されたデザインマンホールは公開されました。翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラクターマンホールマップ</a> にも掲載されます。</>
             )}
           </p>
           {!postedNeedsReview && (
