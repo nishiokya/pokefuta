@@ -16,18 +16,22 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
+// safe-area 系だけを検査する。env() には viewport-segment-* や
+// preferred-text-scale など CSSWG が定義するものが他にもあり、許可リスト方式に
+// すると将来それらを正しく使ったときに落ちてしまう。
+// ここで防ぎたいのは safe-area-* のスペルミスなので、対象をその一族に絞る。
 const VALID = new Set([
   'safe-area-inset-top',
   'safe-area-inset-right',
   'safe-area-inset-bottom',
   'safe-area-inset-left',
-  'titlebar-area-x',
-  'titlebar-area-y',
-  'titlebar-area-width',
-  'titlebar-area-height',
+  'safe-area-max-inset-top',
+  'safe-area-max-inset-right',
+  'safe-area-max-inset-bottom',
+  'safe-area-max-inset-left',
 ]);
 
-const ENV_CALL = /env\(\s*([a-z0-9-]+)/gi;
+const ENV_CALL = /env\(\s*(safe-area[a-z0-9-]*)/gi;
 const EXTENSIONS = new Set(['.ts', '.tsx', '.css', '.js', '.jsx']);
 
 function* walk(dir) {
@@ -45,15 +49,15 @@ for (const file of walk(path.join(root, 'src'))) {
   for (const [, name] of text.matchAll(ENV_CALL)) {
     if (!VALID.has(name)) {
       const line = text.slice(0, text.indexOf(`env(${name}`)).split('\n').length;
-      problems.push(`${path.relative(root, file)}:${line} env(${name}) は存在しない`);
+      problems.push(`${path.relative(root, file)}:${line} env(${name}) は存在しない safe-area 変数`);
     }
   }
 }
 
 if (problems.length > 0) {
-  console.error('Invalid env() variables found:');
+  console.error('Invalid safe-area env() variables found:');
   for (const problem of problems) console.error(`  ${problem}`);
-  console.error('\nValid names: ' + [...VALID].join(', '));
+  console.error('\nValid safe-area names: ' + [...VALID].join(', '));
   process.exit(1);
 }
 
