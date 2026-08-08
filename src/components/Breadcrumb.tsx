@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { useHasNavigatedInApp } from '@/components/SiteChrome';
 
 /**
  * 本文先頭の戻る導線。
@@ -31,19 +32,24 @@ const style = { minHeight: 'var(--chrome-tap-min)' };
 
 export default function Breadcrumb({ href, fallbackHref, label }: BreadcrumbProps) {
   const router = useRouter();
-  // 同一タブ内で遷移してきた場合だけ router.back() が意味を持つ。
-  // SSR とハイドレーション直後は false（＝リンク）にしておき、履歴を確認できてから切り替える
-  const [canGoBack, setCanGoBack] = useState(false);
+  // SPA 遷移では document.referrer が空のままなので、SiteChrome が数えている
+  // アプリ内遷移の有無と OR で判定する。referrer だけだと
+  // 「/ を新規タブで開いて Link で /manhole/209 へ移動」を直接着地と誤判定する
+  const hasNavigatedInApp = useHasNavigatedInApp();
+  // SSR とハイドレーション直後は false（＝リンク）にしておき、確認できてから切り替える
+  const [cameFromSameOrigin, setCameFromSameOrigin] = useState(false);
 
   useEffect(() => {
-    // history.length は直接着地でも 1 より大きくなる環境があるため、
-    // 「このタブでの遷移で来たか」を referrer と合わせて判定する
-    const sameOriginReferrer =
-      typeof document !== 'undefined' &&
+    // 初回ロードが同一オリジンからの通常遷移（フルリロード）だったか。
+    // history.length は直接着地でも 1 より大きくなる環境があるため単独では使わない
+    setCameFromSameOrigin(
       document.referrer !== '' &&
-      new URL(document.referrer, location.href).origin === location.origin;
-    setCanGoBack(window.history.length > 1 && sameOriginReferrer);
+        new URL(document.referrer, location.href).origin === location.origin &&
+        window.history.length > 1
+    );
   }, []);
+
+  const canGoBack = hasNavigatedInApp || cameFromSameOrigin;
 
   const body = (
     <>

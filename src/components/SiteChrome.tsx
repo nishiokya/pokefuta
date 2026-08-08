@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -29,6 +29,20 @@ const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 // ─────────────────────────────────────────────
 
 const TitleOverrideContext = createContext<((title: string | null) => void) | null>(null);
+
+/**
+ * このタブでアプリ内遷移を1回以上したか。
+ *
+ * `document.referrer` は **SPA 遷移では空のまま**なので、これだけで判定すると
+ * 「/ を開いて Link で /manhole/209 へ移動」を直接着地と誤判定する。
+ * SiteChrome は layout 側にあってページ遷移でアンマウントされないので、
+ * ここで pathname の変化を数えるのが唯一の正確な判定になる。
+ */
+const InAppNavigationContext = createContext(false);
+
+export function useHasNavigatedInApp() {
+  return useContext(InAppNavigationContext);
+}
 
 /**
  * ルート表で決まらないタイトル（`${市町村}のポケふた` など）を上書きする。
@@ -384,11 +398,14 @@ const footerLinkStyle: React.CSSProperties = {
 function SpUtilityFooter({ user, authLoaded }: ChromeState) {
   const { trackXLinkClick } = useAnalytics();
 
+  // pb-nav-safe はフッター自身に付ける。
+  // ページ側の pb-nav-safe は children の内側にあるのでフッターを保護できず、
+  // これが無いと固定下タブがフッターに重なって X リンクが完全に隠れる。
   return (
-    <footer className="lg:hidden" style={{ borderTop: '1px solid var(--chrome-sp-border)' }}>
+    <footer className="pb-nav-safe lg:hidden lg:pb-0" style={{ borderTop: '1px solid var(--chrome-sp-border)' }}>
       <nav
         aria-label="サイト内リンク"
-        className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-3 text-xs font-bold"
+        className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 pb-1 pt-3 text-xs font-bold"
       >
         <a href={DATA_SITE_URL} className="inline-flex items-center px-2" style={footerLinkStyle}>
           図鑑
@@ -505,6 +522,16 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
+  const [hasNavigatedInApp, setHasNavigatedInApp] = useState(false);
+  const previousPathRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // 初回マウントでは記録するだけ。2回目以降の pathname 変化が「アプリ内遷移」
+    if (previousPathRef.current !== null && previousPathRef.current !== pathname) {
+      setHasNavigatedInApp(true);
+    }
+    previousPathRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     let supabase: SupabaseClient;
@@ -548,6 +575,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
 
   return (
     <TitleOverrideContext.Provider value={setOverride}>
+      <InAppNavigationContext.Provider value={hasNavigatedInApp}>
       {route.bare ? (
         children
       ) : (
@@ -559,6 +587,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
           <BottomNav {...state} />
         </>
       )}
+      </InAppNavigationContext.Provider>
     </TitleOverrideContext.Provider>
   );
 }
