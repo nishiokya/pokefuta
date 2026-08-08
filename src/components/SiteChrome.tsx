@@ -44,6 +44,15 @@ export function useHeaderTitle(title: string | undefined) {
   }, [setOverride, title]);
 }
 
+/**
+ * サーバーコンポーネントからタイトルを指定するための薄いラッパー。
+ * not-found.tsx などフックを直接呼べない場所で使う。
+ */
+export function HeaderTitle({ value }: { value: string }) {
+  useHeaderTitle(value);
+  return null;
+}
+
 // ─────────────────────────────────────────────
 // パーツ
 // ─────────────────────────────────────────────

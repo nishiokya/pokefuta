@@ -1,9 +1,11 @@
 import Link from 'next/link';
+import { HeaderTitle } from '@/components/SiteChrome';
 import { CameraOff, Home, List, Navigation } from 'lucide-react';
 
 export default function SharedPhotoNotFound() {
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <HeaderTitle value="写真が見つかりません" />
 
       <main className="mx-auto flex min-h-[calc(100vh-9rem)] w-full max-w-3xl items-center px-4 py-8">
         <section className="w-full overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
