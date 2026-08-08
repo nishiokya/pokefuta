@@ -150,8 +150,10 @@ pokefuta #198 の `confirmed_different` は、現行差分ではPOST成功レス
 - 最新実装HEAD `4cdfd76eb28e6b03c1ccc3924f885760e48b5b36` を再レビューし、追加の品質問題は見つからなかった。
 - 近接確認済み投稿の `needs_review` 永続化、公開API・写真APIからの除外、50m以内の直接INSERTを抑止するDBトリガーとRLSを確認した。
 - 写真差替え時のEXIF解析・近接検索・例外処理・`finally` は同じ写真世代でガードされ、古い非同期結果が新しい写真へ反映されないことを確認した。
-- GitHub ActionsはNode 20で `npm run test:design-manhole` を実行し、追加テストを含めて成功。PRは競合なし・mergeableであり、Draft解除とsquash mergeへ進めてよい。
-- 本番DBへのmigration適用とデプロイは、このPRのマージ作業には含めない。
+- inbox更新後の最終HEAD `72ec9429ac0dd0bf645497ed75518944af43c9b5` でも、GitHub ActionsはNode 20で `npm run test:design-manhole` を実行して成功し、競合なし・mergeableを再確認した。
+- PR #198はDraft解除後、2026-08-08にmerge commit `fa311e99ed4d4c29dd4b1c58acd9989c4ced8814` でsquash merge済み。
+- 最終状態: pokefuta PR #198、pokefuta-tracker PR #394、後続の日次データPR #395はいずれもmerge済み。追加の未処理inbox指示はない。
+- 本番DBへのmigration適用とデプロイは行っていない。再発防止を本番で有効にする作業は別途必要。
 
 ## 関連
 
