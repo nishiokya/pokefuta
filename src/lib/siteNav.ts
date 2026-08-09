@@ -65,6 +65,10 @@ export function resolveChrome(pathname: string): RouteChrome {
   return best ?? FALLBACK;
 }
 
+export function isSubmissionPage(pathname: string): boolean {
+  return pathname === '/upload' || pathname === '/design-manholes/new';
+}
+
 /**
  * ナビ項目。PC の横ナビと SP の下タブで同じ定義を使う。
  *

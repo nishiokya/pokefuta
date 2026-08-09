@@ -7,7 +7,7 @@ import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus }
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { AUTH_NAV_ITEMS, GUEST_NAV_ITEMS, NavKey, resolveChrome } from '@/lib/siteNav';
+import { AUTH_NAV_ITEMS, GUEST_NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNav';
 
 /**
  * サイト共通クロム（SPヘッダー／PCトップナビ／SP下タブ）。
@@ -566,6 +566,7 @@ const BOTTOM_TAB_ICONS: Record<string, React.ReactNode> = {
 function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
   const { trackNavClick } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
+  const hideUploadFab = isSubmissionPage(pathname);
 
   const tab = ({ key, label, href }: { key: NavKey; label: string; href: string }) => (
     <Link
@@ -597,32 +598,34 @@ function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
 
         {/* 中央の投稿 FAB */}
         <div style={{ width: 72, flexShrink: 0, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Link
-              href="/upload"
-              onClick={() => trackNavClick('投稿')}
-              aria-current={isActivePath(pathname, '/upload') ? 'page' : undefined}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none' }}
-            >
-              <span
-                style={{
-                  width: 58,
-                  height: 58,
-                  borderRadius: 999,
-                  border: '3px solid #fff',
-                  background: 'radial-gradient(120% 120% at 30% 25%, #d06a4f, var(--chrome-cta))',
-                  color: '#fff',
-                  display: 'grid',
-                  placeItems: 'center',
-                  boxShadow: '0 4px 0 var(--chrome-cta-shadow), 0 10px 22px rgba(191,86,64,.45)',
-                  flexShrink: 0,
-                }}
+          {!hideUploadFab && (
+            <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Link
+                href="/upload"
+                onClick={() => trackNavClick('投稿')}
+                aria-current={isActivePath(pathname, '/upload') ? 'page' : undefined}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none' }}
               >
-                <Camera size={26} strokeWidth={2.4} />
-              </span>
-              <span style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--chrome-cta)', fontFamily: ROUND, lineHeight: 1 }}>投稿</span>
-            </Link>
-          </div>
+                <span
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 999,
+                    border: '3px solid #fff',
+                    background: 'radial-gradient(120% 120% at 30% 25%, #d06a4f, var(--chrome-cta))',
+                    color: '#fff',
+                    display: 'grid',
+                    placeItems: 'center',
+                    boxShadow: '0 4px 0 var(--chrome-cta-shadow), 0 10px 22px rgba(191,86,64,.45)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Camera size={26} strokeWidth={2.4} />
+                </span>
+                <span style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--chrome-cta)', fontFamily: ROUND, lineHeight: 1 }}>投稿</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-1 justify-around">{AUTH_NAV_ITEMS.slice(2).map(tab)}</div>
