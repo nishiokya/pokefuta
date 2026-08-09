@@ -18,6 +18,10 @@ import {
   toOfficialManholeCandidate,
   type OfficialManholeCandidate,
 } from '@/lib/design-manhole-proximity';
+import {
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED,
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
+} from '@/lib/design-manhole-submission-status';
 
 type GpsSource = 'exif' | null;
 type ProximityCheckStatus = 'idle' | 'checking' | 'ready' | 'error';
@@ -226,17 +230,23 @@ export default function DesignManholeNewPage() {
     input.click();
   };
 
-  const canSubmit = isDesignManholeSubmissionReady({
-    hasFile: !!file,
-    hasCoordinates: lat != null && lng != null,
-    exifChecking,
-    submitting,
-    proximityCheckStatus,
-    nearbyOfficialManhole,
-    confirmedNearbyOfficialManholeId,
-  });
+  const canSubmit =
+    !DESIGN_MANHOLE_SUBMISSION_SUSPENDED &&
+    isDesignManholeSubmissionReady({
+      hasFile: !!file,
+      hasCoordinates: lat != null && lng != null,
+      exifChecking,
+      submitting,
+      proximityCheckStatus,
+      nearbyOfficialManhole,
+      confirmedNearbyOfficialManholeId,
+    });
 
   const handleSubmit = async () => {
+    if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
+      setError(DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE);
+      return;
+    }
     if (!file || lat == null || lng == null) return;
 
     setSubmitting(true);
@@ -373,6 +383,27 @@ export default function DesignManholeNewPage() {
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
+        {DESIGN_MANHOLE_SUBMISSION_SUSPENDED && (
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-2 rounded-lg border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-3 text-[#B5483C]"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold">
+                {DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
+                ご迷惑をおかけします。ポケふた（ポケモンマンホール）の写真投稿は
+                <Link href="/upload" className="mx-0.5 underline hover:opacity-80">
+                  こちら
+                </Link>
+                から通常どおりご利用いただけます。
+              </p>
+            </div>
+          </div>
+        )}
+
         <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
           ポケふた以外の「オンリーワンなデザインマンホール」を見つけたら教えてください。
           写真1枚と位置情報が必須です。
@@ -619,14 +650,18 @@ export default function DesignManholeNewPage() {
             disabled={!canSubmit}
             className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting
-              ? '投稿中...'
-              : nearbyOfficialManhole
-                ? '確認待ちで投稿する'
-                : '投稿する'}
+            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
+              ? '投稿を一時停止中です'
+              : submitting
+                ? '投稿中...'
+                : nearbyOfficialManhole
+                  ? '確認待ちで投稿する'
+                  : '投稿する'}
           </button>
           <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
-            {nearbyOfficialManhole
+            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
+              ? '復旧までしばらくお待ちください。'
+              : nearbyOfficialManhole
               ? '近くに公式ポケふたがある投稿は、確認が完了するまで公開されません。'
               : '投稿された写真と位置情報はすぐに公開されます。'}
           </p>
