@@ -12,6 +12,7 @@ import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/lo
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
+import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
 interface PhotoMetadata {
   latitude?: number;
@@ -659,9 +660,15 @@ function UploadPageInner() {
           実際の訪問を確認するため、GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
         </p>
         <p className="mt-2 text-right text-xs">
-          <Link href="/design-manholes/new" className="text-[#7B63A8] underline hover:opacity-80">
-            ポケふた以外のデザインマンホールの投稿はこちら →
-          </Link>
+          {DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
+            <span className="text-[#2A2A2A]/50">
+              ポケふた以外のデザインマンホールの投稿は一時停止中です
+            </span>
+          ) : (
+            <Link href="/design-manholes/new" className="text-[#7B63A8] underline hover:opacity-80">
+              ポケふた以外のデザインマンホールの投稿はこちら →
+            </Link>
+          )}
         </p>
 
         {/* Hint Manhole Card */}
@@ -759,14 +766,19 @@ function UploadPageInner() {
           {selectedPhoto && !loading && selectedPhoto.error && (
             <div className="mt-2 text-xs text-[#B5483C]">
               <p>{selectedPhoto.error}</p>
-              {selectedPhoto.photoStatus === 'no_nearby_manhole' && (
-                <Link
-                  href="/design-manholes/new"
-                  className="mt-1 inline-block font-bold underline hover:opacity-80"
-                >
-                  ポケふた以外のマンホールなら → デザインマンホール投稿へ
-                </Link>
-              )}
+              {selectedPhoto.photoStatus === 'no_nearby_manhole' &&
+                (DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
+                  <p className="mt-1 text-[#2A2A2A]/50">
+                    ポケふた以外のデザインマンホール投稿は現在一時停止中です。
+                  </p>
+                ) : (
+                  <Link
+                    href="/design-manholes/new"
+                    className="mt-1 inline-block font-bold underline hover:opacity-80"
+                  >
+                    ポケふた以外のマンホールなら → デザインマンホール投稿へ
+                  </Link>
+                ))}
             </div>
           )}
         </section>

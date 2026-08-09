@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { authCookieOptions } from '@/lib/supabase/cookies';
+import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
@@ -38,7 +39,11 @@ export async function middleware(req: NextRequest) {
     // 認証が必要なページへのアクセス
     // upload ページは認証必須
     // visits ページはプレビューモードがあるため未認証でもアクセス可能
-    const protectedPaths = ['/upload', '/design-manholes/new'];
+    // デザインマンホール投稿が停止中は、ログインを求める前に停止案内を見せる
+    // （ログインさせた先が「投稿できません」では意味がない）
+    const protectedPaths = DESIGN_MANHOLE_SUBMISSION_SUSPENDED
+      ? ['/upload']
+      : ['/upload', '/design-manholes/new'];
     const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname.startsWith(path));
 
     if (!session && isProtectedPath) {
