@@ -667,8 +667,8 @@ export default function DesignManholeNewPage() {
             {submitting
               ? '投稿中...'
               : nearbyOfficialManhole
-                ? '確認待ちで投稿する'
-                : '投稿する'}
+                ? 'この写真を確認待ちとして投稿する'
+                : 'この写真を投稿する'}
           </button>
           <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
             {nearbyOfficialManhole

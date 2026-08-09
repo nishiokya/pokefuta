@@ -920,7 +920,7 @@ function UploadPageInner() {
                 className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canSubmit}
               >
-                {selectedPhoto?.uploading ? '投稿中...' : isPublic ? '投稿する' : '非公開で投稿する'}
+                {selectedPhoto?.uploading ? '投稿中...' : isPublic ? 'この写真を投稿する' : 'この写真を非公開で投稿する'}
               </button>
               {isPublic ? (
                 <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
