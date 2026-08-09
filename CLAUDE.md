@@ -51,11 +51,16 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | `tools/check-safe-area-env.js` | CSS `env(safe-area-*)` のスペル |
 | `tools/check-supabase-target.js` | `.env.local` への本番資格情報の混入 |
 
-本番に接続するため個別に叩くもの:
+個別に叩くもの:
 
-| スクリプト | 内容 |
-|---|---|
-| `npm run db:drift` | マイグレーションのローカル / 本番のズレ |
+| スクリプト | 内容 | 前提 |
+|---|---|---|
+| `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
+| `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
+
+`tests/design-manhole-db-policy.test.ts` はマイグレーションSQLを正規表現で照合するだけで、
+トリガを実行しない。**オブジェクトが存在することと実行時に正しく動くことは別物**なので、
+DB の挙動を変えたら `verify:design-manhole-trigger` の側も更新する。
 
 ## 用語
 
