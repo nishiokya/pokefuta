@@ -18,6 +18,10 @@ import {
   toOfficialManholeCandidate,
   type OfficialManholeCandidate,
 } from '@/lib/design-manhole-proximity';
+import {
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED,
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
+} from '@/lib/design-manhole-submission-status';
 
 type GpsSource = 'exif' | null;
 type ProximityCheckStatus = 'idle' | 'checking' | 'ready' | 'error';
@@ -363,6 +367,47 @@ export default function DesignManholeNewPage() {
             >
               続けて投稿する
             </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 停止中はフォームを出さない。写真選択・EXIF解析・近接API通信まで進ませてから
+  // 送信だけ弾くと、現地で撮った人の手間を無駄にする。
+  if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
+    return (
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+        <main className="mx-auto max-w-2xl px-4 pb-8 pt-10">
+          <div
+            role="status"
+            className="rounded-xl border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-5 text-center"
+          >
+            <AlertCircle className="mx-auto h-10 w-10 text-[#B5483C]" />
+            <h1 className="mt-3 text-base font-bold text-[#B5483C]">
+              {DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#2A2A2A]/70">
+              ご迷惑をおかけします。撮っていただいた写真は、復旧後にあらためて投稿してください。
+            </p>
+          </div>
+
+          <p className="mt-6 text-center text-sm text-[#2A2A2A]/70">
+            ポケふた（ポケモンマンホール）の写真投稿は通常どおりご利用いただけます。
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/upload"
+              className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+            >
+              ポケふたの写真を投稿する
+            </Link>
+            <Link
+              href="/design-manholes"
+              className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+            >
+              みんなのデザインマンホールを見る
+            </Link>
           </div>
         </main>
       </div>

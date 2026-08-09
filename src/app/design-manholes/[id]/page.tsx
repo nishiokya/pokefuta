@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Plus, Share2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import MapSection from '../MapSection';
+import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
+import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
 import { formatDateJaJst } from '@/lib/date';
@@ -193,15 +195,11 @@ export default async function Page({ params }: Props) {
 
         <div className="mt-6 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-5 text-center">
           <p className="text-sm text-[#2A2A2A]/70">
-            あなたの街のデザインマンホールも投稿してみませんか？
+            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
+              ? '不具合のため、デザインマンホールの投稿を一時停止しています。'
+              : 'あなたの街のデザインマンホールも投稿してみませんか？'}
           </p>
-          <Link
-            href="/design-manholes/new"
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
-          >
-            <Plus className="h-4 w-4" />
-            投稿する
-          </Link>
+          <SubmitCta className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
         </div>
       </main>
 

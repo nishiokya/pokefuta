@@ -17,6 +17,11 @@ import {
   getDesignManholePublicationStatus,
   getOfficialManholeProximityDecision,
 } from '@/lib/design-manhole-proximity';
+import {
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED,
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
+} from '@/lib/design-manhole-submission-status';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -74,9 +79,22 @@ function optionalText(value: FormDataEntryValue | null, maxLength: number): stri
  *       400: { description: バリデーションエラー }
  *       401: { description: 認証が必要 }
  *       409: { description: 50m以内に未確認の公式ポケふた候補がある }
- *       503: { description: 公式ポケふたとの照合を実行できない }
+ *       503: { description: 投稿受付を一時停止中、または公式ポケふたとの照合を実行できない }
  */
 export async function POST(request: NextRequest) {
+  // 受付停止中は何もせず閉じる。R2 に上げてから消す無駄も、
+  // 古いJSを掴んだクライアントへの誤った「時間をおいて」案内も避ける。
+  if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
+    return NextResponse.json(
+      {
+        success: false,
+        code: DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
+        error: DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
+      },
+      { status: 503 }
+    );
+  }
+
   let uploadedStorageKey: string | null = null;
 
   try {
