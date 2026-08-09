@@ -39,3 +39,4 @@ database/mirgrations/*
 tools/capture/output/*
 
 design/*
+.env.local.*
