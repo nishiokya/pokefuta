@@ -230,23 +230,17 @@ export default function DesignManholeNewPage() {
     input.click();
   };
 
-  const canSubmit =
-    !DESIGN_MANHOLE_SUBMISSION_SUSPENDED &&
-    isDesignManholeSubmissionReady({
-      hasFile: !!file,
-      hasCoordinates: lat != null && lng != null,
-      exifChecking,
-      submitting,
-      proximityCheckStatus,
-      nearbyOfficialManhole,
-      confirmedNearbyOfficialManholeId,
-    });
+  const canSubmit = isDesignManholeSubmissionReady({
+    hasFile: !!file,
+    hasCoordinates: lat != null && lng != null,
+    exifChecking,
+    submitting,
+    proximityCheckStatus,
+    nearbyOfficialManhole,
+    confirmedNearbyOfficialManholeId,
+  });
 
   const handleSubmit = async () => {
-    if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
-      setError(DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE);
-      return;
-    }
     if (!file || lat == null || lng == null) return;
 
     setSubmitting(true);
@@ -379,31 +373,51 @@ export default function DesignManholeNewPage() {
     );
   }
 
+  // 停止中はフォームを出さない。写真選択・EXIF解析・近接API通信まで進ませてから
+  // 送信だけ弾くと、現地で撮った人の手間を無駄にする。
+  if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
+    return (
+      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+        <main className="mx-auto max-w-2xl px-4 pb-8 pt-10">
+          <div
+            role="status"
+            className="rounded-xl border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-5 text-center"
+          >
+            <AlertCircle className="mx-auto h-10 w-10 text-[#B5483C]" />
+            <h1 className="mt-3 text-base font-bold text-[#B5483C]">
+              {DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#2A2A2A]/70">
+              ご迷惑をおかけします。撮っていただいた写真は、復旧後にあらためて投稿してください。
+            </p>
+          </div>
+
+          <p className="mt-6 text-center text-sm text-[#2A2A2A]/70">
+            ポケふた（ポケモンマンホール）の写真投稿は通常どおりご利用いただけます。
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/upload"
+              className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+            >
+              ポケふたの写真を投稿する
+            </Link>
+            <Link
+              href="/design-manholes"
+              className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+            >
+              みんなのデザインマンホールを見る
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
-        {DESIGN_MANHOLE_SUBMISSION_SUSPENDED && (
-          <div
-            role="status"
-            className="mb-4 flex items-start gap-2 rounded-lg border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-3 text-[#B5483C]"
-          >
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="text-sm font-bold">
-                {DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
-                ご迷惑をおかけします。ポケふた（ポケモンマンホール）の写真投稿は
-                <Link href="/upload" className="mx-0.5 underline hover:opacity-80">
-                  こちら
-                </Link>
-                から通常どおりご利用いただけます。
-              </p>
-            </div>
-          </div>
-        )}
-
         <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
           ポケふた以外の「オンリーワンなデザインマンホール」を見つけたら教えてください。
           写真1枚と位置情報が必須です。
@@ -650,18 +664,14 @@ export default function DesignManholeNewPage() {
             disabled={!canSubmit}
             className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
-              ? '投稿を一時停止中です'
-              : submitting
-                ? '投稿中...'
-                : nearbyOfficialManhole
-                  ? '確認待ちで投稿する'
-                  : '投稿する'}
+            {submitting
+              ? '投稿中...'
+              : nearbyOfficialManhole
+                ? '確認待ちで投稿する'
+                : '投稿する'}
           </button>
           <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
-            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
-              ? '復旧までしばらくお待ちください。'
-              : nearbyOfficialManhole
+            {nearbyOfficialManhole
               ? '近くに公式ポケふたがある投稿は、確認が完了するまで公開されません。'
               : '投稿された写真と位置情報はすぐに公開されます。'}
           </p>

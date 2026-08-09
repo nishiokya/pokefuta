@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
+import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
+import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { DesignManhole } from '@/types/database';
 
 // Amplify ではビルド時静的化で内容が凍結する事故があるため（/api/site-stats と同じ）、
@@ -63,13 +64,7 @@ function WantedSection() {
         ))}
       </ul>
       <div className="mt-4 text-center">
-        <Link
-          href="/design-manholes/new"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
-        >
-          <Plus className="h-4 w-4" />
-          投稿する
-        </Link>
+        <SubmitCta className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
       </div>
     </section>
   );
@@ -116,14 +111,10 @@ export default async function DesignManholesPage() {
               ポケふた以外の、オンリーワンなデザインマンホールのコレクション
             </p>
           </div>
-          <Link
-            href="/design-manholes/new"
-            className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-          >
-            <Plus className="h-4 w-4" />
-            投稿する
-          </Link>
+          <SubmitCta className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
         </div>
+
+        <SuspendedNotice />
 
         {loadError ? (
           <p className="mt-5 rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/10 p-3 text-sm text-[#B5483C]">
@@ -132,14 +123,11 @@ export default async function DesignManholesPage() {
         ) : designManholes.length === 0 ? (
           <div className="mt-5 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-8 text-center">
             <p className="text-sm text-[#2A2A2A]/70">
-              まだ投稿がありません。最初の1枚を投稿してみませんか？
+              {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
+                ? 'まだ投稿がありません。'
+                : 'まだ投稿がありません。最初の1枚を投稿してみませんか？'}
             </p>
-            <Link
-              href="/design-manholes/new"
-              className="mt-4 inline-block rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
-            >
-              投稿する
-            </Link>
+            <SubmitCta className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
           </div>
         ) : (
           <>
