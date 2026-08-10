@@ -15,7 +15,8 @@
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",
     "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",
-    "capture": "node tools/capture/capture.js"
+    "capture": "node tools/capture/capture.js",
+    "verify:photo-visibility": "node tools/verify-photo-visibility.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",

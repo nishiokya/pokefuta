@@ -431,8 +431,11 @@ export async function POST(request: NextRequest) {
 
       const { data: photoData, error: photoError } = await supabase
         .from('photo')
+        // 返す列を明示する。引数なしの .select() は `select=*` になり、
+        // anon/authenticated へ GRANT していない exif まで要求するため
+        // INSERT の RETURNING が権限エラー(42501)で落ちる。使うのは id だけ。
         .insert(photoInsert)
-        .select()
+        .select('id')
         .single();
 
       if (!photoError && photoData) {
