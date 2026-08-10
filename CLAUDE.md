@@ -57,6 +57,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 |---|---|---|
 | `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
 | `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
+| `npm run verify:photo-visibility` | photo の列権限と RLS を実際にロールを切り替えて確認（exif が anon から見えないこと、非公開写真が隠れること、INSERT の RETURNING が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
 
 `tests/design-manhole-db-policy.test.ts` はマイグレーションSQLを正規表現で照合するだけで、
 トリガを実行しない。**オブジェクトが存在することと実行時に正しく動くことは別物**なので、
