@@ -66,7 +66,7 @@ function UploadPageInner() {
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
-  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -147,6 +147,50 @@ function UploadPageInner() {
     document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
   };
 
+  /**
+   * 蓋の一覧が不完全なことを通知する。
+   *
+   * API は Math.min(limit, 1000) でハードキャップするので、蓋が増えれば必ず切り捨てが起きる。
+   * 切り捨てられた蓋の場所では、利用者に「50m以内にマンホールが見つかりません」としか
+   * 出ないまま永久に投稿できない。気づけるのはここだけ。
+   *
+   * 恒常的な状態なので、毎回のページ表示で送るとアクセス数に比例して監視を占有する。
+   * セッション内で1回に抑え、代わりに件数を載せて規模が分かるようにする。
+   */
+  const reportManholeListProblem = (loaded: number, rawTotal: unknown) => {
+    const total =
+      typeof rawTotal === 'number' && Number.isFinite(rawTotal) ? rawTotal : null;
+
+    // total が無い／取得件数より小さいのはデータ契約違反。切り捨てを判定できない＝
+    // 見逃す側に倒れるので、正常扱いにせず別のコードで通知する。
+    const errorCode =
+      total === null || total < loaded
+        ? 'manhole_list_total_invalid'
+        : total > loaded
+          ? 'manhole_list_truncated'
+          : null;
+    if (!errorCode) return;
+
+    const dedupeKey = `pokefuta:${errorCode}`;
+    try {
+      if (sessionStorage.getItem(dedupeKey)) return;
+      sessionStorage.setItem(dedupeKey, '1');
+    } catch {
+      // sessionStorage が使えない環境でも通知自体は行う
+    }
+
+    console.error(
+      `Manhole list problem [${errorCode}]: loaded=${loaded} total=${rawTotal}. ` +
+      '一部の蓋が候補に載らず、投稿できない利用者が出る。APIの上限撤廃か分割取得へ移行すること。'
+    );
+    track('p_app_error', {
+      error_code: errorCode,
+      error_type: 'upload',
+      manhole_loaded: loaded,
+      manhole_total: total ?? undefined,
+    });
+  };
+
   const loadManholes = async () => {
     try {
       // limit を省くと /api/manholes の既定 500 件・id降順で切られ、
@@ -159,18 +203,7 @@ function UploadPageInner() {
         if (data.success && data.manholes) {
           const list = data.manholes as Manhole[];
           setManholes(list);
-          // API は Math.min(limit, 1000) でハードキャップする（api/manholes/route.ts）。
-          // 切り捨てられた＝一部の蓋は永久に一致せず、その場所では投稿できない。
-          // 件数が上限ちょうどでも切り捨てとは限らないので、API が返す total と比べる
-          // （`length >= limit` だと、ちょうど1000枚のとき毎回の訪問で誤検知する）。
-          const total = typeof data.total === 'number' ? data.total : list.length;
-          if (total > list.length) {
-            console.error(
-              `Manhole list is truncated: ${list.length} of ${total}. ` +
-              '一部の蓋が候補に載らず、投稿できない利用者が出る。APIの上限を上げるか分割取得へ移行すること。'
-            );
-            trackAppError('manhole_list_truncated', 'upload');
-          }
+          reportManholeListProblem(list.length, data.total);
           if (hintManholeId) {
             const found = list.find(m => m.id === hintManholeId);
             if (found) setHintManhole(found);
