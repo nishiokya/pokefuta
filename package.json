@@ -13,6 +13,7 @@
     "test:design-manhole": "tsx --test tests/design-manhole-*.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",
+    "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",
     "capture": "node tools/capture/capture.js"
   },
   "dependencies": {
