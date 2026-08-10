@@ -67,7 +67,10 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
 
   const photoSelected = useCallback(
     (params: { photo_source: PhotoSource; has_gps: boolean; has_exif_datetime?: boolean }) => {
-      if (stepRef.current === 'start') stepRef.current = 'photo_selected';
+      // 写真を選び直したら必ず photo_selected へ戻す。
+      // `start` のときだけ進めると、blocked / failed の後に良い写真へ差し替えて
+      // 離脱した人が「blocked なのに理由なし」という矛盾した離脱データになる。
+      stepRef.current = 'photo_selected';
       blockReasonRef.current = undefined;
       trackSubmissionPhotoSelected({ submission_kind, ...params });
     },

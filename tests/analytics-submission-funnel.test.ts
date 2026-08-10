@@ -182,3 +182,42 @@ test('エラー分類: ストレージ例外と、分類できない例外', () 
   // ストレージ操作を包む catch は fallback を渡せる
   assert.equal(classifySubmissionError(new Error('boom'), 'STORAGE_ERROR'), 'STORAGE_ERROR');
 });
+
+/**
+ * ここから下は、実際のコードが例外をどう包み直すかを写した回帰テスト。
+ * 分類関数の単体テストだけでは、呼び出し側が code を捨てていても気づけない
+ * （それがまさに 2026-08-09 の見えなさの正体だった）。
+ */
+test('エラー分類: image-upload が包み直す形でも PGRST204 を拾う', () => {
+  // src/app/api/image-upload/route.ts の visit / photo INSERT 失敗時と同じ形
+  const visitError = { code: 'PGRST204', message: "column 'x' does not exist" };
+  const thrown = new Error(`Visit creation failed: ${visitError.message}`, { cause: visitError });
+  assert.equal(classifySubmissionError(thrown), 'DB_SCHEMA_MISMATCH');
+});
+
+test('エラー分類: R2 が包み直す形でもストレージ障害を拾う', () => {
+  // src/lib/storage/r2.ts の catch と同じ形（AWS SDK 例外を Error で包む）
+  const sdkError = Object.assign(new Error('NoSuchBucket'), {
+    $metadata: { httpStatusCode: 404 },
+  });
+  const thrown = new Error(`Failed to upload to R2: ${sdkError.message}`, { cause: sdkError });
+  assert.equal(classifySubmissionError(thrown), 'STORAGE_ERROR');
+});
+
+test('エラー分類: cause が壊れていても例外を投げない', () => {
+  // cause に文字列が入ると `'$metadata' in cause` が TypeError になっていた
+  assert.equal(classifySubmissionError(new Error('x', { cause: 'text' })), 'UNEXPECTED');
+  assert.equal(classifySubmissionError(new Error('x', { cause: 42 })), 'UNEXPECTED');
+  assert.equal(classifySubmissionError(new Error('x', { cause: null })), 'UNEXPECTED');
+
+  // 循環参照でも止まる
+  const a: any = new Error('a');
+  const b: any = new Error('b');
+  a.cause = b;
+  b.cause = a;
+  assert.equal(classifySubmissionError(a), 'UNEXPECTED');
+
+  // 深く埋まっていても拾う
+  const deep = new Error('1', { cause: new Error('2', { cause: { code: '42501' } }) });
+  assert.equal(classifySubmissionError(deep), 'DB_PERMISSION_DENIED');
+});

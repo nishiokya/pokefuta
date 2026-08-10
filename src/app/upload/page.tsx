@@ -303,12 +303,15 @@ function UploadPageInner() {
     // 既存の選択は破棄（プレビューURLの解放は useEffect クリーンアップが行う）
     setPhotos([]);
 
+    // カメラ導線が立てた 'camera' を1回だけ消費する（次の写真へ持ち越さない）。
+    // await より前に取ること。後ろに置くと、写真を続けて選んだとき解析の
+    // 終了順に依存して、別の写真が 'camera' を横取りする。
+    const photoSource = funnel.consumePhotoSource();
+
     const id = Math.random().toString(36).substring(2, 11);
     const preview = URL.createObjectURL(file);
     const metadata = await extractMetadata(file);
 
-    // カメラ導線が立てた 'camera' を1回だけ消費する（次の写真へ持ち越さない）
-    const photoSource = funnel.consumePhotoSource();
     const hasGps = isValidCoordinates(metadata.latitude, metadata.longitude);
     funnel.photoSelected({
       photo_source: photoSource,
@@ -478,6 +481,8 @@ function UploadPageInner() {
     let failureStage: SubmissionStage = 'compress';
     let responseStatus: number | undefined;
     let responseCode: string | undefined;
+    // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
+    const submittedPhotoSource = funnel.photoSource();
 
     try {
       const uploadStartTime = Date.now();
@@ -493,7 +498,7 @@ function UploadPageInner() {
       trackPhotoUploadStart({
         submission_kind: 'character',
         is_logged_in: true,
-        photo_source: funnel.photoSource(),
+        photo_source: submittedPhotoSource,
       });
 
       // Prepare form data for upload
@@ -554,7 +559,7 @@ function UploadPageInner() {
         manhole_id: photo.matchedManhole?.id,
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
-        photo_source: funnel.photoSource(),
+        photo_source: submittedPhotoSource,
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
         has_note: !!visitNote.trim(),
@@ -599,7 +604,7 @@ function UploadPageInner() {
         status_code: responseStatus,
         error_code: responseCode,
         error_type: errorType,
-        photo_source: funnel.photoSource(),
+        photo_source: submittedPhotoSource,
       });
 
       const errorMsg = error?.message || 'アップロードに失敗しました';

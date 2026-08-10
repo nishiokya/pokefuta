@@ -40,21 +40,34 @@ const SCHEMA_MISMATCH_CODES = new Set(['PGRST204', 'PGRST202', '42703', '42P01']
  */
 const PERMISSION_DENIED_CODES = new Set(['42501', 'PGRST301']);
 
-function readCode(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
+/** cause の鎖を辿る。非オブジェクトで打ち切り、循環参照でも止まる。 */
+function causeChain(error: unknown): object[] {
+  const chain: object[] = [];
+  const seen = new Set<object>();
+  let current = error;
+  // 実際の鎖は深くても2〜3段。壊れた入力で無限に回らないよう上限も置く。
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (!current || typeof current !== 'object') break;
+    const node = current as object;
+    if (seen.has(node)) break;
+    seen.add(node);
+    chain.push(node);
+    current = (node as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+function readCode(value: object): string | undefined {
   const code = (value as { code?: unknown }).code;
   return typeof code === 'string' && code ? code : undefined;
 }
 
-/** supabase-js の PostgrestError は Error でラップされることがあるので cause も辿る。 */
-function extractCode(error: unknown): string | undefined {
-  return readCode(error) ?? readCode((error as { cause?: unknown } | null)?.cause);
-}
-
-/** @aws-sdk/client-s3 の例外は $metadata を持つ。 */
-function isStorageError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  return '$metadata' in error || '$metadata' in (((error as { cause?: object }).cause ?? {}) as object);
+/**
+ * @aws-sdk/client-s3 の例外は $metadata を持つ。
+ * ただし r2.ts が Error で包み直すので、cause 側にしか無いことがある。
+ */
+function hasStorageMarker(value: object): boolean {
+  return '$metadata' in value;
 }
 
 /**
@@ -67,14 +80,18 @@ export function classifySubmissionError(
   error: unknown,
   fallback: SubmissionErrorCode = 'UNEXPECTED'
 ): SubmissionErrorCode {
-  const code = extractCode(error);
+  const chain = causeChain(error);
 
-  if (code) {
+  // DBのコードを優先する。ストレージ判定より先に見るのは、
+  // 「スキーマがズレている」の方が対処が具体的だから。
+  for (const node of chain) {
+    const code = readCode(node);
+    if (!code) continue;
     if (SCHEMA_MISMATCH_CODES.has(code)) return 'DB_SCHEMA_MISMATCH';
     if (PERMISSION_DENIED_CODES.has(code)) return 'DB_PERMISSION_DENIED';
   }
 
-  if (isStorageError(error)) return 'STORAGE_ERROR';
+  if (chain.some(hasStorageMarker)) return 'STORAGE_ERROR';
 
   return fallback;
 }

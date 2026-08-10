@@ -406,7 +406,9 @@ export async function POST(request: NextRequest) {
           visitId = visitData.id;
         } else {
           console.error('Failed to create visit record:', visitError?.message);
-          throw new Error(`Visit creation failed: ${visitError?.message}`);
+          // PostgrestError の code（PGRST204 など）を cause に残す。
+          // message だけにすると classifySubmissionError が UNEXPECTED に落ちる。
+          throw new Error(`Visit creation failed: ${visitError?.message}`, { cause: visitError });
         }
       }
 
@@ -433,7 +435,8 @@ export async function POST(request: NextRequest) {
         imageId = photoData.id;
       } else {
         console.error('Photo insert failed:', photoError?.message);
-        throw new Error(`Photo creation failed: ${photoError?.message}`);
+        // 同上。ここを message だけにすると事故時に原因が GA4 へ届かない
+        throw new Error(`Photo creation failed: ${photoError?.message}`, { cause: photoError });
       }
 
     } catch (dbError: any) {
@@ -610,10 +613,12 @@ export async function GET(request: NextRequest) {
       const { data: images, error, count } = await query;
 
       if (error) {
+        const code = classifySubmissionError(error);
+        console.error(`Failed to fetch images [${code}]:`, error.message, error);
         return NextResponse.json({
           success: false,
-          error: 'Failed to fetch images',
-          details: error.message
+          code,
+          error: 'Failed to fetch images'
         }, { status: 500 });
       }
 
@@ -686,10 +691,12 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error: any) {
+    const code = classifySubmissionError(error);
+    console.error(`Failed to get image [${code}]:`, error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to get image',
-      details: error?.message || 'Unknown error'
+      code,
+      error: 'Failed to get image'
     }, { status: 500 });
   }
 }

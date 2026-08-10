@@ -25,6 +25,26 @@ const SUBMISSION_FLOWS = [
   { file: 'src/app/design-manholes/new/page.tsx', kind: 'design' },
 ];
 
+/**
+ * コメント行を落とす。落とさないと、実装を消してコメントとして残すだけで
+ * 検査が pass してしまう（「呼んでいる」と「書いてある」は別物）。
+ *
+ * 行頭が `//` `*` `/*` の行だけを除く。ブロックコメントを本文ごと正規表現で
+ * 消す方式は使えない — `accept: { 'image/*': ... }` の `/*` を
+ * コメント開始と誤認して、後続のコードごと消してしまうため。
+ * 完全なパーサではないが、「呼び出しをコメントアウトして残す」という
+ * 現実的な逃げ道はこれで塞げる。
+ */
+function stripComments(text) {
+  return text
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('//') && !trimmed.startsWith('*') && !trimmed.startsWith('/*');
+    })
+    .join('\n');
+}
+
 /** gtag.ts の `as const` 配列から文字列リテラルを取り出す。 */
 function readLedger(name) {
   const block = analytics.match(new RegExp(`${name}\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*as const`));
@@ -89,14 +109,16 @@ const funnelEvents = readLedger('SUBMISSION_FUNNEL_EVENTS');
 const blockReasons = readLedger('SUBMISSION_BLOCK_REASONS');
 
 // 1. 台帳の各イベントに、実際に送るヘルパーが gtag.ts にある
+const analyticsCode = stripComments(analytics);
 for (const eventName of funnelEvents) {
   expect(
-    analytics.includes(`trackEvent('${eventName}'`),
+    analyticsCode.includes(`trackEvent('${eventName}'`),
     `${eventName} は SUBMISSION_FUNNEL_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
   );
 }
 
 // 2. 共有フックが、フック側が担当するステップを実際に送っている
+const hookCode = stripComments(submissionFunnelHook);
 for (const helper of [
   'trackSubmissionStart',
   'trackSubmissionPhotoSelected',
@@ -104,18 +126,30 @@ for (const helper of [
   'trackSubmissionAbandoned',
 ]) {
   expect(
-    submissionFunnelHook.includes(`${helper}(`),
+    hookCode.includes(`${helper}({`),
     `useSubmissionFunnel が ${helper} を呼んでいない（ファネルに穴が空く）`
   );
 }
+// 離脱は pagehide で拾う。ここを外すと離脱が一切取れなくなる
+expect(
+  hookCode.includes("addEventListener('pagehide'"),
+  'useSubmissionFunnel が pagehide を購読していない（離脱を検知できない）'
+);
 
-// 3. 両フローが、フックを使い、送信・完了・失敗・離脱理由を送っている
+// 3. 両フローが、フックを使い、ファネルの各ステップを実際に呼んでいる。
+//    片方のフローだけ計測されている状態を fail closed で防ぐ。
+const flowCode = new Map();
 for (const { file, kind } of SUBMISSION_FLOWS) {
-  const text = read(file);
+  const text = stripComments(read(file));
+  flowCode.set(file, text);
   expect(
     text.includes(`useSubmissionFunnel('${kind}')`),
     `${file} が useSubmissionFunnel('${kind}') を使っていない`
   );
+  // start / photoSelected はフック経由、残りは直接ヘルパーを呼ぶ
+  for (const call of ['funnel.start()', 'funnel.photoSelected({', 'funnel.completed()', 'funnel.failed()']) {
+    expect(text.includes(call), `${file} が ${call} を呼んでいない`);
+  }
   for (const helper of ['trackPhotoUploadStart', 'trackPhotoUploadComplete', 'trackSubmissionFailed']) {
     expect(text.includes(`${helper}({`), `${file} が ${helper} を呼んでいない`);
   }
@@ -130,19 +164,42 @@ for (const { file, kind } of SUBMISSION_FLOWS) {
 }
 
 // 4. block_reason の全値が、どこかで実際に送られている（定義だけの値を作らせない）
-const callerText = analyticsCallers.map(({ text }) => text).join('\n');
+const callerCode = analyticsCallers.map(({ text }) => stripComments(text)).join('\n');
 for (const reason of blockReasons) {
   expect(
-    callerText.includes(`blocked('${reason}')`),
+    callerCode.includes(`blocked('${reason}')`),
     `block_reason '${reason}' は定義されているが、どこからも送られていない`
   );
 }
 
 // 5. 投稿導線のクリックが計測されている
 expect(
-  callerText.includes('trackSubmissionEntry({'),
+  callerCode.includes('trackSubmissionEntry({'),
   '投稿導線に trackSubmissionEntry が無い（流入元の内訳が取れない）'
 );
+
+// 6. 投稿APIは失敗時に機械可読な code を返し、生のDBメッセージを外へ出さない。
+//    ここが崩れると、事故が起きても GA4 の error_code が UNEXPECTED に丸まる。
+for (const routeFile of [
+  'src/app/api/design-manholes/route.ts',
+  'src/app/api/image-upload/route.ts',
+]) {
+  const routeCode = stripComments(read(routeFile));
+  expect(
+    routeCode.includes('classifySubmissionError('),
+    `${routeFile} が classifySubmissionError を使っていない`
+  );
+  // `error.message` と `error?.message` の両方を拾う（`?.` を必須にすると素通りする）
+  expect(
+    !/details:\s*\w+\??\.message/.test(routeCode),
+    `${routeFile} が生のエラーメッセージを details でクライアントへ返している`
+  );
+  // PostgrestError の code を捨てると分類できない
+  expect(
+    !/throw new Error\(`[^`]*\$\{(?:visitError|photoError|insertError)\?\.message\}[^`]*`\)/.test(routeCode),
+    `${routeFile} が PostgrestError を cause 無しで包んでいる（code が失われる）`
+  );
+}
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));

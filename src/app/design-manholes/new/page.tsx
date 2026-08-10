@@ -291,6 +291,8 @@ export default function DesignManholeNewPage() {
     let responseCode: string | undefined;
     // 送信できずに止まった（＝失敗ではない）ケースをここで区別する
     let blockedBeforeSubmit = false;
+    // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
+    const submittedPhotoSource = funnel.photoSource();
 
     try {
       let uploadFile: File;
@@ -327,7 +329,7 @@ export default function DesignManholeNewPage() {
       trackPhotoUploadStart({
         submission_kind: 'design',
         is_logged_in: true,
-        photo_source: funnel.photoSource(),
+        photo_source: submittedPhotoSource,
       });
 
       failureStage = 'upload';
@@ -380,7 +382,7 @@ export default function DesignManholeNewPage() {
       trackPhotoUploadComplete({
         submission_kind: 'design',
         is_logged_in: true,
-        photo_source: funnel.photoSource(),
+        photo_source: submittedPhotoSource,
         review_status: typeof status === 'string' ? status : undefined,
         upload_duration_ms: Date.now() - uploadStartTime,
       });
@@ -393,7 +395,7 @@ export default function DesignManholeNewPage() {
           stage: failureStage,
           status_code: responseStatus,
           error_code: responseCode,
-          photo_source: funnel.photoSource(),
+          photo_source: submittedPhotoSource,
         });
       }
     } finally {
