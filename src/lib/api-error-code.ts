@@ -27,11 +27,20 @@ export const SUBMISSION_ERROR_CODES = [
 export type SubmissionErrorCode = (typeof SUBMISSION_ERROR_CODES)[number];
 
 /**
- * スキーマのズレを示すコード。
- * `PGRST204` は PostgREST のスキーマキャッシュに列が無い場合で、今回の事故がこれ。
- * `42703`(undefined_column) / `42P01`(undefined_table) は Postgres 側の同種の訴え。
+ * スキーマのズレを示すコード。PostgREST のスキーマキャッシュに無い、の3種:
+ *   PGRST202 = 関数 / PGRST204 = 列（今回の事故） / PGRST205 = テーブル
+ * Postgres 側の同種の訴えが 42703(undefined_column) / 42P01(undefined_table)。
+ *
+ * テーブルごと未適用のマイグレーションは PGRST205 で来る。列の欠落と同じ事故クラス
+ * なので、ここから漏らすと error_code が UNEXPECTED に丸まって区別できなくなる。
  */
-const SCHEMA_MISMATCH_CODES = new Set(['PGRST204', 'PGRST202', '42703', '42P01']);
+const SCHEMA_MISMATCH_CODES = new Set([
+  'PGRST202',
+  'PGRST204',
+  'PGRST205',
+  '42703',
+  '42P01',
+]);
 
 /**
  * 権限で弾かれたコード。`42501` は RLS 違反も含む。

@@ -163,6 +163,10 @@ test('trackEvent は GA4 予約語 source をイベント引数に使ってい�
 test('エラー分類: PGRST204 はスキーマのズレとして分類される', () => {
   assert.equal(classifySubmissionError({ code: 'PGRST204' }), 'DB_SCHEMA_MISMATCH');
   assert.equal(classifySubmissionError({ code: '42703' }), 'DB_SCHEMA_MISMATCH');
+  // テーブルごと未適用なら PGRST205。列の欠落と同じ事故クラスなので同じ分類にする
+  assert.equal(classifySubmissionError({ code: 'PGRST205' }), 'DB_SCHEMA_MISMATCH');
+  assert.equal(classifySubmissionError({ code: 'PGRST202' }), 'DB_SCHEMA_MISMATCH');
+  assert.equal(classifySubmissionError({ code: '42P01' }), 'DB_SCHEMA_MISMATCH');
   // route.ts は PostgrestError を Error の cause に入れて投げ直す
   assert.equal(
     classifySubmissionError(new Error('column does not exist', { cause: { code: 'PGRST204' } })),
