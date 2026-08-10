@@ -166,6 +166,13 @@ for (const { file, kind } of SUBMISSION_FLOWS) {
     text.includes(`submission_kind: '${kind}'`),
     `${file} が submission_kind: '${kind}' を付けていない`
   );
+  // 圧縮できない写真は両フローに共通で起きる。片方だけ「失敗」に数えると、
+  // 障害の件数が水増しされたうえ、もう片方の block_reason が永久にゼロになって
+  // 2系統を並べて比較できなくなる。
+  expect(
+    text.includes("blocked('unsupported_format')"),
+    `${file} が圧縮失敗を blocked('unsupported_format') として扱っていない`
+  );
 }
 
 // 4. block_reason の全値が、どこかで実際に送られている（定義だけの値を作らせない）

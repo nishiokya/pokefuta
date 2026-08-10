@@ -144,12 +144,25 @@ npm install
 cp .env.example .env.local
 ```
 
+**`.env.local` はローカルスタック専用です。** 本番の Supabase を指す値を書くと
+`npm run type-check` に含まれる `tools/check-supabase-target.js` が落ちます。
+これは意図した動作で、開発中の操作が本番へ届く事故（2026-08-09）を防ぐためのものです。
+
+Supabase の値は `supabase start` が表示するローカルスタックのものを使います
+（キーは `iss: supabase-demo` の固定デモキー）。
+
 `.env.local`を編集：
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
+# このファイルがローカル専用であることの宣言（検査がこれを要求します）
+SUPABASE_ENV=local
+
+# Supabase（`supabase start` の出力から。本番のURL・キーは書かないこと）
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...   # supabase start が出す anon key
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...       # 同 service_role key
+
+# SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD はここに置かないこと。
+# どちらも本番に届く。Supabase CLI は ~/.supabase/access-token を読むので複製は不要。
 
 # Cloudflare R2
 R2_ACCESS_KEY_ID=xxxxx

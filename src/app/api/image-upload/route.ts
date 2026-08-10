@@ -248,13 +248,17 @@ export async function POST(request: NextRequest) {
           error: 'Manhole not found'
         }, { status: 400 });
       } else {
-        // その他のエラー（権限、ネットワーク等）
-        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt}:`, {
+        // その他のエラー（権限、ネットワーク等）。
+        // INSERT だけでなくこの照会も PGRST204 / 42501 を返しうるので、
+        // ここでも機械可読な code を返さないと事故が GA4 から見えない。
+        const code = classifySubmissionError(manholeError);
+        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt} [${code}]:`, {
           code: manholeError.code,
           message: manholeError.message
         });
         return NextResponse.json({
           success: false,
+          code,
           error: 'Database error occurred'
         }, { status: 500 });
       }

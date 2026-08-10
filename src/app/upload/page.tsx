@@ -56,6 +56,8 @@ function UploadPageInner() {
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
+  const manholesLoadFailedRef = useRef(false);
   const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
@@ -154,9 +156,11 @@ function UploadPageInner() {
       // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
       // 画面上は静かなので、ここで数えないと存在に気づけない。
       console.error('Failed to load manholes: unexpected response', response.status);
+      manholesLoadFailedRef.current = true;
       funnel.blocked('manholes_unavailable');
     } catch (error) {
       console.error('Failed to load manholes:', error);
+      manholesLoadFailedRef.current = true;
       funnel.blocked('manholes_unavailable');
     }
   };
@@ -350,6 +354,12 @@ function UploadPageInner() {
     } else {
       distanceError = 'マンホール情報をロード中です。少々お待ちください。';
       photoStatus = 'waiting_manhole';
+      // 一覧の取得に失敗済みなら、この写真はもう判定されない＝ここが実際の行き止まり。
+      // photoSelected が直前に block_reason を消しているので、記録し直さないと
+      // 「理由なしで止まっている人」に見える。
+      if (manholesLoadFailedRef.current) {
+        funnel.blocked('manholes_unavailable');
+      }
     }
 
     setPhotos([{
@@ -489,16 +499,30 @@ function UploadPageInner() {
     let responseCode: string | undefined;
     // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
     const submittedPhotoSource = funnel.photoSource();
+    // 送信できずに止まった（＝障害ではない）ケースを区別する。/design-manholes/new と揃える
+    let blockedBeforeSubmit = false;
 
     try {
       const uploadStartTime = Date.now();
 
       // Compress image
-      const compressedFile = await imageCompression(photo.file, {
-        maxSizeMB: 2,
-        maxWidthOrHeight: 1920,
-        useWebWorker: true
-      });
+      let compressedFile: File;
+      try {
+        compressedFile = await imageCompression(photo.file, {
+          maxSizeMB: 2,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true
+        });
+      } catch (compressionError) {
+        // サーバー障害ではなく写真側の問題。デザインふたと同じく離脱として数える。
+        // ここを失敗に混ぜると運用上の失敗件数が水増しされ、
+        // block_reason:'unsupported_format' がキャラふた側で永久にゼロになる。
+        blockedBeforeSubmit = true;
+        funnel.blocked('unsupported_format');
+        throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください', {
+          cause: compressionError,
+        });
+      }
 
       funnel.submitting();
       trackPhotoUploadStart({
@@ -603,15 +627,19 @@ function UploadPageInner() {
       })();
       trackAppError('upload_error', errorType);
 
-      funnel.failed();
-      trackSubmissionFailed({
-        submission_kind: 'character',
-        stage: failureStage,
-        status_code: responseStatus,
-        error_code: responseCode,
-        error_type: errorType,
-        photo_source: submittedPhotoSource,
-      });
+      // 圧縮できずに止まった場合は既に blocked として数えている。
+      // ここで失敗にも数えると二重になり、障害の件数が水増しされる。
+      if (!blockedBeforeSubmit) {
+        funnel.failed();
+        trackSubmissionFailed({
+          submission_kind: 'character',
+          stage: failureStage,
+          status_code: responseStatus,
+          error_code: responseCode,
+          error_type: errorType,
+          photo_source: submittedPhotoSource,
+        });
+      }
 
       const errorMsg = error?.message || 'アップロードに失敗しました';
       setPhotos(prev => prev.map(p =>

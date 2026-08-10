@@ -66,7 +66,19 @@ export default function DesignManholeNewPage() {
 
   // 投稿ファネルの起点。/upload と同じく画面到達を分母にする
   useEffect(() => {
-    trackView('/design-manholes/new', 'デザインマンホール投稿', 'design_manhole_new');
+    // is_logged_in を省くと trackView の既定値 false が入り、
+    // このファネルのページビューが全部「未ログイン」に化ける。
+    // 停止中は middleware が認証を外すので、既定を true に倒さず実際に解決する。
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        trackView('/design-manholes/new', 'デザインマンホール投稿', 'design_manhole_new', Boolean(session?.user));
+      } catch {
+        // 取得できなければ、保護されている前提（停止中でなければ middleware が認証を保証）
+        trackView('/design-manholes/new', 'デザインマンホール投稿', 'design_manhole_new', !DESIGN_MANHOLE_SUBMISSION_SUSPENDED);
+      }
+    })();
     funnel.start();
     if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
       // 停止中は写真選択にすら進めない。件数が0でないのに気づかない＝戻し忘れ
