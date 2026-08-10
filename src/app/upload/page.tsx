@@ -160,11 +160,13 @@ function UploadPageInner() {
           const list = data.manholes as Manhole[];
           setManholes(list);
           // API は Math.min(limit, 1000) でハードキャップする（api/manholes/route.ts）。
-          // 上限に達した＝一覧が切り捨てられており、一部の蓋は永久に一致しない。
-          // 蓋が増えて崖に達したとき、黙って壊れないようここで気づけるようにする。
-          if (list.length >= MANHOLE_LIST_LIMIT) {
+          // 切り捨てられた＝一部の蓋は永久に一致せず、その場所では投稿できない。
+          // 件数が上限ちょうどでも切り捨てとは限らないので、API が返す total と比べる
+          // （`length >= limit` だと、ちょうど1000枚のとき毎回の訪問で誤検知する）。
+          const total = typeof data.total === 'number' ? data.total : list.length;
+          if (total > list.length) {
             console.error(
-              `Manhole list is truncated at ${MANHOLE_LIST_LIMIT}. ` +
+              `Manhole list is truncated: ${list.length} of ${total}. ` +
               '一部の蓋が候補に載らず、投稿できない利用者が出る。APIの上限を上げるか分割取得へ移行すること。'
             );
             trackAppError('manhole_list_truncated', 'upload');
