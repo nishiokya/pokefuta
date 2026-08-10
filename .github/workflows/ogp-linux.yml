@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:design-manhole
+      - run: npm run test:analytics
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux

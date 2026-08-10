@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
+import { classifySubmissionError } from '@/lib/api-error-code';
 
 /**
  * @swagger
@@ -436,11 +437,13 @@ export async function POST(request: NextRequest) {
       }
 
     } catch (dbError: any) {
-      console.error('Database operation failed:', dbError?.message);
+      const code = classifySubmissionError(dbError);
+      // 生のDBメッセージはクライアントへ返さない（分類済みの code だけ返す）
+      console.error(`Database operation failed [${code}]:`, dbError?.message, dbError);
       return NextResponse.json({
         success: false,
-        error: 'Database operation failed',
-        details: dbError?.message
+        code,
+        error: 'Database operation failed'
       }, { status: 500 });
     }
 
@@ -462,11 +465,12 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Upload error:', error);
+    const code = classifySubmissionError(error);
+    console.error(`Upload error [${code}]:`, error);
     return NextResponse.json({
       success: false,
-      error: 'Unexpected error during upload',
-      details: error?.message || 'Unknown error'
+      code,
+      error: 'Unexpected error during upload'
     }, { status: 500 });
   }
 }

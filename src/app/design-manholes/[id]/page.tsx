@@ -199,7 +199,7 @@ export default async function Page({ params }: Props) {
               ? '不具合のため、デザインマンホールの投稿を一時停止しています。'
               : 'あなたの街のデザインマンホールも投稿してみませんか？'}
           </p>
-          <SubmitCta className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+          <SubmitCta surface="design_manhole_detail" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
         </div>
       </main>
 

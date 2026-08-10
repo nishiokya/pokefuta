@@ -12,6 +12,13 @@ import {
   GAEventParams,
   GAUserProperties,
   PokefutaEventParams,
+  SubmissionAbandonedParams,
+  SubmissionBlockedParams,
+  SubmissionCompleteParams,
+  SubmissionEntryParams,
+  SubmissionEventParams,
+  SubmissionFailedParams,
+  SubmissionPhotoSelectedParams,
 } from '@/lib/analytics/gtag';
 
 // 後方互換用の内部ヘルパー
@@ -63,9 +70,17 @@ export function useAnalytics() {
   const trackPassportOpen  = useCallback((p?: PokefutaEventParams) => pokefutaEvents.passportOpen(p), []);
   const trackCollectionOpen= useCallback((p?: PokefutaEventParams) => pokefutaEvents.collectionOpen(p), []);
 
-  // --- 写真投稿系 ---
-  const trackPhotoUploadStart    = useCallback((p?: PokefutaEventParams) => pokefutaEvents.photoUploadStart(p), []);
-  const trackPhotoUploadComplete = useCallback((p?: PokefutaEventParams) => pokefutaEvents.photoUploadComplete(p), []);
+  // --- 投稿ファネル ---
+  const trackSubmissionEntry         = useCallback((p: SubmissionEntryParams) => pokefutaEvents.submissionEntry(p), []);
+  const trackSubmissionStart         = useCallback((p: SubmissionEventParams) => pokefutaEvents.submissionStart(p), []);
+  const trackSubmissionPhotoSelected = useCallback((p: SubmissionPhotoSelectedParams) => pokefutaEvents.submissionPhotoSelected(p), []);
+  const trackSubmissionBlocked       = useCallback((p: SubmissionBlockedParams) => pokefutaEvents.submissionBlocked(p), []);
+  const trackPhotoUploadStart    = useCallback((p: SubmissionEventParams) => pokefutaEvents.photoUploadStart(p), []);
+  const trackPhotoUploadComplete = useCallback((p: SubmissionCompleteParams) => pokefutaEvents.photoUploadComplete(p), []);
+  const trackSubmissionFailed    = useCallback((p: SubmissionFailedParams) => pokefutaEvents.submissionFailed(p), []);
+  const trackSubmissionAbandoned = useCallback((p: SubmissionAbandonedParams) => pokefutaEvents.submissionAbandoned(p), []);
+
+  // --- 写真閲覧系 ---
   const trackPhotoView           = useCallback((p?: PokefutaEventParams) => pokefutaEvents.photoView(p), []);
   const trackPhotoExpand         = useCallback((p?: PokefutaEventParams) => pokefutaEvents.photoExpand(p), []);
 
@@ -140,9 +155,17 @@ export function useAnalytics() {
     trackPassportOpen,
     trackCollectionOpen,
 
-    // 写真投稿系
+    // 投稿ファネル
+    trackSubmissionEntry,
+    trackSubmissionStart,
+    trackSubmissionPhotoSelected,
+    trackSubmissionBlocked,
     trackPhotoUploadStart,
     trackPhotoUploadComplete,
+    trackSubmissionFailed,
+    trackSubmissionAbandoned,
+
+    // 写真閲覧系
     trackPhotoView,
     trackPhotoExpand,
 

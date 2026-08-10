@@ -4,10 +4,41 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+// 読めないファイルは pass させない。検査が黙って素通りするのが一番危ない。
+const read = (relativePath) => {
+  try {
+    return fs.readFileSync(path.join(root, relativePath), 'utf8');
+  } catch (error) {
+    console.error(`- ${relativePath} を読めませんでした: ${error.message}`);
+    process.exit(1);
+  }
+};
 
 const analytics = read('src/lib/analytics/gtag.ts');
 const provider = read('src/components/GoogleAnalytics.tsx');
+const submissionFunnelHook = read('src/lib/hooks/useSubmissionFunnel.ts');
+
+// 投稿ファネルを送る2つのフロー。片方だけ計測されている状態を作らせない
+// （2026-08-09 の事故当時、デザインふた側はイベントが1つも無かった）。
+const SUBMISSION_FLOWS = [
+  { file: 'src/app/upload/page.tsx', kind: 'character' },
+  { file: 'src/app/design-manholes/new/page.tsx', kind: 'design' },
+];
+
+/** gtag.ts の `as const` 配列から文字列リテラルを取り出す。 */
+function readLedger(name) {
+  const block = analytics.match(new RegExp(`${name}\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*as const`));
+  if (!block) {
+    console.error(`- ${name} を src/lib/analytics/gtag.ts から読み取れませんでした`);
+    process.exit(1);
+  }
+  const values = block[1].match(/'([^']+)'/g);
+  if (!values || values.length === 0) {
+    console.error(`- ${name} が空です`);
+    process.exit(1);
+  }
+  return values.map((value) => value.slice(1, -1));
+}
 
 function sourceFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -46,6 +77,72 @@ expect(!analytics.includes("trackEvent('auth_error'"), 'legacy key event auth_er
 for (const { file, text } of analyticsCallers) {
   expect(!text.match(/\bsource\s*:/), `${path.relative(root, file)} must use surface instead of GA reserved source`);
 }
+
+// ==========================================
+// 投稿ファネル
+//
+// 事故（2026-08-09）の再発防止として、ファネルが「片肺」になっていないことを検査する。
+// 定義があるのに誰も送っていない／片方のフローだけ送っている、を落とす。
+// ==========================================
+
+const funnelEvents = readLedger('SUBMISSION_FUNNEL_EVENTS');
+const blockReasons = readLedger('SUBMISSION_BLOCK_REASONS');
+
+// 1. 台帳の各イベントに、実際に送るヘルパーが gtag.ts にある
+for (const eventName of funnelEvents) {
+  expect(
+    analytics.includes(`trackEvent('${eventName}'`),
+    `${eventName} は SUBMISSION_FUNNEL_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
+  );
+}
+
+// 2. 共有フックが、フック側が担当するステップを実際に送っている
+for (const helper of [
+  'trackSubmissionStart',
+  'trackSubmissionPhotoSelected',
+  'trackSubmissionBlocked',
+  'trackSubmissionAbandoned',
+]) {
+  expect(
+    submissionFunnelHook.includes(`${helper}(`),
+    `useSubmissionFunnel が ${helper} を呼んでいない（ファネルに穴が空く）`
+  );
+}
+
+// 3. 両フローが、フックを使い、送信・完了・失敗・離脱理由を送っている
+for (const { file, kind } of SUBMISSION_FLOWS) {
+  const text = read(file);
+  expect(
+    text.includes(`useSubmissionFunnel('${kind}')`),
+    `${file} が useSubmissionFunnel('${kind}') を使っていない`
+  );
+  for (const helper of ['trackPhotoUploadStart', 'trackPhotoUploadComplete', 'trackSubmissionFailed']) {
+    expect(text.includes(`${helper}({`), `${file} が ${helper} を呼んでいない`);
+  }
+  expect(
+    /funnel\.blocked\('/.test(text),
+    `${file} が funnel.blocked を呼んでいない（離脱理由が取れない）`
+  );
+  expect(
+    text.includes(`submission_kind: '${kind}'`),
+    `${file} が submission_kind: '${kind}' を付けていない`
+  );
+}
+
+// 4. block_reason の全値が、どこかで実際に送られている（定義だけの値を作らせない）
+const callerText = analyticsCallers.map(({ text }) => text).join('\n');
+for (const reason of blockReasons) {
+  expect(
+    callerText.includes(`blocked('${reason}')`),
+    `block_reason '${reason}' は定義されているが、どこからも送られていない`
+  );
+}
+
+// 5. 投稿導線のクリックが計測されている
+expect(
+  callerText.includes('trackSubmissionEntry({'),
+  '投稿導線に trackSubmissionEntry が無い（流入元の内訳が取れない）'
+);
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));

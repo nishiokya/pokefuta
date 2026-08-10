@@ -54,10 +54,12 @@ jobs:
         with:
           version: latest
 
+      # DBパスワードは渡さない。`link` と `migration list --linked` は Management API 経由で
+      # 一時的なログインロールを作る（出力の "Initialising login role..."）ので、
+      # 静的な本番DBパスワードを CI に置く必要がない。置けば漏洩面を無駄に広げるだけ。
       - name: 本番プロジェクトへリンクする
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         # ref は tools/check-migration-drift.js の EXPECTED_PROJECT_REF と
         # 突き合わされる。ずれていればスクリプト側が exit 2 で落ちる。
         run: supabase link --project-ref kbwzwgsjqvflgfauzcpn
@@ -65,5 +67,4 @@ jobs:
       - name: マイグレーションのズレを検査する
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: node tools/check-migration-drift.js

@@ -10,6 +10,7 @@ import {
   deriveDesignSmallKey,
 } from '@/lib/storage';
 import { isValidCoordinates } from '@/lib/location';
+import { classifySubmissionError } from '@/lib/api-error-code';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import {
   buildOfficialManholeConflict,
@@ -281,7 +282,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !inserted) {
-      throw new Error(insertError?.message || 'Failed to insert design manhole');
+      // PostgrestError の code（PGRST204 など）を cause に残す。
+      // ここで message だけにすると、下の catch が原因を分類できなくなる。
+      throw new Error(insertError?.message || 'Failed to insert design manhole', {
+        cause: insertError,
+      });
     }
 
     return NextResponse.json(
@@ -303,9 +308,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.error('Design manhole submission error:', error);
+    const code = classifySubmissionError(error);
+    // 生のメッセージはサーバー側にだけ残す。クライアントへは code だけを返す。
+    console.error(`Design manhole submission error [${code}]:`, error);
     return NextResponse.json(
-      { success: false, error: '投稿に失敗しました。時間をおいて再度お試しください' },
+      {
+        success: false,
+        code,
+        error: '投稿に失敗しました。時間をおいて再度お試しください',
+      },
       { status: 500 }
     );
   }

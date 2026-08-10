@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit && node tools/check-public-display-name-source.js && node tools/check-ga4-contract.js && node tools/check-safe-area-env.js && node tools/check-supabase-target.js",
     "verify:analytics": "node tools/check-ga4-contract.js",
     "test:design-manhole": "tsx --test tests/design-manhole-*.test.ts",
+    "test:analytics": "tsx --test tests/analytics-*.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",
     "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",

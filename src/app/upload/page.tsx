@@ -11,6 +11,8 @@ import { Manhole } from '@/types/database';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
+import type { SubmissionStage } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
@@ -54,7 +56,8 @@ function UploadPageInner() {
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister } = useAnalytics();
+  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  const funnel = useSubmissionFunnel('character');
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
   useEffect(() => {
@@ -107,6 +110,9 @@ function UploadPageInner() {
       }
     })();
 
+    // 投稿ファネルの起点。導線のクリックではなく画面到達を分母にする（到達は100%取れる）
+    funnel.start();
+
     loadManholes();
     // Cookieから公開設定を読み込み
     const savedIsPublic = getCookie('pokefuta_is_public');
@@ -142,10 +148,16 @@ function UploadPageInner() {
             const found = (data.manholes as Manhole[]).find(m => m.id === hintManholeId);
             if (found) setHintManhole(found);
           }
+          return;
         }
       }
+      // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
+      // 画面上は静かなので、ここで数えないと存在に気づけない。
+      console.error('Failed to load manholes: unexpected response', response.status);
+      funnel.blocked('manholes_unavailable');
     } catch (error) {
       console.error('Failed to load manholes:', error);
+      funnel.blocked('manholes_unavailable');
     }
   };
 
@@ -295,6 +307,15 @@ function UploadPageInner() {
     const preview = URL.createObjectURL(file);
     const metadata = await extractMetadata(file);
 
+    // カメラ導線が立てた 'camera' を1回だけ消費する（次の写真へ持ち越さない）
+    const photoSource = funnel.consumePhotoSource();
+    const hasGps = isValidCoordinates(metadata.latitude, metadata.longitude);
+    funnel.photoSelected({
+      photo_source: photoSource,
+      has_gps: hasGps,
+      has_exif_datetime: !!metadata.datetime,
+    });
+
     let matchedManhole: Manhole | undefined;
     let distanceError: string | undefined;
     let photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
@@ -303,6 +324,7 @@ function UploadPageInner() {
     if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
       distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
       photoStatus = 'invalid_gps';
+      funnel.blocked('invalid_gps');
     } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
       // isValidCoordinates が true の場合、lat/lng は有効な数値
       matchedManhole = findNearestManhole(
@@ -314,6 +336,7 @@ function UploadPageInner() {
       } else {
         distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
         photoStatus = 'no_nearby_manhole';
+        funnel.blocked('no_nearby_manhole');
       }
     } else {
       distanceError = 'マンホール情報をロード中です。少々お待ちください。';
@@ -378,6 +401,9 @@ function UploadPageInner() {
       addAlert(type, message);
     };
 
+    // 以下3つは canSubmit（photoStatus === 'valid'）を通った後の防御的な再チェックなので、
+    // 通常は到達しない。GA4 上でここが非ゼロなら onDrop 側の判定に穴がある。
+
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
       const errorMsg = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
@@ -388,6 +414,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
+      funnel.blocked('invalid_gps');
       return;
     }
 
@@ -401,6 +428,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
+      funnel.blocked('no_nearby_manhole');
       return;
     }
 
@@ -417,6 +445,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
+      funnel.blocked('manhole_location_missing');
       return;
     }
 
@@ -437,12 +466,18 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
+      funnel.blocked('too_far');
       return;
     }
 
     setPhotos(prev => prev.map(p =>
       p.id === photoId ? { ...p, uploading: true, error: undefined } : p
     ));
+
+    // 失敗イベントに載せる。catch まで持ち越したいので try の外で宣言する
+    let failureStage: SubmissionStage = 'compress';
+    let responseStatus: number | undefined;
+    let responseCode: string | undefined;
 
     try {
       const uploadStartTime = Date.now();
@@ -454,7 +489,12 @@ function UploadPageInner() {
         useWebWorker: true
       });
 
-      trackPhotoUploadStart({ is_logged_in: true });
+      funnel.submitting();
+      trackPhotoUploadStart({
+        submission_kind: 'character',
+        is_logged_in: true,
+        photo_source: funnel.photoSource(),
+      });
 
       // Prepare form data for upload
       const formData = new FormData();
@@ -492,28 +532,42 @@ function UploadPageInner() {
       }
 
       // Upload to binary storage API
+      failureStage = 'upload';
       const uploadResponse = await fetch('/api/image-upload', {
         method: 'POST',
         body: formData
       });
+      responseStatus = uploadResponse.status;
 
+      // サーバーが応答した後の失敗はこちら。API が返す code をそのまま GA4 へ載せる
+      failureStage = 'persist';
       const uploadResult = await uploadResponse.json();
+      responseCode = typeof uploadResult?.code === 'string' ? uploadResult.code : undefined;
 
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || 'Upload failed');
       }
 
-      const manholeParams = {
+      funnel.completed();
+      trackPhotoUploadComplete({
+        submission_kind: 'character',
         manhole_id: photo.matchedManhole?.id,
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
+        photo_source: funnel.photoSource(),
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
         has_note: !!visitNote.trim(),
         is_public: isPublic,
-      };
-      trackPhotoUploadComplete(manholeParams);
-      trackVisitRegister(manholeParams);
+      });
+      // 訪問記録ができたこと。完了の計測は p_photo_upload_complete が正なので、
+      // 同じパラメータを並べず訪問記録固有のものに絞る（完了数が二重に見えるのを避ける）
+      trackVisitRegister({
+        manhole_id: photo.matchedManhole?.id,
+        prefecture: photo.matchedManhole?.prefecture,
+        is_public: isPublic,
+        is_logged_in: true,
+      });
 
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
@@ -527,6 +581,8 @@ function UploadPageInner() {
     } catch (error: any) {
       console.error('Upload failed:', error);
 
+      // API が code を返さなかったとき（ネットワーク断など）のための推測分類。
+      // サーバーが答えた場合は responseCode の方が正確なので、そちらを error_code に使う。
       const errorType = (() => {
         if (error?.status === 401 || error?.message?.includes('Unauthorized')) return 'unauthorized';
         if (error?.name === 'TypeError' || error?.message?.includes('network')) return 'network';
@@ -535,6 +591,16 @@ function UploadPageInner() {
         return 'unknown';
       })();
       trackAppError('upload_error', errorType);
+
+      funnel.failed();
+      trackSubmissionFailed({
+        submission_kind: 'character',
+        stage: failureStage,
+        status_code: responseStatus,
+        error_code: responseCode,
+        error_type: errorType,
+        photo_source: funnel.photoSource(),
+      });
 
       const errorMsg = error?.message || 'アップロードに失敗しました';
       setPhotos(prev => prev.map(p =>
@@ -564,6 +630,8 @@ function UploadPageInner() {
     input.onchange = async (e) => {
       const target = e.target as HTMLInputElement;
       if (target.files && target.files.length > 0) {
+        // その場で撮った写真はEXIFにGPSが乗る。ライブラリ経由との離脱差を見るため印を付ける
+        funnel.setPhotoSource('camera');
         await onDrop(Array.from(target.files));
       }
     };
@@ -599,13 +667,17 @@ function UploadPageInner() {
           <div className="mt-6 flex justify-center gap-3">
             <Link
               href="/visits"
+              onClick={() => trackNavClick('投稿完了:訪問記録を見る')}
               className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
             >
               訪問記録を見る
             </Link>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                trackNavClick('投稿完了:続けて投稿する');
+                window.location.reload();
+              }}
               className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
             >
               続けて投稿する
