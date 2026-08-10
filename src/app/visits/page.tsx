@@ -160,7 +160,7 @@ export default function VisitsPage() {
   const loadManholesOnly = async () => {
     try {
       const [manholesRes, visitsRes] = await Promise.all([
-        fetch('/api/manholes?limit=1000'),
+        fetch('/api/manholes'),
         fetch('/api/visits?with_photos=true&limit=6&order_by=created_at', { credentials: 'omit' }),
       ]);
       if (manholesRes.ok) {
@@ -200,7 +200,7 @@ export default function VisitsPage() {
     try {
       const [visitsResponse, manholesResponse] = await Promise.all([
         fetch('/api/visits?limit=1000'),
-        fetch('/api/manholes?limit=1000'),
+        fetch('/api/manholes'),
       ]);
 
       if (visitsResponse.ok) {

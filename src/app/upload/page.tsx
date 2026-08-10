@@ -16,14 +16,6 @@ import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gta
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
-/**
- * 蓋の一覧を何件まで取るか。`/api/manholes` の既定は 500 で、
- * 上限は `Math.min(limit, 1000)` にハードキャップされている。
- * 2026-08-10 時点の蓋は 482 枚なので 1000 で全件入るが、
- * 1000 を超えたら分割取得かAPI側の上限引き上げが要る（切り捨ては下で検知する）。
- */
-const MANHOLE_LIST_LIMIT = 1000;
-
 interface PhotoMetadata {
   latitude?: number;
   longitude?: number;
@@ -150,9 +142,10 @@ function UploadPageInner() {
   /**
    * 蓋の一覧が不完全なことを通知する。
    *
-   * API は Math.min(limit, 1000) でハードキャップするので、蓋が増えれば必ず切り捨てが起きる。
-   * 切り捨てられた蓋の場所では、利用者に「50m以内にマンホールが見つかりません」としか
-   * 出ないまま永久に投稿できない。気づけるのはここだけ。
+   * API は limit 未指定なら全件返すので、通常ここは発火しない。
+   * それでも残すのは、将来また上限が入ったり、スナップショット側が壊れたときに、
+   * 黙って壊れないようにするため。切り捨てられた蓋の場所では、利用者に
+   * 「50m以内にマンホールが見つかりません」としか出ないまま永久に投稿できない。
    *
    * 恒常的な状態なので、毎回のページ表示で送るとアクセス数に比例して監視を占有する。
    * セッション内で1回に抑え、代わりに件数を載せて規模が分かるようにする。
@@ -193,11 +186,11 @@ function UploadPageInner() {
 
   const loadManholes = async () => {
     try {
-      // limit を省くと /api/manholes の既定 500 件・id降順で切られ、
-      // 古い id の蓋が候補に載らない。そこへ行った人には
-      // 「50m以内にマンホールが見つかりません」としか出ず、画面にもログにも原因が出ない。
-      // 他のページ（nearby / visits）は既に明示している。
-      const response = await fetch(`/api/manholes?limit=${MANHOLE_LIST_LIMIT}`);
+      // limit は付けない。/api/manholes は未指定なら全件返す。
+      // ここで数を指定すると、蓋がその数を超えたとき古い id の蓋が候補から
+      // 黙って消え、そこへ行った人に「50m以内にマンホールが見つかりません」
+      // としか出なくなる。念のため切り捨てを検知するのが下の report。
+      const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.manholes) {

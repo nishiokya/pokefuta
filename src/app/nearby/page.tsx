@@ -111,7 +111,7 @@ export default function NearbyPage() {
   const loadAllManholes = async () => {
     try {
       setAllLoading(true);
-      const manholesResponse = await fetch('/api/manholes?limit=1000');
+      const manholesResponse = await fetch('/api/manholes');
       if (!manholesResponse.ok) {
         console.error('Failed to load all manholes');
         setAllLoading(false);

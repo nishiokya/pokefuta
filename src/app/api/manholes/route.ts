@@ -46,8 +46,22 @@ export async function GET(request: NextRequest) {
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : null;
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : null;
     const radius = parseFloat(searchParams.get('radius') || '50'); // km, default 50km
-    const limit = parseInt(searchParams.get('limit') || '500');
-    const actualLimit = Math.min(Number.isFinite(limit) ? limit : 500, 1000);
+    // limit 未指定は「全件」。指定があればその件数だけ返す。
+    //
+    // 以前は既定 500 / 上限 Math.min(limit, 1000) だった。これは `/api/manholes` が
+    // Supabase を直接クエリしていた時代に、DB への負荷を抑えるために入れたもの。
+    // #158 で静的スナップショット読みへ移行し、全件をメモリに載せてから slice する
+    // 実装になった時点で、守る対象が無くなっていた（取得済みのデータを捨てるだけ）。
+    //
+    // 既定で切ると、蓋が 500 枚を超えたとき id の小さい古い蓋が一覧から黙って消え、
+    // 地図のピン・全国一覧・詳細ページ・/upload の蓋マッチングが原因不明で壊れる。
+    // 利用者に出るのは「見つかりません」だけで、画面にもログにも理由が出ない。
+    // 2026-08-10 時点で 482 枚。あと 19 枚で踏むところだった。
+    const limitParam = searchParams.get('limit');
+    const parsedLimit = limitParam !== null ? Number.parseInt(limitParam, 10) : NaN;
+    // 未指定・解釈不能・0以下は「全件」として扱う（黙って切るより返しすぎる方が安全）
+    const actualLimit =
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
     const visited = searchParams.get('visited'); // 'true', 'false', or null for all
     const noPhotos = searchParams.get('no_photos') === 'true';
 
@@ -133,6 +147,7 @@ export async function GET(request: NextRequest) {
         .filter(matchesVisitedFilter)
         .filter(manhole => !noPhotos || manhole.photo_count === 0)
         .sort((a, b) => a.distance - b.distance)
+        // actualLimit が undefined なら slice は全件を返す
         .slice(0, actualLimit);
 
       return NextResponse.json({
@@ -143,9 +158,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 通常一覧: id 降順で limit 件（従来の DB クエリと同じ挙動）
+    // 通常一覧: id 降順。limit 指定があればその件数、無ければ全件
     const manholes = [...snapshot.manholes]
       .sort((a, b) => b.id - a.id)
+      // actualLimit が undefined なら slice は全件を返す
       .slice(0, actualLimit)
       .map(withVisitStatus)
       .filter(matchesVisitedFilter)
