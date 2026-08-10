@@ -689,6 +689,9 @@ export interface Database {
           bio: string | null;
           x_url: string | null;
           instagram_url: string | null;
+          // pokemon_go_friend_open が false のときは NULL で返る（関数側で出し分ける）
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
         }[];
       };
       get_own_profile: {
@@ -700,6 +703,9 @@ export interface Database {
           x_url: string | null;
           instagram_url: string | null;
           profile_is_customized: boolean;
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
+          pokemon_go_friend_open: boolean;
         }[];
       };
       update_own_public_profile: {
@@ -708,6 +714,9 @@ export interface Database {
           p_bio: string | null;
           p_x_url: string | null;
           p_instagram_url: string | null;
+          p_pokemon_go_friend_code?: string | null;
+          p_pokemon_go_friend_note?: string | null;
+          p_pokemon_go_friend_open?: boolean;
         };
         Returns: undefined;
       };

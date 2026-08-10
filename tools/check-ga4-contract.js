@@ -184,6 +184,27 @@ for (const reason of blockReasons) {
   );
 }
 
+// 4b. Pokémon GO フレンド募集も、台帳の各イベントに送信ヘルパーと呼び出し元がある。
+//     設定率・コピー率は分母（画面到達・カード表示）が無いと読めないので、
+//     4つ揃っていることを fail closed で担保する。
+for (const eventName of readLedger('GO_FRIEND_EVENTS')) {
+  expect(
+    analyticsCode.includes(`trackEvent('${eventName}'`),
+    `${eventName} は GO_FRIEND_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
+  );
+}
+for (const helper of [
+  'goFriendEditView',
+  'goFriendSaved',
+  'goFriendCardView',
+  'goFriendCodeCopy',
+]) {
+  expect(
+    callerCode.includes(`${helper}({`),
+    `${helper} がどこからも呼ばれていない（Pokémon GO フレンド募集の計測に穴が空く）`
+  );
+}
+
 // 5. 投稿導線のクリックが計測されている
 expect(
   callerCode.includes('trackSubmissionEntry({'),

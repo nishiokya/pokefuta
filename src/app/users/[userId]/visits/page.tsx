@@ -19,6 +19,7 @@ import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { userVisitsShareText } from '@/lib/share';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
+import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
   loadPublicUserPrefectureProgress,
@@ -32,6 +33,16 @@ type PageProps = {
 };
 
 export const dynamic = 'force-dynamic';
+// `dynamic = 'force-dynamic'` はページを毎回レンダリングするだけで、
+// **その中の fetch は Next.js の Data Cache に載ったままになる**。
+// `.next/cache/fetch-cache` はビルドやプロセス再起動をまたいで残るので、
+// プロフィールを変えても古い応答が返り続ける。
+//
+// このページは Pokémon GO の「フレンド募集中」スイッチを表示する。
+// スイッチを OFF にしたのにトレーナーコードが出続けるのは、
+// 表示名が古いのとは意味が違う（本人が消したはずの個人情報が残る）。
+// 実測でも、キャッシュが温まった状態では OFF 後もコードが描画され続けた。
+export const fetchCache = 'force-no-store';
 
 const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(userId)}/visits`;
 const getOgpImageUrl = (userId: string) =>
@@ -174,6 +185,16 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 {instagramUrl && (
                   <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
                 )}
+              </div>
+            )}
+
+            {data.pokemonGoFriendCode && (
+              <div className="mt-4 max-w-md">
+                <PokemonGoFriendCard
+                  code={data.pokemonGoFriendCode}
+                  note={data.pokemonGoFriendNote}
+                  displayName={data.displayName}
+                />
               </div>
             )}
 

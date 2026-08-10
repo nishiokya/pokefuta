@@ -87,6 +87,9 @@ export type AppUserProgressRow = {
   bio?: string | null;
   x_url?: string | null;
   instagram_url?: string | null;
+  // get_public_user_info() が募集スイッチで出し分ける。OFF なら NULL で返る
+  pokemon_go_friend_code?: string | null;
+  pokemon_go_friend_note?: string | null;
 };
 
 export const FALLBACK_DISPLAY_NAME = 'トレーナー';

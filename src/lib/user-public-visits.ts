@@ -30,6 +30,9 @@ export type PublicUserVisits = {
   bio: string | null;
   xUrl: string | null;
   instagramUrl: string | null;
+  // 募集スイッチが OFF のユーザーでは常に null。出し分けは get_public_user_info() 側で行う
+  pokemonGoFriendCode: string | null;
+  pokemonGoFriendNote: string | null;
   totalVisits: number;
   prefectureCount: number;
   visits: PublicVisit[];
@@ -195,6 +198,8 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     bio: appUserRow.bio || null,
     xUrl: appUserRow.x_url || null,
     instagramUrl: appUserRow.instagram_url || null,
+    pokemonGoFriendCode: appUserRow.pokemon_go_friend_code || null,
+    pokemonGoFriendNote: appUserRow.pokemon_go_friend_note || null,
     totalVisits,
     prefectureCount: prefectureSet.size,
     visits: publicVisits,

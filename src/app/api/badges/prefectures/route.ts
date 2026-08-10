@@ -7,8 +7,10 @@ export const dynamic = 'force-dynamic';
  * GET /api/badges/prefectures
  * ユーザーの都道府県バッジ情報を取得
  * 
+ * 対象は常に認証ユーザー自身。app_user への直接 SELECT は自分の行だけに絞ってある
+ * （supabase/migrations/20260810140000_app_user_public_surface_and_pokemon_go_friend_code.sql）。
+ *
  * Query parameters:
- * - userId (optional): ユーザーID。指定なしの場合は認証ユーザー
  * - includeOutdated (boolean): 古いバッジも含めるか（デフォルト: true）
  * 
  * Response:

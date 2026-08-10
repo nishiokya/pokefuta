@@ -125,6 +125,32 @@ export const SUBMISSION_FUNNEL_EVENTS = [
   'p_submission_abandoned',      // 6c. 投稿せずに離脱（pagehide で1回だけ）
 ] as const;
 
+export interface GoFriendEventParams extends GAEventParams {
+  /** 発生箇所。GA4 予約語の source は使わない。 */
+  surface: string;
+}
+
+export interface GoFriendSavedParams extends GoFriendEventParams {
+  /** 保存後に募集中として公開されているか。設定率と公開率を分けて見る。 */
+  is_open: boolean;
+  /** ひとことを書いたか。フリーワードの中身は送らない（個人情報が混じりうる）。 */
+  has_note: boolean;
+}
+
+/**
+ * Pokémon GO フレンド募集の台帳。`tools/check-ga4-contract.js` が
+ * 「定義だけあって誰も送っていない」状態を落とす。
+ *
+ * 分母の取り方は投稿ファネルと同じ考え方で、導線クリックではなく**画面到達**を使う。
+ * 導線は散らばって取りこぼす（2026-08-10 の #208 で同じ判断をしている）。
+ */
+export const GO_FRIEND_EVENTS = [
+  'p_go_friend_edit_view',  // 1. プロフィール編集画面に到達（設定率の分母）
+  'p_go_friend_saved',      // 2. トレーナーコードを保存した
+  'p_go_friend_card_view',  // 3. 公開ページで募集カードが表示された（コピー率の分母）
+  'p_go_friend_code_copy',  // 4. コードをコピーした
+] as const;
+
 export interface ApiErrorEventParams extends GAEventParams {
   api_path: string;
   endpoint?: string;
@@ -361,6 +387,14 @@ export const pokefutaEvents = {
 
   // --- SNS導線系 ---
   xLinkClick:          (p?: PokefutaEventParams) => trackEvent('p_x_link_click', p),
+
+  // --- Pokémon GO フレンド募集（GO_FRIEND_EVENTS の順） ---
+  /** プロフィール編集画面に到達。設定率の分母。 */
+  goFriendEditView:    (p: GoFriendEventParams)  => trackEvent('p_go_friend_edit_view', p),
+  goFriendSaved:       (p: GoFriendSavedParams)  => trackEvent('p_go_friend_saved', p),
+  /** 公開ページで募集カードが出た。コピー率の分母。 */
+  goFriendCardView:    (p: GoFriendEventParams)  => trackEvent('p_go_friend_card_view', p),
+  goFriendCodeCopy:    (p: GoFriendEventParams)  => trackEvent('p_go_friend_code_copy', p),
 };
 
 // ==========================================
