@@ -53,7 +53,11 @@
    `submission_kind` / `block_reason` / `error_code` / `error_type` / `stage` / `last_step` /
    `photo_source` / `review_status` / `surface` / `prefecture` / `page_type` / `is_logged_in` /
    `source_app` / `site_type`
-2. カスタム指標: `upload_duration_ms`、`dwell_ms`（いずれもミリ秒）
+2. カスタム指標:
+   - `upload_duration_ms`、`dwell_ms`（いずれもミリ秒）
+   - `manhole_loaded`、`manhole_total`（件数・標準）
+     — 蓋の一覧が切り捨てられたときの規模を見るため。
+     `p_app_error{error_code:'manhole_list_truncated' | 'manhole_list_total_invalid'}` に載る
 3. キーイベント: `p_photo_upload_complete`（主要コンバージョン）、`p_signup_complete`
 4. 探索（目標到達プロセス）: ステップ 2 → 3 → 5 → 6a、内訳ディメンション `submission_kind`。
    離脱理由は `p_submission_blocked` を `block_reason` で分解した経路データ探索を併設する

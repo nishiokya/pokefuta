@@ -178,7 +178,9 @@ function UploadPageInner() {
     );
     track('p_app_error', {
       error_code: errorCode,
-      error_type: 'upload',
+      error_type: 'data_contract',
+      // 発生箇所は surface で表す（error_type は種別であって場所ではない）
+      surface: 'upload_manhole_list',
       manhole_loaded: loaded,
       manhole_total: total ?? undefined,
     });
