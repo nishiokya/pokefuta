@@ -73,6 +73,34 @@ function listMigrations() {
   return parsed.migrations;
 }
 
+/**
+ * `migration list --linked` は Management API で一時ログインロールを作ってから
+ * 接続するため、ネットワークやAPI側の一過性の失敗で落ちることがある
+ * （2026-08-10、本番は正常なのにCIだけ1回落ちた）。
+ *
+ * 失敗したまま緑にはしない。ただし、たまに赤くなる検査は無視されるようになり、
+ * 本物のズレを見落とす方向に働く。だから**回数を限って**やり直し、
+ * 全部だめなら従来どおり落とす。
+ */
+function listMigrationsWithRetry(attempts = 3, waitMs = 3000) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return listMigrations();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        console.warn(
+          `check-migration-drift: 本番への接続に失敗 (${attempt}/${attempts})。${waitMs}ms 後に再試行する`
+        );
+        // execFileSync と揃えて同期で待つ
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, waitMs);
+      }
+    }
+  }
+  throw lastError;
+}
+
 function main() {
   let ref;
   let migrations;
@@ -100,7 +128,7 @@ function main() {
   console.log(`check-migration-drift: 宛先 ${ref}`);
 
   try {
-    migrations = listMigrations();
+    migrations = listMigrationsWithRetry();
   } catch (error) {
     console.error('check-migration-drift: 本番への接続または出力の解釈に失敗した');
     console.error(error.message);
