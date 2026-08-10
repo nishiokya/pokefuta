@@ -26,6 +26,105 @@ export interface PokefutaEventParams extends GAEventParams {
   surface?: string;        // イベント発生箇所。GA予約語の source は使用しない
 }
 
+// ==========================================
+// 投稿ファネル
+//
+// キャラふた（/upload）とデザインふた（/design-manholes/new）で同じイベント名を使い、
+// submission_kind で出し分ける。GA4 の探索は1つのファネル定義で両方を見られる。
+// ==========================================
+
+export type SubmissionKind = 'character' | 'design';
+
+/**
+ * 送信に進めず止まった理由。ここが「静かな離脱」の可視化そのものなので、
+ * return するだけの分岐を足したら必ずこの一覧にも足す。
+ */
+export const SUBMISSION_BLOCK_REASONS = [
+  'invalid_gps',              // 写真にGPSが無い
+  'no_nearby_manhole',        // 50m以内に登録済みの蓋が無い
+  'too_far',                  // 蓋から50m以上離れている
+  'manhole_location_missing', // 蓋側に座標が無い
+  'manholes_unavailable',     // 蓋の一覧を取得できなかった
+  'official_manhole_nearby',  // 公式ポケふたが近く、確認待ちに差し戻した
+  'unsupported_format',       // 画像形式を変換できなかった
+  'suspended',                // 投稿受付を停止中
+] as const;
+
+export type SubmissionBlockReason = (typeof SUBMISSION_BLOCK_REASONS)[number];
+
+/** 失敗がどの段階で起きたか。原因の切り分けに使う。 */
+export type SubmissionStage = 'compress' | 'upload' | 'persist';
+
+/**
+ * 写真をどう選んだか。
+ * その場で撮ればEXIFにGPSが乗るが、ライブラリやSNS経由の写真は剥がれていることが多い。
+ * `invalid_gps` の主因を説明できるのはこの軸なので、写真選択以降の全イベントに載せる。
+ */
+export type PhotoSource = 'camera' | 'library';
+
+/**
+ * 離脱時点で到達していた最も先のステップ。完了は離脱ではないので含めない。
+ * `failed` は「失敗した後そのまま去った」— 再試行して完了した人と区別できる。
+ */
+export type SubmissionStep = 'start' | 'photo_selected' | 'blocked' | 'submitting' | 'failed';
+
+export interface SubmissionEventParams extends PokefutaEventParams {
+  submission_kind: SubmissionKind;
+  photo_source?: PhotoSource;
+}
+
+export interface SubmissionEntryParams extends SubmissionEventParams {
+  surface: string;
+}
+
+export interface SubmissionPhotoSelectedParams extends SubmissionEventParams {
+  photo_source: PhotoSource;
+  has_gps: boolean;
+  has_exif_datetime?: boolean;
+}
+
+/**
+ * 投稿しないままページを離れたこと。`pagehide` で1回だけ送る。
+ * ファネルの段差は「どこで落ちたか」しか示さないが、こちらは
+ * 滞在時間と、止まっていた理由（block_reason）を併せて残す。
+ */
+export interface SubmissionAbandonedParams extends SubmissionEventParams {
+  last_step: SubmissionStep;
+  dwell_ms: number;
+  block_reason?: SubmissionBlockReason;
+}
+
+export interface SubmissionBlockedParams extends SubmissionEventParams {
+  block_reason: SubmissionBlockReason;
+}
+
+export interface SubmissionCompleteParams extends SubmissionEventParams {
+  review_status?: string;
+  upload_duration_ms?: number;
+}
+
+export interface SubmissionFailedParams extends SubmissionEventParams {
+  stage: SubmissionStage;
+  status_code?: number;
+  /** API が返す機械可読なコード。`src/lib/api-error-code.ts` を参照。 */
+  error_code?: string;
+}
+
+/**
+ * 投稿ファネルの台帳。`tools/check-ga4-contract.js` がこの並びを正として、
+ * 両フローが全ステップを送っているかを検査する。順序はファネルの順序。
+ */
+export const SUBMISSION_FUNNEL_EVENTS = [
+  'p_submission_entry',          // 1. 投稿導線のクリック（補助。分母には使わない）
+  'p_submission_start',          // 2. 投稿画面に到達（ファネルの起点）
+  'p_submission_photo_selected', // 3. 写真を選んだ
+  'p_submission_blocked',        // 4. 送信に進めず止まった
+  'p_photo_upload_start',        // 5. 送信した
+  'p_photo_upload_complete',     // 6a. 完了（キーイベント）
+  'p_submission_failed',         // 6b. 失敗（キーイベントにしない）
+  'p_submission_abandoned',      // 6c. 投稿せずに離脱（pagehide で1回だけ）
+] as const;
+
 export interface ApiErrorEventParams extends GAEventParams {
   api_path: string;
   endpoint?: string;
@@ -213,6 +312,10 @@ export const pokefutaEvents = {
   logout:              (p?: PokefutaEventParams) => trackEvent('p_logout', p),
 
   // --- 訪問記録系 ---
+  /**
+   * 訪問記録が1件できたこと。**ファネルの完了は p_photo_upload_complete が正**で、
+   * こちらはキャラふた固有の意味に絞る（両者を同じパラメータで送ると完了数が二重に見える）。
+   */
   visitRegister:       (p?: PokefutaEventParams) => trackEvent('p_visit_register', p),
   visitDelete:         (p?: PokefutaEventParams) => trackEvent('p_visit_delete', p),
   /** 登録後の公開/非公開切り替え。params: is_public(切替後), surface */
@@ -222,9 +325,20 @@ export const pokefutaEvents = {
   passportOpen:        (p?: PokefutaEventParams) => trackEvent('p_passport_open', p),
   collectionOpen:      (p?: PokefutaEventParams) => trackEvent('p_collection_open', p),
 
-  // --- 写真投稿系 ---
-  photoUploadStart:    (p?: PokefutaEventParams) => trackEvent('p_photo_upload_start', p),
-  photoUploadComplete: (p?: PokefutaEventParams) => trackEvent('p_photo_upload_complete', p),
+  // --- 投稿ファネル（SUBMISSION_FUNNEL_EVENTS の順） ---
+  submissionEntry:         (p: SubmissionEntryParams)         => trackEvent('p_submission_entry', p),
+  submissionStart:         (p: SubmissionEventParams)         => trackEvent('p_submission_start', p),
+  submissionPhotoSelected: (p: SubmissionPhotoSelectedParams) => trackEvent('p_submission_photo_selected', p),
+  submissionBlocked:       (p: SubmissionBlockedParams)       => trackEvent('p_submission_blocked', p),
+  /** 送信（fetch 直前）。submission_kind は必須 — 付け忘れは型で落ちる。 */
+  photoUploadStart:        (p: SubmissionEventParams)         => trackEvent('p_photo_upload_start', p),
+  /** 完了。写真館の主要コンバージョンで、GA4 のキーイベントはこれだけにする。 */
+  photoUploadComplete:     (p: SubmissionCompleteParams)      => trackEvent('p_photo_upload_complete', p),
+  /** 失敗。エラーをキーイベントにしない（gtag.ts 末尾の経緯を参照）。 */
+  submissionFailed:        (p: SubmissionFailedParams)        => trackEvent('p_submission_failed', p),
+  submissionAbandoned:     (p: SubmissionAbandonedParams)     => trackEvent('p_submission_abandoned', p),
+
+  // --- 写真閲覧系 ---
   photoView:           (p?: PokefutaEventParams) => trackEvent('p_photo_view', p),
   photoExpand:         (p?: PokefutaEventParams) => trackEvent('p_photo_expand', p),
 

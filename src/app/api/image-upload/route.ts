@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
+import { classifySubmissionError } from '@/lib/api-error-code';
 
 /**
  * @swagger
@@ -247,13 +248,17 @@ export async function POST(request: NextRequest) {
           error: 'Manhole not found'
         }, { status: 400 });
       } else {
-        // その他のエラー（権限、ネットワーク等）
-        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt}:`, {
+        // その他のエラー（権限、ネットワーク等）。
+        // INSERT だけでなくこの照会も PGRST204 / 42501 を返しうるので、
+        // ここでも機械可読な code を返さないと事故が GA4 から見えない。
+        const code = classifySubmissionError(manholeError);
+        console.error(`[ERROR] Manhole lookup failed for ID ${manholeIdInt} [${code}]:`, {
           code: manholeError.code,
           message: manholeError.message
         });
         return NextResponse.json({
           success: false,
+          code,
           error: 'Database error occurred'
         }, { status: 500 });
       }
@@ -405,7 +410,9 @@ export async function POST(request: NextRequest) {
           visitId = visitData.id;
         } else {
           console.error('Failed to create visit record:', visitError?.message);
-          throw new Error(`Visit creation failed: ${visitError?.message}`);
+          // PostgrestError の code（PGRST204 など）を cause に残す。
+          // message だけにすると classifySubmissionError が UNEXPECTED に落ちる。
+          throw new Error(`Visit creation failed: ${visitError?.message}`, { cause: visitError });
         }
       }
 
@@ -432,15 +439,18 @@ export async function POST(request: NextRequest) {
         imageId = photoData.id;
       } else {
         console.error('Photo insert failed:', photoError?.message);
-        throw new Error(`Photo creation failed: ${photoError?.message}`);
+        // 同上。ここを message だけにすると事故時に原因が GA4 へ届かない
+        throw new Error(`Photo creation failed: ${photoError?.message}`, { cause: photoError });
       }
 
     } catch (dbError: any) {
-      console.error('Database operation failed:', dbError?.message);
+      const code = classifySubmissionError(dbError);
+      // 生のDBメッセージはクライアントへ返さない（分類済みの code だけ返す）
+      console.error(`Database operation failed [${code}]:`, dbError?.message, dbError);
       return NextResponse.json({
         success: false,
-        error: 'Database operation failed',
-        details: dbError?.message
+        code,
+        error: 'Database operation failed'
       }, { status: 500 });
     }
 
@@ -462,11 +472,12 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Upload error:', error);
+    const code = classifySubmissionError(error);
+    console.error(`Upload error [${code}]:`, error);
     return NextResponse.json({
       success: false,
-      error: 'Unexpected error during upload',
-      details: error?.message || 'Unknown error'
+      code,
+      error: 'Unexpected error during upload'
     }, { status: 500 });
   }
 }
@@ -606,10 +617,12 @@ export async function GET(request: NextRequest) {
       const { data: images, error, count } = await query;
 
       if (error) {
+        const code = classifySubmissionError(error);
+        console.error(`Failed to fetch images [${code}]:`, error.message, error);
         return NextResponse.json({
           success: false,
-          error: 'Failed to fetch images',
-          details: error.message
+          code,
+          error: 'Failed to fetch images'
         }, { status: 500 });
       }
 
@@ -682,10 +695,12 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error: any) {
+    const code = classifySubmissionError(error);
+    console.error(`Failed to get image [${code}]:`, error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to get image',
-      details: error?.message || 'Unknown error'
+      code,
+      error: 'Failed to get image'
     }, { status: 500 });
   }
 }

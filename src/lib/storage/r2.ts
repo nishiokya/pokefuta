@@ -61,7 +61,7 @@ export class R2StorageAdapter implements StorageAdapter {
       await this.s3Client.send(command);
     } catch (error) {
       console.error('R2 storage upload error:', error);
-      throw new Error(`Failed to upload to R2: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to upload to R2: ${error instanceof Error ? error.message : 'Unknown error'}`, { cause: error });
     }
   }
 
@@ -82,7 +82,7 @@ export class R2StorageAdapter implements StorageAdapter {
       };
     } catch (error) {
       console.error('R2 storage signed URL error:', error);
-      throw new Error(`Failed to create signed URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to create signed URL: ${error instanceof Error ? error.message : 'Unknown error'}`, { cause: error });
     }
   }
 
@@ -114,7 +114,7 @@ export class R2StorageAdapter implements StorageAdapter {
       await this.s3Client.send(command);
     } catch (error) {
       console.error('R2 storage delete error:', error);
-      throw new Error(`Failed to delete from R2: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to delete from R2: ${error instanceof Error ? error.message : 'Unknown error'}`, { cause: error });
     }
   }
 

@@ -45,6 +45,10 @@ function derivePageType(pathname: string): string {
   if (pathname === '/visits') return 'visits';
   if (pathname === '/popular') return 'popular';
   if (pathname === '/upload') return 'upload';
+  // デザインふたを 'other' に丸めると、投稿APIのエラーがどの画面から出たか分からない
+  if (pathname === '/design-manholes/new') return 'design_manhole_new';
+  if (/^\/design-manholes\//.test(pathname)) return 'design_manhole_detail';
+  if (pathname === '/design-manholes') return 'design_manhole_list';
   if (pathname === '/login') return 'login';
   if (/^\/prefecture\//.test(pathname)) return 'prefecture';
   if (/^\/users\//.test(pathname)) return 'user_profile';

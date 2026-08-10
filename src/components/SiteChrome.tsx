@@ -343,7 +343,7 @@ function pcNavLinkStyle(isActive: boolean): React.CSSProperties {
 }
 
 function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
-  const { trackXLinkClick } = useAnalytics();
+  const { trackXLinkClick, trackSubmissionEntry } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
   const navItems = isLoggedIn ? AUTH_NAV_ITEMS : GUEST_NAV_ITEMS;
   const isUploading = isActivePath(pathname, '/upload');
@@ -410,6 +410,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         <Link
           href="/upload"
           aria-current={isUploading ? 'page' : undefined}
+          onClick={() => trackSubmissionEntry({ submission_kind: 'character', surface: 'header' })}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -564,7 +565,7 @@ const BOTTOM_TAB_ICONS: Record<string, React.ReactNode> = {
 };
 
 function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
-  const { trackNavClick } = useAnalytics();
+  const { trackNavClick, trackSubmissionEntry } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
   const hideUploadFab = isSubmissionPage(pathname);
 
@@ -602,7 +603,10 @@ function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
             <div style={{ position: 'absolute', left: '50%', top: -22, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <Link
                 href="/upload"
-                onClick={() => trackNavClick('投稿')}
+                onClick={() => {
+                  trackNavClick('投稿');
+                  trackSubmissionEntry({ submission_kind: 'character', surface: 'bottom_nav_fab' });
+                }}
                 aria-current={isActivePath(pathname, '/upload') ? 'page' : undefined}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none' }}
               >

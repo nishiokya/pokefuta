@@ -20,8 +20,12 @@ import {
 } from '@/lib/design-manhole-proximity';
 import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED,
+  DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
+import type { SubmissionStage } from '@/lib/analytics/gtag';
 
 type GpsSource = 'exif' | null;
 type ProximityCheckStatus = 'idle' | 'checking' | 'ready' | 'error';
@@ -41,6 +45,8 @@ export default function DesignManholeNewPage() {
     useState<ProximityCheckStatus>('idle');
   const proximityCheckSequenceRef = useRef(0);
   const photoGenerationGuardRef = useRef(createLatestGenerationGuard());
+  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackSubmissionFailed, trackNavClick, trackShareX } = useAnalytics();
+  const funnel = useSubmissionFunnel('design');
 
   // プレビューURLは差し替え時・アンマウント時に解放する
   useEffect(() => {
@@ -57,6 +63,29 @@ export default function DesignManholeNewPage() {
   const [postedId, setPostedId] = useState<string | null>(null);
   const [postedTitle, setPostedTitle] = useState<string | null>(null);
   const [postedNeedsReview, setPostedNeedsReview] = useState(false);
+
+  // 投稿ファネルの起点。/upload と同じく画面到達を分母にする
+  useEffect(() => {
+    // is_logged_in を省くと trackView の既定値 false が入り、
+    // このファネルのページビューが全部「未ログイン」に化ける。
+    // 停止中は middleware が認証を外すので、既定を true に倒さず実際に解決する。
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        trackView('/design-manholes/new', 'デザインマンホール投稿', 'design_manhole_new', Boolean(session?.user));
+      } catch {
+        // 取得できなければ、保護されている前提（停止中でなければ middleware が認証を保証）
+        trackView('/design-manholes/new', 'デザインマンホール投稿', 'design_manhole_new', !DESIGN_MANHOLE_SUBMISSION_SUSPENDED);
+      }
+    })();
+    funnel.start();
+    if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
+      // 停止中は写真選択にすら進めない。件数が0でないのに気づかない＝戻し忘れ
+      funnel.blocked('suspended');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ニックネーム初期値はログインユーザーの表示名（ページ自体は middleware が保護）
   useEffect(() => {
@@ -118,6 +147,10 @@ export default function DesignManholeNewPage() {
       ) return;
       setNearbyOfficialManhole(candidate);
       setProximityCheckStatus('ready');
+      if (candidate) {
+        // 公式ポケふたが近いので、明示確認するまで送信に進めない
+        funnel.blocked('official_manhole_nearby');
+      }
     } catch (lookupError) {
       console.error('Official manhole proximity check failed:', lookupError);
       if (
@@ -127,7 +160,10 @@ export default function DesignManholeNewPage() {
       setNearbyOfficialManhole(null);
       setProximityCheckStatus('error');
       setError('近くの公式ポケふたを確認できませんでした。再確認してください');
+      // 照合できないと投稿を受け付けないので、ここも離脱点
+      funnel.blocked('manholes_unavailable');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const resetProximityCheck = useCallback(() => {
@@ -141,6 +177,8 @@ export default function DesignManholeNewPage() {
     const selected = acceptedFiles[0];
     if (!selected) return;
     const photoGeneration = photoGenerationGuardRef.current.begin();
+    // カメラ導線が立てた 'camera' を1回だけ消費する（次の写真へ持ち越さない）
+    const photoSource = funnel.consumePhotoSource();
 
     setFile(selected);
     setError(null);
@@ -159,7 +197,13 @@ export default function DesignManholeNewPage() {
         gps: true, tiff: true, exif: true, xmp: false, icc: false, iptc: false,
       });
       if (!photoGenerationGuardRef.current.isCurrent(photoGeneration)) return;
-      if (isValidCoordinates(raw?.latitude, raw?.longitude)) {
+      const hasGps = isValidCoordinates(raw?.latitude, raw?.longitude);
+      funnel.photoSelected({
+        photo_source: photoSource,
+        has_gps: hasGps,
+        has_exif_datetime: !!raw?.DateTimeOriginal,
+      });
+      if (hasGps) {
         setLat(raw.latitude);
         setLng(raw.longitude);
         setGpsSource('exif');
@@ -174,6 +218,8 @@ export default function DesignManholeNewPage() {
         setLat(null);
         setLng(null);
         setGpsSource(null);
+        // GPSが無いと座標を出せず送信できない。デザインふた最大の離脱点
+        funnel.blocked('invalid_gps');
       }
       if (raw) {
         setExifPayload({
@@ -194,6 +240,9 @@ export default function DesignManholeNewPage() {
       setLat(null);
       setLng(null);
       setGpsSource(null);
+      // EXIFを読めなかった場合も、利用者から見れば「座標が取れない」で同じ行き止まり
+      funnel.photoSelected({ photo_source: photoSource, has_gps: false });
+      funnel.blocked('invalid_gps');
     } finally {
       if (photoGenerationGuardRef.current.isCurrent(photoGeneration)) {
         setExifChecking(false);
@@ -224,6 +273,8 @@ export default function DesignManholeNewPage() {
     input.onchange = async (e) => {
       const target = e.target as HTMLInputElement;
       if (target.files && target.files.length > 0) {
+        // その場で撮った写真はEXIFにGPSが乗る。ライブラリ経由との離脱差を見るため印を付ける
+        funnel.setPhotoSource('camera');
         await onDrop(Array.from(target.files));
       }
     };
@@ -246,6 +297,15 @@ export default function DesignManholeNewPage() {
     setSubmitting(true);
     setError(null);
 
+    // 失敗イベントに載せる。catch まで持ち越したいので try の外で宣言する
+    let failureStage: SubmissionStage = 'compress';
+    let responseStatus: number | undefined;
+    let responseCode: string | undefined;
+    // 送信できずに止まった（＝失敗ではない）ケースをここで区別する
+    let blockedBeforeSubmit = false;
+    // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
+    const submittedPhotoSource = funnel.photoSource();
+
     try {
       let uploadFile: File;
       try {
@@ -256,6 +316,9 @@ export default function DesignManholeNewPage() {
           useWebWorker: true,
         });
       } catch {
+        // サーバー障害ではなく写真側の問題なので、失敗ではなく離脱として数える
+        blockedBeforeSubmit = true;
+        funnel.blocked('unsupported_format');
         throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください');
       }
 
@@ -274,11 +337,25 @@ export default function DesignManholeNewPage() {
         );
       }
 
+      funnel.submitting();
+      trackPhotoUploadStart({
+        submission_kind: 'design',
+        is_logged_in: true,
+        photo_source: submittedPhotoSource,
+      });
+
+      failureStage = 'upload';
+      const uploadStartTime = Date.now();
       const res = await fetch('/api/design-manholes', {
         method: 'POST',
         body: formData,
       });
+      responseStatus = res.status;
+
+      // サーバーが応答した後の失敗はこちら
+      failureStage = 'persist';
       const data = await res.json().catch(() => null);
+      responseCode = typeof data?.code === 'string' ? data.code : undefined;
 
       if (res.status === 401) {
         throw new Error('セッションが切れました。ログインし直してください');
@@ -291,20 +368,48 @@ export default function DesignManholeNewPage() {
         setNearbyOfficialManhole(data.official_manhole);
         setConfirmedNearbyOfficialManholeId(null);
         setProximityCheckStatus('ready');
+        // 差し戻して確認を求めている状態。サーバー障害ではないので失敗に数えない
+        blockedBeforeSubmit = true;
+        funnel.blocked('official_manhole_nearby');
         throw new Error(
           '近くに公式ポケふたがあります。訪問写真として登録するか、別のマンホールであることを確認してください'
         );
       }
       if (!res.ok) {
+        // 投稿受付の停止中もここに来る（503）。障害ではないので離脱として数える
+        if (data?.code === DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE) {
+          blockedBeforeSubmit = true;
+          funnel.blocked('suspended');
+        }
         throw new Error(data?.error || '投稿に失敗しました。時間をおいて再度お試しください');
       }
 
+      const status = data?.design_manhole?.status;
       setPostedId(data?.design_manhole?.id ?? null);
       setPostedTitle(data?.design_manhole?.title ?? null);
-      setPostedNeedsReview(data?.design_manhole?.status === 'needs_review');
+      setPostedNeedsReview(status === 'needs_review');
       setDone(true);
+
+      funnel.completed();
+      trackPhotoUploadComplete({
+        submission_kind: 'design',
+        is_logged_in: true,
+        photo_source: submittedPhotoSource,
+        review_status: typeof status === 'string' ? status : undefined,
+        upload_duration_ms: Date.now() - uploadStartTime,
+      });
     } catch (err: any) {
       setError(err?.message || '投稿に失敗しました');
+      if (!blockedBeforeSubmit) {
+        funnel.failed();
+        trackSubmissionFailed({
+          submission_kind: 'design',
+          stage: failureStage,
+          status_code: responseStatus,
+          error_code: responseCode,
+          photo_source: submittedPhotoSource,
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -338,6 +443,7 @@ export default function DesignManholeNewPage() {
               href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackShareX({ surface: 'design_manhole_submit_complete' })}
               className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-[#2A2A2A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#444444]"
             >
               <Share2 className="h-4 w-4" />
@@ -348,6 +454,7 @@ export default function DesignManholeNewPage() {
             {postedId && !postedNeedsReview ? (
               <Link
                 href={`/design-manholes/${postedId}`}
+                onClick={() => trackNavClick('投稿完了:自分の投稿ページを見る')}
                 className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
               >
                 自分の投稿ページを見る
@@ -355,6 +462,7 @@ export default function DesignManholeNewPage() {
             ) : (
               <Link
                 href="/design-manholes"
+                onClick={() => trackNavClick('投稿完了:一覧を見る')}
                 className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
               >
                 一覧を見る
@@ -362,7 +470,10 @@ export default function DesignManholeNewPage() {
             )}
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                trackNavClick('投稿完了:続けて投稿する');
+                window.location.reload();
+              }}
               className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
             >
               続けて投稿する

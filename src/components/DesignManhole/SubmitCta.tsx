@@ -1,16 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import { AlertCircle, Plus } from 'lucide-react';
 import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
 
 /**
  * デザインマンホール投稿への導線。
  * 停止中に導線を出したままだと、ログインまで求めた末に停止を知らせることになるので、
  * ボタンそのものを停止表示へ差し替える。
+ *
+ * `surface` はどの画面の導線かを表す（ファネルの分母は画面到達なので、これは内訳用）。
  */
-export function SubmitCta({ className }: { className: string }) {
+export function SubmitCta({ className, surface = 'design_manhole' }: { className: string; surface?: string }) {
+  const { trackSubmissionEntry } = useAnalytics();
+
   if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
     return (
       <span aria-disabled="true" className={`${className} cursor-not-allowed opacity-50`}>
@@ -20,7 +27,11 @@ export function SubmitCta({ className }: { className: string }) {
     );
   }
   return (
-    <Link href="/design-manholes/new" className={className}>
+    <Link
+      href="/design-manholes/new"
+      onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface })}
+      className={className}
+    >
       <Plus className="h-4 w-4" />
       投稿する
     </Link>

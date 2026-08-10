@@ -1,0 +1,70 @@
+name: DB Migration Drift
+
+# `supabase/migrations/` と本番の適用済み版がズレていないかを見る。
+#
+# 2026-08-09、コードだけ本番に出てマイグレーションが未適用のまま2日放置され、
+# デザインマンホールの投稿が全滅した。Amplify はコードを自動で出すが DB は手動 push
+# なので、**コードとスキーマはズレる方向にしか事故らない**。手元で `npm run db:drift`
+# を叩くのを忘れれば同じ事故が再現するため、忘れても気づける場所に置く。
+#
+# 走らせる場面:
+#   - マイグレーションを触る PR（そのPRで適用まで済ませる前提を作る）
+#   - main への push（マージ後に適用忘れが残っていないか）
+#   - 毎日（ダッシュボード直打ちなど、PR を経由しないズレを拾う）
+#
+# 必要な secret: SUPABASE_ACCESS_TOKEN（Management API のアクセストークン）
+# 未設定なら**このジョブは失敗する**。検査を黙って飛ばすと「CI が通った」という
+# 誤った安心だけが残り、防ごうとしている事故がそのまま起きる。
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'tools/check-migration-drift.js'
+      - '.github/workflows/db-drift.yml'
+  push:
+    branches:
+      - main
+  schedule:
+    # 毎日 00:10 UTC（09:10 JST）
+    - cron: '10 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  db-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: secret の有無を確認する
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN が未設定のため drift 検査を実行できない。"
+            echo "::error::リポジトリの Settings > Secrets and variables > Actions で設定すること。"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # DBパスワードは渡さない。`link` と `migration list --linked` は Management API 経由で
+      # 一時的なログインロールを作る（出力の "Initialising login role..."）ので、
+      # 静的な本番DBパスワードを CI に置く必要がない。置けば漏洩面を無駄に広げるだけ。
+      - name: 本番プロジェクトへリンクする
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        # ref は tools/check-migration-drift.js の EXPECTED_PROJECT_REF と
+        # 突き合わされる。ずれていればスクリプト側が exit 2 で落ちる。
+        run: supabase link --project-ref kbwzwgsjqvflgfauzcpn
+
+      - name: マイグレーションのズレを検査する
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node tools/check-migration-drift.js

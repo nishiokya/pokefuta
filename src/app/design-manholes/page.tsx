@@ -64,7 +64,7 @@ function WantedSection() {
         ))}
       </ul>
       <div className="mt-4 text-center">
-        <SubmitCta className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+        <SubmitCta surface="design_manhole_list_header" className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
       </div>
     </section>
   );
@@ -111,7 +111,7 @@ export default async function DesignManholesPage() {
               ポケふた以外の、オンリーワンなデザインマンホールのコレクション
             </p>
           </div>
-          <SubmitCta className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
+          <SubmitCta surface="design_manhole_list_toolbar" className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
         </div>
 
         <SuspendedNotice />
@@ -127,7 +127,7 @@ export default async function DesignManholesPage() {
                 ? 'まだ投稿がありません。'
                 : 'まだ投稿がありません。最初の1枚を投稿してみませんか？'}
             </p>
-            <SubmitCta className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+            <SubmitCta surface="design_manhole_list_empty" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
           </div>
         ) : (
           <>
