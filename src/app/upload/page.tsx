@@ -16,6 +16,14 @@ import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gta
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
+/**
+ * 蓋一覧の問題をこのタブで既に通知したか。
+ * sessionStorage が使えない環境（プライベートブラウズ・ストレージ無効・容量例外）でも
+ * 重複抑止が効くようにするためのフォールバック。モジュールスコープなので
+ * コンポーネントの再マウントをまたいで残る。
+ */
+const reportedManholeListProblems = new Set<string>();
+
 interface PhotoMetadata {
   latitude?: number;
   longitude?: number;
@@ -164,12 +172,16 @@ function UploadPageInner() {
           : null;
     if (!errorCode) return;
 
+    // メモリ側を先に見る。sessionStorage が使えない環境でも「1回だけ」を守る。
+    if (reportedManholeListProblems.has(errorCode)) return;
+    reportedManholeListProblems.add(errorCode);
+
     const dedupeKey = `pokefuta:${errorCode}`;
     try {
       if (sessionStorage.getItem(dedupeKey)) return;
       sessionStorage.setItem(dedupeKey, '1');
     } catch {
-      // sessionStorage が使えない環境でも通知自体は行う
+      // 使えなければメモリ側の抑止だけで進む
     }
 
     console.error(

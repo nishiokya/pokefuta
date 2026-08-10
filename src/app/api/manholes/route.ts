@@ -57,11 +57,29 @@ export async function GET(request: NextRequest) {
     // 地図のピン・全国一覧・詳細ページ・/upload の蓋マッチングが原因不明で壊れる。
     // 利用者に出るのは「見つかりません」だけで、画面にもログにも理由が出ない。
     // 2026-08-10 時点で 482 枚。あと 19 枚で踏むところだった。
-    const limitParam = searchParams.get('limit');
-    const parsedLimit = limitParam !== null ? Number.parseInt(limitParam, 10) : NaN;
-    // 未指定・解釈不能・0以下は「全件」として扱う（黙って切るより返しすぎる方が安全）
-    const actualLimit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
+    //
+    // 指定されたのに解釈できない値は 400 で返す。parseInt は前方一致で拾うので、
+    // `1.9` `1e3` `1foo` がすべて 1 件になり、逆に空文字や `abc` は全件になる。
+    // 入力ミスが「1件」や「全件」に化けて黙って通るより、その場で落とす方がよい。
+    const limitParams = searchParams.getAll('limit');
+    if (limitParams.length > 1) {
+      return NextResponse.json(
+        { error: 'limit must be specified at most once' },
+        { status: 400 }
+      );
+    }
+    const limitParam = limitParams[0];
+    let actualLimit: number | undefined;
+    if (limitParam !== undefined) {
+      // 文字列全体が正の整数であることを要求する（前方一致を許さない）
+      if (!/^\d+$/.test(limitParam) || Number(limitParam) < 1) {
+        return NextResponse.json(
+          { error: 'limit must be a positive integer' },
+          { status: 400 }
+        );
+      }
+      actualLimit = Number(limitParam);
+    }
     const visited = searchParams.get('visited'); // 'true', 'false', or null for all
     const noPhotos = searchParams.get('no_photos') === 'true';
 
@@ -158,14 +176,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 通常一覧: id 降順。limit 指定があればその件数、無ければ全件
+    // 通常一覧: id 降順。limit 指定があればその件数、無ければ全件。
+    //
+    // slice は必ず filter の**後**。先に切ると limit が「条件に一致する件数」ではなく
+    // 「最新N件のうち条件に一致した件数」になり、要求より少なく返る。
+    // 実例: `?no_photos=true&limit=12` は、写真なしの蓋が130枚あるのに5枚しか
+    // 返していなかった（最新12枚のうち写真なしが5枚だったため）。
+    // 近傍検索(lat/lng)側は元から filter → slice の順で、こちらだけがズレていた。
     const manholes = [...snapshot.manholes]
       .sort((a, b) => b.id - a.id)
-      // actualLimit が undefined なら slice は全件を返す
-      .slice(0, actualLimit)
       .map(withVisitStatus)
       .filter(matchesVisitedFilter)
-      .filter(manhole => !noPhotos || manhole.photo_count === 0);
+      .filter(manhole => !noPhotos || manhole.photo_count === 0)
+      // actualLimit が undefined なら slice は全件を返す
+      .slice(0, actualLimit);
 
     return NextResponse.json({
       success: true,
