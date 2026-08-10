@@ -16,6 +16,14 @@ import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gta
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
+/**
+ * 蓋の一覧を何件まで取るか。`/api/manholes` の既定は 500 で、
+ * 上限は `Math.min(limit, 1000)` にハードキャップされている。
+ * 2026-08-10 時点の蓋は 482 枚なので 1000 で全件入るが、
+ * 1000 を超えたら分割取得かAPI側の上限引き上げが要る（切り捨ては下で検知する）。
+ */
+const MANHOLE_LIST_LIMIT = 1000;
+
 interface PhotoMetadata {
   latitude?: number;
   longitude?: number;
@@ -141,13 +149,28 @@ function UploadPageInner() {
 
   const loadManholes = async () => {
     try {
-      const response = await fetch('/api/manholes');
+      // limit を省くと /api/manholes の既定 500 件・id降順で切られ、
+      // 古い id の蓋が候補に載らない。そこへ行った人には
+      // 「50m以内にマンホールが見つかりません」としか出ず、画面にもログにも原因が出ない。
+      // 他のページ（nearby / visits）は既に明示している。
+      const response = await fetch(`/api/manholes?limit=${MANHOLE_LIST_LIMIT}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.manholes) {
-          setManholes(data.manholes);
+          const list = data.manholes as Manhole[];
+          setManholes(list);
+          // API は Math.min(limit, 1000) でハードキャップする（api/manholes/route.ts）。
+          // 上限に達した＝一覧が切り捨てられており、一部の蓋は永久に一致しない。
+          // 蓋が増えて崖に達したとき、黙って壊れないようここで気づけるようにする。
+          if (list.length >= MANHOLE_LIST_LIMIT) {
+            console.error(
+              `Manhole list is truncated at ${MANHOLE_LIST_LIMIT}. ` +
+              '一部の蓋が候補に載らず、投稿できない利用者が出る。APIの上限を上げるか分割取得へ移行すること。'
+            );
+            trackAppError('manhole_list_truncated', 'upload');
+          }
           if (hintManholeId) {
-            const found = (data.manholes as Manhole[]).find(m => m.id === hintManholeId);
+            const found = list.find(m => m.id === hintManholeId);
             if (found) setHintManhole(found);
           }
           return;
