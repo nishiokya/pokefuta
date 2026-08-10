@@ -12,7 +12,7 @@ import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/lo
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
-import type { SubmissionStage } from '@/lib/analytics/gtag';
+import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
@@ -163,43 +163,49 @@ function UploadPageInner() {
 
   // ✅ manholes ロード完了時に既存 photos の matchedManhole/error を再評価
   useEffect(() => {
-    if (manholes.length > 0 && photos.length > 0) {
-      setPhotos(prevPhotos =>
-        prevPhotos.map(photo => {
-          // ロード中ステータスの場合のみ再評価
-          if (photo.photoStatus === 'waiting_manhole') {
-            if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
-              return {
-                ...photo,
-                photoStatus: 'invalid_gps',
-                error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
-              };
-            }
+    if (manholes.length === 0 || photos.length === 0) return;
+    if (!photos.some(photo => photo.photoStatus === 'waiting_manhole')) return;
 
-            const matchedManhole = findNearestManhole(
-              photo.metadata.latitude as number,
-              photo.metadata.longitude as number
-            );
+    // 蓋の一覧が届く前に写真を選ぶと waiting_manhole になり、ここで初めて可否が決まる。
+    // 回線が遅いほど通る経路なので、ここで数えないと onDrop 側の分だけが計上され、
+    // 「離脱理由なしで止まっている人」として見える。
+    const blockReasons: SubmissionBlockReason[] = [];
 
-            if (matchedManhole) {
-              return {
-                ...photo,
-                photoStatus: 'valid',
-                matchedManhole,
-                error: undefined
-              };
-            } else {
-              return {
-                ...photo,
-                photoStatus: 'no_nearby_manhole',
-                error: '50m以内にマンホールが見つかりません。位置情報を確認してください。'
-              };
-            }
-          }
-          return photo;
-        })
+    const reevaluate = (photo: UploadedPhoto): UploadedPhoto => {
+      if (photo.photoStatus !== 'waiting_manhole') return photo;
+
+      if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+        blockReasons.push('invalid_gps');
+        return {
+          ...photo,
+          photoStatus: 'invalid_gps',
+          error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
+        };
+      }
+
+      const matchedManhole = findNearestManhole(
+        photo.metadata.latitude as number,
+        photo.metadata.longitude as number
       );
-    }
+
+      if (matchedManhole) {
+        return { ...photo, photoStatus: 'valid', matchedManhole, error: undefined };
+      }
+
+      blockReasons.push('no_nearby_manhole');
+      return {
+        ...photo,
+        photoStatus: 'no_nearby_manhole',
+        error: '50m以内にマンホールが見つかりません。位置情報を確認してください。'
+      };
+    };
+
+    // 判定は updater の外で行う。setPhotos の更新関数は StrictMode で
+    // 2回呼ばれうるので、その中でイベントを送ると二重に数える。
+    const reevaluated = photos.map(reevaluate);
+    setPhotos(reevaluated);
+    blockReasons.forEach(reason => funnel.blocked(reason));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manholes]);
 
   const extractMetadata = async (file: File): Promise<PhotoMetadata> => {

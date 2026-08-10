@@ -107,10 +107,17 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   const photoSource = useCallback((): PhotoSource | undefined => selectedPhotoSourceRef.current, []);
 
   useEffect(() => {
-    // pagehide は beforeunload と違い、モバイルの bfcache 遷移でも発火する。
-    // visibilitychange は別アプリへ切り替えただけでも hidden になり、
-    // 戻ってくる人まで離脱に数えてしまうので使わない。
-    const handlePageHide = () => {
+    // 離脱は2経路ある。片方だけでは systematically 取りこぼす。
+    //
+    // 1. pagehide — タブを閉じる、URL直打ち、外部サイトへ。
+    //    beforeunload と違いモバイルの bfcache 遷移でも発火する。
+    // 2. アンマウント — Next.js の <Link> によるクライアント遷移。
+    //    ドキュメントを破棄しないので pagehide は**発火しない**。
+    //    ヘッダーと下タブは常時表示なので、実際にはこちらが最頻経路。
+    //
+    // visibilitychange は使わない。別アプリへ切り替えただけでも hidden になり、
+    // 戻ってくる人まで離脱に数えてしまう。
+    const emitAbandoned = () => {
       if (completedRef.current || abandonSentRef.current) return;
       abandonSentRef.current = true;
       trackSubmissionAbandoned({
@@ -122,9 +129,18 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
       });
     };
 
-    window.addEventListener('pagehide', handlePageHide);
-    return () => window.removeEventListener('pagehide', handlePageHide);
-  }, [submission_kind, trackSubmissionAbandoned]);
+    window.addEventListener('pagehide', emitAbandoned);
+    return () => {
+      window.removeEventListener('pagehide', emitAbandoned);
+      // クライアント遷移でここに来る。abandonSentRef が二重送信を防ぐので、
+      // pagehide が既に送っていれば何もしない。
+      emitAbandoned();
+    };
+    // 依存を空にするのは、クリーンアップをアンマウント時だけに限るため。
+    // submission_kind は呼び出し側で固定のリテラル、trackSubmissionAbandoned は
+    // useAnalytics の安定した useCallback なので、閉じ込めても古い値にならない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     start,

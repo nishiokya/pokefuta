@@ -130,10 +130,15 @@ for (const helper of [
     `useSubmissionFunnel が ${helper} を呼んでいない（ファネルに穴が空く）`
   );
 }
-// 離脱は pagehide で拾う。ここを外すと離脱が一切取れなくなる
+// 離脱は2経路ある。pagehide だけだと Next.js の <Link> によるクライアント遷移
+// （ヘッダー・下タブからの離脱＝最頻経路）が丸ごと取れない。
 expect(
   hookCode.includes("addEventListener('pagehide'"),
-  'useSubmissionFunnel が pagehide を購読していない（離脱を検知できない）'
+  'useSubmissionFunnel が pagehide を購読していない（タブを閉じる離脱を検知できない）'
+);
+expect(
+  /return\s*\(\)\s*=>\s*\{[\s\S]*?emitAbandoned\(\);[\s\S]*?\}/.test(hookCode),
+  'useSubmissionFunnel がアンマウント時に離脱を送っていない（Link遷移の離脱が取れない）'
 );
 
 // 3. 両フローが、フックを使い、ファネルの各ステップを実際に呼んでいる。
