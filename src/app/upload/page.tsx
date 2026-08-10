@@ -16,6 +16,14 @@ import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gta
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
+/**
+ * 蓋一覧の問題をこのタブで既に通知したか。
+ * sessionStorage が使えない環境（プライベートブラウズ・ストレージ無効・容量例外）でも
+ * 重複抑止が効くようにするためのフォールバック。モジュールスコープなので
+ * コンポーネントの再マウントをまたいで残る。
+ */
+const reportedManholeListProblems = new Set<string>();
+
 interface PhotoMetadata {
   latitude?: number;
   longitude?: number;
@@ -58,7 +66,7 @@ function UploadPageInner() {
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
-  const { trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -139,15 +147,72 @@ function UploadPageInner() {
     document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
   };
 
+  /**
+   * 蓋の一覧が不完全なことを通知する。
+   *
+   * API は limit 未指定なら全件返すので、通常ここは発火しない。
+   * それでも残すのは、将来また上限が入ったり、スナップショット側が壊れたときに、
+   * 黙って壊れないようにするため。切り捨てられた蓋の場所では、利用者に
+   * 「50m以内にマンホールが見つかりません」としか出ないまま永久に投稿できない。
+   *
+   * 恒常的な状態なので、毎回のページ表示で送るとアクセス数に比例して監視を占有する。
+   * セッション内で1回に抑え、代わりに件数を載せて規模が分かるようにする。
+   */
+  const reportManholeListProblem = (loaded: number, rawTotal: unknown) => {
+    const total =
+      typeof rawTotal === 'number' && Number.isFinite(rawTotal) ? rawTotal : null;
+
+    // total が無い／取得件数より小さいのはデータ契約違反。切り捨てを判定できない＝
+    // 見逃す側に倒れるので、正常扱いにせず別のコードで通知する。
+    const errorCode =
+      total === null || total < loaded
+        ? 'manhole_list_total_invalid'
+        : total > loaded
+          ? 'manhole_list_truncated'
+          : null;
+    if (!errorCode) return;
+
+    // メモリ側を先に見る。sessionStorage が使えない環境でも「1回だけ」を守る。
+    if (reportedManholeListProblems.has(errorCode)) return;
+    reportedManholeListProblems.add(errorCode);
+
+    const dedupeKey = `pokefuta:${errorCode}`;
+    try {
+      if (sessionStorage.getItem(dedupeKey)) return;
+      sessionStorage.setItem(dedupeKey, '1');
+    } catch {
+      // 使えなければメモリ側の抑止だけで進む
+    }
+
+    console.error(
+      `Manhole list problem [${errorCode}]: loaded=${loaded} total=${rawTotal}. ` +
+      '一部の蓋が候補に載らず、投稿できない利用者が出る。APIの上限撤廃か分割取得へ移行すること。'
+    );
+    track('p_app_error', {
+      error_code: errorCode,
+      error_type: 'data_contract',
+      // 発生箇所は surface で表す（error_type は種別であって場所ではない）
+      surface: 'upload_manhole_list',
+      manhole_loaded: loaded,
+      manhole_total: total ?? undefined,
+    });
+  };
+
   const loadManholes = async () => {
     try {
+      // limit は付けない。/api/manholes は未指定なら全件返す。
+      // ここで数を指定すると、蓋がその数を超えたとき古い id の蓋が候補から
+      // 黙って消え、そこへ行った人に「50m以内にマンホールが見つかりません」
+      // としか出なくなる。念のため切り捨てを検知するのが下の report。
       const response = await fetch('/api/manholes');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.manholes) {
-          setManholes(data.manholes);
+          const list = data.manholes as Manhole[];
+          setManholes(list);
+          reportManholeListProblem(list.length, data.total);
           if (hintManholeId) {
-            const found = (data.manholes as Manhole[]).find(m => m.id === hintManholeId);
+            const found = list.find(m => m.id === hintManholeId);
             if (found) setHintManhole(found);
           }
           return;
