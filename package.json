@@ -18,6 +18,7 @@
     "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",
     "verify:photo-visibility": "node tools/verify-photo-visibility.js",
     "verify:app-user-visibility": "node tools/verify-app-user-visibility.js",
+    "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "capture": "node tools/capture/capture.js"
   },
   "dependencies": {
