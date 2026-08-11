@@ -7,7 +7,6 @@ import {
   hasFriendFieldsInput,
   isValidFriendCode,
   normalizeFriendCode,
-  resolveFriendFields,
 } from '../src/lib/pokemon-go-friend-code.ts';
 
 /**
@@ -93,52 +92,18 @@ test('桁数の定数は12', () => {
  * トレーナーコードが黙って消える。
  */
 
-const STORED = {
-  pokemon_go_friend_code: '123456789012',
-  pokemon_go_friend_note: 'ギフト交換歓迎',
-  pokemon_go_friend_open: true,
-};
-
-test('旧4項目だけのペイロードは3項目を指定なしとみなす', () => {
+// 旧ペイロードの「3列を据え置く」動作そのものは、アプリ側で現在値を読み直すのを
+// やめて DB の4引数版へ委ねたので、ここではなく `verify:app-user-visibility` [12b]
+// が実測する。この層に残るのは「どちらの版を呼ぶか」の判定だけ。
+test('旧4項目だけのペイロードは3項目を指定なしとみなす（4引数版へ回す）', () => {
   assert.ok(!hasFriendFieldsInput({}));
 });
 
 test('3項目のどれか1つでもあれば指定ありとみなす', () => {
-  // 同じフォームがまとめて送るので、1つあれば残りは「空で送られた」と読んでよい
+  // 同じフォームがまとめて送るので、1つあれば残りは「空で送られた」と読んでよい。
+  // 空で送られてきたら消す（据え置きにしない）。解除できなくなるため。
   assert.ok(hasFriendFieldsInput({ pokemonGoFriendCode: '' }));
   assert.ok(hasFriendFieldsInput({ pokemonGoFriendNote: '' }));
   assert.ok(hasFriendFieldsInput({ pokemonGoFriendOpen: false }));
 });
 
-test('旧ペイロードでは保存済みのコード・一言・スイッチを据え置く', () => {
-  assert.deepEqual(resolveFriendFields({}, STORED), {
-    code: '123456789012',
-    note: 'ギフト交換歓迎',
-    open: true,
-  });
-});
-
-test('空で送られてきたときは消す（据え置きにしない）', () => {
-  // 「コードを消す」は正当な操作。据え置きに倒すと解除できなくなる
-  assert.deepEqual(
-    resolveFriendFields(
-      { pokemonGoFriendCode: '', pokemonGoFriendNote: '', pokemonGoFriendOpen: false },
-      STORED
-    ),
-    { code: '', note: '', open: false }
-  );
-});
-
-test('送られてきた値は保存済みより優先する', () => {
-  assert.deepEqual(
-    resolveFriendFields(
-      { pokemonGoFriendCode: '9999 8888 7777', pokemonGoFriendNote: '交換希望', pokemonGoFriendOpen: true },
-      STORED
-    ),
-    { code: '9999 8888 7777', note: '交換希望', open: true }
-  );
-});
-
-test('行がまだ無いユーザーの旧ペイロードは未設定になる', () => {
-  assert.deepEqual(resolveFriendFields({}, null), { code: '', note: '', open: false });
-});

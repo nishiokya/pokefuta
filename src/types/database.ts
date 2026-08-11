@@ -776,19 +776,33 @@ export interface Database {
           pokemon_go_friend_open: boolean;
         }[];
       };
+      /**
+       * 版が2つある。PostgREST は body のキー名で選ぶ。
+       *
+       * 7引数版は3項目を**必ず**書く。DB 側に `DEFAULT` を置いていないので
+       * 省略できないし、省略できる形にすると4引数呼び出しがこちらへ解決され、
+       * 既定値で3列が黙って消える。
+       *
+       * 4引数版は旧4項目だけを更新し、Pokémon GO の3列には触らない。
+       * 旧クライアントの payload と、ロールバック後の旧コードが通る経路。
+       */
       update_own_public_profile: {
-        Args: {
-          p_display_name: string;
-          p_bio: string | null;
-          p_x_url: string | null;
-          p_instagram_url: string | null;
-          // DB 側に DEFAULT を置いていないので省略できない。省略できる形にすると
-          // 4引数呼び出しがこちらへ解決され、既定値で3列が黙って消える。
-          // 旧4項目だけを更新したいときは4引数版（別関数）が受ける。
-          p_pokemon_go_friend_code: string | null;
-          p_pokemon_go_friend_note: string | null;
-          p_pokemon_go_friend_open: boolean;
-        };
+        Args:
+          | {
+              p_display_name: string;
+              p_bio: string | null;
+              p_x_url: string | null;
+              p_instagram_url: string | null;
+              p_pokemon_go_friend_code: string | null;
+              p_pokemon_go_friend_note: string | null;
+              p_pokemon_go_friend_open: boolean;
+            }
+          | {
+              p_display_name: string;
+              p_bio: string | null;
+              p_x_url: string | null;
+              p_instagram_url: string | null;
+            };
         Returns: undefined;
       };
     };

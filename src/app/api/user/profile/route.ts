@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import {
   FRIEND_NOTE_MAX,
-  type FriendFieldsStored,
   hasFriendFieldsInput,
   isValidFriendCode,
   normalizeFriendCode,
-  resolveFriendFields,
 } from '@/lib/pokemon-go-friend-code';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
@@ -124,24 +122,17 @@ export async function PATCH(request: Request) {
   const xUrl = input.xUrl.trim();
   const instagramUrl = input.instagramUrl.trim();
   // 3項目が1つも来ていないのは、デプロイ前に開かれたプロフィール画面やキャッシュされた
-  // PWA が旧4項目だけを送ってきた場合。既定値で埋めると update_own_public_profile が
-  // 保存済みのコード・一言・スイッチを黙って消すので、現在値を読み直して据え置く。
-  let stored: FriendFieldsStored | null = null;
-  if (!hasFriendFieldsInput(input)) {
-    const { data, error: storedError } = await supabase.rpc('get_own_profile' as never);
-    if (storedError) {
-      console.error('Failed to load current profile for a legacy payload:', storedError);
-      return NextResponse.json({ error: 'プロフィールを保存できませんでした。' }, { status: 500 });
-    }
-    stored = ((data as unknown as OwnProfileRow[] | null) || [])[0] ?? null;
-  }
-  const go = resolveFriendFields(input, stored);
+  // PWA が旧4項目だけを送ってきた場合。この payload は旧4項目だけを更新する4引数版の
+  // RPC へ回す。ここで現在値を読み直して7引数版へ渡し直すと、読んでから書くまでの間に
+  // 別のクライアントが保存した設定を巻き戻す（同じ利用者が2画面で保存すると起きる）。
+  // 「触らない」はDB側の1文で表すのが確実で、アプリ側で再現するものではない。
+  const legacyPayload = !hasFriendFieldsInput(input);
 
-  const goFriendCode = normalizeFriendCode(go.code);
-  const goFriendNote = go.note.trim();
+  const goFriendCode = normalizeFriendCode(input.pokemonGoFriendCode ?? '');
+  const goFriendNote = (input.pokemonGoFriendNote ?? '').trim();
   // コードが無ければ募集は成立しない。DB側でも同じ判断をするが、
   // ここで揃えておかないと「保存したのにスイッチが戻っている」ように見える。
-  const goFriendOpen = go.open && goFriendCode !== '';
+  const goFriendOpen = (input.pokemonGoFriendOpen ?? false) && goFriendCode !== '';
 
   if (!displayName || [...displayName].length > DISPLAY_NAME_MAX) {
     return NextResponse.json({ error: `表示名は1〜${DISPLAY_NAME_MAX}文字で入力してください。` }, { status: 400 });
@@ -155,22 +146,30 @@ export async function PATCH(request: Request) {
   if (instagramUrl.length > URL_MAX || !isSocialUrl(instagramUrl, ['instagram.com', 'www.instagram.com'])) {
     return NextResponse.json({ error: 'InstagramのプロフィールURLを https://instagram.com/ユーザー名 の形で入力してください。' }, { status: 400 });
   }
-  if (!isValidFriendCode(go.code)) {
+  if (!legacyPayload && !isValidFriendCode(input.pokemonGoFriendCode ?? '')) {
     return NextResponse.json({ error: 'トレーナーコードは数字12桁で入力してください。' }, { status: 400 });
   }
   if ([...goFriendNote].length > FRIEND_NOTE_MAX) {
     return NextResponse.json({ error: `フレンド募集の一言は${FRIEND_NOTE_MAX}文字以内で入力してください。` }, { status: 400 });
   }
 
-  const { error } = await supabase.rpc('update_own_public_profile', {
-    p_display_name: displayName,
-    p_bio: bio || null,
-    p_x_url: xUrl || null,
-    p_instagram_url: instagramUrl || null,
-    p_pokemon_go_friend_code: goFriendCode || null,
-    p_pokemon_go_friend_note: goFriendNote || null,
-    p_pokemon_go_friend_open: goFriendOpen,
-  });
+  // PostgREST は body のキー名で版を選ぶ。3項目を載せなければ4引数版に解決される。
+  const { error } = legacyPayload
+    ? await supabase.rpc('update_own_public_profile', {
+        p_display_name: displayName,
+        p_bio: bio || null,
+        p_x_url: xUrl || null,
+        p_instagram_url: instagramUrl || null,
+      })
+    : await supabase.rpc('update_own_public_profile', {
+        p_display_name: displayName,
+        p_bio: bio || null,
+        p_x_url: xUrl || null,
+        p_instagram_url: instagramUrl || null,
+        p_pokemon_go_friend_code: goFriendCode || null,
+        p_pokemon_go_friend_note: goFriendNote || null,
+        p_pokemon_go_friend_open: goFriendOpen,
+      });
 
   if (error) {
     console.error('Failed to update public profile:', error);
