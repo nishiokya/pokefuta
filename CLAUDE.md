@@ -47,6 +47,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | スクリプト | 内容 |
 |---|---|
 | `tools/check-public-display-name-source.js` | 表示名の参照元 |
+| `tools/check-photo-select-star.js` | photo を `select=*` で読んでいないこと |
 | `tools/check-ga4-contract.js` | GA4 の計測契約 |
 | `tools/check-safe-area-env.js` | CSS `env(safe-area-*)` のスペル |
 | `tools/check-supabase-target.js` | `.env.local` への本番資格情報の混入 |
@@ -57,7 +58,13 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 |---|---|---|
 | `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
 | `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
+| `npm run verify:photo-visibility` | photo の列権限と RLS を実際にロールを切り替えて確認（exif が anon から見えないこと、非公開写真が隠れること、INSERT の RETURNING が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
 | `npm run verify:app-user-visibility` | app_user の列権限と RLS を実際にロールを切り替えて確認（anon が1列も読めないこと、他人の行が見えないこと、プロフィール系 RPC が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
+
+**列単位 GRANT のテーブルは `select=*` で読めない。** PostgREST の `*` は全列に展開されるので、
+GRANT していない列（`photo.exif` 等）まで要求して **42501** で落ちる。
+「権限のある列だけ返す」にはならない。`photo` はこれを `check-photo-select-star.js` で見張っている。
+SQL 側の `verify:*` は列権限と RLS が正しいことしか見ないので、**アプリが `*` を投げている退行は捕まらない**。
 
 **プロフィールに列を足すときは、先に `verify:app-user-visibility` へ「anon から読めない」ケースを足す。**
 `app_user` はテーブル単位の GRANT を持たない設計にしてあるので、列を足しても自動では公開されない。

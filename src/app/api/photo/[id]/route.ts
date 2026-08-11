@@ -173,10 +173,14 @@ export async function DELETE(
     }
 
     // ✅ 2. 写真のメタデータを取得し、所有者確認
+    // 返す列を明示する。`select=*` は photo の全列に展開され、anon/authenticated へ
+    // GRANT していない exif まで要求するため 42501 で落ちる（→ fetchError で 404 になり
+    // 自分の写真すら削除できなくなる）。ここで使うのは storage_key と visit.user_id だけ。
     const { data: photo, error: fetchError } = await supabase
       .from('photo')
       .select(`
-        *,
+        id,
+        storage_key,
         visit:visit_id (
           id,
           user_id

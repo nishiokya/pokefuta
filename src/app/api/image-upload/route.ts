@@ -431,8 +431,11 @@ export async function POST(request: NextRequest) {
 
       const { data: photoData, error: photoError } = await supabase
         .from('photo')
+        // 返す列を明示する。引数なしの .select() は `select=*` になり、
+        // anon/authenticated へ GRANT していない exif まで要求するため
+        // INSERT の RETURNING が権限エラー(42501)で落ちる。使うのは id だけ。
         .insert(photoInsert)
-        .select()
+        .select('id')
         .single();
 
       if (!photoError && photoData) {
@@ -577,10 +580,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(signedUrl.url);
     } else {
       // Build query based on filters
+      // 返す列を明示する。`select=*` は photo の全列に展開され、anon/authenticated へ
+      // GRANT していない exif まで要求するため 42501 で落ちる（一覧が全 caller で失敗する）。
+      // 下の列挙は photo の全列から exif を除いたもの＝この GET の従来の応答と同じ。
       let query = supabase
         .from('photo')
         .select(`
-          *,
+          id,
+          visit_id,
+          manhole_id,
+          storage_key,
+          original_name,
+          file_size,
+          content_type,
+          width,
+          height,
+          sha256,
+          thumbnail_320,
+          thumbnail_800,
+          thumbnail_1600,
+          created_at,
           visit:visit_id!inner (
             id,
             user_id,
