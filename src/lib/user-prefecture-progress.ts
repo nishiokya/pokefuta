@@ -73,6 +73,7 @@ type VisitProgressRow = {
   created_at: string | null;
   manhole_prefecture: string | null;
   latest_photo_id: string | null;
+  latest_photo_created_at: string | null;
 };
 
 /**
@@ -105,8 +106,11 @@ const UNKNOWN_PREFECTURE = '都道府県未設定';
  * 巻き込むことはない
  */
 const CATALOG_BASELINE_WINDOW_MS = 24 * 60 * 60 * 1000;
-/** 訪問一覧・集計の再検証間隔。公開訪問の増減が数分遅れて見えても実害が無い */
-export const PUBLIC_LIST_REVALIDATE_SECONDS = 60;
+/**
+ * マンホールカタログの再検証間隔。全ユーザー共通で、月単位でしか増えない。
+ * 訪問・プロフィールはここに載せない（利用者が取り下げられるものはキャッシュしない）。
+ */
+export const PUBLIC_CATALOG_REVALIDATE_SECONDS = 60;
 
 const toRate = (visited: number, total: number) => (total > 0 ? (visited / total) * 100 : 0);
 
@@ -239,32 +243,36 @@ function createCachedPublicClient(
 }
 
 /**
- * プロフィール取得用。**常に取り直す。**
- * 本人が消したはずのトレーナーコードが残るのは、表示名が古いのとは意味が違う。
+ * 利用者が取り下げられるもの用。**常に取り直す。**
+ *
+ * プロフィール（トレーナーコード・一言・SNS）と、公開訪問ビューの両方がこれ。
+ * 訪問を非公開に戻すのは「もう見せたくない」という操作なので、
+ * その訪問の comment・写真ID・日時が数十秒でも出続けてはいけない。
+ * 公開訪問が1件増えるのが遅れて見えるのとは、間違えたときの意味が違う。
  */
-export function getPublicProfileClient(): SupabaseClient<Database> | null {
+export function getPublicLiveClient(): SupabaseClient<Database> | null {
   return createCachedPublicClient((init) => ({ ...init, cache: 'no-store' }));
 }
 
 /**
- * 訪問一覧・集計・マンホールカタログ用。数分遅れて構わないのでキャッシュに載せる。
- * 公開訪問が増減するだけで、消したはずの個人情報が残るわけではない。
+ * マンホールカタログ専用。全ユーザーで共有でき、月単位でしか増えない。
+ * **ここに利用者が取り下げられるデータを載せないこと。**
  */
 export function getPublicCatalogClient(): SupabaseClient<Database> | null {
   return createCachedPublicClient((init) => ({
     ...init,
-    next: { revalidate: PUBLIC_LIST_REVALIDATE_SECONDS },
+    next: { revalidate: PUBLIC_CATALOG_REVALIDATE_SECONDS },
   }));
 }
 
 async function loadPublicUserPrefectureProgressImpl(
   userId: string
 ): Promise<PublicUserPrefectureProgress | null> {
-  // プロフィールは常に取り直し、カタログはキャッシュに載せる（§キャッシュ戦略）
-  const profileClient = getPublicProfileClient();
+  // プロフィールと訪問は常に取り直し、カタログだけキャッシュに載せる
+  const liveClient = getPublicLiveClient();
   const catalogClient = getPublicCatalogClient();
 
-  if (!profileClient || !catalogClient) {
+  if (!liveClient || !catalogClient) {
     throw new Error('Supabase client is not configured');
   }
 
@@ -273,7 +281,7 @@ async function loadPublicUserPrefectureProgressImpl(
 
   const [profileResult, { data: manholes, error: manholesError }] =
     await Promise.all([
-      profileClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
+      liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
       catalogClient
         .from('manhole')
         .select('id, title, prefecture, municipality, pokemons, created_at')
@@ -338,9 +346,13 @@ async function loadPublicUserPrefectureProgressImpl(
 
   // 公開IDで直接引く。auth_uid は使わない（ビューの内側で結合に使われるだけ）。
   // 最新写真が要るのでカード用ビュー。集計だけなら base を使うこと。
-  const { data: visits, error: visitsError } = await catalogClient
+  // 非公開に戻した訪問が残らないよう live 側で取る（キャッシュしない）。
+  const { data: visits, error: visitsError } = await liveClient
     .from('public_user_visit_card')
-    .select('manhole_id, shot_at, created_at, manhole_prefecture, latest_photo_id')
+    .select(
+      'manhole_id, shot_at, created_at, manhole_prefecture,' +
+      ' latest_photo_id, latest_photo_created_at'
+    )
     .eq('public_user_id', trimmedUserId)
     .not('manhole_id', 'is', null);
 
@@ -382,10 +394,14 @@ async function loadPublicUserPrefectureProgressImpl(
       }
     }
 
-    // ビューが visit ごとに最新1枚を返すので、ここでは訪問間の新しい方を採るだけ。
-    // 写真の created_at はビューの内側でしか見えないため、訪問時刻で比べる。
+    // ビューが visit ごとに最新1枚を返すので、ここでは訪問間で新しい方を採る。
+    // 比較は max(訪問日時, 写真日時)。同じマンホールを複数回訪れた人で、
+    // 古い訪問に後から足した写真が代表になることがあるため、写真の時刻も見る。
     if (visit.latest_photo_id) {
-      const sortTime = getVisitSortTime(visit);
+      const sortTime = Math.max(
+        getVisitSortTime(visit),
+        new Date(visit.latest_photo_created_at || 0).getTime()
+      );
       const current = latestPublicPhotoIdByManhole.get(visit.manhole_id);
       if (!current || sortTime > current.sortTime) {
         latestPublicPhotoIdByManhole.set(visit.manhole_id, {

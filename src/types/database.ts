@@ -629,6 +629,8 @@ export interface Database {
           manhole_municipality: string | null;
           manhole_pokemons: string[] | null;
           latest_photo_id: string | null;
+          // 同じマンホールの代表写真を max(訪問日時, 写真日時) で選ぶために返す
+          latest_photo_created_at: string | null;
         };
         Relationships: [];
       };

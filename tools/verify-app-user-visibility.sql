@@ -374,8 +374,9 @@ BEGIN
   SELECT string_agg(column_name, ',' ORDER BY column_name) INTO txt
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'public_user_visit_card';
-  IF txt <> 'comment,created_at,id,latest_photo_id,manhole_id,manhole_municipality,'
-            'manhole_pokemons,manhole_prefecture,manhole_title,public_user_id,shot_at' THEN
+  IF txt <> 'comment,created_at,id,latest_photo_created_at,latest_photo_id,manhole_id,'
+            'manhole_municipality,manhole_pokemons,manhole_prefecture,manhole_title,'
+            'public_user_id,shot_at' THEN
     RAISE EXCEPTION '[19] public_user_visit_card の列集合が変わった: %', txt;
   END IF;
 

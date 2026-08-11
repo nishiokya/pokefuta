@@ -378,8 +378,11 @@ GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, t
 -- 最新写真の相関サブクエリ用。(visit_id) だけの既存インデックスでは
 -- Bitmap Heap Scan + Sort になる。この複合インデックスで Index Only Scan になり、
 -- 実測では進捗ページのクエリが旧方式の 6.68ms → 3.16ms と逆に速くなった。
+-- NULLS LAST はビュー側の ORDER BY と揃える。DESC の既定は NULLS FIRST なので、
+-- 揃えないと created_at が NULL の写真が「最新」として先頭に来るうえ、
+-- インデックスの並びが一致せず Index Only Scan にならない。
 CREATE INDEX IF NOT EXISTS idx_photo_visit_latest
-  ON public.photo (visit_id, created_at DESC, id DESC);
+  ON public.photo (visit_id, created_at DESC NULLS LAST, id DESC);
 
 -- 基礎ビュー: 写真を含まない。件数・都道府県集計・一覧の土台。
 --
@@ -412,16 +415,28 @@ WHERE v.is_public IS TRUE;
 -- 落ちたら「検査を直す」のではなく、その列を公開してよいか先に決めること。
 
 -- カード用ビュー: 基礎に最新写真を1枚だけ足す。
+--
+-- created_at が NULL の写真があり得るので NULLS LAST を明示する。
+-- DESC の既定は NULLS FIRST で、そのままだと時刻の無い写真が「最新」に化ける。
+--
+-- created_at も一緒に返すのは、都道府県進捗が同じマンホールの代表写真を選ぶときに
+-- max(訪問日時, 写真日時) で比べているため。写真の時刻をビューの内側に隠すと、
+-- 訪問日時だけで比べることになり、同じマンホールを複数回訪れた人で
+-- 代表写真が変わる（後から足した写真が選ばれなくなる）。
 CREATE OR REPLACE VIEW public.public_user_visit_card
 WITH (security_invoker = false, security_barrier = true) AS
 SELECT
   b.*,
-  (SELECT p.id
-     FROM public.photo p
-    WHERE p.visit_id = b.id
-    ORDER BY p.created_at DESC, p.id DESC
-    LIMIT 1) AS latest_photo_id
-FROM public.public_user_visit_base b;
+  latest.id         AS latest_photo_id,
+  latest.created_at AS latest_photo_created_at
+FROM public.public_user_visit_base b
+LEFT JOIN LATERAL (
+  SELECT p.id, p.created_at
+    FROM public.photo p
+   WHERE p.visit_id = b.id
+   ORDER BY p.created_at DESC NULLS LAST, p.id DESC
+   LIMIT 1
+) latest ON true;
 
 REVOKE ALL ON public.public_user_visit_base FROM PUBLIC;
 REVOKE ALL ON public.public_user_visit_card FROM PUBLIC;

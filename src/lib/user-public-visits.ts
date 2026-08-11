@@ -2,8 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import {
   FALLBACK_DISPLAY_NAME,
-  getPublicCatalogClient,
-  getPublicProfileClient,
+  getPublicLiveClient,
   type PublicProfileRow,
 } from '@/lib/user-prefecture-progress';
 
@@ -31,7 +30,7 @@ export type PublicUserVisits = {
   bio: string | null;
   xUrl: string | null;
   instagramUrl: string | null;
-  // 募集スイッチが OFF のユーザーでは常に null。出し分けは get_public_user_info() 側で行う
+  // 募集スイッチが OFF のユーザーでは常に null。出し分けは get_public_profile() 側で行う
   pokemonGoFriendCode: string | null;
   pokemonGoFriendNote: string | null;
   totalVisits: number;
@@ -63,18 +62,18 @@ type PrefectureScanRow = {
 };
 
 async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
-  // プロフィールは常に取り直し、一覧・集計はキャッシュに載せる（§キャッシュ戦略）
-  const profileClient = getPublicProfileClient();
-  const listClient = getPublicCatalogClient();
+  // プロフィールも訪問も常に取り直す。非公開に戻した訪問の comment・写真ID・日時が
+  // キャッシュで生き残ると、「もう見せたくない」という操作が効かなくなる。
+  const liveClient = getPublicLiveClient();
 
-  if (!profileClient || !listClient) {
+  if (!liveClient) {
     throw new Error('Supabase client is not configured');
   }
 
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const { data: userInfo, error: userInfoError } = await profileClient.rpc(
+  const { data: userInfo, error: userInfoError } = await liveClient.rpc(
     'get_public_profile' as never,
     { p_user_id: trimmedUserId } as never
   );
@@ -104,7 +103,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     { count: totalCount, error: totalCountError },
     { data: prefectureRows, error: prefectureScanError },
   ] = await Promise.all([
-    listClient
+    liveClient
       .from('public_user_visit_card')
       .select(
         'id, manhole_id, shot_at, comment, created_at,' +
@@ -114,11 +113,11 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
       .eq('public_user_id', trimmedUserId)
       .order('shot_at', { ascending: false })
       .limit(VISIT_LIMIT),
-    listClient
+    liveClient
       .from('public_user_visit_base')
       .select('id', { count: 'exact', head: true })
       .eq('public_user_id', trimmedUserId),
-    listClient
+    liveClient
       .from('public_user_visit_base')
       .select('manhole_prefecture')
       .eq('public_user_id', trimmedUserId)

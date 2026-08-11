@@ -177,5 +177,33 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'プロフィールを保存できませんでした。' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  // 保存後の値を読み直して返す。
+  //
+  // クライアント側で「送った内容から保存後の姿を推測して state を更新する」と、
+  // DB側の正規化とずれる。たとえばコードを空にして保存すると RPC は一言と
+  // 募集スイッチも落とすが、送信内容だけを見ている画面には一言が残る。
+  // 正規化の規則を2箇所に持たないよう、保存された値そのものを返す。
+  const { data: savedData, error: savedError } = await supabase.rpc('get_own_profile' as never);
+
+  if (savedError) {
+    // 保存自体は成功しているので失敗にはしない。画面が古いままになるだけ。
+    console.warn('Saved the profile but failed to read it back:', savedError);
+    return NextResponse.json({ success: true });
+  }
+
+  const saved = ((savedData as unknown as OwnProfileRow[] | null) || [])[0] ?? null;
+
+  return NextResponse.json({
+    success: true,
+    profile: {
+      displayName: saved?.display_name || displayName,
+      bio: saved?.bio ?? null,
+      xUrl: saved?.x_url ?? null,
+      instagramUrl: saved?.instagram_url ?? null,
+      publicUserId: saved?.public_user_id ?? null,
+      pokemonGoFriendCode: saved?.pokemon_go_friend_code ?? null,
+      pokemonGoFriendNote: saved?.pokemon_go_friend_note ?? null,
+      pokemonGoFriendOpen: saved?.pokemon_go_friend_open ?? false,
+    },
+  });
 }

@@ -119,19 +119,10 @@ export default function ProfilePage() {
       });
     }
 
-    setProfile((prev) => prev && {
-      ...prev,
-      displayName: body.displayName.trim(),
-      bio: body.bio.trim() || null,
-      xUrl: body.xUrl.trim() || null,
-      instagramUrl: body.instagramUrl.trim() || null,
-      // コードが空なら募集は成立しない。サーバー側と同じ判断をここでも行い、
-      // 保存後の画面が実際に保存された状態とずれないようにする。
-      pokemonGoFriendCode: normalizeFriendCode(body.pokemonGoFriendCode) || null,
-      pokemonGoFriendNote: body.pokemonGoFriendNote.trim() || null,
-      pokemonGoFriendOpen:
-        body.pokemonGoFriendOpen && normalizeFriendCode(body.pokemonGoFriendCode) !== '',
-    });
+    // 保存後の姿は送信内容から推測せず、APIが読み直した値で置き換える。
+    // コードを空にして保存すると DB 側は一言と募集スイッチも落とすので、
+    // 推測で state を組むと画面だけ一言が残る。正規化の規則はDBに1つだけ置く。
+    setProfile((prev) => (result.profile as Profile | undefined) ?? prev);
     setSaved(true);
 
     // ヘッダー(SP/PC)は user_metadata.display_name を表示しているため、
