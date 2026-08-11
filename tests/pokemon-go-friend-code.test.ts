@@ -37,6 +37,7 @@ test('未設定（空文字）は有効として扱う', () => {
   // 「コードを消す」は正当な操作。エラーにすると解除できなくなる
   assert.ok(isValidFriendCode(''));
   assert.ok(isValidFriendCode('   '));
+  assert.ok(isValidFriendCode('　'), '全角空白だけも未設定');
 });
 
 test('12桁ちょうどだけを受け付ける', () => {
@@ -53,6 +54,16 @@ test('数字以外が混ざった入力は未設定ではなく無効', () => {
   assert.ok(!isValidFriendCode('abcd'));
   assert.ok(!isValidFriendCode('1234 5678 90ab'), '一部が文字でも弾く');
   assert.ok(!isValidFriendCode('123456789012!'), '記号が付いていても弾く');
+});
+
+test('区切りだけの入力は未設定ではなく無効', () => {
+  // `----` は許可文字なので `abcd` の検査は通り抜けるが、正規化すると空になり、
+  // 「未設定」と区別が付かなくなって保存済みのコード・一言・スイッチが黙って落ちる。
+  // 消す操作は空欄で表すもので、区切りの打ち間違いがそれを兼ねてはいけない。
+  assert.ok(!isValidFriendCode('----'));
+  assert.ok(!isValidFriendCode('-'));
+  assert.ok(!isValidFriendCode(' - - '), '空白混じりでも区切りが残っていれば弾く');
+  assert.ok(!isValidFriendCode('－－－－'), '全角ハイフン');
 });
 
 test('区切りとして許すのは空白とハイフンだけ', () => {

@@ -30,14 +30,23 @@ export function normalizeFriendCode(value: string): string {
  */
 const FRIEND_CODE_CHARS = /^[0-9０-９\s　\-‐–—－]*$/;
 
+/** 空白だけ（全角空白を含む）。これだけが「未設定」として通ってよい。 */
+const BLANK = /^[\s　]*$/;
+
 /**
  * 空文字は「未設定」。未設定か、正規化して12桁ちょうどなら受け付ける。
  * 数字・区切り以外が混ざっていれば、正規化後の桁数によらず無効。
+ *
+ * 区切りだけの入力（`----` など）も無効。許可文字なので `abcd` の検査は通り抜けるが、
+ * 正規化すると空になるので「未設定」と区別が付かなくなり、保存済みのコード・一言・
+ * 募集スイッチが黙って落ちる。**消す操作は空欄で表す**もので、区切りの打ち間違いが
+ * それを兼ねてはいけない。
  */
 export function isValidFriendCode(value: string): boolean {
   if (!FRIEND_CODE_CHARS.test(value)) return false;
   const normalized = normalizeFriendCode(value);
-  return normalized === '' || normalized.length === FRIEND_CODE_DIGITS;
+  if (normalized === '') return BLANK.test(value);
+  return normalized.length === FRIEND_CODE_DIGITS;
 }
 
 /** PATCH /api/user/profile が受け取る Pokémon GO の3項目（旧クライアントは送ってこない）。 */
