@@ -67,6 +67,15 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- **数える前に、この利用者について直列化する。**
+  -- これが無いと、並列に投げられた N 本のトランザクションが互いのコミット前に
+  -- count を実行し、全部が「10件未満」を見て全部通る。PostgREST を並列で叩けば
+  -- 上限は素通りするので、レート制限として成立しない。
+  --
+  -- 名前空間つきの2引数版を使い、DB内の他の advisory lock と衝突させない。
+  -- xact 版なのでトランザクション終了時に自動で解放される。
+  PERFORM pg_advisory_xact_lock(8110, hashtext(NEW.user_id::text));
+
   SELECT count(*) INTO v_recent
   FROM manhole_comment
   WHERE user_id = NEW.user_id
@@ -89,7 +98,8 @@ CREATE TRIGGER enforce_manhole_comment_rate_limit
 
 COMMENT ON FUNCTION public.enforce_manhole_comment_rate_limit() IS
   '1ユーザー1時間10件。API層ではなくDB側に置く（anonキーでPostgRESTを直叩きされても効かせるため）。'
-  ' service_role は auth.uid() が NULL なので対象外。';
+  ' service_role は auth.uid() が NULL なので対象外。'
+  ' 数える前に pg_advisory_xact_lock で利用者ごとに直列化する（並列INSERTで上限を抜けられるため）。';
 
 -- ---------------------------------------------------------------------------
 -- 3. 通報の受け皿
