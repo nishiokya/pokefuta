@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import {
   FRIEND_NOTE_MAX,
+  type FriendFieldsStored,
+  hasFriendFieldsInput,
   isValidFriendCode,
   normalizeFriendCode,
+  resolveFriendFields,
 } from '@/lib/pokemon-go-friend-code';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
@@ -29,7 +32,7 @@ function isProfileInput(value: unknown): value is ProfileInput {
   );
   if (!strings) return false;
   // Pokémon GO の3項目は後から足したもの。古いクライアントが送ってこなくても
-  // 保存を落とさず、未指定は「変更なし」ではなく「未設定」として扱う。
+  // 保存は落とさない。未指定の扱いは PATCH 側で「変更なし」に寄せる。
   const goStrings = ['pokemonGoFriendCode', 'pokemonGoFriendNote'].every(
     (key) => input[key] === undefined || typeof input[key] === 'string'
   );
@@ -120,11 +123,25 @@ export async function PATCH(request: Request) {
   const bio = input.bio.trim();
   const xUrl = input.xUrl.trim();
   const instagramUrl = input.instagramUrl.trim();
-  const goFriendCode = normalizeFriendCode(input.pokemonGoFriendCode ?? '');
-  const goFriendNote = (input.pokemonGoFriendNote ?? '').trim();
+  // 3項目が1つも来ていないのは、デプロイ前に開かれたプロフィール画面やキャッシュされた
+  // PWA が旧4項目だけを送ってきた場合。既定値で埋めると update_own_public_profile が
+  // 保存済みのコード・一言・スイッチを黙って消すので、現在値を読み直して据え置く。
+  let stored: FriendFieldsStored | null = null;
+  if (!hasFriendFieldsInput(input)) {
+    const { data, error: storedError } = await supabase.rpc('get_own_profile' as never);
+    if (storedError) {
+      console.error('Failed to load current profile for a legacy payload:', storedError);
+      return NextResponse.json({ error: 'プロフィールを保存できませんでした。' }, { status: 500 });
+    }
+    stored = ((data as unknown as OwnProfileRow[] | null) || [])[0] ?? null;
+  }
+  const go = resolveFriendFields(input, stored);
+
+  const goFriendCode = normalizeFriendCode(go.code);
+  const goFriendNote = go.note.trim();
   // コードが無ければ募集は成立しない。DB側でも同じ判断をするが、
   // ここで揃えておかないと「保存したのにスイッチが戻っている」ように見える。
-  const goFriendOpen = Boolean(input.pokemonGoFriendOpen) && goFriendCode !== '';
+  const goFriendOpen = go.open && goFriendCode !== '';
 
   if (!displayName || [...displayName].length > DISPLAY_NAME_MAX) {
     return NextResponse.json({ error: `表示名は1〜${DISPLAY_NAME_MAX}文字で入力してください。` }, { status: 400 });
@@ -138,7 +155,7 @@ export async function PATCH(request: Request) {
   if (instagramUrl.length > URL_MAX || !isSocialUrl(instagramUrl, ['instagram.com', 'www.instagram.com'])) {
     return NextResponse.json({ error: 'InstagramのプロフィールURLを https://instagram.com/ユーザー名 の形で入力してください。' }, { status: 400 });
   }
-  if (!isValidFriendCode(input.pokemonGoFriendCode ?? '')) {
+  if (!isValidFriendCode(go.code)) {
     return NextResponse.json({ error: 'トレーナーコードは数字12桁で入力してください。' }, { status: 400 });
   }
   if ([...goFriendNote].length > FRIEND_NOTE_MAX) {

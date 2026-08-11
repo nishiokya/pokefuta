@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import {
   FRIEND_CODE_DIGITS,
   formatFriendCode,
+  hasFriendFieldsInput,
   isValidFriendCode,
   normalizeFriendCode,
+  resolveFriendFields,
 } from '../src/lib/pokemon-go-friend-code.ts';
 
 /**
@@ -70,4 +72,64 @@ test('桁が揃わない値は加工せずそのまま返す', () => {
 
 test('桁数の定数は12', () => {
   assert.equal(FRIEND_CODE_DIGITS, 12);
+});
+
+/**
+ * ここから下は「旧クライアントからの PATCH で保存済みの設定が消えないこと」の固定。
+ *
+ * update_own_public_profile は NULL を「消す」と解釈する（コードを消したら募集も止まる、
+ * という意図的な契約で `verify:app-user-visibility` [12] が依存している）。
+ * 「送られてこなかった」と「空で送られてきた」を区別できるのは、送信内容が見える
+ * この層だけなので、区別を落とすとデプロイ直後にプロフィールを保存した人の
+ * トレーナーコードが黙って消える。
+ */
+
+const STORED = {
+  pokemon_go_friend_code: '123456789012',
+  pokemon_go_friend_note: 'ギフト交換歓迎',
+  pokemon_go_friend_open: true,
+};
+
+test('旧4項目だけのペイロードは3項目を指定なしとみなす', () => {
+  assert.ok(!hasFriendFieldsInput({}));
+});
+
+test('3項目のどれか1つでもあれば指定ありとみなす', () => {
+  // 同じフォームがまとめて送るので、1つあれば残りは「空で送られた」と読んでよい
+  assert.ok(hasFriendFieldsInput({ pokemonGoFriendCode: '' }));
+  assert.ok(hasFriendFieldsInput({ pokemonGoFriendNote: '' }));
+  assert.ok(hasFriendFieldsInput({ pokemonGoFriendOpen: false }));
+});
+
+test('旧ペイロードでは保存済みのコード・一言・スイッチを据え置く', () => {
+  assert.deepEqual(resolveFriendFields({}, STORED), {
+    code: '123456789012',
+    note: 'ギフト交換歓迎',
+    open: true,
+  });
+});
+
+test('空で送られてきたときは消す（据え置きにしない）', () => {
+  // 「コードを消す」は正当な操作。据え置きに倒すと解除できなくなる
+  assert.deepEqual(
+    resolveFriendFields(
+      { pokemonGoFriendCode: '', pokemonGoFriendNote: '', pokemonGoFriendOpen: false },
+      STORED
+    ),
+    { code: '', note: '', open: false }
+  );
+});
+
+test('送られてきた値は保存済みより優先する', () => {
+  assert.deepEqual(
+    resolveFriendFields(
+      { pokemonGoFriendCode: '9999 8888 7777', pokemonGoFriendNote: '交換希望', pokemonGoFriendOpen: true },
+      STORED
+    ),
+    { code: '9999 8888 7777', note: '交換希望', open: true }
+  );
+});
+
+test('行がまだ無いユーザーの旧ペイロードは未設定になる', () => {
+  assert.deepEqual(resolveFriendFields({}, null), { code: '', note: '', open: false });
 });
