@@ -7,7 +7,13 @@ import { Check, ExternalLink, Loader2, LogOut, UserRound } from 'lucide-react';
 import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { pokefutaEvents } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
+import {
+  FRIEND_NOTE_MAX,
+  formatFriendCode,
+  normalizeFriendCode,
+} from '@/lib/pokemon-go-friend-code';
 
 // アカウント管理の唯一の場所。ヘッダーの名前クリックからここに来る。
 // プロフィール編集・公開スタンプ帳への導線・ログアウトを集約し、
@@ -19,6 +25,9 @@ type Profile = {
   xUrl: string | null;
   instagramUrl: string | null;
   publicUserId: string | null;
+  pokemonGoFriendCode: string | null;
+  pokemonGoFriendNote: string | null;
+  pokemonGoFriendOpen: boolean;
 };
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
@@ -30,6 +39,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  /** 保存が成功するたびに増やす。非制御フォームを作り直して入力欄を正規化後の値に揃える */
+  const [formRevision, setFormRevision] = useState(0);
   const { trackView, trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
@@ -45,6 +56,9 @@ export default function ProfilePage() {
           router.replace('/login?redirect=/profile');
           return;
         }
+        // 設定率の分母は導線クリックではなく編集画面への到達にする。
+        // 導線は散らばって取りこぼす（投稿ファネルで同じ判断をしている）。
+        pokefutaEvents.goFriendEditView({ surface: 'profile' });
         const res = await fetch('/api/user/profile');
         if (res.ok) {
           const data = await res.json();
@@ -72,6 +86,9 @@ export default function ProfilePage() {
       bio: String(form.get('bio') ?? ''),
       xUrl: String(form.get('xUrl') ?? ''),
       instagramUrl: String(form.get('instagramUrl') ?? ''),
+      pokemonGoFriendCode: String(form.get('pokemonGoFriendCode') ?? ''),
+      pokemonGoFriendNote: String(form.get('pokemonGoFriendNote') ?? ''),
+      pokemonGoFriendOpen: form.get('pokemonGoFriendOpen') === 'on',
     };
 
     let response: Response;
@@ -94,13 +111,29 @@ export default function ProfilePage() {
       return;
     }
 
-    setProfile((prev) => prev && {
-      ...prev,
-      displayName: body.displayName.trim(),
-      bio: body.bio.trim() || null,
-      xUrl: body.xUrl.trim() || null,
-      instagramUrl: body.instagramUrl.trim() || null,
-    });
+    const savedCode = normalizeFriendCode(body.pokemonGoFriendCode);
+    if (savedCode) {
+      // ひとことの中身は送らない。フリーワードなので個人情報が混じりうる。
+      pokefutaEvents.goFriendSaved({
+        surface: 'profile',
+        is_open: body.pokemonGoFriendOpen,
+        has_note: body.pokemonGoFriendNote.trim() !== '',
+      });
+    }
+
+    // 保存後の姿は送信内容から推測せず、APIが読み直した値で置き換える。
+    // コードを空にして保存すると DB 側は一言と募集スイッチも落とすので、
+    // 推測で state を組むと画面だけ一言が残る。正規化の規則はDBに1つだけ置く。
+    const savedProfile = result.profile as Profile | undefined;
+    if (savedProfile) {
+      setProfile(savedProfile);
+      // 入力欄は非制御なので、state を変えるだけでは画面が追従しない。作り直す。
+      setFormRevision((revision) => revision + 1);
+    }
+    // savedProfile が無いのは、保存は通ったが読み直しに失敗した場合。
+    // ここで作り直すと保存前の state で入力欄が埋まり、消したはずのコードや一言が
+    // 画面に戻る。次の保存でそれが送られるので、保存前より悪い。
+    // 入力欄は利用者が打った内容のまま残す（送信済みの値と一致している）。
     setSaved(true);
 
     // ヘッダー(SP/PC)は user_metadata.display_name を表示しているため、
@@ -167,8 +200,25 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/*
+              入力欄は defaultValue / defaultChecked の非制御フォーム。
+              defaultValue はマウント後の値を更新しないので、保存が終わって
+              profile state を差し替えても、画面に出ている入力欄は古いまま残る。
+
+              実害: コードを空にして保存すると DB は一言と募集スイッチも落とすが、
+              入力欄には一言が、チェックボックスにはONが残る。次に保存すると
+              その古い値が送られ、消したはずの設定が復活する。
+
+              key を保存回数で変えてフォームごと作り直し、正規化後の値で
+              defaultValue を引き直す。
+            */}
             {profile ? (
-              <form onSubmit={handleSubmit} className="mt-4" aria-label="プロフィール編集">
+              <form
+                key={`profile-form-${formRevision}`}
+                onSubmit={handleSubmit}
+                className="mt-4"
+                aria-label="プロフィール編集"
+              >
                 <div className="grid gap-3">
                   <Field label="表示名" name="displayName" defaultValue={profile.displayName} maxLength={40} required />
                   <label className="grid gap-1 font-pixelJp text-[11px] font-bold text-[#6A4D36]">
@@ -185,6 +235,49 @@ export default function ProfilePage() {
                   </label>
                   <Field label="X URL" name="xUrl" type="url" defaultValue={profile.xUrl || ''} maxLength={300} placeholder="https://x.com/username" inputMode="url" />
                   <Field label="Instagram URL" name="instagramUrl" type="url" defaultValue={profile.instagramUrl || ''} maxLength={300} placeholder="https://instagram.com/username" inputMode="url" />
+                </div>
+
+                {/* Pokémon GO フレンド募集 */}
+                <div className="mt-4 rounded-[11px] border border-[#e9dfc7] bg-[#fbf6e9] p-3.5">
+                  <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' }}>
+                    Pokémon GO フレンド募集
+                  </p>
+                  <div className="mt-2.5 grid gap-3">
+                    <Field
+                      label="トレーナーコード"
+                      name="pokemonGoFriendCode"
+                      defaultValue={formatFriendCode(profile.pokemonGoFriendCode)}
+                      maxLength={20}
+                      placeholder="1234 5678 9012"
+                      inputMode="numeric"
+                      autoComplete="off"
+                    />
+                    <Field
+                      label={`ひとこと（${FRIEND_NOTE_MAX}文字まで）`}
+                      name="pokemonGoFriendNote"
+                      defaultValue={profile.pokemonGoFriendNote || ''}
+                      maxLength={FRIEND_NOTE_MAX}
+                      placeholder="毎日ギフト交換できる方歓迎"
+                    />
+                    <label className="flex items-start gap-2.5 font-pixelJp text-[11px] font-bold text-[#6A4D36]">
+                      <input
+                        type="checkbox"
+                        name="pokemonGoFriendOpen"
+                        defaultChecked={profile.pokemonGoFriendOpen}
+                        className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#bf5640]"
+                      />
+                      <span>
+                        公開スタンプ帳に「フレンド募集中」として表示する
+                        <span className="mt-0.5 block text-[10px] font-medium text-[#9b917e]" style={{ fontFamily: ROUND }}>
+                          オフの間はトレーナーコードを誰にも見せません。コードを空にすると募集も止まります。
+                        </span>
+                      </span>
+                    </label>
+                    <p className="rounded-[8px] bg-[#fdf1ec] px-3 py-2 text-[10px] leading-4 text-[#8a5a4a]" style={{ fontFamily: ROUND }}>
+                      トレーナーコードは誰でも見られます。本名・連絡先・自宅や待ち合わせ場所は
+                      ひとことに書かないでください。
+                    </p>
+                  </div>
                 </div>
                 {error && <p role="alert" className="mt-3 text-[11px] font-bold text-[#bf5640]">{error}</p>}
                 <div className="mt-4 flex items-center gap-3">

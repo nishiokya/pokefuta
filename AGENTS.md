@@ -52,7 +52,9 @@
 1. カスタムディメンション（イベントスコープ）を登録:
    `submission_kind` / `block_reason` / `error_code` / `error_type` / `stage` / `last_step` /
    `photo_source` / `review_status` / `surface` / `prefecture` / `page_type` / `is_logged_in` /
-   `source_app` / `site_type`
+   `source_app` / `site_type` / `is_open` / `has_note`
+   （`is_open` / `has_note` は `p_go_friend_saved` の設定率・公開率を分けて見るため。
+   真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
 2. カスタム指標:
    - `upload_duration_ms`、`dwell_ms`（いずれもミリ秒）
    - `manhole_loaded`、`manhole_total`（件数・標準）
