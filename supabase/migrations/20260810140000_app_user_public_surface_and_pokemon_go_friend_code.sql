@@ -263,9 +263,13 @@ CREATE FUNCTION public.update_own_public_profile(
   p_bio text,
   p_x_url text,
   p_instagram_url text,
-  p_pokemon_go_friend_code text DEFAULT NULL,
-  p_pokemon_go_friend_note text DEFAULT NULL,
-  p_pokemon_go_friend_open boolean DEFAULT false
+  -- **DEFAULT を付けない。**
+  -- 付けると旧コードの4引数呼び出しがこの関数に解決され、既定値で上書きが走る。
+  -- 「引数が足りない」で落ちてくれないぶん、静かにデータが消えるので質が悪い。
+  -- 4引数の呼び出しは、下で別に定義した4引数版が受ける。
+  p_pokemon_go_friend_code text,
+  p_pokemon_go_friend_note text,
+  p_pokemon_go_friend_open boolean
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -352,6 +356,63 @@ REVOKE ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, 
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO anon;
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- 6b. 旧4引数版を「旧4項目だけを更新する関数」として残す
+--
+-- マイグレーションの適用とコードのデプロイは連動しておらず、しかも
+-- **ロールバックはコードだけを戻す**（Amplify はスキーマを戻さない）。
+-- つまり「新スキーマ + 旧コード」は事故のときに必ず通る状態になる。
+--
+-- 旧コードはこの関数を4引数で呼ぶ。7引数版に DEFAULT を付けてしまうと、
+-- その呼び出しが7引数版へ解決され、既定値（NULL/NULL/false）で
+-- トレーナーコード・一言・募集スイッチが消える。エラーにならないぶん気付けない。
+-- 「旧コードが落ちない」ことと「旧コードでデータが壊れない」ことは別物。
+--
+-- そこで4引数版を別の関数として持ち、Pokémon GO の3列には触らせない。
+-- 現在値を読んで7引数版へ渡すので、検証と正規化の規則は1箇所のままにできる。
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.update_own_public_profile(
+  p_display_name text,
+  p_bio text,
+  p_x_url text,
+  p_instagram_url text
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $_$
+DECLARE
+  v_code text;
+  v_note text;
+  v_open boolean;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  -- 行がまだ無いユーザーでは3つとも NULL/false になる。新規作成として正しい。
+  SELECT au.pokemon_go_friend_code, au.pokemon_go_friend_note, au.pokemon_go_friend_open
+    INTO v_code, v_note, v_open
+    FROM app_user au
+   WHERE au.auth_uid = auth.uid();
+
+  PERFORM public.update_own_public_profile(
+    p_display_name, p_bio, p_x_url, p_instagram_url,
+    v_code, v_note, COALESCE(v_open, false));
+END;
+$_$;
+
+REVOKE ALL ON FUNCTION public.update_own_public_profile(text, text, text, text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text) TO anon;
+GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text) TO authenticated;
+GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text) TO service_role;
+
+COMMENT ON FUNCTION public.update_own_public_profile(text, text, text, text) IS
+  '旧4項目だけを更新する。Pokémon GO の3列は現在値を据え置く。'
+  ' 新スキーマ + 旧コード（ロールバック時に必ず通る）でトレーナーコードが消えないための互換版。'
+  ' 7引数版に DEFAULT を付けて代用しないこと（静かにデータが消える）。';
 
 -- ---------------------------------------------------------------------------
 -- 7. 公開ページの読み取り面（expand フェーズ）

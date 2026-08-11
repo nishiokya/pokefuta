@@ -269,6 +269,48 @@ BEGIN
     RAISE EXCEPTION '[12] コードを消しても募集スイッチや一言が残っている';
   END IF;
 
+  -- ---------------------------------------------------------------------
+  -- 12b. ロールバック試験: 旧コードの4引数呼び出しで設定が消えない
+  --
+  --      マイグレーション適用後にコードだけ旧版へ戻す状況は、事故のときに必ず通る
+  --      （Amplify はスキーマを戻さない）。旧コードは4引数で呼ぶので、
+  --      7引数版に DEFAULT があるとそこへ解決され、既定値で3列が消える。
+  --      エラーにならないぶん気付けない。「落ちない」と「壊れない」は別物。
+  -- ---------------------------------------------------------------------
+  PERFORM public.update_own_public_profile(
+    '検証オーナー', NULL, NULL, NULL, '123456789012', 'ギフト交換歓迎', true);
+
+  -- 旧コードと同じ呼び方
+  PERFORM public.update_own_public_profile('検証オーナー（旧コード）', '旧コードのbio', NULL, NULL);
+
+  RESET ROLE;
+  SELECT count(*) INTO n
+  FROM public.app_user
+  WHERE id = owner_app
+    AND display_name = '検証オーナー（旧コード）'   -- 旧4項目は更新される
+    AND bio = '旧コードのbio'
+    AND pokemon_go_friend_code = '123456789012'     -- 3列は据え置き
+    AND pokemon_go_friend_note = 'ギフト交換歓迎'
+    AND pokemon_go_friend_open = true;
+  IF n <> 1 THEN
+    RAISE EXCEPTION
+      '[12b] 旧コードの4引数呼び出しで Pokémon GO の設定が消えるか、旧4項目が更新されていない';
+  END IF;
+
+  -- 7引数版に DEFAULT が付いていないことを直接見る。
+  -- 付け直されると 12b の PERFORM が7引数版に解決されてしまい、この検査だけが頼りになる。
+  SELECT count(*) INTO n
+  FROM pg_proc
+  WHERE oid = 'public.update_own_public_profile(text,text,text,text,text,text,boolean)'::regprocedure
+    AND pronargdefaults > 0;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[12b] 7引数版に DEFAULT が付いている。旧4引数呼び出しがこちらへ解決される';
+  END IF;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+
   -- =====================================================================
   -- 公開プロフィール面の再設計（get_public_profile / public_user_visit_*）
   --
