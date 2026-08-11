@@ -124,9 +124,16 @@ export default function ProfilePage() {
     // 保存後の姿は送信内容から推測せず、APIが読み直した値で置き換える。
     // コードを空にして保存すると DB 側は一言と募集スイッチも落とすので、
     // 推測で state を組むと画面だけ一言が残る。正規化の規則はDBに1つだけ置く。
-    setProfile((prev) => (result.profile as Profile | undefined) ?? prev);
-    // 入力欄は非制御なので、state を変えるだけでは画面が追従しない。作り直す。
-    setFormRevision((revision) => revision + 1);
+    const savedProfile = result.profile as Profile | undefined;
+    if (savedProfile) {
+      setProfile(savedProfile);
+      // 入力欄は非制御なので、state を変えるだけでは画面が追従しない。作り直す。
+      setFormRevision((revision) => revision + 1);
+    }
+    // savedProfile が無いのは、保存は通ったが読み直しに失敗した場合。
+    // ここで作り直すと保存前の state で入力欄が埋まり、消したはずのコードや一言が
+    // 画面に戻る。次の保存でそれが送られるので、保存前より悪い。
+    // 入力欄は利用者が打った内容のまま残す（送信済みの値と一致している）。
     setSaved(true);
 
     // ヘッダー(SP/PC)は user_metadata.display_name を表示しているため、
