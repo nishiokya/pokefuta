@@ -21,6 +21,7 @@ DECLARE
   quiet_app uuid := '00000000-0000-0000-0000-00000000eb03';
   pub_visit uuid := '00000000-0000-0000-0000-00000000ec01';
   priv_visit uuid := '00000000-0000-0000-0000-00000000ec02';
+  owner_priv uuid := '00000000-0000-0000-0000-00000000ec03';
   target_manhole bigint;
   n int;
   txt text;
@@ -49,12 +50,16 @@ BEGIN
      '123456789012', '毎日ギフト交換できる方歓迎', true),
     (other_app, other_id, '検証他人',     NULL,          NULL,                    NULL,
      NULL, NULL, false),
+    -- quiet は公開訪問0件だがフレンド募集は ON。
+    -- 「訪問が無いと機能そのものが使えない」退行を検出するための仕掛け。
     (quiet_app, quiet_id, '検証サイレント', '公開訪問が無い人', NULL,              NULL,
-     NULL, NULL, false);
+     '999988887777', '訪問はまだ無いけど募集中', true);
 
-  INSERT INTO public.visit (id, user_id, manhole_id, shot_at, is_public) VALUES
-    (pub_visit,  owner_id, target_manhole, now(), true),
-    (priv_visit, quiet_id, target_manhole, now(), false);
+  INSERT INTO public.visit (id, user_id, manhole_id, shot_at, is_public, note) VALUES
+    (pub_visit,  owner_id, target_manhole, now(), true,  'ないしょのメモ'),
+    (priv_visit, quiet_id, target_manhole, now(), false, 'ないしょのメモ'),
+    -- 公開訪問も持つユーザーの非公開訪問。ビューが is_public だけで正しく切れるか見る
+    (owner_priv, owner_id, target_manhole, now(), false, 'ないしょのメモ');
 
   -- ---------------------------------------------------------------------
   -- 1. anon は app_user を1列も読めない
@@ -264,8 +269,143 @@ BEGIN
     RAISE EXCEPTION '[12] コードを消しても募集スイッチや一言が残っている';
   END IF;
 
+  -- =====================================================================
+  -- 公開プロフィール面の再設計（get_public_profile / public_user_visit_*）
+  --
+  -- 旧 get_public_user_info() は「公開訪問が1件以上」を返却条件にしており、
+  -- その副作用で公開訪問0件のユーザー（本番74人中34人）の公開ページが404だった。
+  -- 門は auth_uid を anon へ返す構造の後始末で、原因ではない。
+  -- 新経路は auth_uid を返さないので門が要らない。ここではその両方を固定する。
+  -- =====================================================================
+
+  RESET ROLE;
+  SET LOCAL ROLE anon;
+
+  -- ---------------------------------------------------------------------
+  -- 13. 公開訪問0件でも get_public_profile は1行返す（404にならない）
+  --     旧 get_public_user_info は今回触らないので、引き続き0行のままであること。
+  -- ---------------------------------------------------------------------
+  SELECT count(*) INTO n FROM public.get_public_profile(quiet_app);
+  IF n <> 1 THEN
+    RAISE EXCEPTION '[13] 公開訪問0件のユーザーが get_public_profile から引けない（%行）', n;
+  END IF;
+
+  SELECT count(*) INTO n FROM public.get_public_user_info(quiet_app);
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[13] 旧 get_public_user_info の門が外れている。expand フェーズでは触らない';
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 14. 訪問0件でも公開中のフレンドコードが返る
+  --     「登録直後はフレンド募集が使えない」という退行を防ぐ
+  -- ---------------------------------------------------------------------
+  SELECT pokemon_go_friend_code INTO txt FROM public.get_public_profile(quiet_app);
+  IF txt IS DISTINCT FROM '999988887777' THEN
+    RAISE EXCEPTION '[14] 訪問0件のユーザーのトレーナーコードが公開されない（%）', txt;
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 15. 募集OFFにすると新RPCからもコードが消える
+  -- ---------------------------------------------------------------------
+  RESET ROLE;
+  UPDATE public.app_user SET pokemon_go_friend_open = false WHERE id = quiet_app;
+  SET LOCAL ROLE anon;
+  SELECT count(*) INTO n FROM public.get_public_profile(quiet_app)
+   WHERE pokemon_go_friend_code IS NOT NULL OR pokemon_go_friend_note IS NOT NULL;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[15] 募集OFFなのにコードか一言が返っている';
+  END IF;
+  RESET ROLE;
+  UPDATE public.app_user SET pokemon_go_friend_open = true WHERE id = quiet_app;
+  SET LOCAL ROLE anon;
+
+  -- ---------------------------------------------------------------------
+  -- 16. ビューは公開訪問だけを返す／非公開訪問は返らない
+  --     owner は公開1件・非公開1件を持つ。切り分けられているか。
+  -- ---------------------------------------------------------------------
+  SELECT count(*) INTO n FROM public.public_user_visit_base WHERE public_user_id = owner_app;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '[16] owner の公開訪問が1件のはずが %件（非公開が混じっている可能性）', n;
+  END IF;
+
+  SELECT count(*) INTO n FROM public.public_user_visit_base
+   WHERE id IN (priv_visit, owner_priv);
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[16] 非公開訪問がビューから読める（%件）', n;
+  END IF;
+
+  -- 公開訪問0件のユーザーはビューでも0件。行が消えるだけでプロフィールは引ける
+  SELECT count(*) INTO n FROM public.public_user_visit_base WHERE public_user_id = quiet_app;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[16] 公開訪問0件のはずのユーザーに訪問が返っている（%件）', n;
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 17. 存在しない公開IDは0行（呼び出し側が notFound() に落とせる）
+  -- ---------------------------------------------------------------------
+  SELECT count(*) INTO n FROM public.get_public_profile('00000000-0000-0000-0000-0000000000ff');
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[17] 存在しない公開IDが1行返っている';
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 18. 新経路のどこにも auth_uid が出ない
+  --     返り値の列名で見る。「レビューで気をつける」ではなく機械で固定する。
+  -- ---------------------------------------------------------------------
+  RESET ROLE;
+  IF pg_get_function_result('public.get_public_profile(uuid)'::regprocedure) ILIKE '%auth_uid%' THEN
+    RAISE EXCEPTION '[18] get_public_profile が auth_uid を返している';
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 19. ビューの列集合を固定する
+  --     所有者権限で走るビューは、列を1つ足すだけで公開面が広がる。
+  --     photo.exif が漏れたのと同じ形なので、増減したらここで落とす。
+  --     **落ちたときに直すのはこの検査ではなく、その列を公開してよいかの判断。**
+  -- ---------------------------------------------------------------------
+  SELECT string_agg(column_name, ',' ORDER BY column_name) INTO txt
+    FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'public_user_visit_base';
+  IF txt <> 'comment,created_at,id,manhole_id,manhole_municipality,manhole_pokemons,'
+            'manhole_prefecture,manhole_title,public_user_id,shot_at' THEN
+    RAISE EXCEPTION '[19] public_user_visit_base の列集合が変わった: %', txt;
+  END IF;
+
+  SELECT string_agg(column_name, ',' ORDER BY column_name) INTO txt
+    FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'public_user_visit_card';
+  IF txt <> 'comment,created_at,id,latest_photo_id,manhole_id,manhole_municipality,'
+            'manhole_pokemons,manhole_prefecture,manhole_title,public_user_id,shot_at' THEN
+    RAISE EXCEPTION '[19] public_user_visit_card の列集合が変わった: %', txt;
+  END IF;
+
+  -- 名指しで「これは絶対に出さない」も見る。列集合検査を機械的に更新されても止まるように
+  SELECT count(*) INTO n FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name IN ('public_user_visit_base', 'public_user_visit_card')
+     AND column_name IN ('auth_uid', 'user_id', 'note', 'shot_location', 'exif');
+  IF n <> 0 THEN
+    RAISE EXCEPTION '[19] ビューに出してはいけない列が入っている（%個）', n;
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- 20. 既存の訪問ありユーザーが退行しない
+  --     旧方式（auth_uid で visit を直接引く）とビュー経由で件数が一致すること。
+  --     ビューへの置換は「動くが数字が変わる」失敗をするので、突き合わせる。
+  -- ---------------------------------------------------------------------
+  SELECT count(*) INTO n FROM public.visit v
+   WHERE v.user_id = owner_id AND v.is_public = true;
+  IF n <> (SELECT count(*) FROM public.public_user_visit_base WHERE public_user_id = owner_app) THEN
+    RAISE EXCEPTION '[20] 旧方式とビューで公開訪問の件数が違う';
+  END IF;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+  RESET ROLE;
+
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）
-  DELETE FROM public.visit WHERE id IN (pub_visit, priv_visit);
+  DELETE FROM public.visit WHERE id IN (pub_visit, priv_visit, owner_priv);
   DELETE FROM public.app_user WHERE id IN (owner_app, other_app, quiet_app);
   DELETE FROM auth.users WHERE id IN (owner_id, other_id, quiet_id);
 

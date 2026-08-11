@@ -352,3 +352,130 @@ REVOKE ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, 
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO anon;
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.update_own_public_profile(text, text, text, text, text, text, boolean) TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- 7. 公開ページの読み取り面（expand フェーズ）
+--
+-- 背景: 公開URLのIDは app_user.id だが、公開ページは訪問を
+-- `visit.user_id = auth_uid` で絞っており、そのために get_public_user_info() が
+-- auth_uid を anon へ返していた。auth_uid は内部認証IDで、公開してよいものではない。
+--
+-- 公開訪問を持つユーザーの auth_uid は visit 行から直接読めるため実質公開済みで、
+-- 0訪問ユーザーの auth_uid だけがこの関数からしか漏れなかった。だから
+-- 「公開訪問が1件以上」を関数の返却条件にして行ごと隠した。その副作用として
+-- **公開訪問0件のユーザー（本番74人中34人）の公開ページが404**になっている。
+--
+-- 門は漏洩の後始末であって、原因ではない。原因は auth_uid を外に出す構造。
+-- ここでは公開IDで直接引ける読み取り面を作り、auth_uid が DB の外へ出ない形にする。
+--
+-- **このマイグレーションは追加だけを行う。** 旧 get_public_user_info() も
+-- visit の GRANT もそのまま残す。適用しても本番で動いている旧コードは壊れない。
+-- 旧経路の閉鎖（visit の anon GRANT 剥奪・旧RPC削除）は別PRの contract フェーズ。
+-- 詳細は Obsidian の
+-- `dev/pokefuta/issue/2026-08-11 pokefuta 公開プロフィール面の再設計（auth_uid を外に出さない）.md`
+-- ---------------------------------------------------------------------------
+
+-- 最新写真の相関サブクエリ用。(visit_id) だけの既存インデックスでは
+-- Bitmap Heap Scan + Sort になる。この複合インデックスで Index Only Scan になり、
+-- 実測では進捗ページのクエリが旧方式の 6.68ms → 3.16ms と逆に速くなった。
+CREATE INDEX IF NOT EXISTS idx_photo_visit_latest
+  ON public.photo (visit_id, created_at DESC, id DESC);
+
+-- 基礎ビュー: 写真を含まない。件数・都道府県集計・一覧の土台。
+--
+-- 写真を別ビューへ分けているのは性能のためではなく**保証**のため。
+-- 1枚に相関サブクエリを持たせると、集計時にそれが実行されないことが
+-- プランナ任せになる。列として存在しなければ実行されようがない。
+--
+-- security_invoker = false: 所有者権限で走る。app_user は anon に GRANT が無いので、
+-- これでないと結合できない。**その代わり RLS を跨ぐので、WHERE v.is_public が唯一の砦**。
+CREATE OR REPLACE VIEW public.public_user_visit_base
+WITH (security_invoker = false, security_barrier = true) AS
+SELECT
+  au.id          AS public_user_id,   -- 公開URLのID。auth_uid は列に持たない
+  v.id           AS id,
+  v.manhole_id   AS manhole_id,
+  v.shot_at      AS shot_at,
+  v.comment      AS comment,
+  v.created_at   AS created_at,
+  m.title        AS manhole_title,
+  m.prefecture   AS manhole_prefecture,
+  m.municipality AS manhole_municipality,
+  m.pokemons     AS manhole_pokemons
+FROM public.visit v
+JOIN public.app_user au ON au.auth_uid = v.user_id
+LEFT JOIN public.manhole m ON m.id = v.manhole_id
+WHERE v.is_public IS TRUE;
+-- 載せない列（意図的）: v.user_id（= auth_uid）, v.note（非公開メモ）,
+-- v.shot_location（GPS）, v.updated_at, photo.exif。
+-- 列を足すときは tools/verify-app-user-visibility.sql の列集合検査が落ちる。
+-- 落ちたら「検査を直す」のではなく、その列を公開してよいか先に決めること。
+
+-- カード用ビュー: 基礎に最新写真を1枚だけ足す。
+CREATE OR REPLACE VIEW public.public_user_visit_card
+WITH (security_invoker = false, security_barrier = true) AS
+SELECT
+  b.*,
+  (SELECT p.id
+     FROM public.photo p
+    WHERE p.visit_id = b.id
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT 1) AS latest_photo_id
+FROM public.public_user_visit_base b;
+
+REVOKE ALL ON public.public_user_visit_base FROM PUBLIC;
+REVOKE ALL ON public.public_user_visit_card FROM PUBLIC;
+GRANT SELECT ON public.public_user_visit_base TO anon, authenticated, service_role;
+GRANT SELECT ON public.public_user_visit_card TO anon, authenticated, service_role;
+
+COMMENT ON VIEW public.public_user_visit_base IS
+  '公開訪問だけを公開ID(app_user.id)で引ける読み取り面。auth_uid / note / shot_location は含まない。'
+  ' 所有者権限で走るため RLS を跨ぐ。WHERE is_public が唯一の砦なので、定義を変えるときは'
+  ' tools/verify-app-user-visibility.sql の非公開訪問テストを必ず通すこと。';
+COMMENT ON VIEW public.public_user_visit_card IS
+  'public_user_visit_base に最新写真を1枚足したカード表示用。集計には base を使うこと。';
+
+-- ---------------------------------------------------------------------------
+-- 8. 公開プロフィール（auth_uid を返さない・門を持たない）
+--
+-- 旧 get_public_user_info() は残す。expand フェーズなので消さない。
+-- 名前を _v2 にしないのは、どちらが正か後から読めなくなるため。
+-- この関数は「auth_uid を持たない公開プロフィール面」を名前で説明している。
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.get_public_profile(p_user_id uuid)
+RETURNS TABLE(
+  display_name text,
+  bio text,
+  x_url text,
+  instagram_url text,
+  pokemon_go_friend_code text,
+  pokemon_go_friend_note text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT
+    au.display_name,
+    au.bio,
+    au.x_url,
+    au.instagram_url,
+    -- 募集スイッチが OFF のときはコードを公開経路に出さない。
+    -- API層で隠しても anon キーの直叩きで素通りするので、ここで出し分ける。
+    CASE WHEN au.pokemon_go_friend_open THEN au.pokemon_go_friend_code END,
+    CASE WHEN au.pokemon_go_friend_open THEN au.pokemon_go_friend_note END
+  FROM app_user au
+  WHERE au.id = p_user_id;
+  -- 公開訪問の有無は問わない。訪問0件でもプロフィールは公開ページとして成立する。
+  -- auth_uid を返さないので、門で行ごと隠す必要がそもそも無い。
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_public_profile(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_profile(uuid) TO anon, authenticated, service_role;
+
+COMMENT ON FUNCTION public.get_public_profile(uuid) IS
+  '公開プロフィール面。auth_uid を返さず、公開訪問の有無で行を隠さない。'
+  ' 訪問は public_user_visit_base / _card から公開IDで引く。'
+  ' 旧 get_public_user_info() は contract フェーズで閉じるまで残す（2026-08-11）。';
