@@ -35,6 +35,11 @@ export interface Database {
           updated_at: string;
           all_prefectures_completed_at: string | null;
           all_prefectures_outdated_at: string | null;
+          // anon には列単位で REVOKE してある（読めるのは RPC 経由だけ）。
+          // 型に出すのは service_role / 本人の読み書き経路のため。
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
+          pokemon_go_friend_open: boolean;
         };
         Insert: {
           id?: string;
@@ -47,6 +52,9 @@ export interface Database {
           profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
+          pokemon_go_friend_code?: string | null;
+          pokemon_go_friend_note?: string | null;
+          pokemon_go_friend_open?: boolean;
         };
         Update: {
           display_name?: string | null;
@@ -57,6 +65,9 @@ export interface Database {
           profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
+          pokemon_go_friend_code?: string | null;
+          pokemon_go_friend_note?: string | null;
+          pokemon_go_friend_open?: boolean;
         };
         Relationships: [];
       };
@@ -594,6 +605,46 @@ export interface Database {
       };
     };
     Views: {
+      /**
+       * 公開訪問だけを公開ID(app_user.id)で引ける読み取り面。
+       * **auth_uid / user_id / note / shot_location は列として存在しない。**
+       * ここに足すことは公開面を広げることなので、先に
+       * tools/verify-app-user-visibility.sql の列集合検査を見ること。
+       */
+      public_user_visit_base: {
+        Row: {
+          public_user_id: string;
+          id: string;
+          manhole_id: number | null;
+          shot_at: string | null;
+          comment: string | null;
+          created_at: string | null;
+          manhole_title: string | null;
+          manhole_prefecture: string | null;
+          manhole_municipality: string | null;
+          manhole_pokemons: string[] | null;
+        };
+        Relationships: [];
+      };
+      /** public_user_visit_base に最新写真を1枚足したカード表示用。集計には base を使う */
+      public_user_visit_card: {
+        Row: {
+          public_user_id: string;
+          id: string;
+          manhole_id: number | null;
+          shot_at: string | null;
+          comment: string | null;
+          created_at: string | null;
+          manhole_title: string | null;
+          manhole_prefecture: string | null;
+          manhole_municipality: string | null;
+          manhole_pokemons: string[] | null;
+          latest_photo_id: string | null;
+          // 同じマンホールの代表写真を max(訪問日時, 写真日時) で選ぶために返す
+          latest_photo_created_at: string | null;
+        };
+        Relationships: [];
+      };
       user_visit_stats: {
         Row: {
           user_id: string;
@@ -689,6 +740,26 @@ export interface Database {
           bio: string | null;
           x_url: string | null;
           instagram_url: string | null;
+          // pokemon_go_friend_open が false のときは NULL で返る（関数側で出し分ける）
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
+        }[];
+      };
+      /**
+       * 公開プロフィール面。**auth_uid を返さない。**
+       * 公開訪問の有無で行を隠さないので、訪問0件のユーザーでも1行返る。
+       * 訪問は public_user_visit_base / _card から公開IDで引く。
+       */
+      get_public_profile: {
+        Args: { p_user_id: string };
+        Returns: {
+          display_name: string | null;
+          bio: string | null;
+          x_url: string | null;
+          instagram_url: string | null;
+          // pokemon_go_friend_open が false のときは NULL で返る（関数側で出し分ける）
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
         }[];
       };
       get_own_profile: {
@@ -700,15 +771,38 @@ export interface Database {
           x_url: string | null;
           instagram_url: string | null;
           profile_is_customized: boolean;
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
+          pokemon_go_friend_open: boolean;
         }[];
       };
+      /**
+       * 版が2つある。PostgREST は body のキー名で選ぶ。
+       *
+       * 7引数版は3項目を**必ず**書く。DB 側に `DEFAULT` を置いていないので
+       * 省略できないし、省略できる形にすると4引数呼び出しがこちらへ解決され、
+       * 既定値で3列が黙って消える。
+       *
+       * 4引数版は旧4項目だけを更新し、Pokémon GO の3列には触らない。
+       * 旧クライアントの payload と、ロールバック後の旧コードが通る経路。
+       */
       update_own_public_profile: {
-        Args: {
-          p_display_name: string;
-          p_bio: string | null;
-          p_x_url: string | null;
-          p_instagram_url: string | null;
-        };
+        Args:
+          | {
+              p_display_name: string;
+              p_bio: string | null;
+              p_x_url: string | null;
+              p_instagram_url: string | null;
+              p_pokemon_go_friend_code: string | null;
+              p_pokemon_go_friend_note: string | null;
+              p_pokemon_go_friend_open: boolean;
+            }
+          | {
+              p_display_name: string;
+              p_bio: string | null;
+              p_x_url: string | null;
+              p_instagram_url: string | null;
+            };
         Returns: undefined;
       };
     };

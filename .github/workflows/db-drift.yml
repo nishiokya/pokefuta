@@ -50,9 +50,14 @@ jobs:
         with:
           node-version: 20
 
+      # `version: latest` は GitHub API で最新リリースを解決する。token を渡さないと
+      # 未認証で叩くことになり、共有 runner の IP レート制限に当たって落ちる
+      # （2026-08-10、"Failed to resolve latest Supabase CLI release: rate limit exceeded"）。
+      # setup-cli はこのための入力を持っているので、token を渡す。
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+          github-token: ${{ github.token }}
 
       # DBパスワードは渡さない。`link` と `migration list --linked` は Management API 経由で
       # 一時的なログインロールを作る（出力の "Initialising login role..."）ので、

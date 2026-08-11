@@ -1,25 +1,42 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
+import {
+  FRIEND_NOTE_MAX,
+  hasFriendFieldsInput,
+  isValidFriendCode,
+  normalizeFriendCode,
+} from '@/lib/pokemon-go-friend-code';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
 const DISPLAY_NAME_MAX = 40;
 const BIO_MAX = 160;
 const URL_MAX = 300;
-
 type ProfileInput = {
   displayName: string;
   bio: string;
   xUrl: string;
   instagramUrl: string;
+  pokemonGoFriendCode: string;
+  pokemonGoFriendNote: string;
+  pokemonGoFriendOpen: boolean;
 };
 
 function isProfileInput(value: unknown): value is ProfileInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const input = value as Record<string, unknown>;
-  return ['displayName', 'bio', 'xUrl', 'instagramUrl'].every(
+  const strings = ['displayName', 'bio', 'xUrl', 'instagramUrl'].every(
     (key) => typeof input[key] === 'string'
   );
+  if (!strings) return false;
+  // Pokémon GO の3項目は後から足したもの。古いクライアントが送ってこなくても
+  // 保存は落とさない。未指定の扱いは PATCH 側で「変更なし」に寄せる。
+  const goStrings = ['pokemonGoFriendCode', 'pokemonGoFriendNote'].every(
+    (key) => input[key] === undefined || typeof input[key] === 'string'
+  );
+  const goOpen =
+    input.pokemonGoFriendOpen === undefined || typeof input.pokemonGoFriendOpen === 'boolean';
+  return goStrings && goOpen;
 }
 
 function isSocialUrl(value: string, hosts: string[]) {
@@ -41,6 +58,9 @@ type OwnProfileRow = {
   x_url: string | null;
   instagram_url: string | null;
   profile_is_customized: boolean;
+  pokemon_go_friend_code: string | null;
+  pokemon_go_friend_note: string | null;
+  pokemon_go_friend_open: boolean | null;
 };
 
 export async function GET() {
@@ -71,6 +91,9 @@ export async function GET() {
       xUrl: row?.x_url ?? null,
       instagramUrl: row?.instagram_url ?? null,
       publicUserId: row?.public_user_id ?? null,
+      pokemonGoFriendCode: row?.pokemon_go_friend_code ?? null,
+      pokemonGoFriendNote: row?.pokemon_go_friend_note ?? null,
+      pokemonGoFriendOpen: row?.pokemon_go_friend_open ?? false,
     },
   });
 }
@@ -98,6 +121,18 @@ export async function PATCH(request: Request) {
   const bio = input.bio.trim();
   const xUrl = input.xUrl.trim();
   const instagramUrl = input.instagramUrl.trim();
+  // 3項目が1つも来ていないのは、デプロイ前に開かれたプロフィール画面やキャッシュされた
+  // PWA が旧4項目だけを送ってきた場合。この payload は旧4項目だけを更新する4引数版の
+  // RPC へ回す。ここで現在値を読み直して7引数版へ渡し直すと、読んでから書くまでの間に
+  // 別のクライアントが保存した設定を巻き戻す（同じ利用者が2画面で保存すると起きる）。
+  // 「触らない」はDB側の1文で表すのが確実で、アプリ側で再現するものではない。
+  const legacyPayload = !hasFriendFieldsInput(input);
+
+  const goFriendCode = normalizeFriendCode(input.pokemonGoFriendCode ?? '');
+  const goFriendNote = (input.pokemonGoFriendNote ?? '').trim();
+  // コードが無ければ募集は成立しない。DB側でも同じ判断をするが、
+  // ここで揃えておかないと「保存したのにスイッチが戻っている」ように見える。
+  const goFriendOpen = (input.pokemonGoFriendOpen ?? false) && goFriendCode !== '';
 
   if (!displayName || [...displayName].length > DISPLAY_NAME_MAX) {
     return NextResponse.json({ error: `表示名は1〜${DISPLAY_NAME_MAX}文字で入力してください。` }, { status: 400 });
@@ -111,18 +146,63 @@ export async function PATCH(request: Request) {
   if (instagramUrl.length > URL_MAX || !isSocialUrl(instagramUrl, ['instagram.com', 'www.instagram.com'])) {
     return NextResponse.json({ error: 'InstagramのプロフィールURLを https://instagram.com/ユーザー名 の形で入力してください。' }, { status: 400 });
   }
+  if (!legacyPayload && !isValidFriendCode(input.pokemonGoFriendCode ?? '')) {
+    return NextResponse.json({ error: 'トレーナーコードは数字12桁で入力してください。' }, { status: 400 });
+  }
+  if ([...goFriendNote].length > FRIEND_NOTE_MAX) {
+    return NextResponse.json({ error: `フレンド募集の一言は${FRIEND_NOTE_MAX}文字以内で入力してください。` }, { status: 400 });
+  }
 
-  const { error } = await supabase.rpc('update_own_public_profile', {
-    p_display_name: displayName,
-    p_bio: bio || null,
-    p_x_url: xUrl || null,
-    p_instagram_url: instagramUrl || null,
-  });
+  // PostgREST は body のキー名で版を選ぶ。3項目を載せなければ4引数版に解決される。
+  const { error } = legacyPayload
+    ? await supabase.rpc('update_own_public_profile', {
+        p_display_name: displayName,
+        p_bio: bio || null,
+        p_x_url: xUrl || null,
+        p_instagram_url: instagramUrl || null,
+      })
+    : await supabase.rpc('update_own_public_profile', {
+        p_display_name: displayName,
+        p_bio: bio || null,
+        p_x_url: xUrl || null,
+        p_instagram_url: instagramUrl || null,
+        p_pokemon_go_friend_code: goFriendCode || null,
+        p_pokemon_go_friend_note: goFriendNote || null,
+        p_pokemon_go_friend_open: goFriendOpen,
+      });
 
   if (error) {
     console.error('Failed to update public profile:', error);
     return NextResponse.json({ error: 'プロフィールを保存できませんでした。' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  // 保存後の値を読み直して返す。
+  //
+  // クライアント側で「送った内容から保存後の姿を推測して state を更新する」と、
+  // DB側の正規化とずれる。たとえばコードを空にして保存すると RPC は一言と
+  // 募集スイッチも落とすが、送信内容だけを見ている画面には一言が残る。
+  // 正規化の規則を2箇所に持たないよう、保存された値そのものを返す。
+  const { data: savedData, error: savedError } = await supabase.rpc('get_own_profile' as never);
+
+  if (savedError) {
+    // 保存自体は成功しているので失敗にはしない。画面が古いままになるだけ。
+    console.warn('Saved the profile but failed to read it back:', savedError);
+    return NextResponse.json({ success: true });
+  }
+
+  const saved = ((savedData as unknown as OwnProfileRow[] | null) || [])[0] ?? null;
+
+  return NextResponse.json({
+    success: true,
+    profile: {
+      displayName: saved?.display_name || displayName,
+      bio: saved?.bio ?? null,
+      xUrl: saved?.x_url ?? null,
+      instagramUrl: saved?.instagram_url ?? null,
+      publicUserId: saved?.public_user_id ?? null,
+      pokemonGoFriendCode: saved?.pokemon_go_friend_code ?? null,
+      pokemonGoFriendNote: saved?.pokemon_go_friend_note ?? null,
+      pokemonGoFriendOpen: saved?.pokemon_go_friend_open ?? false,
+    },
+  });
 }

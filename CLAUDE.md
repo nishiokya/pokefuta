@@ -58,6 +58,11 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
 | `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:photo-visibility` | photo の列権限と RLS を実際にロールを切り替えて確認（exif が anon から見えないこと、非公開写真が隠れること、INSERT の RETURNING が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
+| `npm run verify:app-user-visibility` | app_user の列権限と RLS を実際にロールを切り替えて確認（anon が1列も読めないこと、他人の行が見えないこと、プロフィール系 RPC が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
+
+**プロフィールに列を足すときは、先に `verify:app-user-visibility` へ「anon から読めない」ケースを足す。**
+`app_user` はテーブル単位の GRANT を持たない設計にしてあるので、列を足しても自動では公開されない。
+逆に言うと、公開したい列は名指しで GRANT しない限り出てこない。
 
 `tests/design-manhole-db-policy.test.ts` はマイグレーションSQLを正規表現で照合するだけで、
 トリガを実行しない。**オブジェクトが存在することと実行時に正しく動くことは別物**なので、

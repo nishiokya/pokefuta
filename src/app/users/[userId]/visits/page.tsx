@@ -19,6 +19,7 @@ import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { userVisitsShareText } from '@/lib/share';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
+import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
   loadPublicUserPrefectureProgress,
@@ -32,6 +33,17 @@ type PageProps = {
 };
 
 export const dynamic = 'force-dynamic';
+// ここに `fetchCache = 'force-no-store'` は置かない。
+//
+// `dynamic = 'force-dynamic'` はページを毎回レンダリングするだけで、
+// **その中の fetch は Next.js の Data Cache に載ったままになる**
+// （`.next/cache/fetch-cache` はビルドやプロセス再起動をまたいで残る）。
+// そのため募集スイッチを OFF にしてもトレーナーコードが描画され続けていた。
+//
+// ただしルート単位で no-store にすると、500件の訪問取得もマンホールカタログも
+// 巻き添えで毎回DB直撃になる。ここは SEO 流入の入口なので割に合わない。
+// 代わりに取得ごとに分けてある（`getPublicProfileClient` / `getPublicCatalogClient`）。
+// 即時反映が要るのはプロフィールRPCだけで、訪問一覧は数分遅れて構わない。
 
 const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(userId)}/visits`;
 const getOgpImageUrl = (userId: string) =>
@@ -54,6 +66,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    // 公開訪問が0件のページは表示名と bio しか無い。200 で見せはするが、
+    // 薄いページを検索資産として増やさない。公開訪問が1件でも入れば通常の方針に戻る。
+    // follow は残す（本人が貼ったSNSリンクを辿れなくする理由が無い）。
+    ...(data.totalVisits === 0
+      ? { robots: { index: false, follow: true } }
+      : {}),
     alternates: {
       canonical: pageUrl,
     },
@@ -174,6 +192,16 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 {instagramUrl && (
                   <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
                 )}
+              </div>
+            )}
+
+            {data.pokemonGoFriendCode && (
+              <div className="mt-4 max-w-md">
+                <PokemonGoFriendCard
+                  code={data.pokemonGoFriendCode}
+                  note={data.pokemonGoFriendNote}
+                  displayName={data.displayName}
+                />
               </div>
             )}
 
