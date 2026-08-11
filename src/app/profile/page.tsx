@@ -39,6 +39,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  /** 保存が成功するたびに増やす。非制御フォームを作り直して入力欄を正規化後の値に揃える */
+  const [formRevision, setFormRevision] = useState(0);
   const { trackView, trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
@@ -123,6 +125,8 @@ export default function ProfilePage() {
     // コードを空にして保存すると DB 側は一言と募集スイッチも落とすので、
     // 推測で state を組むと画面だけ一言が残る。正規化の規則はDBに1つだけ置く。
     setProfile((prev) => (result.profile as Profile | undefined) ?? prev);
+    // 入力欄は非制御なので、state を変えるだけでは画面が追従しない。作り直す。
+    setFormRevision((revision) => revision + 1);
     setSaved(true);
 
     // ヘッダー(SP/PC)は user_metadata.display_name を表示しているため、
@@ -189,8 +193,25 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/*
+              入力欄は defaultValue / defaultChecked の非制御フォーム。
+              defaultValue はマウント後の値を更新しないので、保存が終わって
+              profile state を差し替えても、画面に出ている入力欄は古いまま残る。
+
+              実害: コードを空にして保存すると DB は一言と募集スイッチも落とすが、
+              入力欄には一言が、チェックボックスにはONが残る。次に保存すると
+              その古い値が送られ、消したはずの設定が復活する。
+
+              key を保存回数で変えてフォームごと作り直し、正規化後の値で
+              defaultValue を引き直す。
+            */}
             {profile ? (
-              <form onSubmit={handleSubmit} className="mt-4" aria-label="プロフィール編集">
+              <form
+                key={`profile-form-${formRevision}`}
+                onSubmit={handleSubmit}
+                className="mt-4"
+                aria-label="プロフィール編集"
+              >
                 <div className="grid gap-3">
                   <Field label="表示名" name="displayName" defaultValue={profile.displayName} maxLength={40} required />
                   <label className="grid gap-1 font-pixelJp text-[11px] font-bold text-[#6A4D36]">
