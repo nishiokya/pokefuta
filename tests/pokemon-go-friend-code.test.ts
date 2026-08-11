@@ -46,12 +46,21 @@ test('12桁ちょうどだけを受け付ける', () => {
   assert.ok(!isValidFriendCode('1234567890123'), '13桁は弾く');
 });
 
-test('数字以外しか含まない入力は未設定ではなく無効', () => {
-  // 空文字は「未設定」だが、`abcd` は打ち間違いなので黙って消してはいけない…
-  // ただし正規化すると空文字になるため、現状は未設定として通る。
-  // この挙動を明示的に固定しておく（変えるならここが落ちる）。
+test('数字以外が混ざった入力は未設定ではなく無効', () => {
+  // 正規化は数字以外を落とすので、`abcd` は空文字になる。それを「未設定」として
+  // 通すと、打ち間違いで保存済みのコード・一言・募集状態が黙って消える。
+  // 弾かれるほうがまだ良い。
   assert.equal(normalizeFriendCode('abcd'), '');
-  assert.ok(isValidFriendCode('abcd'));
+  assert.ok(!isValidFriendCode('abcd'));
+  assert.ok(!isValidFriendCode('1234 5678 90ab'), '一部が文字でも弾く');
+  assert.ok(!isValidFriendCode('123456789012!'), '記号が付いていても弾く');
+});
+
+test('区切りとして許すのは空白とハイフンだけ', () => {
+  assert.ok(isValidFriendCode('1234 5678 9012'));
+  assert.ok(isValidFriendCode('1234-5678-9012'));
+  assert.ok(isValidFriendCode('1234　5678　9012'), '全角空白');
+  assert.ok(isValidFriendCode('１２３４５６７８９０１２'), '全角数字');
 });
 
 test('表示は4桁区切りに戻す', () => {

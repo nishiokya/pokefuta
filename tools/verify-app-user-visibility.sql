@@ -223,6 +223,30 @@ BEGIN
   END;
 
   -- ---------------------------------------------------------------------
+  -- 11b. 数字と区切り以外が混ざったコードは保存できない
+  --      「数字以外を落として12桁か見る」だけだと `abcd` が空文字になり、
+  --      未設定として通って保存済みのコードを消す。打ち間違いで消えるのは
+  --      弾かれるより悪いので、落とす前に止める。
+  -- ---------------------------------------------------------------------
+  BEGIN
+    PERFORM public.update_own_public_profile(
+      '検証オーナー', NULL, NULL, NULL, 'abcd', NULL, true);
+    RAISE EXCEPTION '[11b] 数字を含まない打ち間違いが「未設定」として通ってしまう';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%Invalid Pokemon GO friend code%' THEN RAISE; END IF;
+  END;
+
+  RESET ROLE;
+  SELECT pokemon_go_friend_code INTO txt FROM public.app_user WHERE id = owner_app;
+  IF txt IS DISTINCT FROM '123456789012' THEN
+    RAISE EXCEPTION '[11b] 打ち間違いの保存が失敗した後にコードが消えている（%）', txt;
+  END IF;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+
+  -- ---------------------------------------------------------------------
   -- 12. コードを消すと募集も止まる
   --     「募集中」と出ているのに申請手段が無い状態を作らない。
   -- ---------------------------------------------------------------------

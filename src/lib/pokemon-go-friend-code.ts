@@ -21,8 +21,21 @@ export function normalizeFriendCode(value: string): string {
     .replace(/[^0-9]/g, '');
 }
 
-/** 空文字は「未設定」。未設定か、正規化して12桁ちょうどなら受け付ける。 */
+/**
+ * 数字と区切りだけでできているか。
+ *
+ * 正規化は「数字以外を落とす」ので、これを先に見ないと `abcd` が空文字になり
+ * 「未設定」として通ってしまう。打ち間違いで保存済みのコードが消えるのは、
+ * 弾かれるより悪い。区切りとして許すのはゲーム画面からの貼り付けに現れるものだけ。
+ */
+const FRIEND_CODE_CHARS = /^[0-9０-９\s　\-‐–—－]*$/;
+
+/**
+ * 空文字は「未設定」。未設定か、正規化して12桁ちょうどなら受け付ける。
+ * 数字・区切り以外が混ざっていれば、正規化後の桁数によらず無効。
+ */
 export function isValidFriendCode(value: string): boolean {
+  if (!FRIEND_CODE_CHARS.test(value)) return false;
   const normalized = normalizeFriendCode(value);
   return normalized === '' || normalized.length === FRIEND_CODE_DIGITS;
 }

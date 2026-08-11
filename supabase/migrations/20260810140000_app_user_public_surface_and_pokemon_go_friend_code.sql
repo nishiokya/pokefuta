@@ -276,6 +276,7 @@ DECLARE
   v_bio text := nullif(btrim(p_bio), '');
   v_x_url text := nullif(btrim(p_x_url), '');
   v_instagram_url text := nullif(btrim(p_instagram_url), '');
+  v_go_raw text;
   v_go_code text;
   v_go_note text := nullif(btrim(p_pokemon_go_friend_note), '');
   v_go_open boolean := COALESCE(p_pokemon_go_friend_open, false);
@@ -298,10 +299,17 @@ BEGIN
 
   -- 全角数字を半角に寄せ、数字以外（空白・ハイフン）を落としてから検証する。
   -- 利用者はゲーム画面の `1234 5678 9012` をそのまま貼るので、そこで弾かない。
-  v_go_code := nullif(regexp_replace(
-    translate(COALESCE(p_pokemon_go_friend_code, ''),
-              '０１２３４５６７８９', '0123456789'),
-    '[^0-9]', '', 'g'), '');
+  v_go_raw := translate(COALESCE(p_pokemon_go_friend_code, ''),
+                        '０１２３４５６７８９', '0123456789');
+
+  -- ただし「数字以外を落とす」だけだと `abcd` が空文字になり、未設定として通って
+  -- 保存済みのコードを消してしまう。打ち間違いで消えるのは弾かれるより悪いので、
+  -- 数字と区切り以外が混ざっていたら、落とす前にここで止める。
+  IF regexp_replace(v_go_raw, '[0-9[:space:]　‐–—－-]', '', 'g') <> '' THEN
+    RAISE EXCEPTION 'Invalid Pokemon GO friend code';
+  END IF;
+
+  v_go_code := nullif(regexp_replace(v_go_raw, '[^0-9]', '', 'g'), '');
 
   IF v_go_code IS NOT NULL AND v_go_code !~ '^[0-9]{12}$' THEN
     RAISE EXCEPTION 'Invalid Pokemon GO friend code';

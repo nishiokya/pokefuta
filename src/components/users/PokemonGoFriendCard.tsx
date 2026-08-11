@@ -22,8 +22,32 @@ type Props = {
  * ゲーム内の「プロフィール → フレンド → フレンド追加」に貼る流れになるので、
  * コピーを一番押しやすいところに置く。
  */
+/**
+ * `navigator.clipboard` が無い / 権限で拒否される環境（古い WebView、
+ * SNS アプリ内ブラウザ、非セキュアコンテキスト）向けの退避路。
+ * 見えない textarea を選択して execCommand('copy') に落とす。
+ */
+function copyViaSelection(text: string): boolean {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.top = '-1000px';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  try {
+    area.select();
+    area.setSelectionRange(0, text.length);
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(area);
+  }
+}
+
 export default function PokemonGoFriendCard({ code, note, displayName }: Props) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const formatted = formatFriendCode(code);
 
   useEffect(() => {
@@ -32,23 +56,31 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
   }, []);
 
   useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 2000);
+    if (copyState === 'idle') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 4000);
     return () => window.clearTimeout(timer);
-  }, [copied]);
+  }, [copyState]);
 
   const handleCopy = async () => {
     // ゲームの入力欄は数字だけを受け付ける。表示は4桁区切りでも、コピーは正規化した12桁。
     const raw = normalizeFriendCode(code);
     try {
       await navigator.clipboard.writeText(raw);
-      setCopied(true);
+      setCopyState('copied');
       pokefutaEvents.goFriendCodeCopy({ surface: 'user_visits' });
+      return;
     } catch {
-      // クリップボードが使えない環境（権限拒否・古い WebView）では
-      // コードは画面に出ているので手で入力できる。黙って何もしない。
+      // ここで諦めない。コピーがこのカードの用件なので、無反応は失敗と区別できない。
+    }
+    if (copyViaSelection(raw)) {
+      setCopyState('copied');
+      pokefutaEvents.goFriendCodeCopy({ surface: 'user_visits' });
+    } else {
+      setCopyState('failed');
     }
   };
+
+  const copied = copyState === 'copied';
 
   return (
     <section
@@ -66,8 +98,9 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* コピーが効かない環境では手で拾ってもらうので、選択できる状態にしておく */}
         <code
-          className="rounded-[9px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-sm font-bold tracking-wider text-[#2A2A2A]"
+          className="select-all rounded-[9px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-sm font-bold tracking-wider text-[#2A2A2A]"
           translate="no"
         >
           {formatted}
@@ -81,6 +114,16 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
           {copied ? 'コピーしました' : 'コードをコピー'}
         </button>
       </div>
+
+      {copyState === 'failed' && (
+        <p
+          role="status"
+          className="mt-2 text-[11px] leading-4 font-bold text-[#bf5640]"
+          style={{ fontFamily: ROUND }}
+        >
+          この環境ではコピーできませんでした。上のコードを長押し（PCでは選択）してコピーしてください。
+        </p>
+      )}
 
       <p className="mt-2.5 text-[10px] leading-4 text-[#9b917e]" style={{ fontFamily: ROUND }}>
         Pokémon GO の「プロフィール → フレンド → フレンド追加」に貼り付けてください。
