@@ -35,6 +35,11 @@ export interface Database {
           updated_at: string;
           all_prefectures_completed_at: string | null;
           all_prefectures_outdated_at: string | null;
+          // anon には列単位で REVOKE してある（読めるのは RPC 経由だけ）。
+          // 型に出すのは service_role / 本人の読み書き経路のため。
+          pokemon_go_friend_code: string | null;
+          pokemon_go_friend_note: string | null;
+          pokemon_go_friend_open: boolean;
         };
         Insert: {
           id?: string;
@@ -47,6 +52,9 @@ export interface Database {
           profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
+          pokemon_go_friend_code?: string | null;
+          pokemon_go_friend_note?: string | null;
+          pokemon_go_friend_open?: boolean;
         };
         Update: {
           display_name?: string | null;
@@ -57,6 +65,9 @@ export interface Database {
           profile_is_customized?: boolean;
           all_prefectures_completed_at?: string | null;
           all_prefectures_outdated_at?: string | null;
+          pokemon_go_friend_code?: string | null;
+          pokemon_go_friend_note?: string | null;
+          pokemon_go_friend_open?: boolean;
         };
         Relationships: [];
       };
@@ -771,9 +782,12 @@ export interface Database {
           p_bio: string | null;
           p_x_url: string | null;
           p_instagram_url: string | null;
-          p_pokemon_go_friend_code?: string | null;
-          p_pokemon_go_friend_note?: string | null;
-          p_pokemon_go_friend_open?: boolean;
+          // DB 側に DEFAULT を置いていないので省略できない。省略できる形にすると
+          // 4引数呼び出しがこちらへ解決され、既定値で3列が黙って消える。
+          // 旧4項目だけを更新したいときは4引数版（別関数）が受ける。
+          p_pokemon_go_friend_code: string | null;
+          p_pokemon_go_friend_note: string | null;
+          p_pokemon_go_friend_open: boolean;
         };
         Returns: undefined;
       };
