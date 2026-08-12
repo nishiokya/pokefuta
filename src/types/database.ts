@@ -181,6 +181,31 @@ export interface Database {
         };
         Relationships: [];
       };
+      // 蓋コメントの通報。読めるのは service_role のみ（SELECT ポリシーを作っていない）。
+      // アプリからは INSERT だけ。`.select()` を付けると 42501 で落ちる。
+      comment_report: {
+        Row: {
+          id: string;
+          comment_id: string;
+          reporter_user_id: string | null;
+          reason: string | null;
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          comment_id: string;
+          reporter_user_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+          resolved_at?: string | null;
+        };
+        Update: {
+          reason?: string | null;
+          resolved_at?: string | null;
+        };
+        Relationships: [];
+      };
       visit: {
         Row: {
           id: string;
