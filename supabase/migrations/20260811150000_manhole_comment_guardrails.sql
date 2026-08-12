@@ -37,9 +37,16 @@
 -- **API 層はセキュリティ境界ではない。** 境界は GRANT・RLS・制約だけ。
 -- ---------------------------------------------------------------------------
 
-ALTER TABLE public.manhole_comment
-  ADD CONSTRAINT manhole_comment_content_length
-  CHECK (char_length(content) <= 1000);
+-- このファイルは全体を再実行できるようにしてある（他は IF NOT EXISTS / OR REPLACE）。
+-- ADD CONSTRAINT だけ素で書くと、手で途中まで適用したあとの再実行が 42710 で**中断**し、
+-- 以降の comment_report・RLS・RPC の書き換えが丸ごと無適用のまま「成功したように見える」。
+-- 本番が手動適用である以上、それは drift 事故そのものなので guard する。
+DO $$ BEGIN
+  ALTER TABLE public.manhole_comment
+    ADD CONSTRAINT manhole_comment_content_length
+    CHECK (char_length(content) <= 1000);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 空白だけの投稿も止める。API 側は JS の trim() で弾いているが、直叩きは素通りする。
 --
@@ -47,9 +54,12 @@ ALTER TABLE public.manhole_comment
 -- 全角スペース（U+3000）だけのコメントが通り抜ける。** 日本語入力では素で起きる。
 -- `[:space:]` は UTF-8 で全角スペース・タブ・改行を含むので、こちらで判定する。
 -- （2026-08-11、検査 [2] が実際にこれを検出した）
-ALTER TABLE public.manhole_comment
-  ADD CONSTRAINT manhole_comment_content_not_blank
-  CHECK (content ~ '[^[:space:]]');
+DO $$ BEGIN
+  ALTER TABLE public.manhole_comment
+    ADD CONSTRAINT manhole_comment_content_not_blank
+    CHECK (content ~ '[^[:space:]]');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. 通報の受け皿
@@ -89,11 +99,41 @@ ALTER TABLE public.comment_report ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.comment_report FROM PUBLIC, anon, authenticated;
 GRANT INSERT (comment_id, reporter_user_id, reason) ON public.comment_report TO authenticated;
 
+-- 通報対象が自分のコメントかどうかを、呼び出し側の列権限に依存せずに判定する。
+--
+-- ポリシー式は呼び出しロールの権限で評価されるので、式の中で
+-- manhole_comment.user_id を直接読むと「あとで user_id の SELECT を剥がした瞬間に
+-- 通報が全部落ちる」という時限式になる。SECURITY DEFINER で切り離しておく。
+CREATE OR REPLACE FUNCTION public.is_own_manhole_comment(p_comment_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM manhole_comment mc
+    WHERE mc.id = p_comment_id AND mc.user_id = auth.uid()
+  );
+$function$;
+
+COMMENT ON FUNCTION public.is_own_manhole_comment(uuid) IS
+  '通報ポリシー専用。呼び出し側に manhole_comment.user_id の SELECT 権限が無くても判定できる。';
+
 -- 自分の名前でしか通報できない。他人になりすました通報を作らせない。
+--
+-- **自分のコメントも通報できない。** API 側でも弾いているが、
+-- authenticated は comment_report に INSERT 権限を持つので PostgREST 直叩きで迂回できる。
+-- 「コメントを書く → 自分で通報する」を繰り返すだけで、運営が週次で読む滞留件数を
+-- いくらでも膨らませられる。**読むことが前提の受け皿を、書き手が汚せてはいけない。**
+-- （2026-08-12、レビューで指摘。API だけの防御になっていた）
 DROP POLICY IF EXISTS users_insert_own_reports ON public.comment_report;
 CREATE POLICY users_insert_own_reports ON public.comment_report
   FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = reporter_user_id);
+  WITH CHECK (
+    auth.uid() = reporter_user_id
+    AND NOT public.is_own_manhole_comment(comment_id)
+  );
 
 -- SELECT ポリシーは意図的に作らない。service_role は RLS を迂回するので運用は読める。
 --
@@ -161,9 +201,17 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.get_public_display_names(uuid[]) IS
-  '公開表示名。条件は get_public_user_ids と同じに保つこと（片方だけ変えると'
-  '「名前は出るのにリンクできない」非対称が復活する）。1 uid につき必ず1行。';
+  '公開表示名。「公開に値する活動」の3分岐（公開visit / 公開visitへのコメント / 蓋コメント）は'
+  ' get_public_user_ids と同じに保つこと（片方だけ変えると「名前は出るのにリンクできない」'
+  '非対称が復活する）。au.auth_uid = auth.uid() の分岐はこちらだけが持つ（本人向け）。'
+  ' 1 uid につき必ず1行。';
 
+-- **公開visitの分岐だけでなく、visit_comment の分岐も揃える。**
+-- 「公開visitあり OR 蓋コメントあり」で揃えたつもりだったが、表示名の側には
+-- 「公開visitへのコメントあり」という3本目の分岐が残っていた。
+-- 公開訪問にコメントしただけの人（自分の公開visitは無い）は、
+-- **名前は出るのにプロフィールへリンクできない**まま。直そうとした非対称が
+-- 条件を1本取りこぼしたせいで別の形で生き残っていた（2026-08-12、レビューで指摘）。
 CREATE OR REPLACE FUNCTION public.get_public_user_ids(p_auth_uids uuid[])
 RETURNS TABLE(auth_uid uuid, public_user_id uuid)
 LANGUAGE sql
@@ -180,6 +228,11 @@ AS $function$
         WHERE v.user_id = au.auth_uid AND v.is_public = true
       )
       OR EXISTS (
+        SELECT 1 FROM visit_comment vc
+        JOIN visit v ON v.id = vc.visit_id
+        WHERE vc.user_id = au.auth_uid AND v.is_public = true
+      )
+      OR EXISTS (
         SELECT 1 FROM manhole_comment mc
         WHERE mc.user_id = au.auth_uid
       )
@@ -187,5 +240,8 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.get_public_user_ids(uuid[]) IS
-  '公開IDを返す条件は get_public_display_names と同じ（公開visitあり OR 蓋コメントあり）。'
-  ' 名前が出る条件と、その名前のリンク先が出る条件を揃えている。片方だけ変えないこと。';
+  '公開IDを返す条件は get_public_display_names の「公開に値する活動」3分岐と同じ'
+  '（公開visitあり OR 公開visitへのコメントあり OR 蓋コメントあり）。'
+  ' 唯一の差は get_public_display_names だけが持つ au.auth_uid = auth.uid()（本人には常に'
+  '自分の名前を返す）で、これは公開条件ではなく本人向けの分岐なのでこちらには持たせない。'
+  ' 活動側の3分岐は必ず揃えること。片方だけ足すと「名前は出るのにリンクできない」が復活する。';
