@@ -72,7 +72,11 @@ export async function POST(
       const body = await request.json();
       const raw = body?.reason;
       if (typeof raw === 'string' && raw.trim() !== '') {
-        reason = raw.trim().slice(0, 500);
+        // **コードポイント単位で切る。** `slice()` は UTF-16 単位なので、
+        // 絵文字などサロゲートペアの途中で切ると孤立サロゲートが残り、
+        // JSON にすると Postgres が 22P05 で拒否して**通報が 500 で消える**。
+        // DB 側の CHECK も char_length（＝文字数）なので、単位も揃う。
+        reason = Array.from(raw.trim()).slice(0, 500).join('');
       }
     } catch {
       // 本文なしの通報を許す。理由は任意。

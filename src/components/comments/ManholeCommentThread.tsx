@@ -7,9 +7,18 @@ import { commentThreadState, pokefutaEvents } from '@/lib/analytics/gtag';
 import CommentComposer from './CommentComposer';
 import CommentItem, { type PublicComment } from './CommentItem';
 
+const PAGE_SIZE = 50;
+
 interface Props {
   manholeId: number | string;
-  isLoggedIn: boolean;
+  /**
+   * `null` は「まだ分からない」。セッション取得は蓋の取得と別便なので、
+   * false で代用すると**ログイン済みの人に一瞬ログインCTAが出る**。
+   * その窓でCTAを押されると、ゲート撤去の効果を測る唯一の指標
+   * `p_comment_login_prompt_click` がログイン済みの人で汚れ、
+   * さらに本人は不要なログイン画面へ飛ばされる。
+   */
+  isLoggedIn: boolean | null;
   /** 発生箇所。GA4 予約語の source は使わない。 */
   surface?: string;
 }
@@ -24,7 +33,9 @@ interface Props {
  */
 export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 'manhole_detail' }: Props) {
   const [comments, setComments] = useState<PublicComment[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState('');
@@ -38,14 +49,25 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
   const threadState = commentThreadState(comments.length);
 
   const loadComments = useCallback(async () => {
+    // **別の蓋へ移るときに前の蓋のコメントを消す。**
+    // このコンポーネントは蓋間の遷移でアンマウントされない（ManholePage は
+    // manhole を null に戻さない）ので、消さないと蓋Bのページに蓋Aのコメントが
+    // 件数ごと表示され、しかも「自分のコメント」として削除ボタンまで出る。
+    // 取得に失敗した場合は前の蓋の内容が残り続ける。
+    setComments([]);
+    setTotal(0);
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/manholes/${manholeId}/comments?limit=50&offset=0`);
+      const response = await fetch(
+        `/api/manholes/${manholeId}/comments?limit=${PAGE_SIZE}&offset=0`
+      );
       const data = await response.json();
       if (response.ok && data.success) {
-        const loaded: PublicComment[] = data.comments || [];
+        // API は新しい順。表示は会話の流れどおり古い順に戻す。
+        const loaded: PublicComment[] = [...(data.comments || [])].reverse();
         setComments(loaded);
+        setTotal(typeof data.total === 'number' ? data.total : loaded.length);
 
         // **分母は「読み込みに成功して描画されたスレッド」だけ。**
         // 読み込みが失敗した状態で送ると、障害が「コメント0件の部屋を見た人」として
@@ -78,6 +100,29 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     loadComments();
   }, [loadComments]);
 
+  // 古い側へ遡る。起点が常に最新なので、増えても新着が押し出されない。
+  const loadOlder = async () => {
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/manholes/${manholeId}/comments?limit=${PAGE_SIZE}&offset=${comments.length}`
+      );
+      const data = await response.json();
+      if (response.ok && data.success) {
+        const older: PublicComment[] = [...(data.comments || [])].reverse();
+        setComments((prev) => [...older, ...prev]);
+        if (typeof data.total === 'number') setTotal(data.total);
+      } else {
+        setError(data.error || 'コメントの読み込みに失敗しました');
+      }
+    } catch {
+      setError('コメントの読み込み中にエラーが発生しました');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const content = draft.trim();
     if (!content || content.length > 1000) return;
@@ -96,6 +141,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
 
       if (response.ok && data.success) {
         setComments((prev) => [...prev, data.comment]);
+        setTotal((prev) => prev + 1);
         setDraft('');
         composeStartSentRef.current = false;
         pokefutaEvents.commentPosted({ surface, thread_state: threadState, is_reply: false });
@@ -142,6 +188,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
       const data = await response.json();
       if (response.ok && data.success) {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setTotal((prev) => Math.max(0, prev - 1));
         pokefutaEvents.commentDelete({ surface, thread_state: threadState });
       } else {
         setError(data.error || 'コメントの削除に失敗しました');
@@ -184,9 +231,9 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         <MessageCircle className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
         コメント
         {/* 件数がゼロのときは件数を出さない。「0件」を482枚に並べるのが最悪の選択肢。 */}
-        {comments.length > 0 && (
+        {total > 0 && (
           <span className="font-pixelJp text-[11px] font-normal text-[#9b917e]">
-            {comments.length}
+            {total}
           </span>
         )}
       </h3>
@@ -200,12 +247,23 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
           </p>
         )}
 
+        {comments.length < total && (
+          <button
+            type="button"
+            onClick={loadOlder}
+            disabled={loadingMore}
+            className="self-start font-pixelJp text-xs text-[#6f6657] underline decoration-[#e9dfc7] underline-offset-2 disabled:opacity-50"
+          >
+            {loadingMore ? '読み込み中…' : `以前のコメントを見る（残り${total - comments.length}）`}
+          </button>
+        )}
+
         {comments.map((comment) => (
           <CommentItem
             key={comment.id}
             comment={comment}
             busy={busyCommentId === comment.id}
-            canReport={isLoggedIn}
+            canReport={isLoggedIn === true}
             reported={reportedIds.has(comment.id)}
             onDelete={handleDelete}
             onReport={handleReport}
@@ -218,6 +276,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
           onSubmit={handleSubmit}
           submitting={submitting}
           isLoggedIn={isLoggedIn}
+          loginRedirectPath={`/manhole/${manholeId}`}
           onComposeStart={() => {
             if (composeStartSentRef.current) return;
             composeStartSentRef.current = true;

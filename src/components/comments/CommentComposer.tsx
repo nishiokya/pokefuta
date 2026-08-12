@@ -9,8 +9,10 @@ interface Props {
   onChange: (value: string) => void;
   onSubmit: () => void;
   submitting: boolean;
-  /** 未ログインなら入力欄ではなくログイン導線を出す */
-  isLoggedIn: boolean;
+  /** `null` は判定前。未ログインなら入力欄ではなくログイン導線を出す */
+  isLoggedIn: boolean | null;
+  /** ログイン後に戻る先。渡さないとトップに着地して蓋を探し直すことになる */
+  loginRedirectPath?: string;
   /** 最初のキーストロークで1回だけ呼ぶ（呼び分けは親が持つ） */
   onComposeStart: () => void;
   /** 未ログインで導線を叩いた。ゲート撤去の効果を示す唯一の数字 */
@@ -24,21 +26,41 @@ export default function CommentComposer({
   onSubmit,
   submitting,
   isLoggedIn,
+  loginRedirectPath,
   onComposeStart,
   onLoginPromptClick,
   placeholder = 'この場所のことを書いてみる（駐車場、行き方、見つけたときのこと…）',
 }: Props) {
+  // ログイン判定が返る前は、どちらの顔も出さない。
+  // ここで未ログイン扱いにすると、ログイン済みの人に一瞬ログインCTAが出て、
+  // 押されれば p_comment_login_prompt_click が汚れたうえ本人が飛ばされる。
+  if (isLoggedIn === null) {
+    return (
+      <div
+        className="h-[92px] rounded-[14px] border border-dashed border-[#e9dfc7] bg-[#fffdf7]"
+        aria-hidden="true"
+      />
+    );
+  }
+
   // 未ログインでも「書ける場所がある」ことは見せる。
   // 以前は入力欄ごと存在せず、蓋482枚のほぼ全てで未ログイン訪問者には
   // コメント欄が1ピクセルも描画されていなかった。
   if (!isLoggedIn) {
+    // 認証後に元の蓋へ戻す。渡さないとトップに着地し、
+    // **このPRが消そうとしている離脱をログイン画面側で作り直す**ことになる。
+    // mode は指定しない（ログイン画面が redirect 付きの導線に合わせて既定を選ぶ）。
+    const loginHref = loginRedirectPath
+      ? `/login?redirect=${encodeURIComponent(loginRedirectPath)}`
+      : '/login';
+
     return (
       <div className="rounded-[14px] border border-dashed border-[#e9dfc7] bg-[#fffdf7] p-3">
         <p className="mb-2 font-pixelJp text-xs leading-relaxed text-[#6f6657]">
           ログインすると、このポケふたにコメントを書けます。
         </p>
         <Link
-          href="/login?mode=login"
+          href={loginHref}
           onClick={onLoginPromptClick}
           className="inline-block rounded-[12px] bg-[#bf5640] px-4 py-2 font-pixelJp text-xs font-bold text-white"
         >

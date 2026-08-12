@@ -97,11 +97,13 @@ order by c.created_at desc;
 
 ### A. 特定の利用者だけ止める（推奨）
 
-レート制限のトリガに乗せるのがいちばん狭い。
+**この1本をそのまま実行すれば止まる。** 表の作成とポリシーの差し替えを同じ
+トランザクションに入れてあるのは、片方だけ実行して「止めたつもり」になるのを防ぐため
+（表に INSERT するだけの手順を書いていたことがあり、**それは何も止めなかった**）。
 
 ```sql
--- 1時間あたりの上限を、この利用者だけ 0 にする代わりに、
--- 手っ取り早くは既存の投稿を消さずに新規だけ止めたいので RLS 側で落とす。
+begin;
+
 create table if not exists public.comment_ban (
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -110,13 +112,39 @@ create table if not exists public.comment_ban (
 alter table public.comment_ban enable row level security;
 revoke all on public.comment_ban from public, anon, authenticated;
 
-insert into public.comment_ban (user_id, note) values ('<auth_uid>', '<理由>');
+-- 止める相手（複数なら行を足す）
+insert into public.comment_ban (user_id, note)
+values ('<auth_uid>', '<理由>')
+on conflict (user_id) do nothing;
+
+-- **ここが本体。** ポリシーを差し替えないと上の INSERT は何の効果も持たない。
+drop policy if exists users_insert_own_comments on public.manhole_comment;
+create policy "users_insert_own_comments" on public.manhole_comment
+  for insert with check (
+    auth.uid() = user_id
+    and not exists (select 1 from public.comment_ban b where b.user_id = auth.uid())
+  );
+
+commit;
 ```
 
-**この表は現時点では存在しないし、どのポリシーからも参照されていない。**
-使うことになった時点で、`manhole_comment` の INSERT ポリシー `users_insert_own_comments` に
-`not exists (select 1 from comment_ban b where b.user_id = auth.uid())` を足し、
-**マイグレーションファイルに落として版を合わせる**こと（ダッシュボードで打ちっぱなしにしない）。
+止まったことを、その利用者の立場で必ず確認する:
+
+```sql
+-- 期待: new row violates row-level security policy
+set local role authenticated;
+select set_config('request.jwt.claims',
+                  json_build_object('sub','<auth_uid>','role','authenticated')::text, true);
+insert into public.manhole_comment (manhole_id, user_id, content)
+values ((select id from public.manhole limit 1), '<auth_uid>', 'ban check');
+reset role;
+```
+
+解除は `delete from public.comment_ban where user_id = '<auth_uid>';`（ポリシーはそのままでよい）。
+
+**落ち着いたら必ずマイグレーションファイルに落として版を合わせる。**
+ダッシュボードで打ちっぱなしにすると `npm run db:drift` が赤いまま残り、
+次の人が「本番だけにある DDL」を追いかけることになる。
 
 ### B. 全員のコメント投稿を止める
 

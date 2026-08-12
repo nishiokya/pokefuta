@@ -106,6 +106,7 @@ export default function ManholeDetailPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [photoExpanded, setPhotoExpanded] = useState(false);
@@ -200,6 +201,10 @@ export default function ManholeDetailPage() {
       }
     } catch (err) {
       console.error('Failed to load current user:', err);
+    } finally {
+      // セッション取得は蓋の取得と別便なので、返るまでは「未ログイン」と区別する。
+      // コメント欄はこれを見て、判定前にログインCTAを出さないようにしている。
+      setAuthChecked(true);
     }
   };
 
@@ -1056,7 +1061,7 @@ export default function ManholeDetailPage() {
           {manhole && (
             <ManholeCommentThread
               manholeId={manhole.id}
-              isLoggedIn={currentUserId !== null}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
               surface="manhole_detail"
             />
           )}

@@ -28,7 +28,7 @@ import {
  *         schema:
  *           type: integer
  *           default: 20
- *         description: 取得件数
+ *         description: 取得件数（新しい順。表示側で昇順に戻すこと）
  *       - in: query
  *         name: offset
  *         schema:
@@ -106,12 +106,17 @@ export async function GET(
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
 
+    // **新しい順に返す。** 以前は古い順で先頭 limit 件だったので、
+    // クライアントが50件だけ取ると **51件目以降の新着が再読込のたびに消えていた**
+    // （投稿直後はローカル state への append で見えるので気づきにくい）。
+    // スレッドが育つほど新しい発言が誰にも見えなくなる、成功が失敗を生む形だった。
+    // 表示は昇順に戻すが、それは描画側の仕事。ページングの起点は常に最新。
     const { data: comments, error, count } = await supabase
       .from('manhole_comment')
       .select(MANHOLE_COMMENT_COLUMNS, { count: 'exact' })
       .eq('manhole_id', manholeId)
       .is('parent_comment_id', null)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) {
