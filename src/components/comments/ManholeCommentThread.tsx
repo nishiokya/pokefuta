@@ -46,6 +46,12 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
   const threadViewSentRef = useRef(false);
   const composeStartSentRef = useRef(false);
 
+  // **取得の世代。** 蓋を素早く移ると、蓋Aの取得中に蓋Bへ移り、B→A の順で
+  // 応答が返ることがある。state を同期的に空にするだけでは、遅れて届いた
+  // 蓋Aの応答が蓋Bの画面を上書きしてしまう（前回の修正はここまで塞げていない）。
+  // effect ごとに世代を進め、古い世代の応答は捨てる。
+  const requestGenerationRef = useRef(0);
+
   const threadState = commentThreadState(comments.length);
 
   const loadComments = useCallback(async () => {
@@ -54,6 +60,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     // manhole を null に戻さない）ので、消さないと蓋Bのページに蓋Aのコメントが
     // 件数ごと表示され、しかも「自分のコメント」として削除ボタンまで出る。
     // 取得に失敗した場合は前の蓋の内容が残り続ける。
+    const generation = ++requestGenerationRef.current;
     setComments([]);
     setTotal(0);
     setLoading(true);
@@ -63,6 +70,8 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         `/api/manholes/${manholeId}/comments?limit=${PAGE_SIZE}&offset=0`
       );
       const data = await response.json();
+      // 自分より新しい取得が始まっていたら、この応答は捨てる。
+      if (generation !== requestGenerationRef.current) return;
       if (response.ok && data.success) {
         // API は新しい順。表示は会話の流れどおり古い順に戻す。
         const loaded: PublicComment[] = [...(data.comments || [])].reverse();
@@ -86,9 +95,10 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         setError(data.error || 'コメントの読み込みに失敗しました');
       }
     } catch {
+      if (generation !== requestGenerationRef.current) return;
       setError('コメントの読み込み中にエラーが発生しました');
     } finally {
-      setLoading(false);
+      if (generation === requestGenerationRef.current) setLoading(false);
     }
   }, [manholeId, surface]);
 
@@ -101,25 +111,44 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
   }, [loadComments]);
 
   // 古い側へ遡る。起点が常に最新なので、増えても新着が押し出されない。
+  //
+  // 続きは **今持っている中でいちばん古い1件をカーソルに**して取る。
+  // 件数を offset にすると、取りに行く間に新着が入った分だけ窓がずれて
+  // 同じコメントが二度返る（React の duplicate key と件数の不整合）。
   const loadOlder = async () => {
+    const oldest = comments[0];
+    if (!oldest) return;
+
+    const generation = requestGenerationRef.current;
     setLoadingMore(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/manholes/${manholeId}/comments?limit=${PAGE_SIZE}&offset=${comments.length}`
-      );
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        before_created_at: oldest.created_at,
+        before_id: oldest.id,
+      });
+      const response = await fetch(`/api/manholes/${manholeId}/comments?${params}`);
       const data = await response.json();
+      // 遡っている間に別の蓋へ移っていたら捨てる。
+      if (generation !== requestGenerationRef.current) return;
       if (response.ok && data.success) {
         const older: PublicComment[] = [...(data.comments || [])].reverse();
-        setComments((prev) => [...older, ...prev]);
+        setComments((prev) => {
+          // カーソルで境界は揃うが、念のため id で重複を落とす。
+          // 表示が壊れるより、1件多く捨てるほうがましなので防御を二重にする。
+          const seen = new Set(prev.map((c) => c.id));
+          return [...older.filter((c) => !seen.has(c.id)), ...prev];
+        });
         if (typeof data.total === 'number') setTotal(data.total);
       } else {
         setError(data.error || 'コメントの読み込みに失敗しました');
       }
     } catch {
+      if (generation !== requestGenerationRef.current) return;
       setError('コメントの読み込み中にエラーが発生しました');
     } finally {
-      setLoadingMore(false);
+      if (generation === requestGenerationRef.current) setLoadingMore(false);
     }
   };
 

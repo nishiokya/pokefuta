@@ -112,6 +112,21 @@ create table if not exists public.comment_ban (
 alter table public.comment_ban enable row level security;
 revoke all on public.comment_ban from public, anon, authenticated;
 
+-- **RLS 式から comment_ban を直接 SELECT しないこと。**
+-- RLS 式は投稿者の権限で評価されるので、authenticated から REVOKE した表を
+-- 式の中で読むと、**ban していない利用者まで権限エラーで投稿できなくなる。**
+-- 「1人を止める」つもりの手順が全体停止になる（2026-08-12、実際に踏んだ）。
+-- SECURITY DEFINER 関数を1枚挟めば、表は閉じたまま判定だけできる。
+-- 誰が ban されているかを利用者に見せないためにも、直接 SELECT は許可しない。
+create or replace function public.is_comment_banned()
+returns boolean
+language sql stable security definer set search_path to 'public'
+as $fn$
+  select exists (select 1 from comment_ban b where b.user_id = auth.uid());
+$fn$;
+revoke all on function public.is_comment_banned() from public, anon;
+grant execute on function public.is_comment_banned() to authenticated;
+
 -- 止める相手（複数なら行を足す）
 insert into public.comment_ban (user_id, note)
 values ('<auth_uid>', '<理由>')
@@ -122,22 +137,39 @@ drop policy if exists users_insert_own_comments on public.manhole_comment;
 create policy "users_insert_own_comments" on public.manhole_comment
   for insert with check (
     auth.uid() = user_id
-    and not exists (select 1 from public.comment_ban b where b.user_id = auth.uid())
+    and not public.is_comment_banned()
   );
 
 commit;
 ```
 
-止まったことを、その利用者の立場で必ず確認する:
+**確認は必ず2人ぶんやること。** ban 対象が止まったことだけ見ると、
+全員止まっていても気づけない — 実際にそれで全体停止の手順を書いていた。
 
 ```sql
--- 期待: new row violates row-level security policy
+begin;
 set local role authenticated;
+
+-- 1. ban 対象。期待: new row violates row-level security policy
 select set_config('request.jwt.claims',
-                  json_build_object('sub','<auth_uid>','role','authenticated')::text, true);
+                  json_build_object('sub','<banned_auth_uid>','role','authenticated')::text, true);
 insert into public.manhole_comment (manhole_id, user_id, content)
-values ((select id from public.manhole limit 1), '<auth_uid>', 'ban check');
-reset role;
+values ((select id from public.manhole limit 1), '<banned_auth_uid>', 'ban check');
+
+rollback;
+```
+
+```sql
+begin;
+set local role authenticated;
+
+-- 2. ban していない人。**期待: 成功する。** ここが落ちたら全体停止している
+select set_config('request.jwt.claims',
+                  json_build_object('sub','<普通の利用者のauth_uid>','role','authenticated')::text, true);
+insert into public.manhole_comment (manhole_id, user_id, content)
+values ((select id from public.manhole limit 1), '<普通の利用者のauth_uid>', 'sanity check');
+
+rollback;
 ```
 
 解除は `delete from public.comment_ban where user_id = '<auth_uid>';`（ポリシーはそのままでよい）。

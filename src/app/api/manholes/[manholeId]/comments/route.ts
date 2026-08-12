@@ -94,6 +94,9 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
+    // カーソル。この時刻・IDより「古い」ものを返す（新しい順の続き）。
+    const beforeCreatedAt = searchParams.get('before_created_at');
+    const beforeId = searchParams.get('before_id');
 
     const manholeId = Number(params.manholeId);
     if (!Number.isFinite(manholeId)) {
@@ -111,13 +114,34 @@ export async function GET(
     // （投稿直後はローカル state への append で見えるので気づきにくい）。
     // スレッドが育つほど新しい発言が誰にも見えなくなる、成功が失敗を生む形だった。
     // 表示は昇順に戻すが、それは描画側の仕事。ページングの起点は常に最新。
-    const { data: comments, error, count } = await supabase
+    //
+    // **続きは offset ではなくカーソルで取る。** 新しい順のリストは先頭が動くので、
+    // offset=50 を取りに行く間に新着が1件入ると、窓が1件ぶんずれて
+    // **初回ページの最古コメントが再び返り、重複IDが state に積まれる**
+    // （React の duplicate key と件数の不整合）。逆に消えれば1件飛ぶ。
+    // (created_at, id) の組で「これより古いもの」を指定すれば、
+    // 何件増減しても境界がずれない。
+    let query = supabase
       .from('manhole_comment')
       .select(MANHOLE_COMMENT_COLUMNS, { count: 'exact' })
       .eq('manhole_id', manholeId)
       .is('parent_comment_id', null)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('id', { ascending: false });
+
+    if (beforeCreatedAt) {
+      // created_at が同値の行は id で決める（同時刻の投稿で境界が壊れないように）。
+      query = beforeId
+        ? query.or(
+          `created_at.lt.${beforeCreatedAt},and(created_at.eq.${beforeCreatedAt},id.lt.${beforeId})`
+        )
+        : query.lt('created_at', beforeCreatedAt);
+      query = query.limit(limit);
+    } else {
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: comments, error, count } = await query;
 
     if (error) {
       console.error('Error fetching manhole comments:', error);
