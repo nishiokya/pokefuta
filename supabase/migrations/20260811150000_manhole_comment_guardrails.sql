@@ -1,13 +1,25 @@
 -- 蓋コメント（manhole_comment）を「主役」にする前の下ごしらえ。
 --
 -- 現状（2026-08-11 本番実測）: コメント6件・書いた人2人。
--- これから導線を直して件数を増やすが、**増える前にしか入れられないもの**が3つある。
+-- これから導線を直して件数を増やすが、**増える前にしか入れられないもの**が2つある。
 --
---   1. 長さの上限        … 既存の最大は26文字。今なら CHECK が無条件に通る
---   2. 投稿レート制限    … 現状 1時間10件を超えた人は0人。今なら誰も弾かない
---   3. 通報の受け皿      … 荒れてから作ると、荒れている間だけ手段が無い
+--   1. 長さの上限   … 既存の最大は26文字。今なら CHECK が無条件に通る
+--   2. 通報の受け皿 … 荒れてから作ると、荒れている間だけ手段が無い
 --
--- どれも「コメントが増えてから」だと、既存データとの整合を取りながら入れることになる。
+-- どちらも「コメントが増えてから」だと、既存データとの整合を取りながら入れることになる。
+--
+-- **投稿レート制限は入れない（2026-08-12 判断）。**
+-- 一度は BEFORE INSERT トリガ（1ユーザー1時間10件 + pg_advisory_xact_lock）を書いたが外した。
+-- 決め手は `created_at` がサーバー管理でないこと: authenticated は manhole_comment に
+-- GRANT ALL を持つので、PostgREST 直叩きで created_at を過去にすれば1時間窓の count は
+-- そのまま素通りする。**迂回できる制限は、実装した側だけが安心する。**
+-- 加えて、制限として成立させるには 429 への変換・利用者への再試行時刻の提示・
+-- 弾かれた件数の監視までが要る。現状6件・2人で実害は観測されていない。
+--
+-- 入れるのは「スパムを観測した時点」か「コメント導線を大きく露出する直前」。
+-- そのときは created_at をサーバー管理（列の GRANT を外す or トリガで上書き）にしたうえで、
+-- 429 + 再試行時間 + 計測をセットで入れること。トリガだけ先に置くと、
+-- 11件目が利用者から見てただの 500 になる。
 --
 -- 索引は足さない。スレッド取得は既存の idx_manhole_comment_manhole_id と
 -- idx_manhole_comment_parent の BitmapAnd で解決しており（本番 EXPLAIN で
@@ -40,69 +52,7 @@ ALTER TABLE public.manhole_comment
   CHECK (content ~ '[^[:space:]]');
 
 -- ---------------------------------------------------------------------------
--- 2. 投稿レート制限
---
--- アカウントを1つ作れば482枚の蓋すべてに投稿できる状態を、コメントを主役にしてから
--- 気づくのでは遅い。コードベースにレート制限は1つも無い。
---
--- API 層ではなく DB 側に置く理由は 1 と同じ。加えて、コメント POST の経路は
--- すでに ensureAppUser を呼び忘れた実績がある（visit 側にはあり、蓋側には無い）。
--- 手順を増やせば忘れる。
---
--- service_role（日次同期・バックフィル）は auth.uid() が NULL になるので素通しする。
--- 制限したいのは利用者であって運用ではない。
--- ---------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION public.enforce_manhole_comment_rate_limit()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_recent integer;
-BEGIN
-  -- auth.uid() が NULL＝service_role やマイグレーションからの書き込み。対象外。
-  IF auth.uid() IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- **数える前に、この利用者について直列化する。**
-  -- これが無いと、並列に投げられた N 本のトランザクションが互いのコミット前に
-  -- count を実行し、全部が「10件未満」を見て全部通る。PostgREST を並列で叩けば
-  -- 上限は素通りするので、レート制限として成立しない。
-  --
-  -- 名前空間つきの2引数版を使い、DB内の他の advisory lock と衝突させない。
-  -- xact 版なのでトランザクション終了時に自動で解放される。
-  PERFORM pg_advisory_xact_lock(8110, hashtext(NEW.user_id::text));
-
-  SELECT count(*) INTO v_recent
-  FROM manhole_comment
-  WHERE user_id = NEW.user_id
-    AND created_at > now() - interval '1 hour';
-
-  IF v_recent >= 10 THEN
-    RAISE EXCEPTION 'Comment rate limit exceeded'
-      USING ERRCODE = '53400',
-            HINT = '1時間あたり10件までです。';
-  END IF;
-
-  RETURN NEW;
-END;
-$function$;
-
-DROP TRIGGER IF EXISTS enforce_manhole_comment_rate_limit ON public.manhole_comment;
-CREATE TRIGGER enforce_manhole_comment_rate_limit
-  BEFORE INSERT ON public.manhole_comment
-  FOR EACH ROW EXECUTE FUNCTION public.enforce_manhole_comment_rate_limit();
-
-COMMENT ON FUNCTION public.enforce_manhole_comment_rate_limit() IS
-  '1ユーザー1時間10件。API層ではなくDB側に置く（anonキーでPostgRESTを直叩きされても効かせるため）。'
-  ' service_role は auth.uid() が NULL なので対象外。'
-  ' 数える前に pg_advisory_xact_lock で利用者ごとに直列化する（並列INSERTで上限を抜けられるため）。';
-
--- ---------------------------------------------------------------------------
--- 3. 通報の受け皿
+-- 2. 通報の受け皿
 --
 -- 通報ボタンを置く以上「読む」というコミットが要る。専用の管理画面は
 -- コメント6件の段階では過剰なので作らない。滞留件数を週次で見る運用にする。
@@ -156,7 +106,7 @@ COMMENT ON TABLE public.comment_report IS
   ' 滞留件数は週次で確認する運用。専用の管理画面は作っていない。';
 
 -- ---------------------------------------------------------------------------
--- 4. get_public_user_ids のゲートを get_public_display_names に揃える
+-- 3. get_public_user_ids のゲートを get_public_display_names に揃える
 --
 -- 現状の非対称:
 --   get_public_display_names … 公開visitあり **OR** 蓋コメントあり → 表示名を返す

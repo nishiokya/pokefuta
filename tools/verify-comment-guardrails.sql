@@ -14,7 +14,6 @@ DECLARE
   commenter   uuid := '00000000-0000-0000-0000-00000000ca03';
   target_manhole bigint;
   n int;
-  i int;
   report_id uuid;
   new_comment uuid;
   ok boolean;
@@ -66,35 +65,7 @@ BEGIN
   END;
 
   -- =====================================================================
-  -- 3. レート制限が効く（1ユーザー1時間10件）
-  --    auth.uid() を立てないとトリガが素通しするので、JWT クレームを立てる。
-  -- =====================================================================
-  PERFORM set_config('request.jwt.claims',
-                     json_build_object('sub', other_id, 'role', 'authenticated')::text, true);
-
-  FOR i IN 1..10 LOOP
-    INSERT INTO public.manhole_comment (manhole_id, user_id, content)
-    VALUES (target_manhole, other_id, 'rate limit test ' || i);
-  END LOOP;
-
-  BEGIN
-    INSERT INTO public.manhole_comment (manhole_id, user_id, content)
-    VALUES (target_manhole, other_id, 'rate limit test 11');
-    RAISE EXCEPTION '[3] 11件目が通ってしまった。レート制限が効いていない';
-  EXCEPTION WHEN configuration_limit_exceeded THEN
-    NULL; -- ERRCODE 53400
-  END;
-
-  -- =====================================================================
-  -- 4. service_role はレート制限の対象外
-  --    日次同期やバックフィルを止めない。制限したいのは利用者であって運用ではない。
-  -- =====================================================================
-  PERFORM set_config('request.jwt.claims', NULL, true);
-  INSERT INTO public.manhole_comment (manhole_id, user_id, content)
-  VALUES (target_manhole, other_id, '運用からの書き込み（auth.uid() が NULL）');
-
-  -- =====================================================================
-  -- 5. 通報は自分の名前でしか作れない
+  -- 3. 通報は自分の名前でしか作れない
   -- =====================================================================
   INSERT INTO public.manhole_comment (manhole_id, user_id, content)
   VALUES (target_manhole, author_id, '通報対象') RETURNING id INTO new_comment;
@@ -112,7 +83,7 @@ BEGIN
   BEGIN
     INSERT INTO public.comment_report (comment_id, reporter_user_id, reason)
     VALUES (new_comment, commenter, 'RETURNING 検証') RETURNING id INTO report_id;
-    RAISE EXCEPTION '[5] 通報の INSERT ... RETURNING が通ってしまった。'
+    RAISE EXCEPTION '[3] 通報の INSERT ... RETURNING が通ってしまった。'
                     '通報が読めるようになっている（通報者が晒される）';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL; -- 期待どおり。アプリは .select() を付けないこと
@@ -121,30 +92,30 @@ BEGIN
   BEGIN
     INSERT INTO public.comment_report (comment_id, reporter_user_id, reason)
     VALUES (new_comment, other_id, 'なりすまし通報');
-    RAISE EXCEPTION '[5] 他人の名前で通報できてしまった';
+    RAISE EXCEPTION '[3] 他人の名前で通報できてしまった';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL; -- RLS の WITH CHECK で弾かれる
   END;
 
   -- =====================================================================
-  -- 6. 同じ人が同じコメントを二度通報しても1件
+  -- 4. 同じ人が同じコメントを二度通報しても1件
   --    連打で滞留件数が膨らむと、読む運用が先に壊れる。
   -- =====================================================================
   BEGIN
     INSERT INTO public.comment_report (comment_id, reporter_user_id, reason)
     VALUES (new_comment, commenter, '二度目');
-    RAISE EXCEPTION '[6] 同じ通報が2件入ってしまった';
+    RAISE EXCEPTION '[4] 同じ通報が2件入ってしまった';
   EXCEPTION WHEN unique_violation THEN
     NULL;
   END;
 
   -- =====================================================================
-  -- 7. 通報は authenticated からも anon からも読めない
+  -- 5. 通報は authenticated からも anon からも読めない
   --    「誰が誰を通報したか」は通報者を晒す情報。読めるのは service_role だけ。
   -- =====================================================================
   BEGIN
     SELECT count(*) INTO n FROM public.comment_report;
-    RAISE EXCEPTION '[7] authenticated が通報を読めている（% 行）', n;
+    RAISE EXCEPTION '[5] authenticated が通報を読めている（% 行）', n;
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
@@ -152,13 +123,13 @@ BEGIN
   SET LOCAL ROLE anon;
   BEGIN
     SELECT count(*) INTO n FROM public.comment_report;
-    RAISE EXCEPTION '[7] anon が通報を読めている（% 行）', n;
+    RAISE EXCEPTION '[5] anon が通報を読めている（% 行）', n;
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
 
   -- =====================================================================
-  -- 8. コメントしかしていない人にも公開IDが出る
+  -- 6. コメントしかしていない人にも公開IDが出る
   --    get_public_display_names は蓋コメント投稿者を含めるのに
   --    get_public_user_ids は「公開visitあり」だけだったため、
   --    **名前は出るのにプロフィールへリンクできない**状態だった。
@@ -170,23 +141,23 @@ BEGIN
   SELECT count(*) INTO n
   FROM public.get_public_user_ids(ARRAY[commenter]::uuid[]);
   IF n <> 1 THEN
-    RAISE EXCEPTION '[8] コメントのみのユーザーに公開IDが返らない（% 行）', n;
+    RAISE EXCEPTION '[6] コメントのみのユーザーに公開IDが返らない（% 行）', n;
   END IF;
 
   -- 表示名の側と条件が揃っていること（片方だけ変えると非対称が復活する）
   SELECT count(*) INTO n
   FROM public.get_public_display_names(ARRAY[commenter]::uuid[]);
   IF n <> 1 THEN
-    RAISE EXCEPTION '[8] 表示名と公開IDの公開条件が揃っていない（表示名 % 行）', n;
+    RAISE EXCEPTION '[6] 表示名と公開IDの公開条件が揃っていない（表示名 % 行）', n;
   END IF;
 
   -- =====================================================================
-  -- 9. 何もしていない人には公開IDを出さない（過剰に開いていないこと）
+  -- 7. 何もしていない人には公開IDを出さない（過剰に開いていないこと）
   -- =====================================================================
   SELECT count(*) INTO n
   FROM public.get_public_user_ids(ARRAY['00000000-0000-0000-0000-0000000000ff'::uuid]);
   IF n <> 0 THEN
-    RAISE EXCEPTION '[9] 存在しない/無活動のユーザーに公開IDが返っている（% 行）', n;
+    RAISE EXCEPTION '[7] 存在しない/無活動のユーザーに公開IDが返っている（% 行）', n;
   END IF;
 
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）

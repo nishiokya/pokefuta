@@ -26,8 +26,6 @@ const SQL_FILE = path.join(__dirname, 'verify-comment-guardrails.sql');
 const CHECKS = [
   '1000文字を超える本文が入らない（境界の1000文字は通る）',
   '空白だけの本文が入らない（全角スペースを含む）',
-  'レート制限が効く（1ユーザー1時間10件）',
-  'service_role はレート制限の対象外（日次同期を止めない）',
   '通報は自分の名前でしか作れない／RETURNING は落ちる',
   '同じ人が同じコメントを二度通報しても1件',
   '通報は anon からも authenticated からも読めない',
