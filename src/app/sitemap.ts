@@ -57,6 +57,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     },
+    {
+      // 検索資産ではないが、投稿の削除根拠になる文書なのでリンク先として安定させる。
+      url: `${baseUrl}/terms`,
+      lastModified,
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
   ];
 
   let dynamicPages: MetadataRoute.Sitemap = [];

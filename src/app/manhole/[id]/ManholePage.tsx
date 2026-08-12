@@ -17,6 +17,7 @@ import ShareButtons from '@/components/ShareButtons';
 import Breadcrumb from '@/components/Breadcrumb';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
+import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { calculateDistance } from '@/lib/location';
 import { manholeShareText, photoShareText } from '@/lib/share';
@@ -92,18 +93,6 @@ const relatedManholeLabel = (m: Manhole) => {
   return `${m.prefecture}${muni}のポケふた${poke ? `（${poke}）` : ''}`;
 };
 
-interface ManholeComment {
-  id: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  user: {
-    id: string;
-    email?: string | null;
-    display_name?: string | null;
-  };
-}
-
 export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -121,12 +110,6 @@ export default function ManholeDetailPage() {
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [photoExpanded, setPhotoExpanded] = useState(false);
 
-  const [manholeComments, setManholeComments] = useState<ManholeComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentsSubmitting, setCommentsSubmitting] = useState(false);
-  const [commentsError, setCommentsError] = useState<string | null>(null);
-  const [newManholeComment, setNewManholeComment] = useState('');
-
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
 
@@ -139,7 +122,6 @@ export default function ManholeDetailPage() {
       setPhotoExpanded(false);
       loadManholeDetail(manholeId as string);
       loadPhotos(manholeId as string);
-      loadManholeComments(manholeId as string);
       loadCurrentUser();
     }
   }, [params.id]);
@@ -209,14 +191,6 @@ export default function ManholeDetailPage() {
     }
   }, [manhole]);
 
-  const getCommentUserLabel = (comment: ManholeComment) => {
-    const name = comment.user.display_name;
-    return name?.trim() || '名無し';
-  };
-
-  const getCommentUserInitial = (comment: ManholeComment) =>
-    getCommentUserLabel(comment)?.[0]?.toUpperCase() || 'U';
-
   const loadCurrentUser = async () => {
     try {
       const response = await fetch('/api/auth/session');
@@ -285,57 +259,6 @@ export default function ManholeDetailPage() {
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
-    }
-  };
-
-  const loadManholeComments = async (id: string) => {
-    setCommentsLoading(true);
-    setCommentsError(null);
-    try {
-      const response = await fetch(`/api/manholes/${id}/comments?limit=50&offset=0`);
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setManholeComments(data.comments || []);
-      } else {
-        setCommentsError(data.error || 'コメントの読み込みに失敗しました');
-      }
-    } catch {
-      setCommentsError('コメントの読み込み中にエラーが発生しました');
-    } finally {
-      setCommentsLoading(false);
-    }
-  };
-
-  const handleSubmitManholeComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUserId || !newManholeComment.trim()) return;
-    if (newManholeComment.length > 1000) {
-      setCommentsError('コメントは1000文字以内で入力してください');
-      return;
-    }
-    const manholeId = params.id;
-    if (!manholeId) return;
-    setCommentsSubmitting(true);
-    setCommentsError(null);
-    try {
-      const response = await fetch(`/api/manholes/${manholeId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newManholeComment.trim() }),
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setManholeComments((prev) => [...prev, data.comment]);
-        setNewManholeComment('');
-      } else if (response.status === 401) {
-        setCommentsError('ログインが必要です');
-      } else {
-        setCommentsError(data.error || 'コメントの投稿に失敗しました');
-      }
-    } catch {
-      setCommentsError('コメントの投稿中にエラーが発生しました');
-    } finally {
-      setCommentsSubmitting(false);
     }
   };
 
@@ -1125,6 +1048,19 @@ export default function ManholeDetailPage() {
             </div>
           )}
 
+          {/*
+            ── Comments ──
+            関連リンク3種とシェアの**上**に置く。以前は全1261行の最下部にあり、
+            スクロールしきった人しか到達できなかった。ここは部屋の主コンテンツ。
+          */}
+          {manhole && (
+            <ManholeCommentThread
+              manholeId={manhole.id}
+              isLoggedIn={currentUserId !== null}
+              surface="manhole_detail"
+            />
+          )}
+
           {/* ── Nearby manholes ── */}
           {related.nearby.length > 0 && (
             <div>
@@ -1172,63 +1108,6 @@ export default function ManholeDetailPage() {
                 hashtags={sharePayload.hashtags}
                 analyticsParams={sharePayload.analyticsParams}
               />
-            </div>
-          )}
-
-          {/* ── Comments (preserved) ── */}
-          {(manholeComments.length > 0 || currentUserId) && (
-            <div>
-              <h3 className="mb-3 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">コメント</h3>
-              <div className="flex flex-col gap-3">
-                {commentsLoading && (
-                  <p className="font-pixelJp text-xs text-[#9b917e]">読み込み中…</p>
-                )}
-                {manholeComments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="flex gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dfe7f3] font-pixelJp text-sm font-bold text-[#6f6657]">
-                      {getCommentUserInitial(comment)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-0.5 flex items-center gap-2">
-                        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
-                          {getCommentUserLabel(comment)}
-                        </span>
-                        <span className="font-pixelJp text-[10px] text-[#9b917e]">
-                          {new Date(comment.created_at).toLocaleDateString('ja-JP')}
-                        </span>
-                      </div>
-                      <p className="font-pixelJp text-xs leading-relaxed text-[#6f6657]">
-                        {comment.content}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {currentUserId && (
-                  <form onSubmit={handleSubmitManholeComment} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newManholeComment}
-                      onChange={(e) => setNewManholeComment(e.target.value)}
-                      placeholder="コメントを追加…"
-                      maxLength={1000}
-                      className="flex-1 rounded-[12px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-xs text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-1 focus:ring-[#bf5640]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={commentsSubmitting || !newManholeComment.trim()}
-                      className="rounded-[12px] bg-[#bf5640] px-4 py-2 font-pixelJp text-xs font-bold text-white disabled:opacity-50"
-                    >
-                      投稿
-                    </button>
-                  </form>
-                )}
-                {commentsError && (
-                  <p className="font-pixelJp text-xs text-[#bf5640]">{commentsError}</p>
-                )}
-              </div>
             </div>
           )}
 

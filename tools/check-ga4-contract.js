@@ -205,6 +205,32 @@ for (const helper of [
   );
 }
 
+// 4c. 蓋コメントも同じ形で担保する。
+//     ここが崩れると「機能はあるが行動が無い」と「そもそも計測が無い」を区別できなくなる。
+//     特に thread_view（分母）と login_prompt_click は、片方欠けるだけで
+//     設計の当否を判定する式そのものが成立しない。
+for (const eventName of readLedger('COMMENT_EVENTS')) {
+  expect(
+    analyticsCode.includes(`trackEvent('${eventName}'`),
+    `${eventName} は COMMENT_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
+  );
+}
+for (const helper of [
+  'commentThreadView',
+  'commentLoginPrompt',
+  'commentComposeStart',
+  'commentSubmit',
+  'commentPosted',
+  'commentFailed',
+  'commentDelete',
+  'commentReport',
+]) {
+  expect(
+    callerCode.includes(`${helper}({`),
+    `${helper} がどこからも呼ばれていない（蓋コメントの計測に穴が空く）`
+  );
+}
+
 // 5. 投稿導線のクリックが計測されている
 expect(
   callerCode.includes('trackSubmissionEntry({'),

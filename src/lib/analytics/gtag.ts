@@ -151,6 +151,79 @@ export const GO_FRIEND_EVENTS = [
   'p_go_friend_code_copy',  // 4. コードをコピーした
 ] as const;
 
+/**
+ * スレッドの賑わい。**設計の当否はこの次元での分解でしか答えられない。**
+ *
+ * 「コメント欄を目立たせれば書かれる」という仮説が正しいなら、
+ * `p_comment_posted / p_comment_thread_view` は `active` で高く `empty` で低いはず。
+ * 全部の状態で等しく低いなら、問題はUIではなく**部屋あたりの観客がいない**ことで、
+ * 次の打ち手は蓋ページの磨き込みではなく部屋の単位を変えること（県 / ポケモン / ルート）。
+ */
+export const COMMENT_THREAD_STATES = [
+  'empty',   // 0件。482枚のうち大半がこれ
+  'single',  // 1件
+  'small',   // 2件
+  'active',  // 3件以上
+] as const;
+
+export type CommentThreadState = (typeof COMMENT_THREAD_STATES)[number];
+
+export function commentThreadState(commentCount: number): CommentThreadState {
+  if (commentCount <= 0) return 'empty';
+  if (commentCount === 1) return 'single';
+  if (commentCount === 2) return 'small';
+  return 'active';
+}
+
+export interface CommentEventParams extends GAEventParams {
+  /** 発生箇所。GA4 予約語の source は使わない。 */
+  surface: string;
+  thread_state: CommentThreadState;
+}
+
+export interface CommentThreadViewParams extends CommentEventParams {
+  /** スレッドの件数そのもの。カスタム**指標**として登録が要る。 */
+  thread_size: number;
+}
+
+export interface CommentPostedParams extends CommentEventParams {
+  /** 返信か。Phase 1b では常に false（返信UIは通知と同時に出す）。 */
+  is_reply: boolean;
+}
+
+export interface CommentFailedParams extends CommentEventParams {
+  /** 'rate_limited' / 'invalid_content' / 'unauthorized' / 'network' / 'unexpected' */
+  error_code: string;
+  status_code?: number;
+}
+
+/**
+ * 蓋コメントの台帳。`tools/check-ga4-contract.js` が
+ * 「定義だけあって誰も送っていない」状態を落とす。
+ *
+ * **コメント総数を指標にしない。** 6→30 は5倍だが何も意味しない。
+ * 見るのは `p_comment_posted / p_comment_thread_view` を thread_state で割ったもの。
+ *
+ * `compose_start` はあるのに `posted` が無い＝コンポーザ / 文字数UIの問題。
+ * `compose_start` すら無い＝発見・配置の問題。
+ * **別の修正であり、両方のイベントが無いと区別できない。**
+ *
+ * デプロイ前に GA4 管理画面で登録が要る（遡及しない）:
+ *   カスタムディメンション … thread_state, is_reply
+ *   カスタム指標         … thread_size
+ *   （surface / error_code / is_logged_in は登録済み）
+ */
+export const COMMENT_EVENTS = [
+  'p_comment_thread_view',        // 1. スレッドが描画された（**分母**。PVではない）
+  'p_comment_login_prompt_click', // 2. 未ログインがコンポーザを叩いた
+  'p_comment_compose_start',      // 3. 最初のキーストローク
+  'p_comment_submit',             // 4. 送信した
+  'p_comment_posted',             // 5a. 投稿できた（キーイベント）
+  'p_comment_failed',             // 5b. 失敗（キーイベントにしない）
+  'p_comment_delete',             // 6. 自分のコメントを消した
+  'p_comment_report',             // 7. 通報した
+] as const;
+
 export interface ApiErrorEventParams extends GAEventParams {
   api_path: string;
   endpoint?: string;
@@ -395,6 +468,18 @@ export const pokefutaEvents = {
   /** 公開ページで募集カードが出た。コピー率の分母。 */
   goFriendCardView:    (p: GoFriendEventParams)  => trackEvent('p_go_friend_card_view', p),
   goFriendCodeCopy:    (p: GoFriendEventParams)  => trackEvent('p_go_friend_code_copy', p),
+
+  // --- 蓋コメント（COMMENT_EVENTS の順） ---
+  /** スレッドが描画された。全コメント指標の分母。 */
+  commentThreadView:   (p: CommentThreadViewParams) => trackEvent('p_comment_thread_view', p),
+  /** 未ログインがコンポーザを叩いた。ゲートが何を失わせていたかを示す唯一の数字。 */
+  commentLoginPrompt:  (p: CommentEventParams)   => trackEvent('p_comment_login_prompt_click', p),
+  commentComposeStart: (p: CommentEventParams)   => trackEvent('p_comment_compose_start', p),
+  commentSubmit:       (p: CommentEventParams)   => trackEvent('p_comment_submit', p),
+  commentPosted:       (p: CommentPostedParams)  => trackEvent('p_comment_posted', p),
+  commentFailed:       (p: CommentFailedParams)  => trackEvent('p_comment_failed', p),
+  commentDelete:       (p: CommentEventParams)   => trackEvent('p_comment_delete', p),
+  commentReport:       (p: CommentEventParams)   => trackEvent('p_comment_report', p),
 };
 
 // ==========================================

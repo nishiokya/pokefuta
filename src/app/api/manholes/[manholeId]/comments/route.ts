@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
-import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
+import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { getAuthUserDisplayName } from '@/lib/auth/displayName';
+import {
+  MANHOLE_COMMENT_COLUMNS,
+  serializeManholeComments,
+} from '@/lib/manhole-comments';
 
 /**
  * @swagger
@@ -98,9 +103,12 @@ export async function GET(
       );
     }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    const viewerUserId = session?.user?.id ?? null;
+
     const { data: comments, error, count } = await supabase
       .from('manhole_comment')
-      .select('*', { count: 'exact' })
+      .select(MANHOLE_COMMENT_COLUMNS, { count: 'exact' })
       .eq('manhole_id', manholeId)
       .is('parent_comment_id', null)
       .order('created_at', { ascending: true })
@@ -118,27 +126,11 @@ export async function GET(
       );
     }
 
-    const userIds = Array.from(
-      new Set(
-        (comments || [])
-          .map((c: any) => c?.user_id)
-          .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
-      )
+    const enriched = await serializeManholeComments(
+      supabase,
+      (comments || []) as any[],
+      viewerUserId
     );
-
-    const displayNameByAuthUid = await loadPublicDisplayNameMap(supabase, userIds);
-
-    const enriched = (comments || []).map((c: any) => {
-      const uid = c.user_id;
-      const displayName = typeof uid === 'string' ? (displayNameByAuthUid.get(uid) ?? null) : null;
-      return {
-        ...c,
-        user: {
-          id: uid,
-          display_name: displayName,
-        },
-      };
-    });
 
     return NextResponse.json({
       success: true,
@@ -216,6 +208,10 @@ export async function POST(
 
     const userId = session.user.id;
 
+    // app_user が無いと表示名が解決できず「名無し」のコメントになる。
+    // visit 側の POST には元からあるのに、こちらだけ抜けていた。
+    await ensureAppUser(supabase, userId, getAuthUserDisplayName(session.user));
+
     const { data: comment, error: commentError } = await supabase
       .from('manhole_comment')
       .insert({
@@ -224,11 +220,37 @@ export async function POST(
         content: content.trim(),
         parent_comment_id: null,
       })
-      .select('*')
+      .select(MANHOLE_COMMENT_COLUMNS)
       .single();
 
     if (commentError) {
       console.error('Error creating manhole comment:', commentError);
+
+      // レート制限トリガ（53400）は利用者の操作の結果なので、500 ではなく 429 で返す。
+      // 生のDBメッセージはクライアントへ返さない。
+      if (commentError.code === '53400') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Rate limit exceeded',
+            message: '短時間に投稿しすぎです。1時間ほどおいてからお試しください。',
+          },
+          { status: 429 }
+        );
+      }
+
+      // CHECK 制約違反（23514）＝ 長さ・空白のみ。これも利用者側の入力。
+      if (commentError.code === '23514') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid content',
+            message: 'コメントの内容を確認してください。',
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         {
           success: false,
@@ -239,22 +261,11 @@ export async function POST(
       );
     }
 
-    let displayName: string | null = null;
-    try {
-      displayName = (await loadPublicDisplayNameMap(supabase, [userId])).get(userId) ?? null;
-    } catch {
-      // ignore
-    }
+    const [serialized] = await serializeManholeComments(supabase, [comment as any], userId);
 
     return NextResponse.json({
       success: true,
-      comment: {
-        ...comment,
-        user: {
-          id: userId,
-          display_name: displayName,
-        },
-      },
+      comment: serialized,
     });
   } catch (error: any) {
     console.error('Unexpected error creating manhole comment:', error);
