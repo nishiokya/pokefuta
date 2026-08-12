@@ -48,26 +48,42 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
   const threadViewSentRef = useRef(false);
   const composeStartSentRef = useRef(false);
 
-  // **取得の世代。** 蓋を素早く移ると、蓋Aの取得中に蓋Bへ移り、B→A の順で
-  // 応答が返ることがある。state を同期的に空にするだけでは、遅れて届いた
-  // 蓋Aの応答が蓋Bの画面を上書きしてしまう（前回の修正はここまで塞げていない）。
-  // effect ごとに世代を進め、古い世代の応答は捨てる。
+  // 取得の世代。古い世代の応答は state に反映しない。
+  //
+  // **蓋から蓋への遷移では、現状これは発火しない。** App Router は
+  // `/manhole/[id]` のパラメータが変わるとページを作り直すので、この
+  // コンポーネントはアンマウントされ、state ごと捨てられる。
+  // 実測（Playwright で遷移前後の mount/unmount を記録）: 遷移時に
+  // UNMOUNT → MOUNT が起きる。したがって「蓋Bに蓋Aのコメントが残る」
+  // 「進行中フラグが固まる」はいずれも現状では起こらない。
+  //
+  // それでも残しているのは、この安全性が**マウントの寿命という外部の前提**に
+  // ぶら下がっているため。Phase 2 で統合スレッドを別の場所に置いたり、
+  // モーダルに載せたりして再マウントされなくなった瞬間、**黙って**
+  // 「別の蓋のコメントが混ざる」に戻る。3行の保険でその失敗を静かでなくする。
   const requestGenerationRef = useRef(0);
 
   const threadState = commentThreadState(comments.length);
 
   const loadComments = useCallback(async () => {
-    // **別の蓋へ移るときに前の蓋のコメントを消す。**
-    // このコンポーネントは蓋間の遷移でアンマウントされない（ManholePage は
-    // manhole を null に戻さない）ので、消さないと蓋Bのページに蓋Aのコメントが
-    // 件数ごと表示され、しかも「自分のコメント」として削除ボタンまで出る。
-    // 取得に失敗した場合は前の蓋の内容が残り続ける。
+    // 取得を始めるときに前の内容を消す。現状は遷移でアンマウントされるので
+    // 実害は出ないが、それはマウントの寿命に依存した安全性でしかない
+    // （requestGenerationRef のコメント参照）。
     const generation = ++requestGenerationRef.current;
     setComments([]);
     setTotal(0);
     setHasMore(false);
     setLoading(true);
     setError(null);
+
+    // 進行中フラグも戻す。世代照合は `finally` にも掛かっているので、
+    // これが無いと「応答が返るころに世代が変わっていた」ケースで
+    // `setSubmitting(false)` ごと捨てられ、ボタンが無効のまま固定される。
+    // 解除を無条件にするのでは駄目で（新しい世代の操作中に古い応答が来て
+    // 再有効化し、二重送信の窓を開ける）、開始時に戻すのが正しい形。
+    setSubmitting(false);
+    setLoadingMore(false);
+    setBusyCommentId(null);
     try {
       const response = await fetch(
         `/api/manholes/${manholeId}/comments?limit=${PAGE_SIZE}&offset=0`
@@ -162,11 +178,9 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     const content = draft.trim();
     if (!content || content.length > 1000) return;
 
-    // GET と同じ世代照合を書き込み側にも入れる。
-    // 蓋Aで投稿して応答前に蓋Bへ移ると、**蓋Aの投稿結果が蓋Bの一覧に足され、
-    // 件数まで増える**（削除なら蓋Bの件数が誤って減る）。
-    // 投稿・削除・通報そのものはサーバで完了していてよく、
-    // 捨てるのは「もう表示していないスレッドへの反映」だけ。
+    // GET と同じ世代照合を書き込み側にも入れる。捨てるのは
+    // 「もう表示していないスレッドへの反映」だけで、投稿そのものは
+    // サーバで完了していてよい。
     const generation = requestGenerationRef.current;
     setSubmitting(true);
     setError(null);
