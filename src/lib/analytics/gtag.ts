@@ -192,7 +192,10 @@ export interface CommentPostedParams extends CommentEventParams {
 }
 
 export interface CommentFailedParams extends CommentEventParams {
-  /** 'rate_limited' / 'invalid_content' / 'unauthorized' / 'network' / 'unexpected' */
+  /**
+   * 'invalid_content' / 'unauthorized' / 'network' / 'unexpected'
+   * レート制限を入れ直すときに 'rate_limited' を足す（今は 429 を返す経路が無い）。
+   */
   error_code: string;
   status_code?: number;
 }

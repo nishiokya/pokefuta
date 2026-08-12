@@ -226,20 +226,12 @@ export async function POST(
     if (commentError) {
       console.error('Error creating manhole comment:', commentError);
 
-      // レート制限トリガ（53400）は利用者の操作の結果なので、500 ではなく 429 で返す。
-      // 生のDBメッセージはクライアントへ返さない。
-      if (commentError.code === '53400') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Rate limit exceeded',
-            message: '短時間に投稿しすぎです。1時間ほどおいてからお試しください。',
-          },
-          { status: 429 }
-        );
-      }
-
-      // CHECK 制約違反（23514）＝ 長さ・空白のみ。これも利用者側の入力。
+      // CHECK 制約違反（23514）＝ 長さ・空白のみ。利用者側の入力なので 400。
+      //
+      // 429 の分岐は置いていない。投稿レート制限は 1a で入れかけて外したので
+      // （created_at がサーバー管理でなく迂回できるため）、現状 53400 を投げる経路が無い。
+      // 入れ直すときは、トリガと同じ PR で 429 + 再試行時間 + p_comment_failed の
+      // error_code='rate_limited' をセットにすること。**片方だけ先に置かない。**
       if (commentError.code === '23514') {
         return NextResponse.json(
           {

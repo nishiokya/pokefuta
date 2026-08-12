@@ -138,12 +138,24 @@ from pg_policy
 where polrelid = 'public.manhole_comment'::regclass;
 ```
 
-### C. レート制限を締める
+### C. レート制限（現時点では存在しない）
 
-荒れの規模が「1人が大量」なら A、「多数がそこそこ」ならこちら。
-`enforce_manhole_comment_rate_limit()` の `v_recent >= 10` を下げる。
-関数の定義は `supabase/migrations/20260811150000_manhole_comment_guardrails.sql` にある。
-**変更したらマイグレーションファイル側も同じ値にする**（`npm run db:drift` が落ちる）。
+**投稿レート制限は入っていません。** 一度書いて外しました。理由は
+`supabase/migrations/20260811150000_manhole_comment_guardrails.sql` の冒頭にあります
+（`created_at` がサーバー管理でないため、PostgREST 直叩きで迂回できる）。
+
+荒れの規模が「1人が大量」なら A で足ります。**「多数がそこそこ」で初めて
+レート制限が要る**ので、その状況になったら深夜に即席で入れず、
+次の3点をセットにした PR を出すこと:
+
+1. `created_at` をサーバー管理にする（列の GRANT を外す、またはトリガで上書き）。
+   **ここを飛ばすと、入れた制限がその日のうちに迂回される**
+2. API で 429 に変換し、利用者に再試行できる時刻を見せる。
+   トリガだけだと 11件目がただの 500 になる
+3. `p_comment_failed` に `error_code='rate_limited'` を足して、弾かれた件数を見る。
+   見ていない制限は、閾値が適切かどうかを永久に答えられない
+
+急場しのぎが要るなら B（全員止める）のほうが、迂回できる制限より正直です。
 
 ---
 

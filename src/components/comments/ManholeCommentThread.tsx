@@ -105,8 +105,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
       // 失敗の理由を機械可読に残す。ここが丸まると
       // 「レート制限で弾かれている」と「壊れている」が GA4 上で区別できない。
       const errorCode =
-        response.status === 429 ? 'rate_limited'
-          : response.status === 401 ? 'unauthorized'
+        response.status === 401 ? 'unauthorized'
           : response.status === 400 ? 'invalid_content'
           : 'unexpected';
 
