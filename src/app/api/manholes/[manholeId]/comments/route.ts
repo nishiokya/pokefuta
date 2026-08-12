@@ -129,6 +129,14 @@ export async function GET(
       .order('created_at', { ascending: false })
       .order('id', { ascending: false });
 
+    // **「まだ古いものがあるか」は総数から引き算しない。**
+    // total は取得のたびに動く（他人が投稿すれば増える）ので、
+    // 「保持件数 < total」を続きの有無に使うと、**カーソルより新しい位置に増えた1件が
+    // 差分として永久に残り、「以前のコメントを見る（残り1）」が消えなくなる。**
+    // 押しても取れるのは古い側だけなので、利用者から見て操作不能なボタンになる。
+    // 1件多く読んで、実際に次があるかを直接答える。
+    const fetchLimit = limit + 1;
+
     if (beforeCreatedAt) {
       // created_at が同値の行は id で決める（同時刻の投稿で境界が壊れないように）。
       query = beforeId
@@ -136,12 +144,15 @@ export async function GET(
           `created_at.lt.${beforeCreatedAt},and(created_at.eq.${beforeCreatedAt},id.lt.${beforeId})`
         )
         : query.lt('created_at', beforeCreatedAt);
-      query = query.limit(limit);
+      query = query.limit(fetchLimit);
     } else {
-      query = query.range(offset, offset + limit - 1);
+      query = query.range(offset, offset + fetchLimit - 1);
     }
 
-    const { data: comments, error, count } = await query;
+    const { data: rows, error, count } = await query;
+
+    const hasMore = (rows || []).length > limit;
+    const comments = (rows || []).slice(0, limit);
 
     if (error) {
       console.error('Error fetching manhole comments:', error);
@@ -157,14 +168,21 @@ export async function GET(
 
     const enriched = await serializeManholeComments(
       supabase,
-      (comments || []) as any[],
+      comments as any[],
       viewerUserId
     );
 
     return NextResponse.json({
       success: true,
       comments: enriched,
-      total: count || 0,
+      // スレッド全体の件数。**カーソル付きの取得では返さない。**
+      // PostgREST の count はフィルタ後の件数なので、カーソルを付けると
+      // 「そのカーソルより古い件数」になる。スレッド全体の件数として使うと
+      // 60件のスレッドで 10 と表示されるなど、見出しが壊れる。
+      // （2026-08-12、has_more の実測中に発見）
+      total: beforeCreatedAt ? null : (count || 0),
+      // 続きの有無はこちらで答える。total からの引き算では判定しないこと。
+      has_more: hasMore,
     });
   } catch (error: any) {
     console.error('Unexpected error fetching manhole comments:', error);

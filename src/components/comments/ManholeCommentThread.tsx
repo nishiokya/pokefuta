@@ -34,6 +34,8 @@ interface Props {
 export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 'manhole_detail' }: Props) {
   const [comments, setComments] = useState<PublicComment[]>([]);
   const [total, setTotal] = useState(0);
+  // 続きの有無はサーバに直接答えてもらう。保持件数と total の差から導かない。
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     const generation = ++requestGenerationRef.current;
     setComments([]);
     setTotal(0);
+    setHasMore(false);
     setLoading(true);
     setError(null);
     try {
@@ -77,6 +80,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         const loaded: PublicComment[] = [...(data.comments || [])].reverse();
         setComments(loaded);
         setTotal(typeof data.total === 'number' ? data.total : loaded.length);
+        setHasMore(Boolean(data.has_more));
 
         // **分母は「読み込みに成功して描画されたスレッド」だけ。**
         // 読み込みが失敗した状態で送ると、障害が「コメント0件の部屋を見た人」として
@@ -140,7 +144,9 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
           const seen = new Set(prev.map((c) => c.id));
           return [...older.filter((c) => !seen.has(c.id)), ...prev];
         });
-        if (typeof data.total === 'number') setTotal(data.total);
+        // total はカーソル付きの取得では返らない（フィルタ後の件数になるため）。
+        // 見出しの件数は初回取得の値を保つ。
+        setHasMore(Boolean(data.has_more));
       } else {
         setError(data.error || 'コメントの読み込みに失敗しました');
       }
@@ -156,6 +162,12 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     const content = draft.trim();
     if (!content || content.length > 1000) return;
 
+    // GET と同じ世代照合を書き込み側にも入れる。
+    // 蓋Aで投稿して応答前に蓋Bへ移ると、**蓋Aの投稿結果が蓋Bの一覧に足され、
+    // 件数まで増える**（削除なら蓋Bの件数が誤って減る）。
+    // 投稿・削除・通報そのものはサーバで完了していてよく、
+    // 捨てるのは「もう表示していないスレッドへの反映」だけ。
+    const generation = requestGenerationRef.current;
     setSubmitting(true);
     setError(null);
     pokefutaEvents.commentSubmit({ surface, thread_state: threadState });
@@ -167,6 +179,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         body: JSON.stringify({ content }),
       });
       const data = await response.json();
+      if (generation !== requestGenerationRef.current) return;
 
       if (response.ok && data.success) {
         setComments((prev) => [...prev, data.comment]);
@@ -196,6 +209,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         || (response.status === 401 ? 'ログインが必要です' : 'コメントの投稿に失敗しました')
       );
     } catch {
+      if (generation !== requestGenerationRef.current) return;
       pokefutaEvents.commentFailed({
         surface,
         thread_state: threadState,
@@ -203,11 +217,12 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
       });
       setError('コメントの投稿中にエラーが発生しました');
     } finally {
-      setSubmitting(false);
+      if (generation === requestGenerationRef.current) setSubmitting(false);
     }
   };
 
   const handleDelete = async (commentId: string) => {
+    const generation = requestGenerationRef.current;
     setBusyCommentId(commentId);
     setError(null);
     try {
@@ -215,6 +230,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         method: 'DELETE',
       });
       const data = await response.json();
+      if (generation !== requestGenerationRef.current) return;
       if (response.ok && data.success) {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
         setTotal((prev) => Math.max(0, prev - 1));
@@ -223,13 +239,15 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         setError(data.error || 'コメントの削除に失敗しました');
       }
     } catch {
+      if (generation !== requestGenerationRef.current) return;
       setError('コメントの削除中にエラーが発生しました');
     } finally {
-      setBusyCommentId(null);
+      if (generation === requestGenerationRef.current) setBusyCommentId(null);
     }
   };
 
   const handleReport = async (commentId: string) => {
+    const generation = requestGenerationRef.current;
     setBusyCommentId(commentId);
     setError(null);
     try {
@@ -239,6 +257,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         body: JSON.stringify({}),
       });
       const data = await response.json();
+      if (generation !== requestGenerationRef.current) return;
       if (response.ok && data.success) {
         // 既に通報済み（`already_reported`）でも利用者には同じ結果を見せる。
         // 「誰が通報したか」を推測させないため。
@@ -248,9 +267,10 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
         setError(data.error || '通報を受け付けられませんでした');
       }
     } catch {
+      if (generation !== requestGenerationRef.current) return;
       setError('通報の送信中にエラーが発生しました');
     } finally {
-      setBusyCommentId(null);
+      if (generation === requestGenerationRef.current) setBusyCommentId(null);
     }
   };
 
@@ -276,14 +296,14 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
           </p>
         )}
 
-        {comments.length < total && (
+        {hasMore && (
           <button
             type="button"
             onClick={loadOlder}
             disabled={loadingMore}
             className="self-start font-pixelJp text-xs text-[#6f6657] underline decoration-[#e9dfc7] underline-offset-2 disabled:opacity-50"
           >
-            {loadingMore ? '読み込み中…' : `以前のコメントを見る（残り${total - comments.length}）`}
+            {loadingMore ? '読み込み中…' : '以前のコメントを見る'}
           </button>
         )}
 
