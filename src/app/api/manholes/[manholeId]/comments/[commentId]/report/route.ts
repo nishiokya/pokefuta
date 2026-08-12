@@ -81,7 +81,7 @@ export async function POST(
     // 存在しないコメントIDで滞留件数を膨らませられないようにする。
     const { data: comment, error: fetchError } = await supabase
       .from('manhole_comment')
-      .select('id')
+      .select('id, user_id')
       .eq('id', commentId)
       .eq('manhole_id', manholeId)
       .single();
@@ -91,6 +91,17 @@ export async function POST(
         success: false,
         error: 'Comment not found'
       }, { status: 404 });
+    }
+
+    // 自分のコメントは通報できない。UI では通報ボタンを出していないが、
+    // **UI は境界ではない。** ここで弾かないと、自分で投稿して自分で通報するだけで
+    // 運営が読むべき滞留件数をいくらでも水増しできる。
+    // （通報の受け皿を作る目的が「読む」ことである以上、これは機能の否定にあたる）
+    if ((comment as any).user_id === userId) {
+      return NextResponse.json({
+        success: false,
+        error: 'You cannot report your own comment'
+      }, { status: 403 });
     }
 
     // **`.select()` を付けないこと。** comment_report には SELECT ポリシーが無いので、

@@ -44,7 +44,22 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
       const response = await fetch(`/api/manholes/${manholeId}/comments?limit=50&offset=0`);
       const data = await response.json();
       if (response.ok && data.success) {
-        setComments(data.comments || []);
+        const loaded: PublicComment[] = data.comments || [];
+        setComments(loaded);
+
+        // **分母は「読み込みに成功して描画されたスレッド」だけ。**
+        // 読み込みが失敗した状態で送ると、障害が「コメント0件の部屋を見た人」として
+        // 積み上がり、thread_state='empty' の変換率と分母の両方が壊れる。
+        // この計画の当否は p_comment_posted / p_comment_thread_view で判定するので、
+        // ここが汚れると判定式そのものが成立しない。
+        if (!threadViewSentRef.current) {
+          threadViewSentRef.current = true;
+          pokefutaEvents.commentThreadView({
+            surface,
+            thread_state: commentThreadState(loaded.length),
+            thread_size: loaded.length,
+          });
+        }
       } else {
         setError(data.error || 'コメントの読み込みに失敗しました');
       }
@@ -53,7 +68,7 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     } finally {
       setLoading(false);
     }
-  }, [manholeId]);
+  }, [manholeId, surface]);
 
   useEffect(() => {
     threadViewSentRef.current = false;
@@ -62,17 +77,6 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     setDraft('');
     loadComments();
   }, [loadComments]);
-
-  // **分母。** PV ではなく「スレッドが実際に描画されたこと」を数える。
-  useEffect(() => {
-    if (loading || threadViewSentRef.current) return;
-    threadViewSentRef.current = true;
-    pokefutaEvents.commentThreadView({
-      surface,
-      thread_state: commentThreadState(comments.length),
-      thread_size: comments.length,
-    });
-  }, [loading, comments.length, surface]);
 
   const handleSubmit = async () => {
     const content = draft.trim();
