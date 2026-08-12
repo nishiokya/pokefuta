@@ -9,11 +9,26 @@ import { loadPublicDisplayNameMap, loadPublicUserIdMap } from '@/lib/public-disp
  *
  * **`user_id`（auth uid の生値）を含めないこと。** これがこの型の存在理由。
  * 以前は `select('*')` の結果をそのまま返していたため、蓋ページを開くだけで
- * コメント投稿者の auth uid が全員に配られていた。コメントを主役にする以上、
- * この漏れの「量」は機能の成功に比例して増える。
+ * コメント投稿者の auth uid が全員に配られていた。
  *
  * 「自分のコメントか」はクライアントで uid を突き合わせるのではなく、
  * サーバが計算した `is_own` で答える。uid をレスポンスに載せずに判定できる形。
+ *
+ * ---
+ * **ただしこれで auth uid が隠れたわけではない。**
+ *
+ * baseline に `GRANT ALL ON manhole_comment TO anon` と
+ * `public_select_manhole_comments USING (true)` が残っているので、
+ * 公開 anon キーで `manhole_comment?select=user_id` を直接叩けば
+ * 全投稿者の auth uid が取れる。**この型が塞ぐのはアプリのAPI経路だけで、
+ * DB は開いたまま。** 「API 層はセキュリティ境界ではない」という
+ * このリポジトリの前提は、ここでもそのまま当てはまる。
+ *
+ * 塞ぐには SECURITY DEFINER RPC を足す → 適用 → このファイルを切り替える →
+ * デプロイ → `REVOKE SELECT (user_id)` の順が要る（列を剥がす前に、
+ * 読まなくなっているコードが本番で動いている必要がある）。
+ * 計画では `visit` の M2 と同じ contract フェーズ（Phase 5）にまとめてある。
+ * `~/.claude/plans/seo-sns-ux-mutable-simon.md` §7 / §失敗する筋 7 を参照。
  */
 export type PublicManholeComment = {
   id: string;
