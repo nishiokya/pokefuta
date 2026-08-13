@@ -147,12 +147,36 @@ export async function fetchManholeCommentPage(
 
   const rows = ((data || []) as ManholeCommentRpcRow[]);
   const hasMore = rows.length > limit;
+  const offset = Math.max(params.offset ?? 0, 0);
+
+  // `thread_total` は行に乗って返るので、**0件のページでは受け取れない**。
+  //
+  // `offset=0`（カーソル無し）で0件なら、スレッド自体が空なので 0 で正しい。
+  // だが **`offset` が末尾を越えた場合も0件**になり、そこで 0 を返すと
+  // 「コメントはあるのに見出しが 0 件」になる。以前の `count: 'exact'` は
+  // この場合でも実数を返していたので、黙った退行になる（codex レビューの指摘）。
+  //
+  // その1点だけ数え直す。`offset > 0` かつ0件、という稀な組み合わせに限るので、
+  // 大多数を占める「コメントの無い蓋の初回ページ」に追加の問い合わせは出ない。
+  // 数えるのに読むのは `id` だけ（`user_id` は読まない）。
+  let threadTotal = Number(rows[0]?.thread_total ?? 0);
+  if (rows.length === 0 && offset > 0) {
+    const { count, error: countError } = await supabase
+      .from('manhole_comment')
+      .select('id', { count: 'exact', head: true })
+      .eq('manhole_id', params.manholeId)
+      .is('parent_comment_id', null);
+
+    if (countError) {
+      return { page: null, error: countError };
+    }
+    threadTotal = count ?? 0;
+  }
 
   return {
     page: {
       comments: rows.slice(0, limit).map(toPublicComment),
-      // 空ページなら数えるものが無い。初回ページが空＝スレッドが空。
-      threadTotal: Number(rows[0]?.thread_total ?? 0),
+      threadTotal,
       hasMore,
     },
     error: null,
