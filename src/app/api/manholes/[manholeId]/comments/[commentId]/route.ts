@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { isOwnManholeComment } from '@/lib/manhole-comments';
 
 /**
  * @swagger
@@ -64,9 +65,13 @@ export async function DELETE(
       }, { status: 400 });
     }
 
+    // **user_id を読まない（Phase 1c-b）。** 「自分のものしか消せない」は
+    // RLS の `users_delete_own_comments` がすでに強制しているので、ここでの判定は
+    // 403 と 404 を区別するためだけにある。判定は SECURITY DEFINER の
+    // `is_own_manhole_comment` に閉じてあり、1c-c で列を剥がしても動く。
     const { data: comment, error: fetchError } = await supabase
       .from('manhole_comment')
-      .select('id, user_id')
+      .select('id')
       .eq('id', commentId)
       .eq('manhole_id', manholeId)
       .single();
@@ -78,7 +83,7 @@ export async function DELETE(
       }, { status: 404 });
     }
 
-    if ((comment as any).user_id !== userId) {
+    if (!(await isOwnManholeComment(supabase, commentId))) {
       return NextResponse.json({
         success: false,
         error: 'You can only delete your own comments'

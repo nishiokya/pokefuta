@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { isOwnManholeComment } from '@/lib/manhole-comments';
 
 /**
  * @swagger
@@ -83,9 +84,11 @@ export async function POST(
     }
 
     // 存在しないコメントIDで滞留件数を膨らませられないようにする。
+    // **user_id は読まない（Phase 1c-b）。** 自己通報の判定は下の
+    // `is_own_manhole_comment` に任せる（RLS の WITH CHECK も同じ関数を使っている）。
     const { data: comment, error: fetchError } = await supabase
       .from('manhole_comment')
-      .select('id, user_id')
+      .select('id')
       .eq('id', commentId)
       .eq('manhole_id', manholeId)
       .single();
@@ -101,7 +104,7 @@ export async function POST(
     // **UI は境界ではない。** ここで弾かないと、自分で投稿して自分で通報するだけで
     // 運営が読むべき滞留件数をいくらでも水増しできる。
     // （通報の受け皿を作る目的が「読む」ことである以上、これは機能の否定にあたる）
-    if ((comment as any).user_id === userId) {
+    if (await isOwnManholeComment(supabase, commentId)) {
       return NextResponse.json({
         success: false,
         error: 'You cannot report your own comment'
