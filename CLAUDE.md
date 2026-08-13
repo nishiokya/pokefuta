@@ -65,7 +65,15 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 
 **列単位 GRANT のテーブルは `select=*` で読めない。** PostgREST の `*` は全列に展開されるので、
 GRANT していない列（`photo.exif` 等）まで要求して **42501** で落ちる。
-「権限のある列だけ返す」にはならない。`photo` はこれを `check-photo-select-star.js` で見張っている。
+「権限のある列だけ返す」にはならない。`photo` はこれを `check-photo-select-star.js` で、`manhole_comment` は
+`check-manhole-comment-user-id.js` で見張っている（どちらも `tools/lib/select-chains.js` を共有）。
+
+**列を隠すのは「REVOKE を1行足す」ではない。** Postgres の列単位 `REVOKE SELECT (col)` は
+列ACLしか削らないので、テーブル単位の `GRANT` が残っていると読めたままになる。
+テーブル単位で剥がして、見せてよい列を名指しで GRANT し直すこと（`photo` / `manhole_comment` が
+その形）。加えて、そのテーブルを参照する `security_invoker` のビューは呼び出し側の権限で
+評価されるので、隠した列を参照していると**ビューごと 42501 になる**
+（`manhole_comment_stats` の `count(DISTINCT user_id)` が実際にそうなった）。
 SQL 側の `verify:*` は列権限と RLS が正しいことしか見ないので、**アプリが `*` を投げている退行は捕まらない**。
 
 **プロフィールに列を足すときは、先に `verify:app-user-visibility` へ「anon から読めない」ケースを足す。**

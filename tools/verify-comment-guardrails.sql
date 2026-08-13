@@ -281,46 +281,75 @@ BEGIN
     RAISE EXCEPTION '[9] 本人が呼んでも is_own が偽（自分のコメントを消せなくなる）';
   END IF;
 
-  -- 9-4. **1c-c の予行演習。** 列を名指しにしても壊れないことを、実際に権限を
-  --      張り替えて確かめる。ここが通らないうちは 1c-c を本番に打てない。
+  -- =====================================================================
+  -- 10. auth uid は DB からも読めない（Phase 1c-c・20260813120000）
   --
-  --      列単位の `REVOKE SELECT (user_id)` では塞がらない（テーブル単位の
-  --      GRANT ALL が残るため）。photo と同じく table 単位で剥がして名指しで返す。
+  --     ここが本丸。1c-a/1c-b は「読まなくする」までで、**塞いだのはこの版**。
+  --     以前は予行演習として権限を張り替えて元に戻していたが、1c-c を適用した
+  --     いまは定常状態そのものを検査する（戻す処理が残っていると、この検査を
+  --     走らせるたびにローカルの 1c-c が剥がれる）。
+  -- =====================================================================
   RESET ROLE;
-  REVOKE SELECT ON public.manhole_comment FROM anon, authenticated;
-  GRANT SELECT (id, manhole_id, parent_comment_id, content,
-                is_edited, edited_at, created_at, updated_at)
-    ON public.manhole_comment TO anon, authenticated;
-
   SET LOCAL ROLE anon;
   PERFORM set_config('request.jwt.claims', '', true);
 
   BEGIN
     SELECT mc.user_id INTO probe_uid FROM public.manhole_comment mc LIMIT 1;
-    RAISE EXCEPTION '[9] 列を名指しにしても anon が user_id を読めている';
+    RAISE EXCEPTION '[10] anon が manhole_comment.user_id を読めている';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL; -- 期待どおり
   END;
 
   -- **`select=*` は落ちる。** PostgREST の `*` は全列に展開されるので、
   -- GRANT していない user_id まで要求して 42501 になる（photo で踏んだのと同じ形）。
-  -- 1c-b で MANHOLE_COMMENT_COLUMNS から user_id を外し忘れると本番がこれで死ぬ。
+  -- アプリ側で `MANHOLE_COMMENT_COLUMNS` に user_id を戻すと本番がこれで死ぬ。
+  -- 静的な見張りは tools/check-manhole-comment-user-id.js。
   BEGIN
     PERFORM * FROM public.manhole_comment LIMIT 1;
-    RAISE EXCEPTION '[9] user_id を剥がしたのに select * が通ってしまった';
+    RAISE EXCEPTION '[10] manhole_comment を select * で読めてしまう（user_id が開いている）';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
+
+  -- 見せてよい列は読める（過剰に絞っていないこと）
+  PERFORM mc.id, mc.manhole_id, mc.parent_comment_id, mc.content,
+          mc.is_edited, mc.edited_at, mc.created_at, mc.updated_at
+  FROM public.manhole_comment mc LIMIT 1;
 
   -- 肝心の RPC は動き続ける（SECURITY DEFINER なので呼び出し側の列権限に依らない）
   SELECT count(*) INTO n
   FROM public.get_manhole_comments(target_manhole::int, 101);
   IF n = 0 THEN
-    RAISE EXCEPTION '[9] 列を名指しにしたら RPC がコメントを返さなくなった';
+    RAISE EXCEPTION '[10] 列を名指しにしたら RPC がコメントを返さなくなった';
+  END IF;
+
+  -- **manhole_comment_stats が巻き添えで死んでいないこと。**
+  -- security_invoker のビューは呼び出し側の権限で評価されるので、定義に
+  -- user_id が残っていると anon から 42501 になる（1c-c で commenter_count を外した）。
+  --
+  -- 素で書くと Postgres の `permission denied for table manhole_comment` がそのまま
+  -- 出てきて、**ビューが原因だと分からない**（検査の失敗メッセージは、直す人が
+  -- どこを見ればいいか分かる形にする）。
+  BEGIN
+    SELECT count(*) INTO n FROM public.manhole_comment_stats;
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE EXCEPTION '[10] manhole_comment_stats が anon から読めない。'
+                    'security_invoker のビューが user_id を参照している';
+  END;
+
+  -- 人数の再混入を止める。`count(DISTINCT user_id)` を戻すとこのビューは
+  -- 読めなくなる（しかも参照する画面が出るまで誰も気づかない）。
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'manhole_comment_stats'
+      AND column_name = 'commenter_count'
+  ) THEN
+    RAISE EXCEPTION '[10] manhole_comment_stats に commenter_count が戻っている'
+                    '（invoker ビューが user_id を参照すると anon から読めなくなる）';
   END IF;
 
   -- 投稿と自己削除は RLS のポリシー式が user_id を見る。列を剥がしても
-  -- ポリシーが評価できること（＝1c-c で投稿・削除が死なないこと）を確かめる。
+  -- ポリシーが評価できること（＝投稿・削除が死んでいないこと）を確かめる。
   RESET ROLE;
   SET LOCAL ROLE authenticated;
   PERFORM set_config('request.jwt.claims',
@@ -332,12 +361,10 @@ BEGIN
 
   DELETE FROM public.manhole_comment WHERE id = rehearsal_comment;
   IF EXISTS (SELECT 1 FROM public.manhole_comment mc WHERE mc.id = rehearsal_comment) THEN
-    RAISE EXCEPTION '[9] 列を名指しにしたら自分のコメントを削除できなくなった';
+    RAISE EXCEPTION '[10] 列を名指しにしたら自分のコメントを削除できなくなった';
   END IF;
 
-  -- 権限を元に戻す（この検査は 1c-c の予行演習であって、適用ではない）。
   RESET ROLE;
-  GRANT SELECT ON public.manhole_comment TO anon, authenticated;
 
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）
   DELETE FROM public.comment_report WHERE reporter_user_id = commenter;
