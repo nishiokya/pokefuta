@@ -34,7 +34,7 @@ jobs:
   db-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: secret の有無を確認する
         env:
@@ -46,15 +46,19 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       # `version: latest` は GitHub API で最新リリースを解決する。token を渡さないと
       # 未認証で叩くことになり、共有 runner の IP レート制限に当たって落ちる
       # （2026-08-10、"Failed to resolve latest Supabase CLI release: rate limit exceeded"）。
       # setup-cli はこのための入力を持っているので、token を渡す。
-      - uses: supabase/setup-cli@v1
+      #
+      # **v3 には上げていない。** v3 は解決先を GitHub Releases から npm に変え、
+      # `github-token` 入力を削除した。上の対策が要らなくなる代わりに解決経路ごと
+      # 変わるので、node20 非推奨の解消（v2 で足りる）とは分けて判断する。
+      - uses: supabase/setup-cli@v2
         with:
           version: latest
           github-token: ${{ github.token }}
