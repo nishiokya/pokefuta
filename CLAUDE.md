@@ -48,6 +48,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 |---|---|
 | `tools/check-public-display-name-source.js` | 表示名の参照元 |
 | `tools/check-photo-select-star.js` | photo を `select=*` で読んでいないこと |
+| `tools/check-manhole-comment-user-id.js` | manhole_comment を `user_id` 込み／`select=*` で読んでいないこと、一覧が `get_manhole_comments()` 経由であること |
 | `tools/check-ga4-contract.js` | GA4 の計測契約 |
 | `tools/check-safe-area-env.js` | CSS `env(safe-area-*)` のスペル |
 | `tools/check-supabase-target.js` | `.env.local` への本番資格情報の混入 |

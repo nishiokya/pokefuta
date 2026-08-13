@@ -6,7 +6,8 @@ import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import {
   MANHOLE_COMMENT_COLUMNS,
-  serializeManholeComments,
+  fetchManholeCommentPage,
+  serializeOwnManholeComment,
 } from '@/lib/manhole-comments';
 
 /**
@@ -106,9 +107,6 @@ export async function GET(
       );
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const viewerUserId = session?.user?.id ?? null;
-
     // **新しい順に返す。** 以前は古い順で先頭 limit 件だったので、
     // クライアントが50件だけ取ると **51件目以降の新着が再読込のたびに消えていた**
     // （投稿直後はローカル state への append で見えるので気づきにくい）。
@@ -121,68 +119,45 @@ export async function GET(
     // （React の duplicate key と件数の不整合）。逆に消えれば1件飛ぶ。
     // (created_at, id) の組で「これより古いもの」を指定すれば、
     // 何件増減しても境界がずれない。
-    let query = supabase
-      .from('manhole_comment')
-      .select(MANHOLE_COMMENT_COLUMNS, { count: 'exact' })
-      .eq('manhole_id', manholeId)
-      .is('parent_comment_id', null)
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false });
+    //
+    // **テーブルではなく `get_manhole_comments()` を読む（Phase 1c-b）。**
+    // 直読みだと投稿者の auth uid を取ってきてサーバ側で捨てることになり、
+    // 1c-c で列そのものを剥がした瞬間に 42501 で落ちる。RPC は
+    // SECURITY DEFINER なので、列を剥がしたあとも動く。
+    // カーソル・件数・表示名の解決は RPC の中に寄せてある。
+    const { page, error } = await fetchManholeCommentPage(supabase, {
+      manholeId,
+      limit,
+      offset,
+      beforeCreatedAt,
+      beforeId,
+    });
 
-    // **「まだ古いものがあるか」は総数から引き算しない。**
-    // total は取得のたびに動く（他人が投稿すれば増える）ので、
-    // 「保持件数 < total」を続きの有無に使うと、**カーソルより新しい位置に増えた1件が
-    // 差分として永久に残り、「以前のコメントを見る（残り1）」が消えなくなる。**
-    // 押しても取れるのは古い側だけなので、利用者から見て操作不能なボタンになる。
-    // 1件多く読んで、実際に次があるかを直接答える。
-    const fetchLimit = limit + 1;
-
-    if (beforeCreatedAt) {
-      // created_at が同値の行は id で決める（同時刻の投稿で境界が壊れないように）。
-      query = beforeId
-        ? query.or(
-          `created_at.lt.${beforeCreatedAt},and(created_at.eq.${beforeCreatedAt},id.lt.${beforeId})`
-        )
-        : query.lt('created_at', beforeCreatedAt);
-      query = query.limit(fetchLimit);
-    } else {
-      query = query.range(offset, offset + fetchLimit - 1);
-    }
-
-    const { data: rows, error, count } = await query;
-
-    const hasMore = (rows || []).length > limit;
-    const comments = (rows || []).slice(0, limit);
-
-    if (error) {
+    if (error || !page) {
       console.error('Error fetching manhole comments:', error);
       return NextResponse.json(
         {
           success: false,
           error: 'Failed to fetch comments',
-          details: error.message,
+          details: error?.message ?? 'Unknown error',
         },
         { status: 500 }
       );
     }
 
-    const enriched = await serializeManholeComments(
-      supabase,
-      comments as any[],
-      viewerUserId
-    );
-
     return NextResponse.json({
       success: true,
-      comments: enriched,
+      comments: page.comments,
       // スレッド全体の件数。**カーソル付きの取得では返さない。**
-      // PostgREST の count はフィルタ後の件数なので、カーソルを付けると
-      // 「そのカーソルより古い件数」になる。スレッド全体の件数として使うと
-      // 60件のスレッドで 10 と表示されるなど、見出しが壊れる。
-      // （2026-08-12、has_more の実測中に発見）
-      total: beforeCreatedAt ? null : (count || 0),
+      // RPC の thread_total はカーソルに依らずスレッド全体を数えるので、
+      // 実は常に返して構わない（PostgREST の `count: 'exact'` がカーソル付きで
+      // 「そのカーソルより古い件数」になる問題は無くなった）。
+      // ただし 1c-b では**契約を変えない**。クライアントは初回の値を保持する作りで、
+      // ここを変えると読み込み中の見出しの動きまで変わる。切り替えるなら
+      // ManholeCommentThread の total 保持と一緒に、別の PR で。
+      total: beforeCreatedAt ? null : page.threadTotal,
       // 続きの有無はこちらで答える。total からの引き算では判定しないこと。
-      has_more: hasMore,
+      has_more: page.hasMore,
     });
   } catch (error: any) {
     console.error('Unexpected error fetching manhole comments:', error);
@@ -300,7 +275,12 @@ export async function POST(
       );
     }
 
-    const [serialized] = await serializeManholeComments(supabase, [comment as any], userId);
+    // 書いたのはセッションの本人だと分かっているので、行から user_id を読まない。
+    const serialized = await serializeOwnManholeComment(
+      supabase,
+      comment as any,
+      userId
+    );
 
     return NextResponse.json({
       success: true,

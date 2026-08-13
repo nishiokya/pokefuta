@@ -15,20 +15,16 @@ import { loadPublicDisplayNameMap, loadPublicUserIdMap } from '@/lib/public-disp
  * サーバが計算した `is_own` で答える。uid をレスポンスに載せずに判定できる形。
  *
  * ---
- * **ただしこれで auth uid が隠れたわけではない。**
+ * **読み口は DB 側でも閉じた（Phase 1c）。**
  *
- * baseline に `GRANT ALL ON manhole_comment TO anon` と
- * `public_select_manhole_comments USING (true)` が残っているので、
+ * かつては baseline の `GRANT ALL ON manhole_comment TO anon` と
+ * `public_select_manhole_comments USING (true)` が残っていたので、
  * 公開 anon キーで `manhole_comment?select=user_id` を直接叩けば
- * 全投稿者の auth uid が取れる。**この型が塞ぐのはアプリのAPI経路だけで、
- * DB は開いたまま。** 「API 層はセキュリティ境界ではない」という
- * このリポジトリの前提は、ここでもそのまま当てはまる。
+ * 全投稿者の auth uid が取れた。**API 層はセキュリティ境界ではない。**
  *
- * 塞ぐには SECURITY DEFINER RPC を足す → 適用 → このファイルを切り替える →
- * デプロイ → `REVOKE SELECT (user_id)` の順が要る（列を剥がす前に、
- * 読まなくなっているコードが本番で動いている必要がある）。
- * 計画では `visit` の M2 と同じ contract フェーズ（Phase 5）にまとめてある。
- * `~/.claude/plans/seo-sns-ux-mutable-simon.md` §7 / §失敗する筋 7 を参照。
+ * 一覧は `get_manhole_comments()`（SECURITY DEFINER）経由にしてあり、
+ * このファイルはもう `user_id` を読まない。列そのものを剥がすのは 1c-c。
+ * `~/.claude/plans/seo-sns-ux-mutable-simon.md` §Phase 1c を参照。
  */
 export type PublicManholeComment = {
   id: string;
@@ -46,52 +42,178 @@ export type PublicManholeComment = {
 /**
  * `select('*')` を使わず列を名指しする。
  * 列を足したときに自動で公開面へ出ないようにするため（`photo.exif` の教訓）。
+ *
+ * **`user_id` を戻さないこと。** 1c-c で `manhole_comment` の SELECT を列名指しに
+ * したあとは、この定数に `user_id` があるだけで投稿が 42501 で落ちる
+ * （PostgREST は要求した列をそのまま権限検査に掛ける）。
  */
 export const MANHOLE_COMMENT_COLUMNS =
-  'id, manhole_id, parent_comment_id, content, created_at, user_id';
+  'id, manhole_id, parent_comment_id, content, created_at';
 
-type ManholeCommentRow = {
+/** `get_manhole_comments()` の1行。auth uid は含まれない。 */
+type ManholeCommentRpcRow = {
   id: string;
   manhole_id: number;
   parent_comment_id: string | null;
   content: string;
   created_at: string;
-  user_id: string | null;
+  is_own: boolean;
+  display_name: string | null;
+  public_user_id: string | null;
+  thread_total: number;
+};
+
+/** POST の返却に使う、書き込み直後の行（RETURNING の結果）。 */
+type InsertedManholeCommentRow = {
+  id: string;
+  manhole_id: number;
+  parent_comment_id: string | null;
+  content: string;
+  created_at: string;
 };
 
 /**
- * DB の行を公開表現へ変換する。表示名と public_user_id の解決はここに閉じる。
+ * API が受け付ける1ページの上限。
  *
- * @param viewerUserId 閲覧者の auth uid（未ログインなら null）。`is_own` の判定にのみ使い、
- *                     レスポンスには載せない。
+ * RPC 側の上限は has_more 判定の +1 込みで 101 なので、ここは 100 で頭打ちにする。
+ * 以前は `parseInt` の結果をそのまま渡していたため、`?limit=99999` で
+ * スレッド全件を1回で引けた（`NaN` も素通りしていた）。
  */
-export async function serializeManholeComments(
-  supabase: SupabaseClient<Database>,
-  rows: ManholeCommentRow[],
-  viewerUserId: string | null
-): Promise<PublicManholeComment[]> {
-  const authUids = rows
-    .map((row) => row.user_id)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+const MAX_PAGE_SIZE = 100;
 
+function clampLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 20;
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_PAGE_SIZE);
+}
+
+function toPublicComment(row: ManholeCommentRpcRow): PublicManholeComment {
+  return {
+    id: row.id,
+    manhole_id: row.manhole_id,
+    parent_comment_id: row.parent_comment_id ?? null,
+    content: row.content,
+    created_at: row.created_at,
+    is_own: Boolean(row.is_own),
+    user: {
+      display_name: row.display_name ?? null,
+      public_user_id: row.public_user_id ?? null,
+    },
+  };
+}
+
+export type ManholeCommentPage = {
+  comments: PublicManholeComment[];
+  /** スレッド全体（親コメント）の件数。カーソルの有無に依らない。 */
+  threadTotal: number;
+  /** さらに古いコメントがあるか。総数からの引き算では判定しない。 */
+  hasMore: boolean;
+};
+
+/**
+ * スレッド1ページ分を読む。**テーブルではなく RPC を読む。**
+ *
+ * 表示名と公開IDの解決も RPC の中で済んでいるので、ここから
+ * `loadPublicDisplayNameMap` / `loadPublicUserIdMap` は呼ばない
+ * （呼ぶと同じ問い合わせを二重に投げることになる）。
+ *
+ * `has_more` は「1件多く読んで、実際に次があるかを直接答える」方式のまま。
+ * total からの引き算にすると、取得の合間に増えた1件が差分として永久に残り
+ * 「以前のコメントを見る（残り1）」が押しても消えないボタンになる。
+ */
+export async function fetchManholeCommentPage(
+  supabase: SupabaseClient<Database>,
+  params: {
+    manholeId: number;
+    limit: number;
+    offset?: number;
+    beforeCreatedAt?: string | null;
+    beforeId?: string | null;
+  }
+): Promise<{ page: ManholeCommentPage | null; error: { message: string } | null }> {
+  const limit = clampLimit(params.limit);
+
+  const { data, error } = await supabase.rpc('get_manhole_comments' as never, {
+    p_manhole_id: params.manholeId,
+    // has_more を判定するため1件多く読む。RPC 側の上限（101）はこの +1 込み。
+    p_limit: limit + 1,
+    p_offset: Math.max(params.offset ?? 0, 0),
+    p_before_created_at: params.beforeCreatedAt ?? null,
+    p_before_id: params.beforeId ?? null,
+  } as never);
+
+  if (error) {
+    return { page: null, error };
+  }
+
+  const rows = ((data || []) as ManholeCommentRpcRow[]);
+  const hasMore = rows.length > limit;
+
+  return {
+    page: {
+      comments: rows.slice(0, limit).map(toPublicComment),
+      // 空ページなら数えるものが無い。初回ページが空＝スレッドが空。
+      threadTotal: Number(rows[0]?.thread_total ?? 0),
+      hasMore,
+    },
+    error: null,
+  };
+}
+
+/**
+ * 投稿直後の1件を公開表現にする。
+ *
+ * **投稿者の uid は行から読まない。** 書いたのはセッションの本人だと分かっているので、
+ * `authorUserId` を受け取って解決する。`is_own` は定義上つねに真。
+ * （一覧と違って RPC を通さないのは、書き込み直後の1件をスレッド検索で拾い直すのが
+ *   無駄だから。読む列に `user_id` が無ければ 1c-c の目的は達している）
+ */
+export async function serializeOwnManholeComment(
+  supabase: SupabaseClient<Database>,
+  row: InsertedManholeCommentRow,
+  authorUserId: string
+): Promise<PublicManholeComment> {
   const [displayNameByAuthUid, publicUserIdByAuthUid] = await Promise.all([
-    loadPublicDisplayNameMap(supabase, authUids),
-    loadPublicUserIdMap(supabase, authUids),
+    loadPublicDisplayNameMap(supabase, [authorUserId]),
+    loadPublicUserIdMap(supabase, [authorUserId]),
   ]);
 
-  return rows.map((row) => {
-    const uid = row.user_id;
-    return {
-      id: row.id,
-      manhole_id: row.manhole_id,
-      parent_comment_id: row.parent_comment_id ?? null,
-      content: row.content,
-      created_at: row.created_at,
-      is_own: Boolean(uid && viewerUserId && uid === viewerUserId),
-      user: {
-        display_name: uid ? (displayNameByAuthUid.get(uid) ?? null) : null,
-        public_user_id: uid ? (publicUserIdByAuthUid.get(uid) ?? null) : null,
-      },
-    };
-  });
+  return {
+    id: row.id,
+    manhole_id: row.manhole_id,
+    parent_comment_id: row.parent_comment_id ?? null,
+    content: row.content,
+    created_at: row.created_at,
+    is_own: true,
+    user: {
+      display_name: displayNameByAuthUid.get(authorUserId) ?? null,
+      public_user_id: publicUserIdByAuthUid.get(authorUserId) ?? null,
+    },
+  };
+}
+
+/**
+ * そのコメントが呼び出し元本人のものか。
+ *
+ * `manhole_comment.user_id` を読んで突き合わせない。
+ * RLS はすでに「自分のものしか消せない」を強制しているので、この判定は
+ * **403 と 404 を区別して返すためだけ**にある（UI の文言のため）。
+ * 判定は SECURITY DEFINER の `is_own_manhole_comment` に閉じてあり、
+ * 呼び出し側に user_id の SELECT 権限が無くても動く。
+ */
+export async function isOwnManholeComment(
+  supabase: SupabaseClient<Database>,
+  commentId: string
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_own_manhole_comment' as never, {
+    p_comment_id: commentId,
+  } as never);
+
+  if (error) {
+    console.error('Failed to evaluate is_own_manhole_comment:', error);
+    // 判定できないときは「自分のものではない」に倒す。
+    // 消させない/通報させないほうが、他人のコメントを消せるより安全。
+    return false;
+  }
+
+  return data === true;
 }
