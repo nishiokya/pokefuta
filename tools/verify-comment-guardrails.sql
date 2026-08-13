@@ -19,6 +19,14 @@ DECLARE
   self_comment uuid;
   public_visit uuid := '00000000-0000-0000-0000-00000000cb01';
   ok boolean;
+  -- [9] Phase 1c（蓋コメントの auth uid を DB でも閉じる）で使う
+  result_sig text;
+  commenter_name text;
+  commenter_public_id uuid;
+  own_flag boolean;
+  rpc_total bigint;
+  probe_uid uuid;
+  rehearsal_comment uuid;
 BEGIN
   SELECT id INTO target_manhole FROM public.manhole ORDER BY id LIMIT 1;
   IF target_manhole IS NULL THEN
@@ -208,6 +216,128 @@ BEGIN
   IF n <> 0 THEN
     RAISE EXCEPTION '[8] 存在しない/無活動のユーザーに公開IDが返っている（% 行）', n;
   END IF;
+
+  -- =====================================================================
+  -- 9. 蓋コメントは auth uid を配らずに読める（Phase 1c）
+  --    マイグレーション: 20260813000000_manhole_comment_public_rpc.sql
+  --
+  --    #215 で蓋コメント欄を482枚すべて未ログインに公開したが、DB 側は
+  --    `GRANT ALL TO anon` + `USING (true)` のままで、公開キーで
+  --    `manhole_comment?select=user_id` を叩けば投稿者の auth uid が全部取れる。
+  --    RPC を足して読み口を差し替え、最後に列を名指しにして塞ぐ3段構え。
+  -- =====================================================================
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', '', true);
+
+  -- 9-1. 返り値の型に user_id が無い。**これがこの RPC の存在理由。**
+  --      ここに user_id を足すと 1c 全体が無意味になるので、型で固定する。
+  SELECT pg_get_function_result(p.oid) INTO result_sig
+  FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+  WHERE ns.nspname = 'public' AND p.proname = 'get_manhole_comments';
+
+  IF result_sig IS NULL THEN
+    RAISE EXCEPTION '[9] get_manhole_comments が存在しない';
+  END IF;
+  -- public_user_id は返してよい（公開URL用のID）。auth uid そのものだけを禁じる。
+  IF regexp_replace(result_sig, 'public_user_id', '', 'g') ~ 'user_id' THEN
+    RAISE EXCEPTION '[9] get_manhole_comments が auth uid を返している: %', result_sig;
+  END IF;
+
+  -- 9-2. 未ログイン（anon）から呼べて、表示名と公開IDが解決される。
+  --      コメントしかしていない人でも名前が出ること＝[7] と同じ条件に乗っていること。
+  SET LOCAL ROLE anon;
+  SELECT r.display_name, r.public_user_id, r.is_own, r.thread_total
+    INTO commenter_name, commenter_public_id, own_flag, rpc_total
+  FROM public.get_manhole_comments(target_manhole::int, 101) r
+  WHERE r.content = 'コメントだけする人の発言';
+
+  IF commenter_name IS DISTINCT FROM 'コメントだけの人' THEN
+    RAISE EXCEPTION '[9] anon から表示名が解決できない（% ）', coalesce(commenter_name, 'NULL');
+  END IF;
+  IF commenter_public_id IS NULL THEN
+    RAISE EXCEPTION '[9] anon から public_user_id が解決できない（名前は出るのにリンクできない）';
+  END IF;
+  IF own_flag THEN
+    RAISE EXCEPTION '[9] 未ログインなのに is_own が真になっている';
+  END IF;
+
+  -- thread_total はカーソルの有無に関係なくスレッド全体の件数。
+  SELECT count(*) INTO n FROM public.manhole_comment mc
+  WHERE mc.manhole_id = target_manhole AND mc.parent_comment_id IS NULL;
+  IF rpc_total <> n THEN
+    RAISE EXCEPTION '[9] thread_total が実件数と違う（RPC % / 実 %）', rpc_total, n;
+  END IF;
+
+  -- 9-3. 本人が呼べば is_own が真。uid をレスポンスに載せずに判定できていること。
+  RESET ROLE;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', commenter, 'role', 'authenticated')::text, true);
+
+  SELECT r.is_own INTO own_flag
+  FROM public.get_manhole_comments(target_manhole::int, 101) r
+  WHERE r.content = 'コメントだけする人の発言';
+  IF NOT own_flag THEN
+    RAISE EXCEPTION '[9] 本人が呼んでも is_own が偽（自分のコメントを消せなくなる）';
+  END IF;
+
+  -- 9-4. **1c-c の予行演習。** 列を名指しにしても壊れないことを、実際に権限を
+  --      張り替えて確かめる。ここが通らないうちは 1c-c を本番に打てない。
+  --
+  --      列単位の `REVOKE SELECT (user_id)` では塞がらない（テーブル単位の
+  --      GRANT ALL が残るため）。photo と同じく table 単位で剥がして名指しで返す。
+  RESET ROLE;
+  REVOKE SELECT ON public.manhole_comment FROM anon, authenticated;
+  GRANT SELECT (id, manhole_id, parent_comment_id, content,
+                is_edited, edited_at, created_at, updated_at)
+    ON public.manhole_comment TO anon, authenticated;
+
+  SET LOCAL ROLE anon;
+  PERFORM set_config('request.jwt.claims', '', true);
+
+  BEGIN
+    SELECT mc.user_id INTO probe_uid FROM public.manhole_comment mc LIMIT 1;
+    RAISE EXCEPTION '[9] 列を名指しにしても anon が user_id を読めている';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- 期待どおり
+  END;
+
+  -- **`select=*` は落ちる。** PostgREST の `*` は全列に展開されるので、
+  -- GRANT していない user_id まで要求して 42501 になる（photo で踏んだのと同じ形）。
+  -- 1c-b で MANHOLE_COMMENT_COLUMNS から user_id を外し忘れると本番がこれで死ぬ。
+  BEGIN
+    PERFORM * FROM public.manhole_comment LIMIT 1;
+    RAISE EXCEPTION '[9] user_id を剥がしたのに select * が通ってしまった';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  -- 肝心の RPC は動き続ける（SECURITY DEFINER なので呼び出し側の列権限に依らない）
+  SELECT count(*) INTO n
+  FROM public.get_manhole_comments(target_manhole::int, 101);
+  IF n = 0 THEN
+    RAISE EXCEPTION '[9] 列を名指しにしたら RPC がコメントを返さなくなった';
+  END IF;
+
+  -- 投稿と自己削除は RLS のポリシー式が user_id を見る。列を剥がしても
+  -- ポリシーが評価できること（＝1c-c で投稿・削除が死なないこと）を確かめる。
+  RESET ROLE;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', commenter, 'role', 'authenticated')::text, true);
+
+  INSERT INTO public.manhole_comment (manhole_id, user_id, content)
+  VALUES (target_manhole, commenter, '列を名指しにしたあとの投稿')
+  RETURNING id INTO rehearsal_comment;
+
+  DELETE FROM public.manhole_comment WHERE id = rehearsal_comment;
+  IF EXISTS (SELECT 1 FROM public.manhole_comment mc WHERE mc.id = rehearsal_comment) THEN
+    RAISE EXCEPTION '[9] 列を名指しにしたら自分のコメントを削除できなくなった';
+  END IF;
+
+  -- 権限を元に戻す（この検査は 1c-c の予行演習であって、適用ではない）。
+  RESET ROLE;
+  GRANT SELECT ON public.manhole_comment TO anon, authenticated;
 
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）
   DELETE FROM public.comment_report WHERE reporter_user_id = commenter;
