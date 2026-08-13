@@ -32,6 +32,8 @@ const CHECKS = [
   '通報は anon からも authenticated からも読めない',
   'コメントのみのユーザーにも公開IDが出る（蓋コメント・公開visitへのコメントの両方）',
   '無活動のユーザーには公開IDを出さない',
+  '蓋コメントを auth uid 抜きで読める（get_manhole_comments）／'
+  + '列を名指しにする 1c-c の予行演習（RPC・投稿・自己削除が生き残り、直叩きと select * が落ちる）',
 ];
 
 try {
