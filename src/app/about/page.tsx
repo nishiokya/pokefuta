@@ -24,7 +24,7 @@ const journeySteps = [
   {
     icon: <Search className="h-5 w-5" />,
     title: 'ポケふたを探す',
-    description: '都道府県や地図から、次に見に行きたいポケふたを見つけられます。',
+    description: 'ポケふた図鑑で、都道府県・登場ポケモン・地図から次の目的地を探せます。',
   },
   {
     icon: <Camera className="h-5 w-5" />,
@@ -41,18 +41,18 @@ const journeySteps = [
 const featureCards = [
   {
     icon: <Map className="h-5 w-5" />,
-    title: '全国のポケふたを掲載',
-    description: '自治体ごとの設置情報を見ながら、旅行や散策の目的地を探せます。',
+    title: 'ポケふた図鑑',
+    description: '全国の設置情報を、都道府県・登場ポケモン・地図から調べられます。',
   },
   {
     icon: <Compass className="h-5 w-5" />,
-    title: '次に行く場所を見つける',
-    description: '未訪問の候補や都道府県別の進捗から、次の一枚を選びやすくします。',
+    title: 'ポケふた写真館',
+    description: '訪問記録や写真を残し、スタンプ帳と都道府県別の進捗で振り返れます。',
   },
   {
     icon: <Sparkles className="h-5 w-5" />,
-    title: 'みんなの写真を楽しむ',
-    description: '投稿された写真を眺めながら、まだ知らないポケふたとの出会いを増やせます。',
+    title: '一つにつながる体験',
+    description: '探すところから、現地での記録、次の旅の計画までを一つのサービスで支えます。',
   },
 ];
 
@@ -63,24 +63,24 @@ const privacyItems = [
 ];
 
 const disclaimerItems = [
-  '本アプリは個人が開発した非公式アプリです。',
+  '本サービスはnishiokyaが個人で開発・運営する非公式サービスです。',
   'マンホール情報は公開情報を基にしていますが、訪問前に最新情報をご確認ください。',
   'ポケふたを訪問する際は、周囲の安全に配慮し、交通ルールを守ってください。',
-  '本アプリの利用により生じたいかなる損害についても、開発者は責任を負いかねます。',
+  '本サービスの利用により生じたいかなる損害についても、運営者は責任を負いかねます。',
 ];
 
 export default function AboutPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = pageTitle('このアプリについて');
+    document.title = pageTitle('このサイトについて');
     (async () => {
       try {
         const supabase = createBrowserClient();
         const { data: { session } } = await supabase.auth.getSession();
-        trackView('/about', 'このアプリについて', 'about', Boolean(session?.user));
+        trackView('/about', 'このサイトについて', 'about', Boolean(session?.user));
       } catch {
-        trackView('/about', 'このアプリについて', 'about', false);
+        trackView('/about', 'このサイトについて', 'about', false);
       }
     })();
   }, []);
@@ -95,14 +95,14 @@ export default function AboutPage() {
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
                 <Stamp className="h-3.5 w-3.5" />
-                旅行スタンプ帳
+                ポケふたの旅をもっと楽しく
               </div>
 
               <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
-                ポケふたの旅を記録するスタンプ帳
+                ポケふたを探す、記録する、振り返る
               </h1>
               <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-[#6A4D36] sm:text-base">
-                ポケふた写真館は、全国のポケふたを探して、旅先で撮った写真を残し、訪問済みをスタンプ帳として振り返るためのサービスです。
+                ポケふたは、全国の設置情報を調べる「ポケふた図鑑」と、写真・訪問記録を残す「ポケふた写真館」を一つにつないだ個人運営サービスです。
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -120,13 +120,13 @@ export default function AboutPage() {
                   <Stamp className="h-4 w-4" />
                   旅の続きへ
                 </Link>
-                <Link
-                  href="/manholes"
+                <a
+                  href="https://data.pokefuta.com/"
                   className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-[#8C6A4A]/20 bg-white/70 px-5 py-3 text-sm font-bold text-[#4F3828] shadow-sm transition hover:bg-white"
                 >
                   <Map className="h-4 w-4" />
-                  ポケふたを探す
-                </Link>
+                  図鑑でポケふたを探す
+                </a>
               </div>
             </div>
 
@@ -200,7 +200,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-5 shadow-sm">
+        <section id="contact" className="mt-6 scroll-mt-24 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function AboutPage() {
                 <h2 className="text-lg font-extrabold text-[#4F3828]">フィードバック</h2>
               </div>
               <p className="max-w-2xl text-sm font-medium leading-relaxed text-[#6A4D36]">
-                バグ報告、機能要望、掲載情報の気づきがあればお知らせください。アプリの更新情報はXでも発信しています。
+                バグ報告、機能要望、掲載情報の気づきがあればお知らせください。サービスの更新情報はXでも発信しています。
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -232,6 +232,19 @@ export default function AboutPage() {
               </a>
             </div>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-[8px] border border-[#8C6A4A]/15 bg-[#FFF7E5] p-5 shadow-sm">
+          <h2 className="text-lg font-extrabold text-[#4F3828]">運営情報</h2>
+          <dl className="mt-3 grid gap-2 text-sm font-medium text-[#6A4D36] sm:grid-cols-[7rem_1fr]">
+            <dt className="font-extrabold text-[#4F3828]">サービス名</dt>
+            <dd>ポケふた（ポケふた写真館・ポケふた図鑑）</dd>
+            <dt className="font-extrabold text-[#4F3828]">運営者</dt>
+            <dd>nishiokya（個人運営）</dd>
+          </dl>
+          <p className="mt-3 text-xs font-medium leading-relaxed text-[#6A4D36]">
+            本サービスは株式会社ポケモン、任天堂株式会社、各自治体その他の権利者とは関係ありません。ポケットモンスター・ポケモン・Pokémonは各権利者に帰属します。
+          </p>
         </section>
 
         <section className="mt-6 rounded-[8px] border border-[#8C6A4A]/10 bg-white/55 px-4 py-3 text-center">

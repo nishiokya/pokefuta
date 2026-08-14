@@ -390,7 +390,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
 
       <div style={{ flex: 1 }} />
 
-      <Link href="/about" style={pcIconBtn} title="このアプリについて" aria-label="このアプリについて">
+      <Link href="/about" style={pcIconBtn} title="このサイトについて" aria-label="このサイトについて">
         <Info size={18} strokeWidth={2} />
       </Link>
 
@@ -536,7 +536,7 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
         </Link>
         <Link href="/about" className="inline-flex items-center gap-1.5 px-2" style={footerLinkStyle}>
           <Info className="h-4 w-4" />
-          このアプリについて
+          このサイトについて
         </Link>
         <a
           href={X_ACCOUNT_URL}
