@@ -7,6 +7,7 @@
 - ページ表示は標準の `page_view` を1回だけ送る。`page_location` は `code`・token・OAuthエラーを除去し、`from=data`など安全な計測情報は残す。
 - `data.pokefuta.com` からの遷移はクロスドメインリンカーを正とし、内部UTMは付けない。`from=data` を `source_app=tracker` と `p_data_referral` で計測する。
 - `/about` を `pokefuta.com` と `data.pokefuta.com` 共通のAbout・お問い合わせページの正本とする。両ドメインを「姉妹サイト」と表現せず、同じサービス内の「ポケふた写真館」と「ポケふた図鑑」として扱う。運営者名は `nishiokya` と表記する。
+- AdSenseのサイト登録は `pokefuta.com`、パブリッシャーIDは `pub-6885302916426075`。ルートの `public/ads.txt` と所有確認metaを維持する。広告枠は当初 `data.pokefuta.com` の都道府県・詳細ページだけに置き、写真館には置かない。
 - イベント発生箇所は `surface` で表す。GA4の流入元予約語 `source` をカスタムイベント引数に使わない。
 - エラーイベントは `p_api_error` / `p_auth_error` / `p_app_error` を使う。旧キーイベント名 `error_event` / `auth_error` は送信しない。
 
