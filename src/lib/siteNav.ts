@@ -35,7 +35,7 @@ const ROUTES: Record<string, RouteChrome> = {
   '/map': { title: 'ポケふたマップ', activeNav: 'search' },
   '/visits': { title: 'スタンプ帳', activeNav: 'stamp' },
   '/my-trip': { title: 'マイ旅', activeNav: 'mytrip' },
-  '/upload': { title: '写真を投稿' },
+  '/upload': { title: 'ポケふたを投稿' },
   '/profile': { title: 'プロフィール' },
   '/about': { title: 'このアプリについて' },
   '/design-manholes': { title: 'デザインマンホール', activeNav: 'design' },

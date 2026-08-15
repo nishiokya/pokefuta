@@ -15,6 +15,7 @@ import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
 import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
+import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 
 /**
  * 蓋一覧の問題をこのタブで既に通知したか。
@@ -107,7 +108,7 @@ function UploadPageInner() {
 
   useEffect(() => {
     // ページタイトル設定
-    document.title = pageTitle('写真を投稿');
+    document.title = pageTitle('ポケふたを投稿');
 
     // ✅ GA: ページビュー追跡
     (async () => {
@@ -831,21 +832,16 @@ function UploadPageInner() {
 
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
-        <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
-          ポケふたの写真を投稿すると、訪問記録として図鑑に掲載されます。
-          実際の訪問を確認するため、GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
-        </p>
-        <p className="mt-2 text-right text-xs">
-          {DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
-            <span className="text-[#2A2A2A]/50">
-              ポケふた以外のデザインマンホールの投稿は一時停止中です
-            </span>
-          ) : (
-            <Link href="/design-manholes/new" className="text-[#7B63A8] underline hover:opacity-80">
-              ポケふた以外のデザインマンホールの投稿はこちら →
-            </Link>
-          )}
-        </p>
+        <SubmissionTypeSwitcher
+          current="pokefuta"
+          designSubmissionSuspended={DESIGN_MANHOLE_SUBMISSION_SUSPENDED}
+        />
+        <div className="mt-4 rounded-xl border border-[#BF5640]/25 bg-[#FFF3EE] p-4">
+          <p className="text-sm font-extrabold text-[#8F3F2E]">ここはポケふたの投稿ページです</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+            投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
+          </p>
+        </div>
 
         {/* Hint Manhole Card */}
         {hintManhole && (

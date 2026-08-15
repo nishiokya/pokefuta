@@ -26,6 +26,7 @@ import {
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
 import type { SubmissionStage } from '@/lib/analytics/gtag';
+import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 
 type GpsSource = 'exif' | null;
 type ProximityCheckStatus = 'idle' | 'checking' | 'ready' | 'error';
@@ -427,7 +428,7 @@ export default function DesignManholeNewPage() {
     );
 
     return (
-      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
@@ -488,11 +489,12 @@ export default function DesignManholeNewPage() {
   // 送信だけ弾くと、現地で撮った人の手間を無駄にする。
   if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
     return (
-      <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10">
+          <SubmissionTypeSwitcher current="design" designSubmissionSuspended />
           <div
             role="status"
-            className="rounded-xl border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-5 text-center"
+            className="mt-5 rounded-xl border-2 border-[#B5483C]/40 bg-[#B5483C]/10 p-5 text-center"
           >
             <AlertCircle className="mx-auto h-10 w-10 text-[#B5483C]" />
             <h1 className="mt-3 text-base font-bold text-[#B5483C]">
@@ -526,18 +528,16 @@ export default function DesignManholeNewPage() {
   }
 
   return (
-    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+    <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
-        <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
-          ポケふた以外の「オンリーワンなデザインマンホール」を見つけたら教えてください。
-          写真1枚と位置情報が必須です。
-        </p>
-        <p className="mt-2 text-right text-xs">
-          <Link href="/upload" className="text-[#7B63A8] underline hover:opacity-80">
-            ポケふた（ポケモンマンホール）の写真投稿はこちら →
-          </Link>
-        </p>
+        <SubmissionTypeSwitcher current="design" />
+        <div className="mt-4 rounded-xl border border-[#7B63A8]/30 bg-[#F4F0FA] p-4 shadow-sm">
+          <p className="text-sm font-extrabold text-[#5E4788]">ここはデザインマンホールの投稿ページです</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+            キャラクター・ご当地デザインなど、ポケふた以外のマンホールが対象です。写真1枚と位置情報が必須です。
+          </p>
+        </div>
 
         {/* 写真 */}
         <section className="mt-6">

@@ -13,6 +13,7 @@ import {
   Stamp,
   TrendingUp,
   UserRound,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
@@ -20,6 +21,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { SITE_NAME } from '@/lib/constants';
+import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 
 type FeedVisit = {
   id: string;
@@ -50,7 +52,7 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const feedPerPage = 24;
-  const { trackView } = useAnalytics();
+  const { trackView, trackSubmissionEntry } = useAnalytics();
 
   useEffect(() => {
     document.title = SITE_NAME;
@@ -267,6 +269,45 @@ export default function HomePage() {
             </p>
           </section>
         )}
+
+        <section className="mt-6 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
+              <ImageIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
+              <h2 className="mt-0.5 text-lg font-extrabold">デザインふたも集まっています</h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[#5F574F]">
+                キャラクター・ご当地デザインなど、みんなが見つけた全国のマンホールを楽しめます。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/design-manholes"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+            >
+              みんなの投稿を見る
+            </Link>
+            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-lg border border-[#7B63A8]/20 bg-white/50 px-4 text-sm font-bold text-[#5E4788]/55"
+              >
+                投稿は一時停止中
+              </span>
+            ) : (
+              <Link
+                href="/design-manholes/new"
+                onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'home_design_manhole_card' })}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#7B63A8]/35 bg-white/80 px-4 text-sm font-bold text-[#5E4788] transition hover:bg-white"
+              >
+                見つけたマンホールを投稿
+              </Link>
+            )}
+          </div>
+        </section>
 
         {/* Photo Gallery */}
         {!loading && (
