@@ -389,10 +389,10 @@ export default function ManholeDetailPage() {
     return { shareText, shareUrl, hashtags: titleHashtags, analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture } };
   }, [manhole, photos, currentUserId]);
 
-  // 周辺・同ポケモン・県内の回遊リスト（docs/MANHOLE_DETAIL_SPEC.md セクション7-9）
+  // 周辺・同ポケモンの回遊リスト
   const related = useMemo(() => {
     if (!manhole || allManholes.length === 0) {
-      return { nearby: [] as Array<{ manhole: Manhole; distance: number }>, samePokemon: [] as Manhole[], samePref: [] as Manhole[] };
+      return { nearby: [] as Array<{ manhole: Manhole; distance: number }>, samePokemon: [] as Manhole[] };
     }
     const others = allManholes.filter((m) => m.id !== manhole.id);
     const nearby =
@@ -412,8 +412,7 @@ export default function ManholeDetailPage() {
       pokemonSet.size > 0
         ? others.filter((m) => (m.pokemons ?? []).some((p) => pokemonSet.has(p))).slice(0, 6)
         : [];
-    const samePref = others.filter((m) => m.prefecture === manhole.prefecture).slice(0, 8);
-    return { nearby, samePokemon, samePref };
+    return { nearby, samePokemon };
   }, [manhole, allManholes]);
 
   // 早期 return より前に呼ぶ（フックの呼び出し順を固定するため）
@@ -849,7 +848,7 @@ export default function ManholeDetailPage() {
                           <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
                             @{getPhotoUserLabel(photo)}
                           </span>
-                          {isRepresentative && photo.visit?.shot_at && (
+                          {photo.visit?.shot_at && (
                             <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
                               {formatPhotoDate(photo.visit.shot_at)}
                             </span>
@@ -1016,16 +1015,18 @@ export default function ManholeDetailPage() {
                 登場ポケモン
               </h3>
               <div className="flex flex-wrap gap-2">
-                {manhole.pokemons.map((pokemon, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white px-3 py-1.5 font-pixelJp text-xs font-bold text-[#6f6657]"
+                {manhole.pokemons.map((pokemon) => (
+                  <Link
+                    key={pokemon}
+                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white px-3 py-1.5 font-pixelJp text-xs font-bold text-[#6f6657] transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+                    aria-label={`ポケふた図鑑で${pokemon}を見る`}
                   >
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#f6e4b6] text-[10px]">
                       ◓
                     </span>
                     {pokemon}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -1066,16 +1067,16 @@ export default function ManholeDetailPage() {
             </div>
           )}
 
-          {/* ── Same prefecture ── */}
-          {related.samePref.length > 0 && (
-            <div>
-              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
-                <Flag className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
-                {manhole.prefecture}のポケふた
-              </h3>
-              {renderRelatedCards(related.samePref.map((m) => ({ manhole: m })))}
-            </div>
-          )}
+          {/* ── Prefecture dex ── */}
+          <Link
+            href={`/manholes?q=${encodeURIComponent(manhole.prefecture)}`}
+            className="flex min-h-[48px] items-center gap-2.5 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs font-bold text-[#6f6657] shadow-sm transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+            aria-label={`ポケふた図鑑で${manhole.prefecture}を見る`}
+          >
+            <Flag className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+            <span>ポケふた図鑑で{manhole.prefecture}を見る</span>
+            <span className="ml-auto text-base" aria-hidden="true">›</span>
+          </Link>
 
           {/* ── Share ── */}
           {sharePayload && (
