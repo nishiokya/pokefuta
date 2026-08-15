@@ -97,10 +97,12 @@ function PhotoLikeButton({
   visitId,
   isLoggedIn,
   loginHref,
+  variant = 'default',
 }: {
   visitId: string;
   isLoggedIn: boolean;
   loginHref: string;
+  variant?: 'default' | 'gallery';
 }) {
   const router = useRouter();
   const [likes, setLikes] = useState(0);
@@ -127,6 +129,23 @@ function PhotoLikeButton({
     return () => { active = false; };
   }, [visitId]);
 
+  useEffect(() => {
+    const syncLikeState = (event: Event) => {
+      const detail = (event as CustomEvent<{ visitId: string; likes: number; userLiked: boolean }>).detail;
+      if (detail?.visitId !== visitId) return;
+      setLikes(detail.likes);
+      setUserLiked(detail.userLiked);
+    };
+    window.addEventListener('pokefuta:photo-like', syncLikeState);
+    return () => window.removeEventListener('pokefuta:photo-like', syncLikeState);
+  }, [visitId]);
+
+  const broadcastLikeState = (nextLikes: number, nextUserLiked: boolean) => {
+    window.dispatchEvent(new CustomEvent('pokefuta:photo-like', {
+      detail: { visitId, likes: nextLikes, userLiked: nextUserLiked },
+    }));
+  };
+
   const toggleLike = async () => {
     if (!isLoggedIn) {
       router.push(loginHref);
@@ -137,8 +156,10 @@ function PhotoLikeButton({
     const previousLiked = userLiked;
     const previousLikes = likes;
     const nextLiked = !previousLiked;
+    const nextLikes = Math.max(0, previousLikes + (nextLiked ? 1 : -1));
     setUserLiked(nextLiked);
-    setLikes(Math.max(0, previousLikes + (nextLiked ? 1 : -1)));
+    setLikes(nextLikes);
+    broadcastLikeState(nextLikes, nextLiked);
     setSaving(true);
 
     try {
@@ -148,6 +169,7 @@ function PhotoLikeButton({
       if (response.status === 401) {
         setUserLiked(previousLiked);
         setLikes(previousLikes);
+        broadcastLikeState(previousLikes, previousLiked);
         router.push(loginHref);
         return;
       }
@@ -155,6 +177,7 @@ function PhotoLikeButton({
     } catch {
       setUserLiked(previousLiked);
       setLikes(previousLikes);
+      broadcastLikeState(previousLikes, previousLiked);
     } finally {
       setSaving(false);
     }
@@ -163,17 +186,24 @@ function PhotoLikeButton({
   return (
     <button
       type="button"
-      onClick={toggleLike}
+      onClick={(event) => {
+        event.stopPropagation();
+        void toggleLike();
+      }}
       disabled={saving}
       aria-pressed={userLiked}
       aria-label={userLiked ? `いいねを取り消す（${likes}件）` : `いいねする（${likes}件）`}
-      className={`inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold backdrop-blur-sm transition-colors disabled:opacity-60 ${
+      className={`inline-flex shrink-0 items-center rounded-full border font-bold backdrop-blur-sm transition-colors disabled:opacity-60 ${
+        variant === 'gallery'
+          ? 'min-h-8 min-w-8 justify-center gap-1 px-2 py-1 text-[10px] shadow-sm'
+          : 'min-h-8 gap-1 px-2.5 py-1 text-[11px]'
+      } ${
         userLiked
           ? 'border-[#f4a6a6] bg-white/95 text-[#c94b4b]'
           : 'border-white/40 bg-black/45 text-white hover:bg-black/60'
       }`}
     >
-      <Heart className={`h-3.5 w-3.5 ${userLiked ? 'fill-current' : ''}`} strokeWidth={2.3} />
+      <Heart className={`${variant === 'gallery' ? 'h-4 w-4' : 'h-3.5 w-3.5'} ${userLiked ? 'fill-current' : ''}`} strokeWidth={2.3} />
       <span>{loading ? '–' : likes}</span>
     </button>
   );
@@ -924,28 +954,42 @@ export default function ManholeDetailPage() {
                       </div>
                       <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                         {allDisplayPhotos.map((photo, index) => (
-                          <button
+                          <div
                             key={photo.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedPhotoIdx(index);
-                              document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }}
-                            aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
                             className={`relative aspect-square overflow-hidden rounded-[10px] border-2 ${
                               featuredPhoto.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
                             }`}
                           >
-                            <img
-                              src={`/api/photo/${photo.id}?size=small`}
-                              alt=""
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPhotoIdx(index);
+                                document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                              aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
+                              className="block h-full w-full p-0"
+                            >
+                              <img
+                                src={`/api/photo/${photo.id}?size=small`}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </button>
+                            {photo.visit?.id && (
+                              <span className="absolute right-1 top-1 z-10">
+                                <PhotoLikeButton
+                                  visitId={photo.visit.id}
+                                  isLoggedIn={isLoggedIn}
+                                  loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                                  variant="gallery"
+                                />
+                              </span>
+                            )}
                             <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-['Outfit'] text-[9px] font-bold text-white">
                               {index + 1}
                             </span>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </div>
