@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
-  Sparkles, ChevronUp, Eye, EyeOff,
+  Sparkles, ChevronUp, Eye, EyeOff, Heart,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
@@ -93,6 +93,92 @@ const formatPhotoDate = (shot_at: string) => {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 };
 
+function PhotoLikeButton({
+  visitId,
+  isLoggedIn,
+  loginHref,
+}: {
+  visitId: string;
+  isLoggedIn: boolean;
+  loginHref: string;
+}) {
+  const router = useRouter();
+  const [likes, setLikes] = useState(0);
+  const [userLiked, setUserLiked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch(`/api/visits/${visitId}/social`)
+      .then(async (response) => response.ok ? response.json() : Promise.reject(new Error('social fetch failed')))
+      .then((data) => {
+        if (!active) return;
+        setLikes(Number(data.likes) || 0);
+        setUserLiked(Boolean(data.userLiked));
+      })
+      .catch(() => {
+        // いいね取得失敗で写真自体を壊さない。
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [visitId]);
+
+  const toggleLike = async () => {
+    if (!isLoggedIn) {
+      router.push(loginHref);
+      return;
+    }
+    if (loading || saving) return;
+
+    const previousLiked = userLiked;
+    const previousLikes = likes;
+    const nextLiked = !previousLiked;
+    setUserLiked(nextLiked);
+    setLikes(Math.max(0, previousLikes + (nextLiked ? 1 : -1)));
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/visits/${visitId}/like`, {
+        method: previousLiked ? 'DELETE' : 'POST',
+      });
+      if (response.status === 401) {
+        setUserLiked(previousLiked);
+        setLikes(previousLikes);
+        router.push(loginHref);
+        return;
+      }
+      if (!response.ok) throw new Error('like toggle failed');
+    } catch {
+      setUserLiked(previousLiked);
+      setLikes(previousLikes);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggleLike}
+      disabled={saving}
+      aria-pressed={userLiked}
+      aria-label={userLiked ? `いいねを取り消す（${likes}件）` : `いいねする（${likes}件）`}
+      className={`inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold backdrop-blur-sm transition-colors disabled:opacity-60 ${
+        userLiked
+          ? 'border-[#f4a6a6] bg-white/95 text-[#c94b4b]'
+          : 'border-white/40 bg-black/45 text-white hover:bg-black/60'
+      }`}
+    >
+      <Heart className={`h-3.5 w-3.5 ${userLiked ? 'fill-current' : ''}`} strokeWidth={2.3} />
+      <span>{loading ? '–' : likes}</span>
+    </button>
+  );
+}
+
 const relatedManholeLabel = (m: Manhole) => {
   const muni = m.city || m.municipality || '';
   const poke = (m.pokemons ?? []).slice(0, 3).join('・');
@@ -116,6 +202,9 @@ export default function ManholeDetailPage() {
   const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [photoExpanded, setPhotoExpanded] = useState(false);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  const [photoLoadError, setPhotoLoadError] = useState(false);
+  const photoRequestIdRef = useRef(0);
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
@@ -138,8 +227,6 @@ export default function ManholeDetailPage() {
       loadPrefectureVisited(manhole.prefecture, prefectureDex.total);
     }
   }, [manhole?.prefecture, prefectureDex?.total, currentUserId]);
-
-  useEffect(() => { setPhotoExpanded(false); }, [selectedPhotoIdx]);
 
   useEffect(() => {
     if (manhole) {
@@ -262,14 +349,42 @@ export default function ManholeDetailPage() {
   };
 
   const loadPhotos = async (id: string) => {
+    const requestId = ++photoRequestIdRef.current;
+    setPhotosLoading(true);
+    setPhotoLoadError(false);
     try {
-      const response = await fetch(`/api/image-upload?manhole_id=${id}`);
-      if (response.ok) {
+      const pageSize = 100;
+      const loadedPhotos: Photo[] = [];
+      let offset = 0;
+      let total = 0;
+
+      do {
+        const response = await fetch(`/api/image-upload?manhole_id=${id}&limit=${pageSize}&offset=${offset}`);
+        if (!response.ok) throw new Error('photo page fetch failed');
         const data = await response.json();
-        if (data.success && data.images) setPhotos(data.images);
+        if (!data.success || !Array.isArray(data.images)) throw new Error('invalid photo page');
+        loadedPhotos.push(...data.images);
+        total = Number(data.total) || loadedPhotos.length;
+        offset += data.images.length;
+        if (data.images.length === 0 && loadedPhotos.length < total) {
+          throw new Error('photo pagination ended early');
+        }
+      } while (loadedPhotos.length < total);
+
+      // ページ遷移中に前の蓋の写真で上書きしない。
+      if (requestId === photoRequestIdRef.current) {
+        setPhotos(loadedPhotos);
       }
     } catch (err) {
       console.error('Failed to load photos:', err);
+      if (requestId === photoRequestIdRef.current) {
+        setPhotos([]);
+        setPhotoLoadError(true);
+      }
+    } finally {
+      if (requestId === photoRequestIdRef.current) {
+        setPhotosLoading(false);
+      }
     }
   };
 
@@ -414,6 +529,8 @@ export default function ManholeDetailPage() {
         : [];
     return { nearby, samePokemon };
   }, [manhole, allManholes]);
+
+  const detailMapManholes = useMemo(() => manhole ? [manhole] : [], [manhole]);
 
   // 早期 return より前に呼ぶ（フックの呼び出し順を固定するため）
   useHeaderTitle(manhole ? `${manhole.city || manhole.municipality || '場所未設定'}のポケふた` : undefined);
@@ -685,7 +802,7 @@ export default function ManholeDetailPage() {
 
   // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
   // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
-  const promptCard = photoState === 'none'
+  const promptCard = !photosLoading && !photoLoadError && photoState === 'none'
     ? <div className="hidden lg:block">{promptCardContent}</div>
     : null;
 
@@ -696,7 +813,24 @@ export default function ManholeDetailPage() {
           <Breadcrumb href="/nearby" label="ポケふたを探す" />
 
           {/* ── Gallery ── */}
-          {photoState === 'none' ? (
+          {photosLoading ? (
+            <div className="flex h-[210px] items-center justify-center rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] lg:h-[360px] lg:rounded-[18px]">
+              <span className="font-pixelJp text-sm font-bold text-[#8b816f]">
+                写真を読み込み中<span className="rpg-loading" />
+              </span>
+            </div>
+          ) : photoLoadError ? (
+            <div className="flex h-[210px] flex-col items-center justify-center gap-3 rounded-[16px] border border-[#e9dfc7] bg-[#fffdf7] px-4 text-center lg:h-[360px] lg:rounded-[18px]">
+              <p className="font-pixelJp text-sm font-bold text-[#6f6657]">写真を読み込めませんでした</p>
+              <button
+                type="button"
+                onClick={() => loadPhotos(String(params.id))}
+                className="rounded-full border border-[#d7c8a7] bg-white px-4 py-2 font-pixelJp text-xs font-bold text-[#6f6657]"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : photoState === 'none' ? (
             <div
               className="relative overflow-hidden rounded-[16px] lg:rounded-[18px] border-2 border-dashed border-[#cdbf9f] h-[210px] lg:h-[360px] flex items-center justify-center"
               style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)' }}
@@ -721,26 +855,29 @@ export default function ManholeDetailPage() {
             <div className="flex flex-col gap-3">
               {photoExpanded && featuredPhoto ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoExpanded(false)}
-                    aria-label="写真一覧に戻る"
-                    className="relative block aspect-[3/4] w-full overflow-hidden rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm lg:rounded-[18px]"
+                  <div
+                    id="featured-manhole-photo"
+                    className="relative block aspect-[3/4] w-full overflow-hidden rounded-[16px] border border-[#e9dfc7] bg-[#1c1a17] p-0 shadow-sm lg:aspect-auto lg:h-[72vh] lg:max-h-[760px] lg:rounded-[18px]"
                   >
                     <img
                       src={`/api/photo/${featuredPhoto.id}?size=large`}
                       alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain"
                     />
                     {featuredPhoto.visit?.user_id === currentUserId && (
                       <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
                         あなたの投稿
                       </span>
                     )}
-                    <span className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white backdrop-blur-sm">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoExpanded(false)}
+                      aria-label="写真一覧に戻る"
+                      className="absolute left-3 top-3 z-10 inline-flex min-h-8 items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white backdrop-blur-sm"
+                    >
                       <ChevronUp className="h-3 w-3" strokeWidth={2.6} />一覧に戻る
-                    </span>
-                    <div className="absolute inset-x-0 bottom-0 z-[1] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-11 pt-10 text-white">
+                    </button>
+                    <div className="absolute inset-x-0 bottom-0 z-[1] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-10 text-white">
                       {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
                         <Link
                           href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
@@ -757,6 +894,14 @@ export default function ManholeDetailPage() {
                           {formatPhotoDate(featuredPhoto.visit.shot_at)}
                         </span>
                       )}
+                      {featuredPhoto.visit?.id && (
+                        <PhotoLikeButton
+                          key={featuredPhoto.visit.id}
+                          visitId={featuredPhoto.visit.id}
+                          isLoggedIn={isLoggedIn}
+                          loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                        />
+                      )}
                       {featuredPhoto.visit?.user_id === currentUserId && (
                         <button
                           type="button"
@@ -770,25 +915,39 @@ export default function ManholeDetailPage() {
                         </button>
                       )}
                     </div>
-                  </button>
+                  </div>
                   {allDisplayPhotos.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {allDisplayPhotos.map((photo, index) => (
-                        <button
-                          key={photo.id}
-                          type="button"
-                          onClick={() => setSelectedPhotoIdx(index)}
-                          className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border-2 lg:h-[72px] lg:w-[72px] ${
-                            featuredPhoto.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
-                          }`}
-                        >
-                          <img
-                            src={`/api/photo/${photo.id}?size=small`}
-                            alt={`@${getPhotoUserLabel(photo)}`}
-                            className="h-full w-full object-cover"
-                          />
-                        </button>
-                      ))}
+                    <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">すべての写真</span>
+                        <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+                        {allDisplayPhotos.map((photo, index) => (
+                          <button
+                            key={photo.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhotoIdx(index);
+                              document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
+                            className={`relative aspect-square overflow-hidden rounded-[10px] border-2 ${
+                              featuredPhoto.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
+                            }`}
+                          >
+                            <img
+                              src={`/api/photo/${photo.id}?size=small`}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                            <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-['Outfit'] text-[9px] font-bold text-white">
+                              {index + 1}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </>
@@ -866,9 +1025,23 @@ export default function ManholeDetailPage() {
               )}
 
               <div className="flex items-center justify-between gap-3 px-1">
-                <span className="font-pixelJp text-[11px] font-semibold text-[#8b816f]">
-                  {photoContributorCount > 0 ? `${photoContributorCount}人が撮影・` : ''}全{allDisplayPhotos.length}枚
-                </span>
+                <div className="flex min-w-0 items-center gap-1.5 font-pixelJp text-[11px] font-semibold text-[#8b816f]">
+                  {photoContributorCount > 0 && <span>{photoContributorCount}人が撮影</span>}
+                  {photoExpanded ? (
+                    <span>全{allDisplayPhotos.length}枚</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPhotoIdx(0);
+                        setPhotoExpanded(true);
+                      }}
+                      className="rounded-full px-1.5 py-1 font-bold text-[#bf5640] underline decoration-[#dfb7aa] underline-offset-2 hover:bg-[#fdeae2]"
+                    >
+                      全{allDisplayPhotos.length}枚を見る
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
@@ -951,7 +1124,7 @@ export default function ManholeDetailPage() {
             <div className="flex flex-wrap gap-1.5">
               {titleBadges.map((title, idx) => (
                 <span
-                  key={title.key}
+                  key={`${title.key}-${idx}`}
                   className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
                 >
                   {title.emoji || '★'} {title.label}
@@ -961,7 +1134,7 @@ export default function ManholeDetailPage() {
           ) : null}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
-          {photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
+          {!photosLoading && !photoLoadError && photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
 
           <hr className="border-[#e9dfc7]" />
 
@@ -975,9 +1148,11 @@ export default function ManholeDetailPage() {
               <div className="h-[140px]">
                 <MapComponent
                   center={{ lat: manhole.latitude ?? 36.0, lng: manhole.longitude ?? 138.0 }}
-                  manholes={[manhole]}
+                  manholes={detailMapManholes}
                   onManholeClick={handleManholeClick}
                   userLocation={null}
+                  zoom={16}
+                  minHeight={140}
                 />
               </div>
               <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">

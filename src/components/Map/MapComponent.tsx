@@ -14,6 +14,7 @@ interface MapComponentProps {
   onManholeClick: (manhole: Manhole) => void;
   userLocation?: { lat: number; lng: number } | null;
   zoom?: number;
+  minHeight?: number | string;
 }
 
 export default function MapComponent({
@@ -21,11 +22,17 @@ export default function MapComponent({
   manholes,
   onManholeClick,
   userLocation,
-  zoom
+  zoom,
+  minHeight = 400,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const onManholeClickRef = useRef(onManholeClick);
+
+  useEffect(() => {
+    onManholeClickRef.current = onManholeClick;
+  }, [onManholeClick]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -33,7 +40,7 @@ export default function MapComponent({
     // Initialize map
     const map = L.map(mapRef.current, {
       center: [center.lat, center.lng],
-      zoom: parseInt(process.env.NEXT_PUBLIC_MAP_DEFAULT_ZOOM || '10'),
+      zoom: zoom ?? parseInt(process.env.NEXT_PUBLIC_MAP_DEFAULT_ZOOM || '10'),
       zoomControl: true,
       attributionControl: true,
     });
@@ -60,13 +67,13 @@ export default function MapComponent({
   // Update map center and zoom when props change
   useEffect(() => {
     if (mapInstanceRef.current) {
-      const currentZoom = zoom || mapInstanceRef.current.getZoom();
+      const currentZoom = zoom ?? mapInstanceRef.current.getZoom();
       mapInstanceRef.current.setView([center.lat, center.lng], currentZoom, {
         animate: true,
         duration: 0.5
       });
     }
-  }, [center, zoom]);
+  }, [center.lat, center.lng, zoom]);
 
   // Update user location marker
   useEffect(() => {
@@ -105,16 +112,12 @@ export default function MapComponent({
     // Clear existing markers
     markersLayerRef.current.clearLayers();
 
-    console.log(`MapComponent: Rendering ${manholes.length} manholes`);
-
     // Add manhole markers
     manholes.forEach((manhole) => {
       if (!manhole) {
-        console.log('MapComponent: Skipping null/undefined manhole');
         return; // Skip null/undefined manholes
       }
-      console.log(`MapComponent: Processing manhole ${manhole.id}, lat=${manhole.latitude}, lng=${manhole.longitude}`);
-      if (manhole.latitude && manhole.longitude) {
+      if (manhole.latitude != null && manhole.longitude != null) {
         try {
           const isVisited = manhole.is_visited;
 
@@ -222,25 +225,22 @@ export default function MapComponent({
 
           // Add click handler
           marker.on('click', () => {
-            onManholeClick(manhole);
+            onManholeClickRef.current(manhole);
           });
 
           markersLayerRef.current?.addLayer(marker);
-          console.log(`MapComponent: Successfully added marker for manhole ${manhole.id}`);
         } catch (error) {
           console.error(`MapComponent: Error creating marker for manhole ${manhole.id}:`, error);
         }
-      } else {
-        console.log(`MapComponent: Skipping manhole ${manhole.id} - missing coordinates (lat=${manhole.latitude}, lng=${manhole.longitude})`);
       }
     });
-  }, [manholes, onManholeClick]);
+  }, [manholes]);
 
   return (
     <div
       ref={mapRef}
       className="map-container w-full h-full"
-      style={{ minHeight: '400px' }}
+      style={{ minHeight }}
     />
   );
 }
