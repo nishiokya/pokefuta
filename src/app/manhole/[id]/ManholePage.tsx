@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  MapPin, ArrowLeft, Camera, Navigation, Building2,
+  MapPin, ArrowLeft, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
-  Star, Sparkles, ChevronDown, ChevronUp, Eye, EyeOff,
+  Sparkles, ChevronUp, Eye, EyeOff,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
@@ -20,6 +20,7 @@ import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { calculateDistance } from '@/lib/location';
+import { orderManholePhotosForViewer } from '@/lib/manhole-photo-ranking';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { SITE_URL, pageTitle } from '@/lib/constants';
@@ -42,6 +43,11 @@ interface Photo {
   storage_key: string;
   content_type: string;
   created_at: string;
+  // The scoring project can expose any of these during its rollout.
+  // Keep ranking client-side compatible while unscored photos fall back to recency.
+  score?: number | null;
+  quality_score?: number | null;
+  ranking_score?: number | null;
   visit?: {
     id: string;
     user_id: string;
@@ -447,15 +453,19 @@ export default function ManholeDetailPage() {
 
   // ── Derived photo state ────────────────────────────────────────────
   const isLoggedIn = currentUserId !== null;
-  const myPhotos = isLoggedIn ? photos.filter((p) => p.visit?.user_id === currentUserId) : [];
-  const commPhotos = photos.filter(
-    (p) => p.visit?.is_public === true && (!isLoggedIn || p.visit?.user_id !== currentUserId)
+  const { myPhotos, orderedPhotos: allDisplayPhotos } = orderManholePhotosForViewer(
+    photos,
+    currentUserId
   );
-  const allDisplayPhotos = [...myPhotos, ...commPhotos];
   const photoState: 'none' | 'mine' | 'community' =
     photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
+  const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
+  const remainingGalleryPhotos = Math.max(0, allDisplayPhotos.length - galleryPreviewPhotos.length);
+  const photoContributorCount = new Set(
+    allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
+  ).size;
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const titleBadges = getSortedTitles(manhole.titles);
 
@@ -676,7 +686,9 @@ export default function ManholeDetailPage() {
 
   // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
   // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
-  const promptCard = <div className="hidden lg:block">{promptCardContent}</div>;
+  const promptCard = photoState === 'none'
+    ? <div className="hidden lg:block">{promptCardContent}</div>
+    : null;
 
   return (
     <div className="min-h-content safe-area-body bg-[#f1e8d4]">
@@ -708,185 +720,163 @@ export default function ManholeDetailPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {/* Featured — 1:1 collapsed / 3:4 expanded on tap */}
-              <button
-                type="button"
-                onClick={() => setPhotoExpanded((e) => !e)}
-                aria-expanded={photoExpanded}
-                aria-label={photoExpanded ? '写真を閉じる' : '写真全体を見る'}
-                className="relative block w-full overflow-hidden rounded-[16px] lg:rounded-[18px] shadow-sm"
-                style={{
-                  aspectRatio: photoExpanded ? '3/4' : '1/1',
-                  minHeight: photoExpanded ? undefined : 300,
-                  border: featuredPhoto?.visit?.user_id === currentUserId
-                    ? '2.5px solid #1f9d63'
-                    : '1px solid #e9dfc7',
-                  background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)',
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                {featuredPhoto && (
-                  <img
-                    src={`/api/photo/${featuredPhoto.id}?size=small`}
-                    alt="ポケふた写真"
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                )}
-                {/* top-left: community count */}
-                <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
-                  <ImageIcon className="h-3 w-3" strokeWidth={2.2} />
-                  みんなの写真 {commPhotos.length}枚
-                </span>
-                {/* top-right: mine / 未投稿
-                    「あなたは未投稿」は photoState !== 'mine' の時だけ表示。
-                    自分の写真があってもコミュニティ写真を選択中の場合は出さない。 */}
-                {isLoggedIn && (
-                  featuredPhoto?.visit?.user_id === currentUserId ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#1f9d63] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
-                      あなたの写真
-                    </span>
-                  ) : photoState !== 'mine' ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#bf5640] bg-opacity-95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
-                      あなたは未投稿
-                    </span>
-                  ) : null
-                )}
-                {/* expand hint pill */}
-                <span className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white backdrop-blur-sm" style={{ background: 'rgba(20,14,5,.55)' }}>
-                  {photoExpanded
-                    ? <><ChevronUp className="h-3 w-3" strokeWidth={2.6} />閉じる</>
-                    : <><ChevronDown className="h-3 w-3" strokeWidth={2.6} />全体を見る</>}
-                </span>
-                {/* caption — inline styles to prevent global CSS overrides */}
-                {featuredPhoto && (
-                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '26px 13px 44px', background: 'linear-gradient(180deg,transparent,rgba(20,14,5,.62))', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, zIndex: 1 }}>
-                    {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
-                      <Link
-                        href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700, color: '#fff', textDecoration: 'underline' }}
-                      >
-                        @{getPhotoUserLabel(featuredPhoto)}
-                      </Link>
-                    ) : (
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 700 }}>
-                        @{getPhotoUserLabel(featuredPhoto)}
-                      </span>
-                    )}
-                    {featuredPhoto.visit?.shot_at && (
-                      <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'Outfit,sans-serif', opacity: 0.9 }}>
-                        {formatPhotoDate(featuredPhoto.visit.shot_at)}
-                      </span>
-                    )}
+              {photoExpanded && featuredPhoto ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoExpanded(false)}
+                    aria-label="写真一覧に戻る"
+                    className="relative block aspect-[3/4] w-full overflow-hidden rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm lg:rounded-[18px]"
+                  >
+                    <img
+                      src={`/api/photo/${featuredPhoto.id}?size=large`}
+                      alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
+                      className="h-full w-full object-cover"
+                    />
                     {featuredPhoto.visit?.user_id === currentUserId && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(featuredPhoto.id, featuredPhoto.visit?.id); }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(180,30,30,0.75)', borderRadius: 99, padding: '3px 9px', flexShrink: 0, border: 'none', cursor: 'pointer' }}
-                      >
-                        削除
-                      </button>
+                      <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
+                        あなたの投稿
+                      </span>
                     )}
-                  </div>
-                )}
-              </button>
-
-              {/* Thumbnail strips */}
-              <div className="flex flex-col gap-3">
-                {/* Your photos */}
-                {isLoggedIn && myPhotos.length > 0 && (
-                  <div>
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <Camera className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
-                      <span className="font-pixelJp text-[13px] font-bold">あなたの写真</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {myPhotos.map((p, i) => (
+                    <span className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white backdrop-blur-sm">
+                      <ChevronUp className="h-3 w-3" strokeWidth={2.6} />一覧に戻る
+                    </span>
+                    <div className="absolute inset-x-0 bottom-0 z-[1] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-11 pt-10 text-white">
+                      {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
+                        <Link
+                          href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="min-w-0 truncate text-xs font-bold underline"
+                        >
+                          @{getPhotoUserLabel(featuredPhoto)}
+                        </Link>
+                      ) : (
+                        <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
+                      )}
+                      {featuredPhoto.visit?.shot_at && (
+                        <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
+                          {formatPhotoDate(featuredPhoto.visit.shot_at)}
+                        </span>
+                      )}
+                      {featuredPhoto.visit?.user_id === currentUserId && (
                         <button
-                          key={p.id}
                           type="button"
-                          onClick={() => setSelectedPhotoIdx(i)}
-                          className="relative h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 overflow-hidden rounded-[11px]"
-                          style={{
-                            border:
-                              featuredPhoto?.id === p.id
-                                ? '2.5px solid #bf5640'
-                                : '2px solid #1f9d63',
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteClick(featuredPhoto.id, featuredPhoto.visit?.id);
                           }}
+                          className="shrink-0 rounded-full bg-red-800/80 px-2.5 py-1 text-[11px] font-bold text-white"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                  </button>
+                  {allDisplayPhotos.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {allDisplayPhotos.map((photo, index) => (
+                        <button
+                          key={photo.id}
+                          type="button"
+                          onClick={() => setSelectedPhotoIdx(index)}
+                          className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border-2 lg:h-[72px] lg:w-[72px] ${
+                            featuredPhoto.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
+                          }`}
                         >
                           <img
-                            src={`/api/photo/${p.id}?size=small`}
-                            alt="あなたの写真"
+                            src={`/api/photo/${photo.id}?size=small`}
+                            alt={`@${getPhotoUserLabel(photo)}`}
                             className="h-full w-full object-cover"
                           />
-                          <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1f9d63]">
-                            <Camera className="h-2.5 w-2.5 text-white" strokeWidth={2.4} />
-                          </span>
                         </button>
                       ))}
-                      {/* add slot */}
-                      <button
-                        type="button"
-                        onClick={() => router.push('/upload')}
-                        className="flex h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
-                        style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
-                      >
-                        <Plus className="h-[18px] w-[18px] text-[#bf5640]" strokeWidth={2.5} />
-                      </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Community photos */}
-                <div>
-                  <div className="mb-2 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
-                    <span className="font-pixelJp text-[13px] font-bold">みんなの写真</span>
-                    <span className="font-['Outfit'] text-xs font-bold text-[#9b917e]">
-                      {commPhotos.length}枚
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {commPhotos.map((p, i) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelectedPhotoIdx(myPhotos.length + i)}
-                        title={`@${getPhotoUserLabel(p)}`}
-                        className="relative h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 overflow-hidden rounded-[11px]"
-                        style={{
-                          border:
-                            featuredPhoto?.id === p.id
-                              ? '2.5px solid #bf5640'
-                              : '1px solid #e9dfc7',
-                        }}
-                      >
-                        <img
-                          src={`/api/photo/${p.id}?size=small`}
-                          alt={`@${getPhotoUserLabel(p)}`}
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                    ))}
-                    {/* add slot when no own photos */}
-                    {(!isLoggedIn || myPhotos.length === 0) && (
-                      <button
-                        type="button"
-                        onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
-                        className="flex h-[60px] w-[60px] lg:h-[70px] lg:w-[70px] shrink-0 items-center justify-center rounded-[11px] border-2 border-dashed border-[#cdbf9f]"
-                        style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 6px,#ece2cd 6px 12px)' }}
-                      >
-                        {isLoggedIn ? (
-                          <Plus className="h-[18px] w-[18px] text-[#bf5640]" strokeWidth={2.5} />
-                        ) : (
-                          <Lock className="h-4 w-4 text-[#bcae8e]" strokeWidth={2} />
-                        )}
-                      </button>
+                  )}
+                </>
+              ) : allDisplayPhotos.length === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setPhotoExpanded(true)}
+                  aria-label="写真を全体表示"
+                  className="group relative block aspect-[4/3] w-full overflow-hidden rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm lg:aspect-square lg:rounded-[18px]"
+                >
+                  <img
+                    src={`/api/photo/${allDisplayPhotos[0].id}?size=large`}
+                    alt={`@${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
+                    <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
+                    {allDisplayPhotos[0].visit?.shot_at && (
+                      <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
+                        {formatPhotoDate(allDisplayPhotos[0].visit!.shot_at)}
+                      </span>
                     )}
                   </div>
+                </button>
+              ) : (
+                <div className="grid h-[250px] grid-cols-3 grid-rows-2 gap-2 lg:h-[420px]">
+                  {galleryPreviewPhotos.map((photo, index) => {
+                    const isRepresentative = index === 0;
+                    const isOnlySecondary = galleryPreviewPhotos.length === 2 && index === 1;
+                    return (
+                      <button
+                        key={photo.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPhotoIdx(index);
+                          setPhotoExpanded(true);
+                        }}
+                        aria-label={`@${getPhotoUserLabel(photo)}さんの写真を全体表示`}
+                        className={`group relative overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
+                          isRepresentative
+                            ? 'col-span-2 row-span-2 rounded-l-[16px] lg:rounded-l-[18px]'
+                            : `${isOnlySecondary ? 'row-span-2' : ''} rounded-r-[13px] lg:rounded-r-[15px]`
+                        }`}
+                      >
+                        <img
+                          src={`/api/photo/${photo.id}?size=${isRepresentative ? 'large' : 'small'}`}
+                          alt={`@${getPhotoUserLabel(photo)}さんのポケふた写真`}
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          loading={isRepresentative ? 'eager' : 'lazy'}
+                        />
+                        {isRepresentative && (
+                          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
+                            <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
+                          </span>
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 flex items-end gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
+                          <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
+                            @{getPhotoUserLabel(photo)}
+                          </span>
+                          {isRepresentative && photo.visit?.shot_at && (
+                            <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
+                              {formatPhotoDate(photo.visit.shot_at)}
+                            </span>
+                          )}
+                        </span>
+                        {index === galleryPreviewPhotos.length - 1 && remainingGalleryPhotos > 0 && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/40 font-['Outfit'] text-2xl font-black text-white backdrop-blur-[1px]">
+                            +{remainingGalleryPhotos}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 px-1">
+                <span className="font-pixelJp text-[11px] font-semibold text-[#8b816f]">
+                  {photoContributorCount > 0 ? `${photoContributorCount}人が撮影・` : ''}全{allDisplayPhotos.length}枚
+                </span>
+                <button
+                  type="button"
+                  onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640]"
+                >
+                  <Plus className="h-3 w-3" strokeWidth={2.4} />写真を追加
+                </button>
               </div>
             </div>
           )}
@@ -958,19 +948,7 @@ export default function ManholeDetailPage() {
           </div>
 
           {/* ── Rarity pills ── */}
-          {photoState === 'community' && isLoggedIn ? (
-            <div className="flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdeae2] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#bf5640]">
-                <Star className="h-3 w-3" strokeWidth={2} />夜・雪の構図はまだ無い
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ece9fb] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#6a5fc4]">
-                <Trophy className="h-3 w-3" strokeWidth={2} />ベスト写真を狙える
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e2f2e9] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#1f9d63]">
-                <Sparkles className="h-3 w-3" strokeWidth={2} />あなたの季節を残す
-              </span>
-            </div>
-          ) : titleBadges.length > 0 ? (
+          {titleBadges.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {titleBadges.map((title, idx) => (
                 <span
@@ -984,7 +962,7 @@ export default function ManholeDetailPage() {
           ) : null}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
-          <div className="lg:hidden">{promptCardContent}</div>
+          {photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
 
           <hr className="border-[#e9dfc7]" />
 
