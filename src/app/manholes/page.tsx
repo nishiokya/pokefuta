@@ -19,6 +19,9 @@ export default function ManholesPage() {
   useEffect(() => {
     document.title = pageTitle('全国ポケふた一覧');
 
+    const initialQuery = new URLSearchParams(window.location.search).get('q')?.trim();
+    if (initialQuery) setQuery(initialQuery);
+
     (async () => {
       try {
         const supabase = createBrowserClient();
