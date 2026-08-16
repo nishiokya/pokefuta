@@ -524,31 +524,41 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
   // これが無いと固定下タブがフッターに重なって X リンクが完全に隠れる。
   return (
     <footer className="pb-nav-safe lg:hidden lg:pb-0" style={{ borderTop: '1px solid var(--chrome-sp-border)' }}>
+      {/*
+        以前は4リンクを1つの flex-wrap に並べていたが、SP 幅では合計が入らず
+        「X @pokemonmanhole」だけが2行目に落ちる。gap-y-1（4px）しか無いので
+        意図した2段ではなく事故に見えていた。折り返し任せをやめ、
+        サイト内3リンクと外部リンクを別の行として組む。
+      */}
       <nav
         aria-label="サイト内リンク"
-        className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 pb-1 pt-3 text-xs font-bold"
+        className="mx-auto max-w-md px-4 pb-1 pt-3 text-xs font-bold"
       >
-        <a href={DATA_SITE_URL} className="inline-flex items-center px-2" style={footerLinkStyle}>
-          図鑑
-        </a>
-        <Link href="/design-manholes" className="inline-flex items-center px-2" style={footerLinkStyle}>
-          デザインふた
-        </Link>
-        <Link href="/about" className="inline-flex items-center gap-1.5 px-2" style={footerLinkStyle}>
-          <Info className="h-4 w-4" />
-          このサイトについて
-        </Link>
-        <a
-          href={X_ACCOUNT_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-2"
-          style={footerLinkStyle}
-          onClick={() => trackXLinkClick({ surface: 'footer', source_app: 'tracker', is_logged_in: authLoaded && user !== null })}
-        >
-          <span className="font-sans text-base font-black">X</span>
-          @pokemonmanhole
-        </a>
+        <div className="flex items-center justify-center gap-x-2">
+          <a href={DATA_SITE_URL} className="inline-flex items-center px-2" style={footerLinkStyle}>
+            図鑑
+          </a>
+          <Link href="/design-manholes" className="inline-flex items-center px-2" style={footerLinkStyle}>
+            デザインふた
+          </Link>
+          <Link href="/about" className="inline-flex items-center gap-1.5 px-2" style={footerLinkStyle}>
+            <Info className="h-4 w-4" />
+            このサイトについて
+          </Link>
+        </div>
+        <div className="mt-1 flex items-center justify-center">
+          <a
+            href={X_ACCOUNT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-2"
+            style={footerLinkStyle}
+            onClick={() => trackXLinkClick({ surface: 'footer', source_app: 'tracker', is_logged_in: authLoaded && user !== null })}
+          >
+            <span className="font-sans text-base font-black">X</span>
+            @pokemonmanhole
+          </a>
+        </div>
       </nav>
     </footer>
   );
