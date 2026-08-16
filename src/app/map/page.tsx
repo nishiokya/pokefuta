@@ -299,6 +299,11 @@ export default function MapPage() {
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
+            {/*
+              ここだけ PhraseText を使わない。3文とも長く、句を割らない代わりに
+              スマホ幅(390px)では2行が3行に増える。地図が本体の画面で説明文が
+              1行伸びるほうが、PCで「ます。」が孤立するより損。
+            */}
             <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
               {isLoggedIn
                 ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'

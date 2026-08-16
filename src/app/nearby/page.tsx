@@ -18,6 +18,7 @@ import PCShell from '@/components/PCShell';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
+import { PhraseText } from '@/components/PhraseText';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -392,11 +393,16 @@ export default function NearbyPage() {
                   <Stamp className="h-3 w-3" />
                   ポケふたスタンプ帳
                 </div>
-                <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-4xl">
-                  ポケふた巡りを、あなただけのスタンプ帳に。
+                {/*
+                  max-w-2xl（=588px。ルートの font-size が 14px なので 2xl は 588px）は
+                  親の 604px より狭く、収まる幅を自分で削っていた。加えて句で切らないと
+                  「…スタンプ／帳に。」と語の途中で割れる。
+                */}
+                <h1 className="text-2xl font-extrabold leading-tight tracking-normal sm:text-4xl">
+                  <PhraseText text="ポケふた巡りを、あなただけのスタンプ帳に。" />
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-[#4A4A4A] sm:mt-3 sm:text-base">
-                  旅先で見つけたポケふたを写真と一緒に記録。訪問済みの場所やみんなの投稿写真を見ながら、ポケふた巡りを楽しく残しましょう。
+                <p className="mt-2 text-sm font-medium leading-relaxed text-[#4A4A4A] sm:mt-3 sm:text-base">
+                  <PhraseText text="旅先で見つけたポケふたを写真と一緒に記録。訪問済みの場所やみんなの投稿写真を見ながら、ポケふた巡りを楽しく残しましょう。" />
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
                   <Link
@@ -421,11 +427,11 @@ export default function NearbyPage() {
                   <Compass className="h-3.5 w-3.5" />
                   旅先で探す
                 </div>
-                <h1 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+                <h1 className="text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
                   ポケふたを探す
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
-                  現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。
+                <p className="mt-2 text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
+                  <PhraseText text="現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。" />
                 </p>
               </>
             )}

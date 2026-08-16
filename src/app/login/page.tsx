@@ -8,6 +8,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import type { ManholeTitle } from '@/types/database';
 import { pageTitle } from '@/lib/constants';
+import { PhraseText } from '@/components/PhraseText';
 
 type RarePreviewManhole = {
   id: number;
@@ -108,7 +109,7 @@ function RareFomoBox({ items }: { items: RarePreviewItem[] }) {
       <div className="pr-10">
         <p className="text-xs font-extrabold text-[#8C6315]">未発見のレアふたが待っています</p>
         <p className="mt-1 text-[11px] font-medium leading-relaxed text-[#6A4D36]">
-          登録すると訪問済みと照らし合わせて、称号つきの候補を探せます。
+          <PhraseText text="登録すると訪問済みと照らし合わせて、称号つきの候補を探せます。" />
         </p>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -628,7 +629,7 @@ function LoginForm() {
             あなただけのスタンプ帳に。
           </h1>
           <p className="text-xs font-medium leading-relaxed text-[#6A4D36]">
-            旅先のポケふたを写真で記録。次に巡る一枚も、ここから。
+            <PhraseText text="旅先のポケふたを写真で記録。次に巡る一枚も、ここから。" />
           </p>
         </div>
 
@@ -671,13 +672,18 @@ function LoginForm() {
               <Sparkles className="w-3 h-3" />
               ポケふたスタンプ帳
             </span>
-            <h1 className="font-extrabold text-[33px] leading-tight tracking-tight text-[#2A2A2A]">
+            {/*
+              33px だと2行目「あなただけのスタンプ帳に。」が 418px 必要で、
+              左カラム 404px に入らず「に。」だけが3行目に落ちていた。
+              30px なら 380px で収まる。
+            */}
+            <h1 className="font-extrabold text-[30px] leading-tight tracking-tight text-[#2A2A2A]">
               470か所のポケふたを、
               <br />
               あなただけのスタンプ帳に。
             </h1>
             <p className="text-sm font-medium leading-relaxed text-[#6A4D36]">
-              旅先で見つけたポケふたを写真で記録。訪問済みの場所も、次に巡る一枚も、ここから。
+              <PhraseText text="旅先で見つけたポケふたを写真で記録。訪問済みの場所も、次に巡る一枚も、ここから。" />
             </p>
             <div className="flex flex-col gap-4 mt-1">
               <ValueRow icon={MapPin} title="行った場所を記録" desc="訪問したポケふたが地図とリストに残る" />
@@ -696,9 +702,13 @@ function LoginForm() {
                 {mode === 'signup' ? '無料ではじめる' : 'ログインして続ける'}
               </h2>
               <p className="text-sm text-[#6A4D36]">
-                {mode === 'signup'
-                  ? '30秒でスタンプ帳ができます。すでにお持ちの方はログインへ。'
-                  : 'スタンプ帳の続きに戻れます。'}
+                <PhraseText
+                  text={
+                    mode === 'signup'
+                      ? '30秒でスタンプ帳ができます。すでにお持ちの方はログインへ。'
+                      : 'スタンプ帳の続きに戻れます。'
+                  }
+                />
               </p>
             </div>
             {renderAuthContent()}

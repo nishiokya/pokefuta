@@ -6,7 +6,6 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
-  Lock,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -67,10 +66,11 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
+  const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -85,12 +85,10 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
-        setSessionChecked(true);
         trackView('/', 'ポケふた写真館', 'gallery_index', loggedIn);
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
-        setSessionChecked(true);
         trackView('/', 'ポケふた写真館', 'gallery_index', false);
       }
     })();
@@ -134,6 +132,7 @@ export default function HomePage() {
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
+      setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
     }
@@ -167,37 +166,10 @@ export default function HomePage() {
       ? totalManholes - manholesWithPhotos
       : null;
 
-  // 右レールは未ログイン時の募集カードだけ。ログイン中は rail を渡さないので
-  // PCShell は1カラムのままになり、本文幅が狭まらない。
-  const pcGuestRail = sessionChecked && !isLoggedIn ? (
-    <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-white shadow-sm">
-      <div className="flex items-center gap-2 bg-gradient-to-r from-[#fdeae2] to-[#fdf1e6] px-4 py-3">
-        <TrendingUp className="h-4 w-4 text-[#B5483C]" />
-        <span className="font-bold text-sm text-[#7d4536]">写真ゼロを埋めよう</span>
-        <span className="ml-auto">
-          <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? '–'}</span>
-          <span className="text-xs text-[#6B6B6B]"> 枚 募集中</span>
-        </span>
-      </div>
-      <div className="flex flex-col gap-3 p-4">
-        <p className="text-sm text-[#4A4A4A] leading-relaxed">
-          まだ写真の無いポケふたは残り{' '}
-          <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 枚。あなたの1枚目が、この場所の最初の記録になります。
-        </p>
-        <Link
-          href="/login"
-          className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
-        >
-          <Camera className="h-4 w-4" />
-          無料で旅の記録をはじめる
-        </Link>
-        <p className="flex items-center justify-center gap-1 text-center text-xs text-[#9B9B9B]">
-          <Lock className="h-3 w-3" />
-          ログインして写真を投稿できます
-        </p>
-      </div>
-    </div>
-  ) : undefined;
+  // PC の右レール（未ログイン向けの「写真ゼロを埋めよう」募集カード）は外した。
+  // 登録導線はヒーロー内のボタンが担っており重複していた上に、レールが出ると
+  // 本文カラムが 1064px → 618px まで縮み、見出しが折り返す原因になっていた。
+  // rail を渡さなければ PCShell は1カラムのままになる。
 
   return (
     // pb-nav-safe はここには要らない。固定下タブを避ける責任は、この後ろに描かれる
@@ -210,7 +182,7 @@ export default function HomePage() {
         フッターが担っているので本文には要らない。ここはフッターとの間隔として
         必要な分だけ残す。
       */}
-      <PCShell rail={pcGuestRail} className="pb-10 pt-5 lg:pb-12 lg:pt-6">
+      <PCShell className="pb-10 pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -220,22 +192,31 @@ export default function HomePage() {
               「う」だけが次行に落ちる。意味のまとまりを inline-block にして、
               改行しうる箇所をこの2つの境目だけに限定する。
               text-wrap 系のプロパティと違い、対応ブラウザを問わず効く。
+
+              max-w-2xl を付けてはいけない。ルートの font-size が 14px なので
+              2xl は 588px にしかならず、見出しも下の本文（590px）も、
+              親の max-w-3xl（672px）には収まるのに自分の上限だけで折り返っていた。
+              行長は親の max-w-3xl で決める。
             */}
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
               <span className="inline-block">全国のポケふたを</span>
               <span className="inline-block">写真で埋めよう</span>
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+            <p className="mt-4 text-base font-medium leading-relaxed sm:text-lg">
               {/*
                 蓋を数える単位は「枚」で揃える（CLAUDE.md の用語規約。以前ここだけ
                 「件」になっていた）。本文なので概念名の「デザインマンホール」を使い、
                 ナビ用ラベルの「デザインふた」は使わない。
+
+                数字と単位は whitespace-nowrap で括る。半角数字の前後の空白が
+                折り返し候補になるため、幅次第で「枚。」だけが次行に落ちる。
+                枚数は日々増えて桁も変わるので、幅で回避せず構造で止める。
               */}
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  ポケふたの写真が <b>{totalPosts}</b> 枚集まっています。
+                  ポケふたの写真が <span className="whitespace-nowrap"><b>{totalPosts}</b> 枚</span>集まっています。
                   {unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</>
+                    <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
                   )}
                 </>
               ) : (
@@ -287,7 +268,20 @@ export default function HomePage() {
             </span>
             <div>
               <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
-              <h2 className="mt-0.5 text-lg font-extrabold">デザインふたも集まっています</h2>
+              {/*
+                枚数は /api/site-stats の design_manholes（status='published' のみ）で、
+                以前ヒーロー本文に出ていたものをこのカードへ戻した。下の説明文ではなく
+                見出しに付ける。説明文は今ちょうど1行に収まっており、頭に枚数を足すと
+                行があふれて「す。」だけが次行に落ちるため。取得できない日は見出しだけ出す。
+              */}
+              <h2 className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-lg font-extrabold">
+                デザインふたも集まっています
+                {designManholes != null && designManholes > 0 && (
+                  <span className="whitespace-nowrap text-sm font-bold text-[#7B63A8]">
+                    これまでに {designManholes} 枚
+                  </span>
+                )}
+              </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-[#5F574F]">
                 キャラクター・ご当地デザインなど、みんなが見つけた全国のマンホールを楽しめます。
               </p>
