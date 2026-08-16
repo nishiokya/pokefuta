@@ -6,6 +6,7 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Info,
   Lock,
   MapPin,
   MessageCircle,
@@ -167,7 +168,40 @@ export default function HomePage() {
       ? totalManholes - manholesWithPhotos
       : null;
 
-  const pcGuestRail = sessionChecked && !isLoggedIn ? (
+  /**
+   * 「何のサイトか」を PC の右レールに置く。
+   *
+   * h1 は行動を促す文で、サイトの説明にはなっていない。初見の来訪者が
+   * ここが何なのかを読める場所が本文中に無かった。ログインの有無で
+   * 出し分ける理由が無いので、下の募集カードと違って常に出す。
+   *
+   * hidden lg:block は必須。PCShell はレールを PC では右カラムに、
+   * モバイルでは本文の「上」に積むので、これが無いと SP でヒーローより先に
+   * 説明カードが出る。ここは PC の余白を使う話なので SP には出さない。
+   */
+  const pcAboutCard = (
+    <div className="hidden overflow-hidden rounded-[14px] border border-[#7B63A8]/20 bg-white shadow-sm lg:block">
+      <div className="flex items-center gap-2 bg-gradient-to-r from-[#F4F0FA] to-[#FFF8EB] px-4 py-3">
+        <Sparkles className="h-4 w-4 text-[#7B63A8]" />
+        <span className="text-sm font-bold text-[#5E4788]">ポケふた写真館とは</span>
+      </div>
+      <div className="flex flex-col gap-3 p-4">
+        <p className="text-sm leading-relaxed text-[#4A4A4A]">
+          全国{totalManholes ?? '–'}枚のポケふた（ポケモンマンホール）を、
+          みんなの写真で記録していくサイトです。行った場所をスタンプ帳に残せます。
+        </p>
+        <Link
+          href="/about"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-[#7B63A8]/30 bg-white px-4 py-2.5 text-sm font-bold text-[#5E4788] transition hover:bg-[#7B63A8]/5"
+        >
+          <Info className="h-4 w-4" />
+          このサイトについて
+        </Link>
+      </div>
+    </div>
+  );
+
+  const pcGuestCard = sessionChecked && !isLoggedIn ? (
     <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-white shadow-sm">
       <div className="flex items-center gap-2 bg-gradient-to-r from-[#fdeae2] to-[#fdf1e6] px-4 py-3">
         <TrendingUp className="h-4 w-4 text-[#B5483C]" />
@@ -195,7 +229,14 @@ export default function HomePage() {
         </p>
       </div>
     </div>
-  ) : undefined;
+  ) : null;
+
+  const pcGuestRail = (
+    <>
+      {pcAboutCard}
+      {pcGuestCard}
+    </>
+  );
 
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
@@ -205,12 +246,15 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
           <div className="relative max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">
-              <Sparkles className="h-3.5 w-3.5" />
-              ポケふた写真館
-            </div>
+            {/*
+              日本語は単語区切りが無いので、放っておくと文字単位で折り返して
+              「う」だけが次行に落ちる。意味のまとまりを inline-block にして、
+              改行しうる箇所をこの2つの境目だけに限定する。
+              text-wrap 系のプロパティと違い、対応ブラウザを問わず効く。
+            */}
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              全国のポケふたを写真で埋めよう
+              <span className="inline-block">全国のポケふたを</span>
+              <span className="inline-block">写真で埋めよう</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
               {totalPosts != null && totalPosts > 0 ? (
