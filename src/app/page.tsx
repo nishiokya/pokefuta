@@ -323,7 +323,11 @@ export default function HomePage() {
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
+                    const isFresh = isFreshlyShot(visit.shot_at);
+                    // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
+                    // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
+                      isFresh ? '新着投稿' : null,
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
@@ -345,7 +349,7 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {isFreshlyShot(visit.shot_at) && (
+                        {isFresh && (
                           <span className="absolute left-2 top-2 rounded-[6px] bg-[#7B63A8] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
                             新着投稿
                           </span>
