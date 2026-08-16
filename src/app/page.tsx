@@ -174,9 +174,13 @@ export default function HomePage() {
    * h1 は行動を促す文で、サイトの説明にはなっていない。初見の来訪者が
    * ここが何なのかを読める場所が本文中に無かった。ログインの有無で
    * 出し分ける理由が無いので、下の募集カードと違って常に出す。
+   *
+   * hidden lg:block は必須。PCShell はレールを PC では右カラムに、
+   * モバイルでは本文の「上」に積むので、これが無いと SP でヒーローより先に
+   * 説明カードが出る。ここは PC の余白を使う話なので SP には出さない。
    */
   const pcAboutCard = (
-    <div className="overflow-hidden rounded-[14px] border border-[#7B63A8]/20 bg-white shadow-sm">
+    <div className="hidden overflow-hidden rounded-[14px] border border-[#7B63A8]/20 bg-white shadow-sm lg:block">
       <div className="flex items-center gap-2 bg-gradient-to-r from-[#F4F0FA] to-[#FFF8EB] px-4 py-3">
         <Sparkles className="h-4 w-4 text-[#7B63A8]" />
         <span className="text-sm font-bold text-[#5E4788]">ポケふた写真館とは</span>
