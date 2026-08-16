@@ -53,9 +53,11 @@ function isFreshlyShot(shotAt: string | null | undefined): boolean {
   if (!shotAt) return false;
   const shot = new Date(shotAt).getTime();
   if (Number.isNaN(shot)) return false;
-  const elapsed = Date.now() - shot;
-  // 端末時計のズレや撮影日時が未来の写真でバッジが消えないよう、未来側も許容する
-  return elapsed < FRESHLY_SHOT_DAYS * 24 * 60 * 60 * 1000;
+  // 端末時計のズレで直前の撮影が弾かれないよう未来側も見るが、同じ幅で打ち切る。
+  // 片側を開けたままにすると、カメラの日付設定を誤った1枚に「新着投稿」が
+  // 未来永劫つき続ける。
+  const distance = Math.abs(Date.now() - shot);
+  return distance < FRESHLY_SHOT_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export default function HomePage() {

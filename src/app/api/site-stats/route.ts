@@ -86,6 +86,35 @@ async function fetchLiveCounts(): Promise<LiveCounts | null> {
   }
 }
 
+/**
+ * 応答の骨格。
+ *
+ * スナップショットが取れずライブ件数だけ取れた場合でも、キーの欠けた
+ * 成功応答を返さないための土台。利用側は `data.posts` のように直接読むので、
+ * 状況によってキーが生えたり消えたりすると壊れやすい。値が無いことは
+ * 「キーが無い」ではなく null で表す。
+ */
+function emptyStats(): Record<string, unknown> {
+  return {
+    users: null,
+    auth_users: null,
+    active_users_7d: null,
+    posts: null,
+    manholes: null,
+    manholes_with_photos: null,
+    latest_photo_at: null,
+    latest_user_at: null,
+    latest_visit_at: null,
+    posts_last_7d: null,
+    posts_last_30d: null,
+    manhole_comments: null,
+    public_posts: null,
+    private_posts: null,
+    generated_at: null,
+    source: null,
+  };
+}
+
 export async function GET() {
   // スナップショットと件数は互いに独立なので並列で取る
   const [snapshot, live] = await Promise.all([fetchSiteStatsSnapshot(), fetchLiveCounts()]);
@@ -94,7 +123,7 @@ export async function GET() {
     // 件数だけライブ値で上書きし、それ以外はスナップショットのまま返す。
     // private_posts はスナップショットの値と混ざると内訳が合わなくなるので、
     // ライブの posts / public_posts が揃っているときは差分で計算し直す。
-    const merged: Record<string, unknown> = { ...(snapshot ?? { success: true }) };
+    const merged: Record<string, unknown> = { ...emptyStats(), ...(snapshot ?? {}) };
 
     if (live) {
       for (const [key, value] of Object.entries(live)) {
@@ -115,28 +144,17 @@ export async function GET() {
     });
   }
 
-  // 他 API と同様、取得失敗は success: false + 5xx で返す
+  // 他 API と同様、取得失敗は success: false + 5xx で返す。
+  // 成功応答を CDN に持たせている以上、失敗側は明示的に no-store にしないと
+  // エラーが同じだけキャッシュされて復旧が遅れる。
   return NextResponse.json(
     {
+      ...emptyStats(),
       success: false,
-      users: null,
-      auth_users: null,
-      active_users_7d: null,
-      posts: null,
-      manholes: null,
-      manholes_with_photos: null,
-      latest_photo_at: null,
-      latest_user_at: null,
-      latest_visit_at: null,
-      posts_last_7d: null,
-      posts_last_30d: null,
-      manhole_comments: null,
-      public_posts: null,
-      private_posts: null,
       error: 'Site statistics are unavailable',
       source: 'unavailable',
       counts_source: 'unavailable',
     },
-    { status: 503 }
+    { status: 503, headers: { 'Cache-Control': 'no-store' } }
   );
 }
