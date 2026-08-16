@@ -31,6 +31,7 @@ jobs:
       - run: npm run test:analytics
       - run: npm run test:pokemon-go
       - run: npm run test:manhole-gallery
+      - run: npm run test:japanese-phrases
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux

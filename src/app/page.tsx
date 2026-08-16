@@ -6,7 +6,6 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
-  Lock,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -72,7 +71,6 @@ export default function HomePage() {
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -87,12 +85,10 @@ export default function HomePage() {
         } = await supabase.auth.getSession();
         const loggedIn = Boolean(session?.user);
         setIsLoggedIn(loggedIn);
-        setSessionChecked(true);
         trackView('/', 'ポケふた写真館', 'gallery_index', loggedIn);
       } catch (error) {
         console.error('Session check error:', error);
         setIsLoggedIn(false);
-        setSessionChecked(true);
         trackView('/', 'ポケふた写真館', 'gallery_index', false);
       }
     })();
@@ -170,37 +166,10 @@ export default function HomePage() {
       ? totalManholes - manholesWithPhotos
       : null;
 
-  // 右レールは未ログイン時の募集カードだけ。ログイン中は rail を渡さないので
-  // PCShell は1カラムのままになり、本文幅が狭まらない。
-  const pcGuestRail = sessionChecked && !isLoggedIn ? (
-    <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-white shadow-sm">
-      <div className="flex items-center gap-2 bg-gradient-to-r from-[#fdeae2] to-[#fdf1e6] px-4 py-3">
-        <TrendingUp className="h-4 w-4 text-[#B5483C]" />
-        <span className="font-bold text-sm text-[#7d4536]">写真ゼロを埋めよう</span>
-        <span className="ml-auto">
-          <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? '–'}</span>
-          <span className="text-xs text-[#6B6B6B]"> 枚 募集中</span>
-        </span>
-      </div>
-      <div className="flex flex-col gap-3 p-4">
-        <p className="text-sm text-[#4A4A4A] leading-relaxed">
-          まだ写真の無いポケふたは残り{' '}
-          <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 枚。あなたの1枚目が、この場所の最初の記録になります。
-        </p>
-        <Link
-          href="/login"
-          className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
-        >
-          <Camera className="h-4 w-4" />
-          無料で旅の記録をはじめる
-        </Link>
-        <p className="flex items-center justify-center gap-1 text-center text-xs text-[#9B9B9B]">
-          <Lock className="h-3 w-3" />
-          ログインして写真を投稿できます
-        </p>
-      </div>
-    </div>
-  ) : undefined;
+  // PC の右レール（未ログイン向けの「写真ゼロを埋めよう」募集カード）は外した。
+  // 登録導線はヒーロー内のボタンが担っており重複していた上に、レールが出ると
+  // 本文カラムが 1064px → 618px まで縮み、見出しが折り返す原因になっていた。
+  // rail を渡さなければ PCShell は1カラムのままになる。
 
   return (
     // pb-nav-safe はここには要らない。固定下タブを避ける責任は、この後ろに描かれる
@@ -213,7 +182,7 @@ export default function HomePage() {
         フッターが担っているので本文には要らない。ここはフッターとの間隔として
         必要な分だけ残す。
       */}
-      <PCShell rail={pcGuestRail} className="pb-10 pt-5 lg:pb-12 lg:pt-6">
+      <PCShell className="pb-10 pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -228,13 +197,8 @@ export default function HomePage() {
               2xl は 588px にしかならず、見出しも下の本文（590px）も、
               親の max-w-3xl（672px）には収まるのに自分の上限だけで折り返っていた。
               行長は親の max-w-3xl で決める。
-
-              PC の文字サイズが text-5xl(=42px) でないのは、未ログイン時だけ右レール
-              （360px + gap 28px）が出て本文カラムが 618px まで縮むため。42px だと
-              15字で 630px になり、レールのある未ログイン側でだけ2行に落ちていた。
-              40px なら 600px で両方1行に収まる。
             */}
-            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-[40px]">
+            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
               <span className="inline-block">全国のポケふたを</span>
               <span className="inline-block">写真で埋めよう</span>
             </h1>

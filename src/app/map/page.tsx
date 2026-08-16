@@ -8,7 +8,6 @@ import { Manhole } from '@/types/database';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
-import { PhraseText } from '@/components/PhraseText';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -300,14 +299,16 @@ export default function MapPage() {
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
+            {/*
+              ここだけ PhraseText を使わない。3文とも長く、句を割らない代わりに
+              スマホ幅(390px)では2行が3行に増える。地図が本体の画面で説明文が
+              1行伸びるほうが、PCで「ます。」が孤立するより損。
+            */}
             <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
-              <PhraseText
-                text={
-                  isLoggedIn
-                    ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
-                    : '全国のポケふたを表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
-                }
-              />
+              {isLoggedIn
+                ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
+                : '全国のポケふたを表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
+              }
             </p>
 
             {/* マップとリストのコンテナ */}

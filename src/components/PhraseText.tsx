@@ -11,16 +11,16 @@ import { splitJapanesePhrases } from '@/lib/japanese-phrases';
  * 見出しのように区切り位置を手で決めたいところでは、この共通部品ではなく
  * span を直に書く（src/app/page.tsx のヒーロー見出しなど）。
  */
-export function PhraseText({ text, className }: { text: string; className?: string }) {
+export function PhraseText({ text }: { text: string }) {
   const phrases = splitJapanesePhrases(text);
 
   return (
-    <span className={className}>
+    <>
       {phrases.map((phrase, index) => (
         <span key={`${index}-${phrase}`} className="inline-block">
           {phrase}
         </span>
       ))}
-    </span>
+    </>
   );
 }

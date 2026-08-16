@@ -14,9 +14,27 @@
  * 中黒（・）も区切りに含める。「都道府県・登場ポケモン・地図から〜」のような
  * 並列は句点まで20文字以上続くことがあり、句点だけを頼りにすると狭いカラムで
  * 句そのものが1行に入らず、結局その中で文字単位に折り返ってしまう。
+ *
+ * 後読み（?<=）の正規表現は使わない。Safari 16.3 以前が対応しておらず、
+ * 正規表現リテラルは実行時ではなく解析時に SyntaxError になるので、
+ * このモジュールを含むチャンク全体が読めなくなる。browserslist を
+ * 置いていないため Next の既定（Safari 12 まで）が対象で、SWC は
+ * 正規表現の構文をダウンレベルしない。
  */
-const PHRASE_BOUNDARY = /(?<=[。、！？・])/;
+const PHRASE_BOUNDARIES = '。、！？・';
 
 export function splitJapanesePhrases(text: string): string[] {
-  return text.split(PHRASE_BOUNDARY).filter((phrase) => phrase.length > 0);
+  const phrases: string[] = [];
+  let current = '';
+
+  for (const character of text) {
+    current += character;
+    if (PHRASE_BOUNDARIES.includes(character)) {
+      phrases.push(current);
+      current = '';
+    }
+  }
+  if (current.length > 0) phrases.push(current);
+
+  return phrases;
 }
