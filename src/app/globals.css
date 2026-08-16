@@ -341,6 +341,19 @@
   }
 
   /*
+   * PC には下タブが無い。
+   *
+   * この 5rem は .nav-rpg（固定の下タブ）を避けるための余白だが、
+   * .nav-rpg は lg:hidden なので 1024px 以上では存在しない。
+   * 付けたままだとページ末尾に用途の無い空白が残る。
+   */
+  @media (min-width: 1024px) {
+    .pb-nav-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /*
    * ページ本文の最低高さ。
    *
    * ヘッダーは layout.tsx の SiteChrome が本文の外側に描くので、本文に

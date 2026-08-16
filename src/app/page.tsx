@@ -202,7 +202,8 @@ export default function HomePage() {
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
 
-      <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
+      {/* pb-32 は下タブと投稿FABを避けるための余白。どちらも lg:hidden なので PC では詰める */}
+      <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -508,8 +509,15 @@ export default function HomePage() {
                 );
               })}
             </div>
+            {/*
+              「募集中」だけだと、このタイルを押すと何が起きるかが書かれていない。
+              押した先は投稿画面（未ログインならログイン）なので、そこを説明する。
+              以前の「写真を投稿して図鑑を埋めよう」は掛け声で、操作の説明になっていなかった。
+            */}
             <p className="mt-3 text-center text-xs font-medium text-[#6B6B6B]">
-              {isLoggedIn ? '写真を投稿して図鑑を埋めよう' : 'ログインして写真を投稿できます'}
+              {isLoggedIn
+                ? 'タップすると、その場所の投稿画面へ進みます'
+                : 'ログインすると、ここから写真を投稿できます'}
             </p>
           </section>
         )}
