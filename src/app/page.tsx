@@ -67,8 +67,6 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
-  // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
-  const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -136,7 +134,6 @@ export default function HomePage() {
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
-      setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
     }
@@ -228,11 +225,7 @@ export default function HomePage() {
               */}
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  ポケふたの写真が <b>{totalPosts}</b> 枚
-                  {designManholes != null && designManholes > 0 && (
-                    <>、デザインマンホールが <b>{designManholes}</b> 枚</>
-                  )}
-                  集まっています。
+                  ポケふたの写真が <b>{totalPosts}</b> 枚集まっています。
                   {unmetPhotoCount != null && unmetPhotoCount > 0 && (
                     <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</>
                   )}
@@ -242,18 +235,23 @@ export default function HomePage() {
               )}
             </p>
 
+            {/*
+              新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
+              並んでいて、どちらが主かが読めなかった。登録側だけを一段大きくし、
+              スタンプ帳は枠線を外して副次的な見た目に落とす。
+            */}
             {!isLoggedIn && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#7B63A8] px-6 py-3.5 text-base font-extrabold text-white shadow-[0_4px_0_#5f55b8] transition hover:bg-[#6A5299] active:translate-y-0.5 active:shadow-[0_2px_0_#5f55b8]"
                 >
-                  <Camera className="h-4 w-4" />
+                  <Camera className="h-5 w-5" />
                   無料で旅の記録をはじめる
                 </Link>
                 <Link
                   href="/visits"
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 px-4 py-2.5 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-white"
+                  className="inline-flex items-center gap-1.5 px-2 py-2 text-sm font-bold text-[#7B63A8] underline-offset-4 transition hover:underline"
                 >
                   <Stamp className="h-4 w-4" />
                   スタンプ帳を見る
