@@ -110,6 +110,16 @@ export default async function DesignManholesPage() {
             <p className="mt-1 text-sm text-[#2A2A2A]/70">
               ポケふた以外の、オンリーワンなデザインマンホールのコレクション
             </p>
+            {/*
+              枚数は下に並べている配列そのものの長さを使う。別途数え直すと
+              一覧と数字がズレうるが、これなら構造上ズレない（追加の問い合わせも無い）。
+              loadPublishedDesignManholes の上限200枚に達したら数え直しが要る。
+            */}
+            {designManholes.length > 0 && (
+              <p className="mt-2 text-sm font-bold text-[#5E4788]">
+                いま <span className="text-base">{designManholes.length}</span> 枚集まっています
+              </p>
+            )}
           </div>
           <SubmitCta surface="design_manhole_list_toolbar" className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
         </div>
