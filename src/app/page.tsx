@@ -67,6 +67,8 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
+  const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -134,6 +136,7 @@ export default function HomePage() {
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
+      setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
     }
@@ -220,22 +223,36 @@ export default function HomePage() {
               「う」だけが次行に落ちる。意味のまとまりを inline-block にして、
               改行しうる箇所をこの2つの境目だけに限定する。
               text-wrap 系のプロパティと違い、対応ブラウザを問わず効く。
+
+              max-w-2xl を付けてはいけない。ルートの font-size が 14px なので
+              2xl は 588px にしかならず、見出しも下の本文（590px）も、
+              親の max-w-3xl（672px）には収まるのに自分の上限だけで折り返っていた。
+              行長は親の max-w-3xl で決める。
+
+              PC の文字サイズが text-5xl(=42px) でないのは、未ログイン時だけ右レール
+              （360px + gap 28px）が出て本文カラムが 618px まで縮むため。42px だと
+              15字で 630px になり、レールのある未ログイン側でだけ2行に落ちていた。
+              40px なら 600px で両方1行に収まる。
             */}
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
+            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-[40px]">
               <span className="inline-block">全国のポケふたを</span>
               <span className="inline-block">写真で埋めよう</span>
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+            <p className="mt-4 text-base font-medium leading-relaxed sm:text-lg">
               {/*
                 蓋を数える単位は「枚」で揃える（CLAUDE.md の用語規約。以前ここだけ
                 「件」になっていた）。本文なので概念名の「デザインマンホール」を使い、
                 ナビ用ラベルの「デザインふた」は使わない。
+
+                数字と単位は whitespace-nowrap で括る。半角数字の前後の空白が
+                折り返し候補になるため、幅次第で「枚。」だけが次行に落ちる。
+                枚数は日々増えて桁も変わるので、幅で回避せず構造で止める。
               */}
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  ポケふたの写真が <b>{totalPosts}</b> 枚集まっています。
+                  ポケふたの写真が <span className="whitespace-nowrap"><b>{totalPosts}</b> 枚</span>集まっています。
                   {unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</>
+                    <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
                   )}
                 </>
               ) : (
@@ -287,7 +304,20 @@ export default function HomePage() {
             </span>
             <div>
               <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
-              <h2 className="mt-0.5 text-lg font-extrabold">デザインふたも集まっています</h2>
+              {/*
+                枚数は /api/site-stats の design_manholes（status='published' のみ）で、
+                以前ヒーロー本文に出ていたものをこのカードへ戻した。下の説明文ではなく
+                見出しに付ける。説明文は今ちょうど1行に収まっており、頭に枚数を足すと
+                行があふれて「す。」だけが次行に落ちるため。取得できない日は見出しだけ出す。
+              */}
+              <h2 className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-lg font-extrabold">
+                デザインふたも集まっています
+                {designManholes != null && designManholes > 0 && (
+                  <span className="whitespace-nowrap text-sm font-bold text-[#7B63A8]">
+                    これまでに {designManholes} 枚
+                  </span>
+                )}
+              </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-[#5F574F]">
                 キャラクター・ご当地デザインなど、みんなが見つけた全国のマンホールを楽しめます。
               </p>

@@ -189,15 +189,31 @@ export default function PopularPage() {
               <Sparkles className="h-3.5 w-3.5" />
               ポケふた写真館
             </div>
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              全国のポケふたを写真で埋めよう
+            {/*
+              トップ（src/app/page.tsx）と同じヒーロー。折り返しの扱いも揃える。
+              日本語は単語区切りが無いので、放っておくと文字単位で折り返して
+              「う」だけが次行に落ちる。意味のまとまりを inline-block にして、
+              改行しうる箇所をこの2つの境目だけに限定する。
+
+              max-w-2xl は付けない。ルートの font-size が 14px なので 2xl は
+              588px にしかならず、見出しも本文も親の max-w-3xl（672px）には
+              収まるのに自分の上限だけで折り返っていた。
+
+              PC が 40px なのも同じくトップと揃えた理由による。未ログイン時は
+              右レールで本文カラムが 618px まで縮むので、text-5xl(=42px) だと
+              15字で 630px になり1行に収まらない。
+            */}
+            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-[40px]">
+              <span className="inline-block">全国のポケふたを</span>
+              <span className="inline-block">写真で埋めよう</span>
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+            <p className="mt-4 text-base font-medium leading-relaxed sm:text-lg">
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  いま <b>{totalPosts}</b> 枚の写真が集まっています。
+                  {/* 数字と単位は分離させない。空白が折り返し候補になり「枚。」が孤立する */}
+                  いま <span className="whitespace-nowrap"><b>{totalPosts}</b> 枚</span>の写真が集まっています。
                   {unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</>
+                    <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
                   )}
                 </>
               ) : (
