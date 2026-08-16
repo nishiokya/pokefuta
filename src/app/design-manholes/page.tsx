@@ -5,6 +5,7 @@ import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
+import { PhraseText } from '@/components/PhraseText';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { DesignManhole } from '@/types/database';
 
@@ -108,7 +109,7 @@ export default async function DesignManholesPage() {
           <div>
             <h1 className="text-lg font-bold sm:text-xl">みんなのデザインマンホール</h1>
             <p className="mt-1 text-sm text-[#2A2A2A]/70">
-              ポケふた以外の、オンリーワンなデザインマンホールのコレクション
+              <PhraseText text="ポケふた以外の、オンリーワンなデザインマンホールのコレクション" />
             </p>
             {/*
               枚数は下に並べている配列そのものの長さを使う。別途数え直すと

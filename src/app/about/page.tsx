@@ -19,6 +19,7 @@ import {
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
+import { PhraseText } from '@/components/PhraseText';
 
 const journeySteps = [
   {
@@ -149,7 +150,9 @@ export default function AboutPage() {
                     <div>
                       <p className="text-xs font-extrabold text-[#B5483C]">STEP {index + 1}</p>
                       <h2 className="mt-0.5 text-sm font-extrabold text-[#4F3828]">{step.title}</h2>
-                      <p className="mt-1 text-xs font-medium leading-relaxed text-[#6A4D36]">{step.description}</p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-[#6A4D36]">
+                        <PhraseText text={step.description} />
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -165,7 +168,9 @@ export default function AboutPage() {
                 {feature.icon}
               </div>
               <h2 className="text-sm font-extrabold text-[#4F3828]">{feature.title}</h2>
-              <p className="mt-2 text-xs font-medium leading-relaxed text-[#6A4D36]">{feature.description}</p>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-[#6A4D36]">
+                <PhraseText text={feature.description} />
+              </p>
             </div>
           ))}
         </section>
@@ -179,7 +184,7 @@ export default function AboutPage() {
             <div className="space-y-2">
               {privacyItems.map((item) => (
                 <p key={item} className="rounded-[8px] border border-[#8C6A4A]/10 bg-white/65 p-3 text-xs font-medium leading-relaxed text-[#6A4D36]">
-                  {item}
+                  <PhraseText text={item} />
                 </p>
               ))}
             </div>
@@ -193,7 +198,7 @@ export default function AboutPage() {
             <div className="space-y-2">
               {disclaimerItems.map((item) => (
                 <p key={item} className="rounded-[8px] border border-[#8C6A4A]/10 bg-white/65 p-3 text-xs font-medium leading-relaxed text-[#6A4D36]">
-                  {item}
+                  <PhraseText text={item} />
                 </p>
               ))}
             </div>
@@ -208,7 +213,7 @@ export default function AboutPage() {
                 <h2 className="text-lg font-extrabold text-[#4F3828]">フィードバック</h2>
               </div>
               <p className="max-w-2xl text-sm font-medium leading-relaxed text-[#6A4D36]">
-                バグ報告、機能要望、掲載情報の気づきがあればお知らせください。サービスの更新情報はXでも発信しています。
+                <PhraseText text="バグ報告、機能要望、掲載情報の気づきがあればお知らせください。サービスの更新情報はXでも発信しています。" />
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
