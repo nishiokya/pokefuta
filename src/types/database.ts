@@ -748,6 +748,18 @@ export interface Database {
           total_users: number;
         }[];
       };
+      // トップページの件数用。get_site_stats() と違い manholes_with_photos を返す。
+      // /api/site-stats がこちらを呼ぶ（get_site_stats は現在アプリから未使用）。
+      get_site_counts: {
+        Args: Record<string, never>;
+        Returns: {
+          manholes: number;
+          posts: number;
+          public_posts: number;
+          manholes_with_photos: number;
+          users: number;
+        }[];
+      };
       get_public_display_names: {
         Args: {
           p_auth_uids: string[];

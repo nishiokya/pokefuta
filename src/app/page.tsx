@@ -40,6 +40,26 @@ type FeedVisit = {
   display_name?: string | null;
 };
 
+/**
+ * 「新着投稿」バッジの対象。
+ *
+ * 投稿日ではなく撮影日で判定する。写真は旅から帰ってからまとめて上げられるので、
+ * 投稿日で見ると中央値29日・平均177日前に撮られたものが「新着」を名乗ってしまう。
+ * バッジが付くのはグリッド内の該当分だけで、フィードの並びと件数には影響しない。
+ */
+const FRESHLY_SHOT_DAYS = 3;
+
+function isFreshlyShot(shotAt: string | null | undefined): boolean {
+  if (!shotAt) return false;
+  const shot = new Date(shotAt).getTime();
+  if (Number.isNaN(shot)) return false;
+  // 端末時計のズレで直前の撮影が弾かれないよう未来側も見るが、同じ幅で打ち切る。
+  // 片側を開けたままにすると、カメラの日付設定を誤った1枚に「新着投稿」が
+  // 未来永劫つき続ける。
+  const distance = Math.abs(Date.now() - shot);
+  return distance < FRESHLY_SHOT_DAYS * 24 * 60 * 60 * 1000;
+}
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<FeedVisit[]>([]);
@@ -237,39 +257,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 写真がまだないポケふた */}
-        {!rareLoading && rareManholes.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-lg font-extrabold">
-                <Stamp className="h-5 w-5 text-[#7B63A8]" />
-                写真がまだないポケふた
-              </h2>
-              <span className="text-sm font-bold text-[#B5483C]">募集中</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {rareManholes.map((manhole) => {
-                const label = manhole.building
-                  ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
-                  : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
-                return (
-                  <Link
-                    key={manhole.id}
-                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/login'}
-                    className="flex items-center gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-3 py-2.5 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40 hover:bg-white"
-                  >
-                    <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
-                    <span className="line-clamp-2 text-xs leading-snug">{label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-center text-xs font-medium text-[#6B6B6B]">
-              {isLoggedIn ? '写真を投稿して図鑑を埋めよう' : 'ログインして写真を投稿できます'}
-            </p>
-          </section>
-        )}
-
         <section className="mt-6 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
@@ -313,15 +300,11 @@ export default function HomePage() {
         {!loading && (
           <>
             <section className="mt-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-extrabold">
-                  <TrendingUp className="h-5 w-5 text-[#7B63A8]" />
-                  最新の投稿
-                </h2>
-                {totalPosts && (
-                  <p className="text-sm font-bold text-[#6B6B6B]">{totalPosts}枚以上の写真</p>
-                )}
-              </div>
+              {/* 総枚数はヒーローに出しているので、ここでは繰り返さない */}
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
+                <TrendingUp className="h-5 w-5 text-[#7B63A8]" />
+                最新の投稿
+              </h2>
 
               {sortedFeed.length === 0 ? (
                 <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
@@ -340,7 +323,11 @@ export default function HomePage() {
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
+                    const isFresh = isFreshlyShot(visit.shot_at);
+                    // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
+                    // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
+                      isFresh ? '新着投稿' : null,
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
@@ -362,7 +349,7 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {currentPage === 1 && index < 3 && (
+                        {isFresh && (
                           <span className="absolute left-2 top-2 rounded-[6px] bg-[#7B63A8] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
                             新着投稿
                           </span>
@@ -477,6 +464,39 @@ export default function HomePage() {
               </section>
             )}
           </>
+        )}
+
+        {/* 写真がまだないポケふた（募集枠なので、最新の投稿を見終わった一番下に置く） */}
+        {!rareLoading && rareManholes.length > 0 && (
+          <section className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-lg font-extrabold">
+                <Stamp className="h-5 w-5 text-[#7B63A8]" />
+                写真がまだないポケふた
+              </h2>
+              <span className="text-sm font-bold text-[#B5483C]">募集中</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {rareManholes.map((manhole) => {
+                const label = manhole.building
+                  ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
+                  : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
+                return (
+                  <Link
+                    key={manhole.id}
+                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/login'}
+                    className="flex items-center gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-3 py-2.5 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40 hover:bg-white"
+                  >
+                    <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
+                    <span className="line-clamp-2 text-xs leading-snug">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-center text-xs font-medium text-[#6B6B6B]">
+              {isLoggedIn ? '写真を投稿して図鑑を埋めよう' : 'ログインして写真を投稿できます'}
+            </p>
+          </section>
         )}
       </main>
       </PCShell>
