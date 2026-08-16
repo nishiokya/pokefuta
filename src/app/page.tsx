@@ -68,6 +68,8 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
   const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
+  const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -135,6 +137,7 @@ export default function HomePage() {
       setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
+      setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
     }
@@ -208,13 +211,13 @@ export default function HomePage() {
         <span className="font-bold text-sm text-[#7d4536]">写真ゼロを埋めよう</span>
         <span className="ml-auto">
           <span className="font-mono text-lg font-bold text-[#B5483C]">{unmetPhotoCount ?? '–'}</span>
-          <span className="text-xs text-[#6B6B6B]"> 件 募集中</span>
+          <span className="text-xs text-[#6B6B6B]"> 枚 募集中</span>
         </span>
       </div>
       <div className="flex flex-col gap-3 p-4">
         <p className="text-sm text-[#4A4A4A] leading-relaxed">
           まだ写真の無いポケふたは残り{' '}
-          <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 件。あなたの1枚目が、この場所の最初の記録になります。
+          <b className="text-[#B5483C]">{unmetPhotoCount ?? '–'}</b> 枚。あなたの1枚目が、この場所の最初の記録になります。
         </p>
         <Link
           href="/login"
@@ -257,11 +260,20 @@ export default function HomePage() {
               <span className="inline-block">写真で埋めよう</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed sm:text-lg">
+              {/*
+                蓋を数える単位は「枚」で揃える（CLAUDE.md の用語規約。以前ここだけ
+                「件」になっていた）。本文なので概念名の「デザインマンホール」を使い、
+                ナビ用ラベルの「デザインふた」は使わない。
+              */}
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  いま <b>{totalPosts}</b> 枚の写真が集まっています。
+                  ポケふたの写真が <b>{totalPosts}</b> 枚
+                  {designManholes != null && designManholes > 0 && (
+                    <>、デザインマンホールが <b>{designManholes}</b> 枚</>
+                  )}
+                  集まっています。
                   {unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 件。</>
+                    <>写真がまだ無いポケふたは残り <b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</>
                   )}
                 </>
               ) : (

@@ -758,6 +758,8 @@ export interface Database {
           public_posts: number;
           manholes_with_photos: number;
           users: number;
+          /** status='published' のみ。一覧で見える枚数と一致させる */
+          design_manholes: number;
         }[];
       };
       get_public_display_names: {

@@ -36,6 +36,8 @@ type LiveCounts = {
   public_posts: number | null;
   manholes_with_photos: number | null;
   users: number | null;
+  /** status='published' のみ。デザインマンホール一覧で見える枚数と一致する */
+  design_manholes: number | null;
 };
 
 /**
@@ -79,6 +81,7 @@ async function fetchLiveCounts(): Promise<LiveCounts | null> {
       public_posts: num(row.public_posts),
       manholes_with_photos: num(row.manholes_with_photos),
       users: num(row.users),
+      design_manholes: num(row.design_manholes),
     };
   } catch (error) {
     console.error('get_site_counts threw:', error);
@@ -110,6 +113,7 @@ function emptyStats(): Record<string, unknown> {
     manhole_comments: null,
     public_posts: null,
     private_posts: null,
+    design_manholes: null,
     generated_at: null,
     source: null,
   };
