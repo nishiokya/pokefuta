@@ -200,9 +200,17 @@ export default function HomePage() {
   ) : undefined;
 
   return (
-    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
+    // pb-nav-safe はここには要らない。固定下タブを避ける責任は、この後ろに描かれる
+    // SpUtilityFooter 自身が持っている（SiteChrome のコメント参照）。ページ側に付けると
+    // フッターより手前なので下タブは避けられず、本文とフッターの間の空白になるだけ。
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] text-[#2A2A2A]">
 
-      <PCShell rail={pcGuestRail} className="pb-32 pt-5 lg:pt-6">
+      {/*
+        pb-32(112px) は下タブと投稿FABを避けるための余白だったが、下タブ回避は
+        フッターが担っているので本文には要らない。ここはフッターとの間隔として
+        必要な分だけ残す。
+      */}
+      <PCShell rail={pcGuestRail} className="pb-10 pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -508,8 +516,15 @@ export default function HomePage() {
                 );
               })}
             </div>
+            {/*
+              「募集中」だけだと、このタイルを押すと何が起きるかが書かれていない。
+              押した先は投稿画面（未ログインならログイン）なので、そこを説明する。
+              以前の「写真を投稿して図鑑を埋めよう」は掛け声で、操作の説明になっていなかった。
+            */}
             <p className="mt-3 text-center text-xs font-medium text-[#6B6B6B]">
-              {isLoggedIn ? '写真を投稿して図鑑を埋めよう' : 'ログインして写真を投稿できます'}
+              {isLoggedIn
+                ? 'タップすると、その場所の投稿画面へ進みます'
+                : 'ログインすると、ここから写真を投稿できます'}
             </p>
           </section>
         )}
