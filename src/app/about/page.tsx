@@ -215,6 +215,9 @@ export default function AboutPage() {
               <p className="max-w-2xl text-sm font-medium leading-relaxed text-[#6A4D36]">
                 <PhraseText text="バグ報告、機能要望、掲載情報の気づきがあればお知らせください。サービスの更新情報はXでも発信しています。" />
               </p>
+              <p className="mt-2 max-w-2xl text-xs font-medium leading-relaxed text-[#B5483C]">
+                個人情報の確認・訂正・削除に関するご連絡は、GitHub Issuesに書き込まず、Xのダイレクトメッセージ（非公開）をご利用ください。
+              </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <a
@@ -233,7 +236,7 @@ export default function AboutPage() {
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-[#2A2A2A] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:opacity-85"
               >
                 <Twitter className="h-4 w-4" />
-                @pokemonmanhole
+                @pokemonmanhole（DM）
               </a>
             </div>
           </div>
@@ -254,6 +257,14 @@ export default function AboutPage() {
 
         <section className="mt-6 rounded-[8px] border border-[#8C6A4A]/10 bg-white/55 px-4 py-3 text-center">
           <p className="text-xs font-medium text-[#6A4D36]">Version 1.0.0</p>
+          <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+            <Link href="/terms" className="text-xs font-bold text-[#7B63A8] underline underline-offset-2">
+              利用規約
+            </Link>
+            <Link href="/privacy" className="text-xs font-bold text-[#7B63A8] underline underline-offset-2">
+              プライバシーポリシー
+            </Link>
+          </div>
         </section>
       </main>
 

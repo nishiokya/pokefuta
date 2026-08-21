@@ -37,7 +37,7 @@ export default function PrivacyPage() {
             <li>投稿された写真、キャプション、コメント、訪問記録等</li>
             <li>写真に記録された位置情報、撮影日時、カメラの機種等のEXIF情報</li>
             <li>端末からの位置情報（利用者が許可した場合）</li>
-            <li>アクセス日時、参照元、利用環境、操作・エラー等の利用情報</li>
+            <li>Cookie、端末・ブラウザの識別子、アクセス日時、参照元、利用環境、操作・エラー等の利用情報</li>
           </ul>
         </Section>
 
@@ -55,7 +55,8 @@ export default function PrivacyPage() {
 
         <Section title="3. 公開される情報">
           <p>
-            投稿写真、表示名、キャプション、コメント、訪問日、訪問したマンホール等は、本サービス上で公開される場合があります。
+            投稿写真、表示名、キャプション、コメント、訪問日、訪問したマンホール等は、
+            本サービス上または運営者のSNS・ブログ等で公開される場合があります。
             メールアドレスと写真のEXIF情報は、公開プロフィールとしては表示しません。
           </p>
         </Section>
@@ -65,6 +66,10 @@ export default function PrivacyPage() {
             本サービスは、認証・データ保存、画像保存、ホスティング、利用状況の分析のために、
             Supabase、Cloudflare、Amazon Web Services、Google Analytics等の外部サービスを利用することがあります。
             各サービスでは、それぞれのプライバシーポリシーに基づいて情報が取り扱われます。
+          </p>
+          <p>
+            Google AnalyticsはCookie等を使用して利用情報を収集する場合があります。
+            利用者は、ブラウザの設定でCookieを無効にすることにより収集を制限できます。
           </p>
         </Section>
 
@@ -79,10 +84,15 @@ export default function PrivacyPage() {
           <p>
             情報の漏えい、滅失、改ざん、不正アクセス等を防ぐため、合理的な安全管理措置を講じます。
             自分の投稿は本サービスの削除機能から削除できます。その他の情報に関する確認・訂正・削除の依頼は、
-            <Link href="/about#contact" className="font-bold text-[#bf5640] underline decoration-[#e9dfc7] underline-offset-2">
-              本サービスの連絡窓口
-            </Link>
-            からお知らせください。
+            <a
+              href="https://x.com/pokemonmanhole"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-[#bf5640] underline decoration-[#e9dfc7] underline-offset-2"
+            >
+              @pokemonmanholeのダイレクトメッセージ（非公開）
+            </a>
+            からお知らせください。GitHub Issues等の公開ページに個人情報を書き込まないでください。
           </p>
         </Section>
 
