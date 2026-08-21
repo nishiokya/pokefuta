@@ -60,6 +60,30 @@ function readLedger(name) {
   return values.map((value) => value.slice(1, -1));
 }
 
+/** `Record<A, B>` 形式の対応表から key と value を取り出す。 */
+function readRecord(name) {
+  const block = analytics.match(new RegExp(`${name}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+  if (!block) {
+    console.error(`- ${name} を src/lib/analytics/gtag.ts から読み取れませんでした`);
+    process.exit(1);
+  }
+  return Object.fromEntries(
+    [...block[1].matchAll(/^\s*(\w+):\s*'([\w]+)'/gm)].map((match) => [match[1], match[2]])
+  );
+}
+
+/** `Record<SubmissionKind, readonly ...[]>` から系統ごとの配列を取り出す。 */
+function readKindLedger(name, kind) {
+  const block = analytics.match(
+    new RegExp(`${name}[^=]*=\\s*\\{[\\s\\S]*?${kind}:\\s*\\[([\\s\\S]*?)\\]`)
+  );
+  if (!block) {
+    console.error(`- ${name} の ${kind} を読み取れませんでした`);
+    process.exit(1);
+  }
+  return (block[1].match(/'([^']+)'/g) || []).map((value) => value.slice(1, -1));
+}
+
 function sourceFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(directory, entry.name);
@@ -170,19 +194,108 @@ for (const { file, kind } of SUBMISSION_FLOWS) {
   // 障害の件数が水増しされたうえ、もう片方の block_reason が永久にゼロになって
   // 2系統を並べて比較できなくなる。
   expect(
-    text.includes("blocked('unsupported_format')"),
-    `${file} が圧縮失敗を blocked('unsupported_format') として扱っていない`
+    text.includes("blocked('unsupported_format', 'presend')"),
+    `${file} が圧縮失敗を blocked('unsupported_format', 'presend') として扱っていない`
   );
 }
 
-// 4. block_reason の全値が、どこかで実際に送られている（定義だけの値を作らせない）
+// 4. ブロックの2軸が直交していること。
+//    理由（なぜ止まったか）と位置（いつ止まったか）は独立なので、必ず両方送る。
+//    位置が無いと「送信前に止まった人」と「送信したのに差し戻された人」が同じ数に混ざり、
+//    p_photo_upload_start = complete + failed + blocked{postsend} が閉じなくなる。
 const callerCode = analyticsCallers.map(({ text }) => stripComments(text)).join('\n');
+const blockPhases = readLedger('SUBMISSION_BLOCK_PHASES');
+const blockClasses = readLedger('SUBMISSION_BLOCK_CLASSES');
+const blockClassByReason = readRecord('SUBMISSION_BLOCK_CLASS_BY_REASON');
+
+// 4a. 分類表が理由を過不足なく覆う（片方向だけだと、消した理由が表に残る）
 for (const reason of blockReasons) {
   expect(
-    callerCode.includes(`blocked('${reason}')`),
-    `block_reason '${reason}' は定義されているが、どこからも送られていない`
+    Object.prototype.hasOwnProperty.call(blockClassByReason, reason),
+    `block_reason '${reason}' が SUBMISSION_BLOCK_CLASS_BY_REASON に無い（block_class が空になる）`
   );
 }
+for (const [reason, blockClass] of Object.entries(blockClassByReason)) {
+  expect(blockReasons.includes(reason), `SUBMISSION_BLOCK_CLASS_BY_REASON の '${reason}' は台帳に無い理由`);
+  expect(
+    blockClasses.includes(blockClass),
+    `block_reason '${reason}' の block_class '${blockClass}' が SUBMISSION_BLOCK_CLASSES に無い`
+  );
+}
+
+// 4b. 呼び出しは必ず (理由, 位置) の2引数。位置は台帳の値だけ
+for (const { file, text } of analyticsCallers) {
+  const relativePath = path.relative(root, file);
+  const code = stripComments(text);
+  for (const call of code.match(/funnel\.blocked\([^)]*\)/g) || []) {
+    const phase = call.match(/,\s*'([\w]+)'\s*\)/);
+    expect(phase !== null, `${relativePath} の ${call} に block_phase が無い`);
+    if (phase) {
+      expect(
+        blockPhases.includes(phase[1]),
+        `${relativePath} の block_phase '${phase[1]}' が SUBMISSION_BLOCK_PHASES に無い`
+      );
+    }
+  }
+}
+
+// 4c. 系統ごとに「起きうる理由」を宣言し、実装と突き合わせる。
+//     ゼロ件を見たときに「起きていない」のか「送っていない」のか判るようにする。
+const declaredReasons = new Set();
+for (const { file, kind } of SUBMISSION_FLOWS) {
+  const code = flowCode.get(file);
+  const expectedReasons = readKindLedger('SUBMISSION_BLOCK_REASONS_BY_KIND', kind);
+  expect(expectedReasons.length > 0, `SUBMISSION_BLOCK_REASONS_BY_KIND.${kind} が空`);
+
+  for (const reason of expectedReasons) {
+    declaredReasons.add(reason);
+    expect(
+      code.includes(`blocked('${reason}',`),
+      `${file} が blocked('${reason}', ...) を送っていない（${kind} で起きうると宣言されている）`
+    );
+  }
+  // 宣言していない理由を送らない（系統をまたいだ理由の混入を止める）
+  for (const call of code.match(/funnel\.blocked\('([\w]+)'/g) || []) {
+    const reason = call.match(/'([\w]+)'/)[1];
+    expect(
+      expectedReasons.includes(reason),
+      `${file} が ${kind} では起きないはずの block_reason '${reason}' を送っている`
+    );
+  }
+}
+// 定義だけの理由を作らせない
+for (const reason of blockReasons) {
+  expect(
+    declaredReasons.has(reason),
+    `block_reason '${reason}' はどちらの系統でも起きないことになっている（定義だけの値）`
+  );
+}
+
+// 4d. 送信・完了・失敗に attempt_no を載せる。
+//     再送を数え落とすと、失敗率が「人」ではなく「試行」で膨らむ。
+for (const { file } of SUBMISSION_FLOWS) {
+  const code = flowCode.get(file);
+  const attempts = (code.match(/attempt_no:\s*funnel\.attemptNo\(\)/g) || []).length;
+  expect(
+    attempts >= 3,
+    `${file} が attempt_no を送信・完了・失敗の3つに載せていない（${attempts}件）`
+  );
+}
+
+// 4e. 失敗の分類は両系統で同じ関数を使う。
+//     片方だけが独自分類を持っていると、error_type を横並びで読めない。
+for (const { file } of SUBMISSION_FLOWS) {
+  expect(
+    flowCode.get(file).includes('classifyClientSubmissionError('),
+    `${file} が classifyClientSubmissionError を使っていない（error_type が系統で揃わない）`
+  );
+}
+
+// 4f. 同じ失敗を p_app_error と p_submission_failed に二重計上しない
+expect(
+  !callerCode.includes("trackAppError('upload_error'"),
+  '投稿の失敗を p_app_error にも送っている（p_submission_failed と二重に数える）'
+);
 
 // 4b. Pokémon GO フレンド募集も、台帳の各イベントに送信ヘルパーと呼び出し元がある。
 //     設定率・コピー率は分母（画面到達・カード表示）が無いと読めないので、

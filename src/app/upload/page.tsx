@@ -11,6 +11,7 @@ import { Manhole } from '@/types/database';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
 import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
@@ -67,7 +68,7 @@ function UploadPageInner() {
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
-  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -223,11 +224,11 @@ function UploadPageInner() {
       // 画面上は静かなので、ここで数えないと存在に気づけない。
       console.error('Failed to load manholes: unexpected response', response.status);
       manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable');
+      funnel.blocked('manholes_unavailable', 'entry');
     } catch (error) {
       console.error('Failed to load manholes:', error);
       manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable');
+      funnel.blocked('manholes_unavailable', 'entry');
     }
   };
 
@@ -274,7 +275,7 @@ function UploadPageInner() {
     // 2回呼ばれうるので、その中でイベントを送ると二重に数える。
     const reevaluated = photos.map(reevaluate);
     setPhotos(reevaluated);
-    blockReasons.forEach(reason => funnel.blocked(reason));
+    blockReasons.forEach(reason => funnel.blocked(reason, 'photo'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manholes]);
 
@@ -403,7 +404,7 @@ function UploadPageInner() {
     if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
       distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
       photoStatus = 'invalid_gps';
-      funnel.blocked('invalid_gps');
+      funnel.blocked('invalid_gps', 'photo');
     } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
       // isValidCoordinates が true の場合、lat/lng は有効な数値
       matchedManhole = findNearestManhole(
@@ -415,7 +416,7 @@ function UploadPageInner() {
       } else {
         distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
         photoStatus = 'no_nearby_manhole';
-        funnel.blocked('no_nearby_manhole');
+        funnel.blocked('no_nearby_manhole', 'photo');
       }
     } else {
       distanceError = 'マンホール情報をロード中です。少々お待ちください。';
@@ -424,7 +425,7 @@ function UploadPageInner() {
       // photoSelected が直前に block_reason を消しているので、記録し直さないと
       // 「理由なしで止まっている人」に見える。
       if (manholesLoadFailedRef.current) {
-        funnel.blocked('manholes_unavailable');
+        funnel.blocked('manholes_unavailable', 'photo');
       }
     }
 
@@ -499,7 +500,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('invalid_gps');
+      funnel.blocked('invalid_gps', 'presend');
       return;
     }
 
@@ -513,7 +514,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('no_nearby_manhole');
+      funnel.blocked('no_nearby_manhole', 'presend');
       return;
     }
 
@@ -530,7 +531,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('manhole_location_missing');
+      funnel.blocked('manhole_location_missing', 'presend');
       return;
     }
 
@@ -551,7 +552,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('too_far');
+      funnel.blocked('too_far', 'presend');
       return;
     }
 
@@ -584,7 +585,7 @@ function UploadPageInner() {
         // ここを失敗に混ぜると運用上の失敗件数が水増しされ、
         // block_reason:'unsupported_format' がキャラふた側で永久にゼロになる。
         blockedBeforeSubmit = true;
-        funnel.blocked('unsupported_format');
+        funnel.blocked('unsupported_format', 'presend');
         throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください', {
           cause: compressionError,
         });
@@ -595,6 +596,7 @@ function UploadPageInner() {
         submission_kind: 'character',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: funnel.attemptNo(),
       });
 
       // Prepare form data for upload
@@ -656,6 +658,7 @@ function UploadPageInner() {
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: funnel.attemptNo(),
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
         has_note: !!visitNote.trim(),
@@ -682,16 +685,11 @@ function UploadPageInner() {
     } catch (error: any) {
       console.error('Upload failed:', error);
 
-      // API が code を返さなかったとき（ネットワーク断など）のための推測分類。
+      // API が code を返さなかったとき（ネットワーク断など）のための分類。
       // サーバーが答えた場合は responseCode の方が正確なので、そちらを error_code に使う。
-      const errorType = (() => {
-        if (error?.status === 401 || error?.message?.includes('Unauthorized')) return 'unauthorized';
-        if (error?.name === 'TypeError' || error?.message?.includes('network')) return 'network';
-        if (error?.message?.includes('size') || error?.message?.includes('large')) return 'file_size';
-        if (error?.message?.includes('GPS') || error?.message?.includes('location')) return 'gps_validation';
-        return 'unknown';
-      })();
-      trackAppError('upload_error', errorType);
+      // ここで p_app_error を別に送らない — 同じ失敗が p_submission_failed と
+      // 二重に数えられ、障害の規模が2倍に見えていた（デザインふた側は送っていない）。
+      const errorType = classifyClientSubmissionError(error, responseStatus);
 
       // 圧縮できずに止まった場合は既に blocked として数えている。
       // ここで失敗にも数えると二重になり、障害の件数が水増しされる。
@@ -704,6 +702,7 @@ function UploadPageInner() {
           error_code: responseCode,
           error_type: errorType,
           photo_source: submittedPhotoSource,
+          attempt_no: funnel.attemptNo(),
         });
       }
 

@@ -3,6 +3,8 @@
  * 型安全なGA追跡とSSR対応
  */
 
+import type { SubmissionErrorType } from './submission-error';
+
 // ==========================================
 // 型定義
 // ==========================================
@@ -52,6 +54,70 @@ export const SUBMISSION_BLOCK_REASONS = [
 
 export type SubmissionBlockReason = (typeof SUBMISSION_BLOCK_REASONS)[number];
 
+/**
+ * ブロックが**いつ**起きたか。理由（block_reason）と直交する軸で、
+ * これが無いと「送信前に止まった人」と「送信したのに差し戻された人」が同じ数に混ざる。
+ *
+ * postsend は送信済みの試行の終端でもある。この軸があって初めて
+ * `p_photo_upload_start = complete + failed + blocked{postsend}` が成り立つ。
+ */
+export const SUBMISSION_BLOCK_PHASES = [
+  'entry',    // 画面に着いた時点で既に進めない（停止中、蓋の一覧が取れない）
+  'photo',    // 写真を選んだ直後の判定で止まった
+  'presend',  // 送信ボタンを押した後、送信前の再チェック・圧縮で止まった
+  'postsend', // 送信したがサーバーが差し戻した（障害ではない 4xx/5xx）
+] as const;
+
+export type SubmissionBlockPhase = (typeof SUBMISSION_BLOCK_PHASES)[number];
+
+/**
+ * ブロックの性質。**打ち手の持ち主で分ける**（理由の粒度では誰が直すのか判らない）。
+ * 理由を足したら下の対応表がコンパイルエラーになるので、分類漏れは起きない。
+ */
+export const SUBMISSION_BLOCK_CLASSES = [
+  'photo',     // 利用者の写真そのものの問題。打ち手はUIの事前説明
+  'proximity', // 位置関係の問題。打ち手は判定の閾値と蓋データ
+  'catalog',   // 蓋データの欠損。打ち手はデータ補修
+  'system',    // こちら側の障害。打ち手は修正
+  'policy',    // 運用judgment で止めている。打ち手は運用
+] as const;
+
+export type SubmissionBlockClass = (typeof SUBMISSION_BLOCK_CLASSES)[number];
+
+export const SUBMISSION_BLOCK_CLASS_BY_REASON: Record<SubmissionBlockReason, SubmissionBlockClass> = {
+  invalid_gps: 'photo',
+  unsupported_format: 'photo',
+  no_nearby_manhole: 'proximity',
+  too_far: 'proximity',
+  official_manhole_nearby: 'proximity',
+  manhole_location_missing: 'catalog',
+  manholes_unavailable: 'system',
+  suspended: 'policy',
+};
+
+/**
+ * 系統ごとに**起こりうる**理由。片方でしか起きない理由をゼロ件で眺めても
+ * 「起きていない」のか「送っていない」のか判らないので、期待値を先に書く。
+ * `tools/check-ga4-contract.js` が実装側の呼び出しと突き合わせる。
+ */
+export const SUBMISSION_BLOCK_REASONS_BY_KIND: Record<SubmissionKind, readonly SubmissionBlockReason[]> = {
+  character: [
+    'invalid_gps',
+    'no_nearby_manhole',
+    'too_far',
+    'manhole_location_missing',
+    'manholes_unavailable',
+    'unsupported_format',
+  ],
+  design: [
+    'invalid_gps',
+    'manholes_unavailable',
+    'official_manhole_nearby',
+    'unsupported_format',
+    'suspended',
+  ],
+};
+
 /** 失敗がどの段階で起きたか。原因の切り分けに使う。 */
 export type SubmissionStage = 'compress' | 'upload' | 'persist';
 
@@ -71,6 +137,11 @@ export type SubmissionStep = 'start' | 'photo_selected' | 'blocked' | 'submittin
 export interface SubmissionEventParams extends PokefutaEventParams {
   submission_kind: SubmissionKind;
   photo_source?: PhotoSource;
+  /**
+   * この到達の中で何回目の送信か。`submitting()` ごとに増える（送信前は 0）。
+   * 再送は同じ人の同じ投稿なので、これが無いと失敗率が試行の数だけ水増しされる。
+   */
+  attempt_no?: number;
 }
 
 export interface SubmissionEntryParams extends SubmissionEventParams {
@@ -92,15 +163,32 @@ export interface SubmissionAbandonedParams extends SubmissionEventParams {
   last_step: SubmissionStep;
   dwell_ms: number;
   block_reason?: SubmissionBlockReason;
+  block_phase?: SubmissionBlockPhase;
 }
 
 export interface SubmissionBlockedParams extends SubmissionEventParams {
   block_reason: SubmissionBlockReason;
+  /** いつ止まったか。理由と直交する軸なので、理由と必ずセットで送る。 */
+  block_phase: SubmissionBlockPhase;
+  /**
+   * 打ち手の持ち主。`block_reason` から機械的に決まるので呼び出し側では指定しない
+   * （helper が `SUBMISSION_BLOCK_CLASS_BY_REASON` から付ける）。
+   */
+  block_class?: SubmissionBlockClass;
+  /**
+   * この写真で同じ（理由 × 位置）を既に送っているか。
+   * 「何人が詰まったか」は `is_repeat:false` だけを数える。再送のたびに
+   * 増える件数をそのまま人数として読むと、詰まりの深刻さを取り違える。
+   */
+  is_repeat?: boolean;
 }
 
 export interface SubmissionCompleteParams extends SubmissionEventParams {
+  /** デザインふた固有。掲載されたか確認待ちか（キャラふたに審査は無い）。 */
   review_status?: string;
   upload_duration_ms?: number;
+  /** 任意入力（ひとこと・説明）を書いたか。両系統で同じ意味にする。 */
+  has_note?: boolean;
 }
 
 export interface SubmissionFailedParams extends SubmissionEventParams {
@@ -108,6 +196,11 @@ export interface SubmissionFailedParams extends SubmissionEventParams {
   status_code?: number;
   /** API が返す機械可読なコード。`src/lib/api-error-code.ts` を参照。 */
   error_code?: string;
+  /**
+   * サーバーが code を返せなかったとき用のクライアント側の分類。
+   * `src/lib/analytics/submission-error.ts` で両系統とも同じ規則を使う。
+   */
+  error_type?: SubmissionErrorType;
 }
 
 /**
@@ -431,7 +524,11 @@ export const pokefutaEvents = {
   submissionEntry:         (p: SubmissionEntryParams)         => trackEvent('p_submission_entry', p),
   submissionStart:         (p: SubmissionEventParams)         => trackEvent('p_submission_start', p),
   submissionPhotoSelected: (p: SubmissionPhotoSelectedParams) => trackEvent('p_submission_photo_selected', p),
-  submissionBlocked:       (p: SubmissionBlockedParams)       => trackEvent('p_submission_blocked', p),
+  submissionBlocked:       (p: SubmissionBlockedParams)       =>
+    trackEvent('p_submission_blocked', {
+      block_class: SUBMISSION_BLOCK_CLASS_BY_REASON[p.block_reason],
+      ...p,
+    }),
   /** 送信（fetch 直前）。submission_kind は必須 — 付け忘れは型で落ちる。 */
   photoUploadStart:        (p: SubmissionEventParams)         => trackEvent('p_photo_upload_start', p),
   /** 完了。写真館の主要コンバージョンで、GA4 のキーイベントはこれだけにする。 */

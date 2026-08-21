@@ -17,8 +17,8 @@
 **投稿が全部落ちていることに気づく唯一の手段**なので、片方のフローだけ計測する状態を作らない。
 
 イベント名の台帳は `SUBMISSION_FUNNEL_EVENTS`（`src/lib/analytics/gtag.ts`）。
-`tools/check-ga4-contract.js` が台帳・両フローの網羅・`block_reason` 全値の使用を検査する
-（`npm run type-check` に同梱）。
+`tools/check-ga4-contract.js` が台帳・両フローの網羅・ブロックの3軸（理由 × 位置 × 分類）・
+系統ごとの理由表・`attempt_no` の付与を検査する（`npm run type-check` に同梱）。
 
 | # | ステップ | イベント |
 |---|---|---|
@@ -38,6 +38,41 @@
   離脱は `pagehide` で1回だけ。`visibilitychange` は使わない（アプリ切替で戻る人まで離脱に数えるため）。
 - `return` するだけの分岐を足したら、`SUBMISSION_BLOCK_REASONS` にも足して `funnel.blocked()` を呼ぶ。
   静かに止まる経路を残さない。
+
+### 数え方の約束（軸を混ぜない）
+
+同じ人・同じ試行を別の軸で二度数えると、ファネルは静かに嘘をつく。次の3つを守る。
+
+1. **到達1回の終端は `p_photo_upload_complete` か `p_submission_abandoned` のどちらか1つ** —
+   完了していれば離脱は送らない。逆に完了しなかった到達は必ず離脱が出る（`pagehide` と
+   アンマウントの両方を見ているため）。`p_submission_failed` は**試行の結果**であって
+   到達の終端ではない — 失敗して再試行し完了した人は complete、失敗したまま去った人は
+   `p_submission_abandoned{last_step:'failed'}` に出る。両方を「終端」として足さない。
+2. **送信した試行は閉じる** —
+   `p_photo_upload_start` = `p_photo_upload_complete` + `p_submission_failed` + `p_submission_blocked{block_phase:'postsend'}`。
+   サーバーが差し戻したもの（409 の近接確認、503 の受付停止）は**障害ではない**ので失敗に混ぜず、
+   代わりに `postsend` のブロックとして数える。この等式が合わないなら、どこかに送りっぱなしの経路がある。
+3. **人数は `is_repeat:false` で数える** — ブロックの件数は再試行のたびに増える。
+   写真を選び直すと数え直す（別の写真で同じ壁に当たったのは、再試行の重複ではない）。
+
+ブロックは**3軸**で持つ。1つの軸に混ぜない。
+
+| 軸 | パラメータ | 値 |
+|---|---|---|
+| なぜ止まったか | `block_reason` | `SUBMISSION_BLOCK_REASONS`（8種） |
+| いつ止まったか | `block_phase` | `entry` / `photo` / `presend` / `postsend` |
+| 誰が直すか | `block_class` | `photo` / `proximity` / `catalog` / `system` / `policy` |
+
+- `block_class` は `SUBMISSION_BLOCK_CLASS_BY_REASON` から**自動で載る**。呼び出し側では指定しない。
+  理由を足すと `Record` の型が落ちるので、分類漏れは起きない。
+- 系統ごとに起きうる理由は `SUBMISSION_BLOCK_REASONS_BY_KIND` に宣言する。
+  ゼロ件を見たときに「起きていない」のか「送っていない」のかを区別するため。
+  宣言と実装のズレは `tools/check-ga4-contract.js` が落とす。
+- 再送は `attempt_no`（`submitting()` ごとに +1、送信前は 0）。送信・完了・失敗に載せる。
+- 失敗の分類は両系統とも `classifyClientSubmissionError`
+  （`src/lib/analytics/submission-error.ts`）を使う。**ステータスがメッセージより優先**。
+- **同じ失敗を2つのイベントで数えない。** 投稿の失敗は `p_submission_failed` だけ。
+  `p_app_error` を併せて送らない（キャラふただけが送っていて、障害の規模が2倍に見えていた）。
 - 写真の入力手段は `photo_source`（`camera` / `library`）。`invalid_gps` の主因を説明できる唯一の軸。
 - **エラーをキーイベントにしない。** `p_submission_failed` / `p_api_error` / `p_app_error` は
   探索とカスタムインサイトで見る（旧 `error_event` / `auth_error` をキーイベント登録して
@@ -52,9 +87,12 @@
 登録前に届いたイベントのパラメータは探索から永久に参照できない。
 
 1. カスタムディメンション（イベントスコープ）を登録:
-   `submission_kind` / `block_reason` / `error_code` / `error_type` / `stage` / `last_step` /
+   `submission_kind` / `block_reason` / `block_phase` / `block_class` / `is_repeat` / `attempt_no` /
+   `error_code` / `error_type` / `stage` / `last_step` /
    `photo_source` / `review_status` / `surface` / `prefecture` / `page_type` / `is_logged_in` /
    `source_app` / `site_type` / `is_open` / `has_note`
+   （`attempt_no` は件数ではなく「何回目か」で分解したいのでディメンション。
+   `is_repeat` は真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
    （`is_open` / `has_note` は `p_go_friend_saved` の設定率・公開率を分けて見るため。
    真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
 2. カスタム指標:
@@ -64,5 +102,6 @@
      `p_app_error{error_code:'manhole_list_truncated' | 'manhole_list_total_invalid'}` に載る
 3. キーイベント: `p_photo_upload_complete`（主要コンバージョン）、`p_signup_complete`
 4. 探索（目標到達プロセス）: ステップ 2 → 3 → 5 → 6a、内訳ディメンション `submission_kind`。
-   離脱理由は `p_submission_blocked` を `block_reason` で分解した経路データ探索を併設する
+   離脱理由は `p_submission_blocked{is_repeat:false}` を `block_phase` × `block_class` で
+   分解した経路データ探索を併設する（`block_reason` はその下の粒度）
 5. カスタムインサイト（異常検知）: `p_photo_upload_complete` の日次件数が急減したらメール通知
