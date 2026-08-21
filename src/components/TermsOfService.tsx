@@ -60,7 +60,9 @@ export default function TermsOfService({ isChecked, onCheckChange, className = '
             <div>
               <h3 className="font-bold text-[#7B63A8] mb-2">🔒 個人情報の取り扱い</h3>
               <p className="leading-relaxed opacity-90">
-                メールアドレス等の個人情報は、サービスの提供目的でのみ使用し、第三者に提供することはありません。
+                メールアドレス等の個人情報は、アカウント管理、投稿内容の確認・修正、
+                不正利用の防止などサービスの運営に必要な目的でのみ使用します。
+                別途同意のない広告・宣伝メールには使用しません。
                 ただし、投稿された写真や訪問記録のデータは公開コンテンツとして扱われます。
               </p>
             </div>

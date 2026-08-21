@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const LAST_UPDATED = '2026年8月12日';
+const LAST_UPDATED = '2026年8月22日';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -93,7 +93,17 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="5. 免責">
+        <Section title="5. 運営者からの連絡">
+          <p>
+            運営者は、アカウントの管理、投稿内容の確認・修正、規約違反または不正利用の調査、
+            その他本サービスの運営上必要なご案内のために、登録されたメールアドレスへ連絡することがあります。
+          </p>
+          <p>
+            登録されたメールアドレスを、別途同意を得ずに広告・宣伝メールの送信に使用することはありません。
+          </p>
+        </Section>
+
+        <Section title="6. 免責">
           <p>
             本サービスは個人が運営しており、内容の正確性・完全性・可用性を保証しません。
             掲載しているポケふたの設置場所・状態は変わることがあります。現地の情報を優先してください。
@@ -104,13 +114,19 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="6. 規約の変更">
+        <Section title="7. 規約の変更">
           <p>
             運営者は本規約を変更することがあります。変更後の規約は本ページに掲載した時点で効力を生じます。
           </p>
         </Section>
 
-        <div className="mt-10">
+        <div className="mt-10 flex flex-wrap gap-x-5 gap-y-2">
+          <Link
+            href="/privacy"
+            className="text-sm font-bold text-[#bf5640] underline decoration-[#e9dfc7] underline-offset-2"
+          >
+            プライバシーポリシー
+          </Link>
           <Link
             href="/about"
             className="text-sm font-bold text-[#bf5640] underline decoration-[#e9dfc7] underline-offset-2"
