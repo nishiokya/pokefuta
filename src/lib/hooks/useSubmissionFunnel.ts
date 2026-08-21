@@ -107,9 +107,17 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
    * 送信に進めず止まったこと。位置（block_phase）は理由と直交する軸なので必ず渡す。
    * `postsend` はサーバーが差し戻した場合だけ — ここを間違えると
    * 「送信した数 = 完了 + 失敗 + postsend の差し戻し」が閉じなくなる。
+   *
+   * `postsend` は応答を待つ間に写真を選び直せてしまうので、**その送信の属性**を
+   * `attribution` で明示的に渡す。ref を読み直すと、いま画面にある別の写真の
+   * `photo_source` が、前の送信のブロックに付く。
    */
   const blocked = useCallback(
-    (block_reason: SubmissionBlockReason, block_phase: SubmissionBlockPhase) => {
+    (
+      block_reason: SubmissionBlockReason,
+      block_phase: SubmissionBlockPhase,
+      attribution?: { photo_source?: PhotoSource; attempt_no?: number }
+    ) => {
       stepRef.current = 'blocked';
       blockReasonRef.current = block_reason;
       blockPhaseRef.current = block_phase;
@@ -123,8 +131,8 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
         block_reason,
         block_phase,
         is_repeat,
-        attempt_no: attemptRef.current,
-        photo_source: selectedPhotoSourceRef.current,
+        attempt_no: attribution?.attempt_no ?? attemptRef.current,
+        photo_source: attribution?.photo_source ?? selectedPhotoSourceRef.current,
       });
     },
     [submission_kind, trackSubmissionBlocked]
@@ -148,7 +156,10 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   /** 以降のイベントに載せる、選ばれた写真の入力手段。 */
   const photoSource = useCallback((): PhotoSource | undefined => selectedPhotoSourceRef.current, []);
 
-  /** この到達で何回目の送信か。送信・完了・失敗の各イベントに載せる。 */
+  /**
+   * この到達で何回目の送信か。**送信の直後に控えて**、完了・失敗にはその値を載せる。
+   * 応答時に読み直すと、先行リクエストの終端に後続試行の番号が付く。
+   */
   const attemptNo = useCallback((): number => attemptRef.current, []);
 
   useEffect(() => {

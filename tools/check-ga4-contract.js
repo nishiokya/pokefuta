@@ -26,16 +26,59 @@ const SUBMISSION_FLOWS = [
 ];
 
 /**
- * コメント行を落とす。落とさないと、実装を消してコメントとして残すだけで
+ * コメントを落とす。落とさないと、実装を消してコメントとして残すだけで
  * 検査が pass してしまう（「呼んでいる」と「書いてある」は別物）。
  *
- * 行頭が `//` `*` `/*` の行だけを除く。ブロックコメントを本文ごと正規表現で
- * 消す方式は使えない — `accept: { 'image/*': ... }` の `/*` を
- * コメント開始と誤認して、後続のコードごと消してしまうため。
- * 完全なパーサではないが、「呼び出しをコメントアウトして残す」という
- * 現実的な逃げ道はこれで塞げる。
+ * 行頭だけを見る方式では `const x = 1; /* funnel.failed() *\/` のような
+ * **行内**のコメントが残り、そこに退行を隠せてしまう。かといって正規表現で
+ * ブロックコメントを消すと `accept: { 'image/*': ... }` の `/*` を
+ * コメント開始と誤認して後続のコードごと消す。
+ * そこで文字列リテラルの内側かどうかを見ながら1文字ずつ走る。
  */
+function stripCommentsStrict(text) {
+  let out = '';
+  let quote = null;      // 文字列リテラルの内側なら引用符
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (lineComment) {
+      if (char === '\n') {
+        lineComment = false;
+        out += char;
+      }
+      continue;
+    }
+    if (blockComment) {
+      // 行数を保つため改行だけ残す
+      if (char === '\n') out += char;
+      else if (char === '*' && next === '/') { blockComment = false; i += 1; }
+      continue;
+    }
+    if (quote) {
+      out += char;
+      if (char === '\\') { out += next ?? ''; i += 1; continue; }
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '/' && next === '/') { lineComment = true; i += 1; continue; }
+    if (char === '/' && next === '*') { blockComment = true; i += 1; continue; }
+    if (char === '"' || char === "'" || char === '`') { quote = char; out += char; continue; }
+    out += char;
+  }
+
+  // 引用符が閉じないまま終わったら、文字列の判定を誤っている（JSX の
+  // アポストロフィや正規表現リテラルなど）。誤って本文を消すより、
+  // 行頭だけを見る従来の方式へ落ちる方が安全。
+  return quote ? null : out;
+}
+
 function stripComments(text) {
+  const strict = stripCommentsStrict(text);
+  if (strict !== null) return strict;
   return text
     .split('\n')
     .filter((line) => {
@@ -227,8 +270,10 @@ for (const [reason, blockClass] of Object.entries(blockClassByReason)) {
 for (const { file, text } of analyticsCallers) {
   const relativePath = path.relative(root, file);
   const code = stripComments(text);
-  for (const call of code.match(/funnel\.blocked\([^)]*\)/g) || []) {
-    const phase = call.match(/,\s*'([\w]+)'\s*\)/);
+  // 第3引数の `submittedAttribution()` を含むので、内側の括弧1段までを許して拾う
+  for (const call of code.match(/funnel\.blocked\((?:[^()]|\([^()]*\))*\)/g) || []) {
+    // 位置は必ず第2引数。第3引数（属性）と取り違えないよう、順番で見る
+    const phase = call.match(/funnel\.blocked\(\s*[^,]+,\s*'([\w]+)'/);
     expect(phase !== null, `${relativePath} の ${call} に block_phase が無い`);
     if (phase) {
       expect(
@@ -271,15 +316,38 @@ for (const reason of blockReasons) {
   );
 }
 
-// 4d. 送信・完了・失敗に attempt_no を載せる。
-//     再送を数え落とすと、失敗率が「人」ではなく「試行」で膨らむ。
+// 4d. 送信・完了・失敗の**それぞれ**に attempt_no が載っていること。
+//     出現回数だけを数えると、3つとも同じイベントに置いても通ってしまう。
+//     値は送信時に控えた定数であること — 応答時に funnel.attemptNo() を読み直すと、
+//     間に別の送信が始まっていた場合に先行リクエストの終端へ後続試行の番号が付く。
 for (const { file } of SUBMISSION_FLOWS) {
   const code = flowCode.get(file);
-  const attempts = (code.match(/attempt_no:\s*funnel\.attemptNo\(\)/g) || []).length;
-  expect(
-    attempts >= 3,
-    `${file} が attempt_no を送信・完了・失敗の3つに載せていない（${attempts}件）`
-  );
+  for (const helper of ['trackPhotoUploadStart', 'trackPhotoUploadComplete', 'trackSubmissionFailed']) {
+    const args = code.match(new RegExp(`${helper}\\(\\{([\\s\\S]*?)\\n\\s*\\}\\)`));
+    expect(args !== null, `${file} の ${helper} の引数を読み取れない`);
+    if (args) {
+      expect(
+        /attempt_no:/.test(args[1]),
+        `${file} の ${helper} に attempt_no が無い（再送を試行として数えられない）`
+      );
+      expect(
+        !/attempt_no:\s*funnel\.attemptNo\(\)/.test(args[1]),
+        `${file} の ${helper} が attempt_no を応答時に読み直している（送信時に控えた値を使うこと）`
+      );
+    }
+  }
+  // 終端は各1回だけ。増やすと同じ到達・同じ試行に終端が2つ出る
+  for (const call of ['funnel.completed()', 'funnel.failed()', 'trackPhotoUploadStart({']) {
+    const count = code.split(call).length - 1;
+    expect(count === 1, `${file} の ${call} が ${count} 箇所ある（終端は試行につき1つ）`);
+  }
+  // postsend のブロックは、その送信の属性を明示して送る（refを読み直さない）
+  for (const call of code.match(/funnel\.blocked\([^;]*?'postsend'[^;]*?\)/g) || []) {
+    expect(
+      /,\s*submittedAttribution\(\)/.test(call),
+      `${file} の ${call.replace(/\s+/g, ' ')} が送信時の属性を渡していない`
+    );
+  }
 }
 
 // 4e. 失敗の分類は両系統で同じ関数を使う。

@@ -264,6 +264,9 @@ export default function DesignManholeNewPage() {
     },
     maxFiles: 1,
     multiple: false,
+    // 送信中の差し替えを禁じる。許すと、応答が返るまでの間に選び直した写真の属性が
+    // 前の送信の postsend ブロックに付く
+    disabled: submitting,
   });
 
   // スマホの背面カメラで直接撮影する（/upload と同じ導線）
@@ -307,6 +310,13 @@ export default function DesignManholeNewPage() {
     let blockedBeforeSubmit = false;
     // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
     const submittedPhotoSource = funnel.photoSource();
+    // 送信の直後に確定する。それまでは「まだ送っていない」を表す 0
+    let submittedAttemptNo = 0;
+    // postsend のブロックに載せる、この送信の属性
+    const submittedAttribution = () => ({
+      photo_source: submittedPhotoSource,
+      attempt_no: submittedAttemptNo,
+    });
 
     try {
       let uploadFile: File;
@@ -340,11 +350,13 @@ export default function DesignManholeNewPage() {
       }
 
       funnel.submitting();
+      // この送信の番号をここで確定させる。応答時に読み直さない
+      submittedAttemptNo = funnel.attemptNo();
       trackPhotoUploadStart({
         submission_kind: 'design',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
-        attempt_no: funnel.attemptNo(),
+        attempt_no: submittedAttemptNo,
       });
 
       failureStage = 'upload';
@@ -373,7 +385,7 @@ export default function DesignManholeNewPage() {
         setProximityCheckStatus('ready');
         // 差し戻して確認を求めている状態。サーバー障害ではないので失敗に数えない
         blockedBeforeSubmit = true;
-        funnel.blocked('official_manhole_nearby', 'postsend');
+        funnel.blocked('official_manhole_nearby', 'postsend', submittedAttribution());
         throw new Error(
           '近くに公式ポケふたがあります。訪問写真として登録するか、別のマンホールであることを確認してください'
         );
@@ -382,7 +394,7 @@ export default function DesignManholeNewPage() {
         // 投稿受付の停止中もここに来る（503）。障害ではないので離脱として数える
         if (data?.code === DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE) {
           blockedBeforeSubmit = true;
-          funnel.blocked('suspended', 'postsend');
+          funnel.blocked('suspended', 'postsend', submittedAttribution());
         }
         throw new Error(data?.error || '投稿に失敗しました。時間をおいて再度お試しください');
       }
@@ -398,7 +410,7 @@ export default function DesignManholeNewPage() {
         submission_kind: 'design',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
-        attempt_no: funnel.attemptNo(),
+        attempt_no: submittedAttemptNo,
         review_status: typeof status === 'string' ? status : undefined,
         upload_duration_ms: Date.now() - uploadStartTime,
         // キャラふたの「ひとこと」と同じ軸にする（任意入力を書いたか）
@@ -416,7 +428,7 @@ export default function DesignManholeNewPage() {
           // サーバーが code を返せなかったときの受け皿。キャラふたと同じ分類を使う
           error_type: classifyClientSubmissionError(err, responseStatus),
           photo_source: submittedPhotoSource,
-          attempt_no: funnel.attemptNo(),
+          attempt_no: submittedAttemptNo,
         });
       }
     } finally {

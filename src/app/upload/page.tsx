@@ -470,13 +470,19 @@ function UploadPageInner() {
     setLoading(false);
   }, [manholes]);
 
+  // 送信中の写真。差し替えを止める判定と、二重送信の防止に使う
+  const isUploading = photos.some(photo => photo.uploading);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.heic', '.heif']
     },
     maxFiles: 1,
-    multiple: false
+    multiple: false,
+    // 送信中の差し替えを禁じる。許すと in-flight の送信が UI から消えたまま完了し、
+    // 計測も「いま画面にある別の写真」の属性で上書きされる
+    disabled: isUploading
   });
 
   const uploadPhoto = async (photoId: string): Promise<void> => {
@@ -566,6 +572,8 @@ function UploadPageInner() {
     let responseCode: string | undefined;
     // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
     const submittedPhotoSource = funnel.photoSource();
+    // 送信の直後に確定する。それまでは「まだ送っていない」を表す 0
+    let submittedAttemptNo = 0;
     // 送信できずに止まった（＝障害ではない）ケースを区別する。/design-manholes/new と揃える
     let blockedBeforeSubmit = false;
 
@@ -592,11 +600,14 @@ function UploadPageInner() {
       }
 
       funnel.submitting();
+      // この送信の番号をここで確定させる。応答時に読み直すと、間に別の送信が
+      // 始まっていた場合に、先行リクエストの終端へ後続試行の番号が付く
+      submittedAttemptNo = funnel.attemptNo();
       trackPhotoUploadStart({
         submission_kind: 'character',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
-        attempt_no: funnel.attemptNo(),
+        attempt_no: submittedAttemptNo,
       });
 
       // Prepare form data for upload
@@ -658,7 +669,7 @@ function UploadPageInner() {
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
         photo_source: submittedPhotoSource,
-        attempt_no: funnel.attemptNo(),
+        attempt_no: submittedAttemptNo,
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
         has_note: !!visitNote.trim(),
@@ -702,7 +713,7 @@ function UploadPageInner() {
           error_code: responseCode,
           error_type: errorType,
           photo_source: submittedPhotoSource,
-          attempt_no: funnel.attemptNo(),
+          attempt_no: submittedAttemptNo,
         });
       }
 
