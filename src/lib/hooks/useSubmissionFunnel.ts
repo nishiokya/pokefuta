@@ -32,8 +32,9 @@ import type {
  * - **送信済みの試行**は `p_photo_upload_start`
  *   = complete + failed + blocked{block_phase:'postsend'} で閉じる。
  *   サーバーが差し戻したものを失敗に混ぜないので、この等式が成り立つ。
- * - **詰まった人数**は `p_submission_blocked{is_repeat:false}`。
- *   件数そのものは再試行のたびに増える。
+ * - **詰まりの件数**は `p_submission_blocked{is_repeat:false}`。
+ *   生の件数は再試行のたびに増える。なお `is_repeat:false` も**件数であって人数ではない**
+ *   （1人が写真を選び直せば何件でも出る）。人数は GA4 側の総ユーザー数で見る。
  */
 export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   const {

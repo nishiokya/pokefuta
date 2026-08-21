@@ -177,8 +177,9 @@ export interface SubmissionBlockedParams extends SubmissionEventParams {
   block_class?: SubmissionBlockClass;
   /**
    * この写真で同じ（理由 × 位置）を既に送っているか。
-   * 「何人が詰まったか」は `is_repeat:false` だけを数える。再送のたびに
-   * 増える件数をそのまま人数として読むと、詰まりの深刻さを取り違える。
+   * 「どれだけの局面が詰まったか」は `is_repeat:false` だけを数える。再送のたびに
+   * 増える生の件数をそのまま読むと、詰まりの深刻さを取り違える。
+   * ただしこれも件数であって**人数ではない**（1人が写真を選び直せば何件でも出る）。
    */
   is_repeat?: boolean;
 }
