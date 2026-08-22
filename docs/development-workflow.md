@@ -52,6 +52,15 @@ git worktree add ../pokefuta-worktrees/<task-name> \
 - 調査結果、除外した仮説、残作業、確認コマンドはPR本文または `docs/inbox/` のhandoff文書に残す。
 - ローカル memory、ローカル検索index、チャット履歴が別マシンにも存在するとは仮定しない。
 
+## Obsidian索引
+
+Gitを運用ルールの正本とし、Obsidianには人間向けの索引・要約を置く。
+
+- Obsidian: `inbox/dev/pokefuta/flow/2026-08-23 pokefuta Codex・Claude Code 開発運用ルール.md`
+- MacのObsidian `inbox` とK11の `~/note` は `note-sync` で双方向同期する。
+- 内容が食い違った場合は、このGit文書を正とする。
+- Git側のルールを変更したら、Obsidian索引の要約とリンクも更新する。
+
 ## ナレッジの置き場所
 
 | 内容 | 保存先 |
