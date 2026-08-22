@@ -13,6 +13,7 @@ import {
   Stamp,
   TrendingUp,
   UserRound,
+  Image,
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
@@ -271,6 +272,35 @@ export default function HomePage() {
             </p>
           </section>
         )}
+
+        <section className="mt-6 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
+              <Image className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
+              <h2 className="mt-0.5 text-lg font-extrabold">キャラクターマンホールも集まっています</h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[#6B6B6B]">
+                アニメ・ゲーム・ご当地キャラクターなど、みんなが見つけた全国のマンホールを楽しめます。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/design-manholes"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+            >
+              みんなの投稿を見る
+            </Link>
+            <Link
+              href="/design-manholes/new"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#7B63A8]/35 bg-white/80 px-4 text-sm font-bold text-[#5E4788] transition hover:bg-white"
+            >
+              見つけたマンホールを投稿
+            </Link>
+          </div>
+        </section>
 
         {/* Photo Gallery */}
         {!loading && (

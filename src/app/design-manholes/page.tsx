@@ -50,14 +50,14 @@ export default function DesignManholesPage() {
 
   return (
     <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header title="デザインマンホール" showDescriptionLink={false} />
+      <Header title="キャラふた図鑑" showDescriptionLink={false} />
 
       <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold sm:text-xl">みんなのデザインマンホール</h1>
+            <h1 className="text-lg font-bold sm:text-xl">みんなのキャラクターマンホール</h1>
             <p className="mt-1 text-sm text-[#2A2A2A]/70">
-              ポケふた以外の、オンリーワンなデザインマンホールのコレクション
+              アニメ・ゲーム・ご当地キャラクターなど、全国の楽しいマンホールのコレクション
             </p>
           </div>
           <Link
@@ -107,14 +107,14 @@ export default function DesignManholesPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={dm.photo_url}
-                      alt={dm.title || 'デザインマンホール'}
+                      alt={dm.title || 'キャラクターマンホール'}
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
                   </div>
                   <div className="p-2.5">
                     <p className="truncate text-sm font-bold">
-                      {dm.title || 'デザインマンホール'}
+                      {dm.title || 'キャラクターマンホール'}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-[#2A2A2A]/50">
                       {dm.submitter_name ? `${dm.submitter_name} ・ ` : ''}

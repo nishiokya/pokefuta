@@ -10,6 +10,7 @@ import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import BottomNav from '@/components/BottomNav';
 import Header from '@/components/Header';
+import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -655,18 +656,16 @@ function UploadPageInner() {
         </div>
       )}
 
-      <Header title="写真を投稿" />
+      <Header title="ポケふたを投稿" />
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
-        <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
-          ポケふたの写真を投稿すると、訪問記録として図鑑に掲載されます。
-          実際の訪問を確認するため、GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
-        </p>
-        <p className="mt-2 text-right text-xs">
-          <Link href="/design-manholes/new" className="text-[#7B63A8] underline hover:opacity-80">
-            ポケふた以外のデザインマンホールの投稿はこちら →
-          </Link>
-        </p>
+        <SubmissionTypeSwitcher current="pokefuta" />
+        <div className="mt-4 rounded-xl border border-[#BF5640]/25 bg-[#FFF3EE] p-4">
+          <p className="text-sm font-extrabold text-[#8F3F2E]">ここはポケふたの投稿ページです</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+            投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
+          </p>
+        </div>
 
         {/* Hint Manhole Card */}
         {hintManhole && (
@@ -768,7 +767,7 @@ function UploadPageInner() {
                   href="/design-manholes/new"
                   className="mt-1 inline-block font-bold underline hover:opacity-80"
                 >
-                  ポケふた以外のマンホールなら → デザインマンホール投稿へ
+                  キャラクターのマンホールなら → 専用投稿ページへ
                 </Link>
               )}
             </div>

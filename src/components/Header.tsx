@@ -123,10 +123,10 @@ export default function Header({
           <Link
             href="/design-manholes"
             className={`${user ? 'flex' : 'hidden'} h-10 flex-shrink-0 items-center justify-center rounded-full px-2.5 text-xs font-bold text-[#2A2A2A] transition hover:bg-[#7B63A8]/10 sm:flex sm:text-sm`}
-            aria-label="デザインマンホール（ポケふた以外の投稿）"
-            title="デザインマンホール（ポケふた以外の投稿）"
+            aria-label="キャラクターマンホールの投稿を見る"
+            title="キャラクターマンホールの投稿を見る"
           >
-            デザイン蓋
+            キャラふた
           </Link>
 
           <a

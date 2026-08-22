@@ -8,6 +8,7 @@ import imageCompression from 'browser-image-compression';
 import { AlertCircle, Camera, CheckCircle, Upload } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
+import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { isValidCoordinates } from '@/lib/location';
 
@@ -191,13 +192,13 @@ export default function DesignManholeNewPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-        <Header title="デザインマンホール投稿" showDescriptionLink={false} />
+      <div className="min-h-screen safe-area-inset bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
+        <Header title="キャラふた投稿" showDescriptionLink={false} />
         <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
-            投稿されたデザインマンホールは公開されました。
+            投稿されたキャラクターマンホールは公開されました。
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Link
@@ -221,19 +222,17 @@ export default function DesignManholeNewPage() {
   }
 
   return (
-    <div className="min-h-screen safe-area-inset bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <Header title="デザインマンホール投稿" showDescriptionLink={false} />
+    <div className="min-h-screen safe-area-inset bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
+      <Header title="キャラふた投稿" showDescriptionLink={false} />
 
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
-        <p className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3 text-sm leading-relaxed text-[#2A2A2A]/80">
-          ポケふた以外の「オンリーワンなデザインマンホール」を見つけたら教えてください。
-          写真1枚と位置情報が必須です。
-        </p>
-        <p className="mt-2 text-right text-xs">
-          <Link href="/upload" className="text-[#7B63A8] underline hover:opacity-80">
-            ポケふた（ポケモンマンホール）の写真投稿はこちら →
-          </Link>
-        </p>
+        <SubmissionTypeSwitcher current="character" />
+        <div className="mt-4 rounded-xl border border-[#7B63A8]/30 bg-white/75 p-4 shadow-sm">
+          <p className="text-sm font-extrabold text-[#5E4788]">ここはキャラクターマンホールの投稿ページです</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+            アニメ・ゲーム・ご当地キャラクターなど、ポケふた以外のマンホールが対象です。写真1枚と位置情報が必須です。
+          </p>
+        </div>
 
         {/* 写真 */}
         <section className="mt-6">
