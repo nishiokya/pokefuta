@@ -283,6 +283,23 @@ test('MECE: block_class は呼び出し側が指定しなくても理由から�
   );
 });
 
+test('MECE: block_class は呼び出し側が渡した値で上書きできない', () => {
+  // `PokefutaEventParams` に索引シグネチャがあるので、型だけでは混入を止められない。
+  // spread の後ろで台帳から載せ直していることを、実際の送信内容で確かめる。
+  const sent = onProduction(() => {
+    pokefutaEvents.submissionBlocked({
+      submission_kind: 'design',
+      block_reason: 'suspended',
+      block_phase: 'entry',
+      // 運用judgment の停止を「こちら側の障害」に見せかけようとする呼び出し
+      block_class: 'system',
+    } as unknown as Parameters<typeof pokefutaEvents.submissionBlocked>[0]);
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].params.block_class, SUBMISSION_BLOCK_CLASS_BY_REASON.suspended);
+  assert.equal(sent[0].params.block_class, 'policy');
+});
+
 test('MECE: block_phase が理由と直交して載る（同じ理由でも位置で分かれる）', () => {
   const sent = onProduction(() => {
     for (const phase of SUBMISSION_BLOCK_PHASES) {

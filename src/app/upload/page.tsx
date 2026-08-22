@@ -68,6 +68,10 @@ function UploadPageInner() {
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
+  // 一覧の到着を待っている写真があるか。取得に失敗したときのブロックを
+  // entry と photo のどちらで数えるかの判定に使う。
+  // loadManholes はマウント時のクロージャなので photos state を読めず、ref で渡す。
+  const waitingManholePhotoRef = useRef(false);
   const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
@@ -200,6 +204,27 @@ function UploadPageInner() {
     });
   };
 
+  /**
+   * 蓋の一覧が取れなかったことを、**行き止まりになった位置**で数える。
+   *
+   * 一覧が届く前に写真を選ぶとその写真は waiting_manhole になり、取得が失敗すれば
+   * そこが実際の行き止まりになる。ここを常に 'entry' で送ると、回線の速さだけで
+   * 同じ利用者が entry と photo に割れ、位置の軸が読めなくなる
+   * （写真を選んだ後に失敗を知る人は onDrop 側では拾えない — あちらは
+   *   「失敗済みと判ってから写真を選んだ人」の経路）。
+   *
+   * 位置はリテラルで分岐させる。`tools/check-ga4-contract.js` が第2引数を
+   * 台帳の値と突き合わせるので、三項演算子で畳むと検査が効かなくなる。
+   */
+  const reportManholesUnavailable = () => {
+    manholesLoadFailedRef.current = true;
+    if (waitingManholePhotoRef.current) {
+      funnel.blocked('manholes_unavailable', 'photo');
+      return;
+    }
+    funnel.blocked('manholes_unavailable', 'entry');
+  };
+
   const loadManholes = async () => {
     try {
       // limit は付けない。/api/manholes は未指定なら全件返す。
@@ -223,14 +248,18 @@ function UploadPageInner() {
       // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
       // 画面上は静かなので、ここで数えないと存在に気づけない。
       console.error('Failed to load manholes: unexpected response', response.status);
-      manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable', 'entry');
+      reportManholesUnavailable();
     } catch (error) {
       console.error('Failed to load manholes:', error);
-      manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable', 'entry');
+      reportManholesUnavailable();
     }
   };
+
+  // 一覧の到着を待っている写真の有無を ref に写す。loadManholes の失敗は非同期に
+  // 起きるので、そのときの最新値を読めればよい（render を挟むこの経路で足りる）。
+  useEffect(() => {
+    waitingManholePhotoRef.current = photos.some(photo => photo.photoStatus === 'waiting_manhole');
+  }, [photos]);
 
   // ✅ manholes ロード完了時に既存 photos の matchedManhole/error を再評価
   useEffect(() => {
@@ -672,7 +701,9 @@ function UploadPageInner() {
         attempt_no: submittedAttemptNo,
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
-        has_note: !!visitNote.trim(),
+        // 利用者が書いた「ひとこと」。visitNote は onDrop が EXIF から自動生成するので、
+        // そちらを見ると常に true になり、デザインふたの description と並べられない
+        has_note: !!visitComment.trim(),
         is_public: isPublic,
       });
       // 訪問記録ができたこと。完了の計測は p_photo_upload_complete が正なので、

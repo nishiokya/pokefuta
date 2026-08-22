@@ -171,10 +171,11 @@ export interface SubmissionBlockedParams extends SubmissionEventParams {
   /** いつ止まったか。理由と直交する軸なので、理由と必ずセットで送る。 */
   block_phase: SubmissionBlockPhase;
   /**
-   * 打ち手の持ち主。`block_reason` から機械的に決まるので呼び出し側では指定しない
-   * （helper が `SUBMISSION_BLOCK_CLASS_BY_REASON` から付ける）。
+   * 打ち手の持ち主。`block_reason` から機械的に決まるので呼び出し側では指定しない。
+   * helper が `SUBMISSION_BLOCK_CLASS_BY_REASON` から付け直すため、ここに値を入れても
+   * 送信時に**捨てられる**（`PokefutaEventParams` の索引シグネチャがあるので型では防げない）。
    */
-  block_class?: SubmissionBlockClass;
+  block_class?: never;
   /**
    * この写真で同じ（理由 × 位置）を既に送っているか。
    * 「どれだけの局面が詰まったか」は `is_repeat:false` だけを数える。再送のたびに
@@ -525,11 +526,17 @@ export const pokefutaEvents = {
   submissionEntry:         (p: SubmissionEntryParams)         => trackEvent('p_submission_entry', p),
   submissionStart:         (p: SubmissionEventParams)         => trackEvent('p_submission_start', p),
   submissionPhotoSelected: (p: SubmissionPhotoSelectedParams) => trackEvent('p_submission_photo_selected', p),
-  submissionBlocked:       (p: SubmissionBlockedParams)       =>
-    trackEvent('p_submission_blocked', {
+  submissionBlocked:       (p: SubmissionBlockedParams)       => {
+    // block_class は理由から機械的に決まる台帳の値。呼び出し側が渡した値で
+    // 上書きされないよう、spread から取り除いてから**後ろに**載せる。
+    // （順序を戻すと `block_reason:'suspended', block_class:'system'` が通ってしまい、
+    //   打ち手の持ち主で見る集計が黙って壊れる）
+    const { block_class: _ignored, ...rest } = p;
+    return trackEvent('p_submission_blocked', {
+      ...rest,
       block_class: SUBMISSION_BLOCK_CLASS_BY_REASON[p.block_reason],
-      ...p,
-    }),
+    });
+  },
   /** 送信（fetch 直前）。submission_kind は必須 — 付け忘れは型で落ちる。 */
   photoUploadStart:        (p: SubmissionEventParams)         => trackEvent('p_photo_upload_start', p),
   /** 完了。写真館の主要コンバージョンで、GA4 のキーイベントはこれだけにする。 */

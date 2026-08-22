@@ -67,12 +67,22 @@
 
 - `block_class` は `SUBMISSION_BLOCK_CLASS_BY_REASON` から**自動で載る**。呼び出し側では指定しない。
   理由を足すと `Record` の型が落ちるので、分類漏れは起きない。
+  helper は呼び出し側の値を**捨てて**台帳から載せ直す（`PokefutaEventParams` に索引シグネチャが
+  あるため、型だけでは混入を止められない）。
+- `block_phase` は**その利用者が実際に行き止まりに着いた位置**を書く。呼び出し箇所が
+  ページのどこにあるかではない。例: 蓋の一覧の取得失敗は、一覧を待つ写真を既に選んでいれば
+  `photo`、選んでいなければ `entry`。ここを固定値にすると、回線の速さだけで同じ利用者が
+  2つの位置に割れる。
 - 系統ごとに起きうる理由は `SUBMISSION_BLOCK_REASONS_BY_KIND` に宣言する。
   ゼロ件を見たときに「起きていない」のか「送っていない」のかを区別するため。
   宣言と実装のズレは `tools/check-ga4-contract.js` が落とす。
 - 再送は `attempt_no`（`submitting()` ごとに +1、送信前は 0）。送信・完了・失敗に載せる。
 - 失敗の分類は両系統とも `classifyClientSubmissionError`
   （`src/lib/analytics/submission-error.ts`）を使う。**ステータスがメッセージより優先**。
+- `has_note` は「**利用者が任意で書いたか**」。自動生成される入力から導かない
+  （キャラふたの `visitNote` は onDrop が EXIF から埋めるので常に true になる。
+  対応するのは「ひとこと」= `visitComment` の方）。系統をまたいで比較する軸は、
+  両側が同じ意味であることを確かめてから足す。
 - **同じ失敗を2つのイベントで数えない。** 投稿の失敗は `p_submission_failed` だけ。
   `p_app_error` を併せて送らない（キャラふただけが送っていて、障害の規模が2倍に見えていた）。
 - 写真の入力手段は `photo_source`（`camera` / `library`）。`invalid_gps` の主因を説明できる唯一の軸。

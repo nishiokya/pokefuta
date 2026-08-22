@@ -365,6 +365,61 @@ expect(
   '投稿の失敗を p_app_error にも送っている（p_submission_failed と二重に数える）'
 );
 
+// 4g. has_note は両系統で「利用者が任意で書いたか」を指すこと。
+//     キャラふたの visitNote は onDrop が EXIF（カメラ・撮影日時・位置）から
+//     自動生成するので、そこから導くと常に true になる。デザインふたの
+//     description（純粋な任意入力）と並べた瞬間、記入率の比較が壊れる。
+for (const { file, kind } of SUBMISSION_FLOWS) {
+  const args = flowCode.get(file).match(/trackPhotoUploadComplete\(\{([\s\S]*?)\n\s*\}\)/);
+  expect(args !== null, `${file} の trackPhotoUploadComplete の引数を読み取れない`);
+  if (!args) continue;
+  const hasNote = args[1].match(/has_note:\s*([^,\n]+)/);
+  expect(hasNote !== null, `${file} の完了イベントに has_note が無い`);
+  if (kind === 'character' && hasNote) {
+    expect(
+      !/visitNote/.test(hasNote[1]),
+      `${file} の has_note が自動生成される visitNote から導かれている（常に true になり、デザインふたと比較できない）`
+    );
+  }
+}
+
+// 4h. 蓋の一覧の取得に失敗したとき、行き止まりの位置を写真の有無で出し分けること。
+//     一覧の到着前に写真を選んだ人の行き止まりは photo、着いた時点で既に駄目な人は entry。
+//     取得失敗を常に entry で送ると、回線の速さだけで同じ利用者が2つの位置に割れる。
+//     onDrop 側にも 'photo' の呼び出しがあるので、ファイル全体を見るだけでは
+//     この分岐が消えたことに気づけない。失敗経路の関数の中だけを見る。
+{
+  const characterCode = flowCode.get('src/app/upload/page.tsx');
+  const helper = characterCode.match(
+    /const reportManholesUnavailable = \(\) => \{([\s\S]*?)\n  \};/
+  );
+  expect(
+    helper !== null,
+    'src/app/upload/page.tsx に reportManholesUnavailable が無い（一覧取得の失敗を位置で出し分けていない）'
+  );
+  if (helper) {
+    for (const phase of ['entry', 'photo']) {
+      expect(
+        helper[1].includes(`blocked('manholes_unavailable', '${phase}')`),
+        `reportManholesUnavailable が blocked('manholes_unavailable', '${phase}') を送っていない`
+      );
+    }
+  }
+  // 失敗経路が helper を通ること。直接 blocked を呼ぶと分岐を迂回できる
+  const loader = characterCode.match(/const loadManholes = async \(\) => \{([\s\S]*?)\n  \};/);
+  expect(loader !== null, 'src/app/upload/page.tsx の loadManholes を読み取れない');
+  if (loader) {
+    expect(
+      !/funnel\.blocked\('manholes_unavailable'/.test(loader[1]),
+      'loadManholes が reportManholesUnavailable を通さず blocked を直接呼んでいる（位置の分岐を迂回する）'
+    );
+    expect(
+      /reportManholesUnavailable\(\)/.test(loader[1]),
+      'loadManholes が失敗時に reportManholesUnavailable を呼んでいない'
+    );
+  }
+}
+
 // 4b. Pokémon GO フレンド募集も、台帳の各イベントに送信ヘルパーと呼び出し元がある。
 //     設定率・コピー率は分母（画面到達・カード表示）が無いと読めないので、
 //     4つ揃っていることを fail closed で担保する。
