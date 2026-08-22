@@ -19,7 +19,12 @@ jst() {
   if [ -z "$1" ] || [ "$1" = "null" ]; then
     echo "-"
   else
-    TZ=Asia/Tokyo date -d "$1" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "-"
+    # GNU date（k11/WSL）。macOS の BSD date には -d が無いので node へ落とす。
+    # ここが "-" に落ちると gen_jst が行のキーなので、全スナップショットが
+    # 同じ行に上書きされて推移が消える。壊れても静かなので必ず両対応にする。
+    TZ=Asia/Tokyo date -d "$1" '+%Y-%m-%d %H:%M' 2>/dev/null \
+      || node -e 'const d=new Date(process.argv[1]);if(isNaN(d)){console.log("-");process.exit(0)}console.log(new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(d).replace("T"," "))' "$1" 2>/dev/null \
+      || echo "-"
   fi
 }
 
