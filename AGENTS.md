@@ -1,5 +1,8 @@
 # Repository guidance
 
+- Codex / Claude Code で作業を始める前に `docs/development-workflow.md` を読む。
+- 各マシンでは clean な基準 clone の `main` を最新に保ち、実作業は原則として最新の `origin/main` から作ったタスク専用 worktree で行う。dirty な基準 clone を自動で stash・reset・上書きしない。
+- Mac・K11間で共有すべき知識はローカル memory だけに置かず、`AGENTS.md`、`docs/`、またはリポジトリ内の `.agents/skills/` に記録する。
 - Treat `app_user` profile data as public only through narrowly scoped `SECURITY DEFINER` functions. Do not grant anonymous table access.
 - Keep `src/types/database.ts` in sync when a database migration adds or changes profile fields.
 - A user may edit only the profile associated with `auth.uid()`; enforce this in the database as well as in the UI.
