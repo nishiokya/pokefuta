@@ -25,6 +25,7 @@ import {
 } from '@/lib/design-manhole-submission-status';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
+import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import type { SubmissionStage } from '@/lib/analytics/gtag';
 import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 
@@ -83,7 +84,7 @@ export default function DesignManholeNewPage() {
     funnel.start();
     if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
       // 停止中は写真選択にすら進めない。件数が0でないのに気づかない＝戻し忘れ
-      funnel.blocked('suspended');
+      funnel.blocked('suspended', 'entry');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,7 +151,7 @@ export default function DesignManholeNewPage() {
       setProximityCheckStatus('ready');
       if (candidate) {
         // 公式ポケふたが近いので、明示確認するまで送信に進めない
-        funnel.blocked('official_manhole_nearby');
+        funnel.blocked('official_manhole_nearby', 'photo');
       }
     } catch (lookupError) {
       console.error('Official manhole proximity check failed:', lookupError);
@@ -162,7 +163,7 @@ export default function DesignManholeNewPage() {
       setProximityCheckStatus('error');
       setError('近くの公式ポケふたを確認できませんでした。再確認してください');
       // 照合できないと投稿を受け付けないので、ここも離脱点
-      funnel.blocked('manholes_unavailable');
+      funnel.blocked('manholes_unavailable', 'photo');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -220,7 +221,7 @@ export default function DesignManholeNewPage() {
         setLng(null);
         setGpsSource(null);
         // GPSが無いと座標を出せず送信できない。デザインふた最大の離脱点
-        funnel.blocked('invalid_gps');
+        funnel.blocked('invalid_gps', 'photo');
       }
       if (raw) {
         setExifPayload({
@@ -243,7 +244,7 @@ export default function DesignManholeNewPage() {
       setGpsSource(null);
       // EXIFを読めなかった場合も、利用者から見れば「座標が取れない」で同じ行き止まり
       funnel.photoSelected({ photo_source: photoSource, has_gps: false });
-      funnel.blocked('invalid_gps');
+      funnel.blocked('invalid_gps', 'photo');
     } finally {
       if (photoGenerationGuardRef.current.isCurrent(photoGeneration)) {
         setExifChecking(false);
@@ -263,6 +264,9 @@ export default function DesignManholeNewPage() {
     },
     maxFiles: 1,
     multiple: false,
+    // 送信中の差し替えを禁じる。許すと、応答が返るまでの間に選び直した写真の属性が
+    // 前の送信の postsend ブロックに付く
+    disabled: submitting,
   });
 
   // スマホの背面カメラで直接撮影する（/upload と同じ導線）
@@ -306,6 +310,13 @@ export default function DesignManholeNewPage() {
     let blockedBeforeSubmit = false;
     // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
     const submittedPhotoSource = funnel.photoSource();
+    // 送信の直後に確定する。それまでは「まだ送っていない」を表す 0
+    let submittedAttemptNo = 0;
+    // postsend のブロックに載せる、この送信の属性
+    const submittedAttribution = () => ({
+      photo_source: submittedPhotoSource,
+      attempt_no: submittedAttemptNo,
+    });
 
     try {
       let uploadFile: File;
@@ -319,7 +330,7 @@ export default function DesignManholeNewPage() {
       } catch {
         // サーバー障害ではなく写真側の問題なので、失敗ではなく離脱として数える
         blockedBeforeSubmit = true;
-        funnel.blocked('unsupported_format');
+        funnel.blocked('unsupported_format', 'presend');
         throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください');
       }
 
@@ -339,10 +350,13 @@ export default function DesignManholeNewPage() {
       }
 
       funnel.submitting();
+      // この送信の番号をここで確定させる。応答時に読み直さない
+      submittedAttemptNo = funnel.attemptNo();
       trackPhotoUploadStart({
         submission_kind: 'design',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: submittedAttemptNo,
       });
 
       failureStage = 'upload';
@@ -371,7 +385,7 @@ export default function DesignManholeNewPage() {
         setProximityCheckStatus('ready');
         // 差し戻して確認を求めている状態。サーバー障害ではないので失敗に数えない
         blockedBeforeSubmit = true;
-        funnel.blocked('official_manhole_nearby');
+        funnel.blocked('official_manhole_nearby', 'postsend', submittedAttribution());
         throw new Error(
           '近くに公式ポケふたがあります。訪問写真として登録するか、別のマンホールであることを確認してください'
         );
@@ -380,7 +394,7 @@ export default function DesignManholeNewPage() {
         // 投稿受付の停止中もここに来る（503）。障害ではないので離脱として数える
         if (data?.code === DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE) {
           blockedBeforeSubmit = true;
-          funnel.blocked('suspended');
+          funnel.blocked('suspended', 'postsend', submittedAttribution());
         }
         throw new Error(data?.error || '投稿に失敗しました。時間をおいて再度お試しください');
       }
@@ -396,8 +410,11 @@ export default function DesignManholeNewPage() {
         submission_kind: 'design',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: submittedAttemptNo,
         review_status: typeof status === 'string' ? status : undefined,
         upload_duration_ms: Date.now() - uploadStartTime,
+        // キャラふたの「ひとこと」と同じ軸にする（任意入力を書いたか）
+        has_note: !!description.trim(),
       });
     } catch (err: any) {
       setError(err?.message || '投稿に失敗しました');
@@ -408,7 +425,10 @@ export default function DesignManholeNewPage() {
           stage: failureStage,
           status_code: responseStatus,
           error_code: responseCode,
+          // サーバーが code を返せなかったときの受け皿。キャラふたと同じ分類を使う
+          error_type: classifyClientSubmissionError(err, responseStatus),
           photo_source: submittedPhotoSource,
+          attempt_no: submittedAttemptNo,
         });
       }
     } finally {

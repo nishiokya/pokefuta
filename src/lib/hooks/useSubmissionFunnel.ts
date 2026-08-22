@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useAnalytics } from './useAnalytics';
 import type {
   PhotoSource,
+  SubmissionBlockPhase,
   SubmissionBlockReason,
   SubmissionKind,
   SubmissionStep,
@@ -20,8 +21,20 @@ import type {
  *   useEffect(() => funnel.start(), []);          // 画面到達
  *   funnel.setPhotoSource('camera');              // カメラ導線から onDrop を呼ぶ直前
  *   funnel.photoSelected({ has_gps: true });      // 写真を選んだ
- *   funnel.blocked('invalid_gps');                // 送信に進めず止まった
+ *   funnel.blocked('invalid_gps', 'photo');       // 送信に進めず止まった（理由 × 位置）
  *   funnel.submitting(); / funnel.completed(); / funnel.failed();
+ *
+ * 数え方の約束（軸を混ぜないための3つ）:
+ * - **到達の終端**は `p_photo_upload_complete` か `p_submission_abandoned` のどちらか1つ。
+ *   `p_submission_failed` は**試行の結果**であって到達の終端ではない
+ *   （失敗して再試行し完了した人は complete、失敗したまま去った人は
+ *   `abandoned{last_step:'failed'}` に出る）。両方を終端として足さない。
+ * - **送信済みの試行**は `p_photo_upload_start`
+ *   = complete + failed + blocked{block_phase:'postsend'} で閉じる。
+ *   サーバーが差し戻したものを失敗に混ぜないので、この等式が成り立つ。
+ * - **詰まりの件数**は `p_submission_blocked{is_repeat:false}`。
+ *   生の件数は再試行のたびに増える。なお `is_repeat:false` も**件数であって人数ではない**
+ *   （1人が写真を選び直せば何件でも出る）。人数は GA4 側の総ユーザー数で見る。
  */
 export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   const {
@@ -40,10 +53,16 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   const selectedPhotoSourceRef = useRef<PhotoSource | undefined>(undefined);
   const completedRef = useRef(false);
   const abandonSentRef = useRef(false);
+  /** 送信した回数。`submitting()` で増える。送信前は 0。 */
+  const attemptRef = useRef(0);
+  /** この写真で既に送った (理由 × 位置)。再試行の重複を is_repeat で畳む。 */
+  const seenBlocksRef = useRef<Set<string>>(new Set());
+  /** 直近のブロックがどの位置で起きたか。離脱イベントに理由と一緒に載せる。 */
+  const blockPhaseRef = useRef<SubmissionBlockPhase | undefined>(undefined);
 
   const start = useCallback(() => {
     startedAtRef.current = Date.now();
-    trackSubmissionStart({ submission_kind });
+    trackSubmissionStart({ submission_kind, attempt_no: 0 });
   }, [submission_kind, trackSubmissionStart]);
 
   /**
@@ -72,19 +91,49 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
       // 離脱した人が「blocked なのに理由なし」という矛盾した離脱データになる。
       stepRef.current = 'photo_selected';
       blockReasonRef.current = undefined;
-      trackSubmissionPhotoSelected({ submission_kind, ...params });
+      blockPhaseRef.current = undefined;
+      // 写真を選び直したら詰まりも数え直す。別の写真で同じ理由に当たったのは
+      // 「同じ人が同じ壁に2回ぶつかった」であって、再試行の重複ではない。
+      seenBlocksRef.current.clear();
+      trackSubmissionPhotoSelected({
+        submission_kind,
+        attempt_no: attemptRef.current,
+        ...params,
+      });
     },
     [submission_kind, trackSubmissionPhotoSelected]
   );
 
+  /**
+   * 送信に進めず止まったこと。位置（block_phase）は理由と直交する軸なので必ず渡す。
+   * `postsend` はサーバーが差し戻した場合だけ — ここを間違えると
+   * 「送信した数 = 完了 + 失敗 + postsend の差し戻し」が閉じなくなる。
+   *
+   * `postsend` は応答を待つ間に写真を選び直せてしまうので、**その送信の属性**を
+   * `attribution` で明示的に渡す。ref を読み直すと、いま画面にある別の写真の
+   * `photo_source` が、前の送信のブロックに付く。
+   */
   const blocked = useCallback(
-    (block_reason: SubmissionBlockReason) => {
+    (
+      block_reason: SubmissionBlockReason,
+      block_phase: SubmissionBlockPhase,
+      attribution?: { photo_source?: PhotoSource; attempt_no?: number }
+    ) => {
       stepRef.current = 'blocked';
       blockReasonRef.current = block_reason;
+      blockPhaseRef.current = block_phase;
+
+      const key = `${block_reason}:${block_phase}`;
+      const is_repeat = seenBlocksRef.current.has(key);
+      seenBlocksRef.current.add(key);
+
       trackSubmissionBlocked({
         submission_kind,
         block_reason,
-        photo_source: selectedPhotoSourceRef.current,
+        block_phase,
+        is_repeat,
+        attempt_no: attribution?.attempt_no ?? attemptRef.current,
+        photo_source: attribution?.photo_source ?? selectedPhotoSourceRef.current,
       });
     },
     [submission_kind, trackSubmissionBlocked]
@@ -93,6 +142,8 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
   const submitting = useCallback(() => {
     stepRef.current = 'submitting';
     blockReasonRef.current = undefined;
+    blockPhaseRef.current = undefined;
+    attemptRef.current += 1;
   }, []);
 
   const completed = useCallback(() => {
@@ -105,6 +156,12 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
 
   /** 以降のイベントに載せる、選ばれた写真の入力手段。 */
   const photoSource = useCallback((): PhotoSource | undefined => selectedPhotoSourceRef.current, []);
+
+  /**
+   * この到達で何回目の送信か。**送信の直後に控えて**、完了・失敗にはその値を載せる。
+   * 応答時に読み直すと、先行リクエストの終端に後続試行の番号が付く。
+   */
+  const attemptNo = useCallback((): number => attemptRef.current, []);
 
   useEffect(() => {
     // 離脱は2経路ある。片方だけでは systematically 取りこぼす。
@@ -125,6 +182,8 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
         last_step: stepRef.current,
         dwell_ms: Date.now() - startedAtRef.current,
         block_reason: blockReasonRef.current,
+        block_phase: blockPhaseRef.current,
+        attempt_no: attemptRef.current,
         photo_source: selectedPhotoSourceRef.current,
       });
     };
@@ -147,6 +206,7 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
     setPhotoSource,
     consumePhotoSource,
     photoSource,
+    attemptNo,
     photoSelected,
     blocked,
     submitting,

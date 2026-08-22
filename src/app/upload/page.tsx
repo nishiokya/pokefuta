@@ -11,6 +11,7 @@ import { Manhole } from '@/types/database';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
 import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gtag';
 import { pageTitle } from '@/lib/constants';
@@ -67,7 +68,11 @@ function UploadPageInner() {
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
-  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackAppError, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  // 一覧の到着を待っている写真があるか。取得に失敗したときのブロックを
+  // entry と photo のどちらで数えるかの判定に使う。
+  // loadManholes はマウント時のクロージャなので photos state を読めず、ref で渡す。
+  const waitingManholePhotoRef = useRef(false);
+  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -199,6 +204,27 @@ function UploadPageInner() {
     });
   };
 
+  /**
+   * 蓋の一覧が取れなかったことを、**行き止まりになった位置**で数える。
+   *
+   * 一覧が届く前に写真を選ぶとその写真は waiting_manhole になり、取得が失敗すれば
+   * そこが実際の行き止まりになる。ここを常に 'entry' で送ると、回線の速さだけで
+   * 同じ利用者が entry と photo に割れ、位置の軸が読めなくなる
+   * （写真を選んだ後に失敗を知る人は onDrop 側では拾えない — あちらは
+   *   「失敗済みと判ってから写真を選んだ人」の経路）。
+   *
+   * 位置はリテラルで分岐させる。`tools/check-ga4-contract.js` が第2引数を
+   * 台帳の値と突き合わせるので、三項演算子で畳むと検査が効かなくなる。
+   */
+  const reportManholesUnavailable = () => {
+    manholesLoadFailedRef.current = true;
+    if (waitingManholePhotoRef.current) {
+      funnel.blocked('manholes_unavailable', 'photo');
+      return;
+    }
+    funnel.blocked('manholes_unavailable', 'entry');
+  };
+
   const loadManholes = async () => {
     try {
       // limit は付けない。/api/manholes は未指定なら全件返す。
@@ -222,14 +248,18 @@ function UploadPageInner() {
       // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
       // 画面上は静かなので、ここで数えないと存在に気づけない。
       console.error('Failed to load manholes: unexpected response', response.status);
-      manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable');
+      reportManholesUnavailable();
     } catch (error) {
       console.error('Failed to load manholes:', error);
-      manholesLoadFailedRef.current = true;
-      funnel.blocked('manholes_unavailable');
+      reportManholesUnavailable();
     }
   };
+
+  // 一覧の到着を待っている写真の有無を ref に写す。loadManholes の失敗は非同期に
+  // 起きるので、そのときの最新値を読めればよい（render を挟むこの経路で足りる）。
+  useEffect(() => {
+    waitingManholePhotoRef.current = photos.some(photo => photo.photoStatus === 'waiting_manhole');
+  }, [photos]);
 
   // ✅ manholes ロード完了時に既存 photos の matchedManhole/error を再評価
   useEffect(() => {
@@ -274,7 +304,7 @@ function UploadPageInner() {
     // 2回呼ばれうるので、その中でイベントを送ると二重に数える。
     const reevaluated = photos.map(reevaluate);
     setPhotos(reevaluated);
-    blockReasons.forEach(reason => funnel.blocked(reason));
+    blockReasons.forEach(reason => funnel.blocked(reason, 'photo'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manholes]);
 
@@ -403,7 +433,7 @@ function UploadPageInner() {
     if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
       distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
       photoStatus = 'invalid_gps';
-      funnel.blocked('invalid_gps');
+      funnel.blocked('invalid_gps', 'photo');
     } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
       // isValidCoordinates が true の場合、lat/lng は有効な数値
       matchedManhole = findNearestManhole(
@@ -415,7 +445,7 @@ function UploadPageInner() {
       } else {
         distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
         photoStatus = 'no_nearby_manhole';
-        funnel.blocked('no_nearby_manhole');
+        funnel.blocked('no_nearby_manhole', 'photo');
       }
     } else {
       distanceError = 'マンホール情報をロード中です。少々お待ちください。';
@@ -424,7 +454,7 @@ function UploadPageInner() {
       // photoSelected が直前に block_reason を消しているので、記録し直さないと
       // 「理由なしで止まっている人」に見える。
       if (manholesLoadFailedRef.current) {
-        funnel.blocked('manholes_unavailable');
+        funnel.blocked('manholes_unavailable', 'photo');
       }
     }
 
@@ -469,13 +499,19 @@ function UploadPageInner() {
     setLoading(false);
   }, [manholes]);
 
+  // 送信中の写真。差し替えを止める判定と、二重送信の防止に使う
+  const isUploading = photos.some(photo => photo.uploading);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.heic', '.heif']
     },
     maxFiles: 1,
-    multiple: false
+    multiple: false,
+    // 送信中の差し替えを禁じる。許すと in-flight の送信が UI から消えたまま完了し、
+    // 計測も「いま画面にある別の写真」の属性で上書きされる
+    disabled: isUploading
   });
 
   const uploadPhoto = async (photoId: string): Promise<void> => {
@@ -499,7 +535,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('invalid_gps');
+      funnel.blocked('invalid_gps', 'presend');
       return;
     }
 
@@ -513,7 +549,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('no_nearby_manhole');
+      funnel.blocked('no_nearby_manhole', 'presend');
       return;
     }
 
@@ -530,7 +566,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('manhole_location_missing');
+      funnel.blocked('manhole_location_missing', 'presend');
       return;
     }
 
@@ -551,7 +587,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('too_far');
+      funnel.blocked('too_far', 'presend');
       return;
     }
 
@@ -565,6 +601,8 @@ function UploadPageInner() {
     let responseCode: string | undefined;
     // 送信中に写真を差し替えられても、この送信の属性で送る（refを直接読まない）
     const submittedPhotoSource = funnel.photoSource();
+    // 送信の直後に確定する。それまでは「まだ送っていない」を表す 0
+    let submittedAttemptNo = 0;
     // 送信できずに止まった（＝障害ではない）ケースを区別する。/design-manholes/new と揃える
     let blockedBeforeSubmit = false;
 
@@ -584,17 +622,21 @@ function UploadPageInner() {
         // ここを失敗に混ぜると運用上の失敗件数が水増しされ、
         // block_reason:'unsupported_format' がキャラふた側で永久にゼロになる。
         blockedBeforeSubmit = true;
-        funnel.blocked('unsupported_format');
+        funnel.blocked('unsupported_format', 'presend');
         throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください', {
           cause: compressionError,
         });
       }
 
       funnel.submitting();
+      // この送信の番号をここで確定させる。応答時に読み直すと、間に別の送信が
+      // 始まっていた場合に、先行リクエストの終端へ後続試行の番号が付く
+      submittedAttemptNo = funnel.attemptNo();
       trackPhotoUploadStart({
         submission_kind: 'character',
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: submittedAttemptNo,
       });
 
       // Prepare form data for upload
@@ -656,9 +698,12 @@ function UploadPageInner() {
         prefecture: photo.matchedManhole?.prefecture,
         is_logged_in: true,
         photo_source: submittedPhotoSource,
+        attempt_no: submittedAttemptNo,
         upload_duration_ms: Date.now() - uploadStartTime,
         has_location: isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude),
-        has_note: !!visitNote.trim(),
+        // 利用者が書いた「ひとこと」。visitNote は onDrop が EXIF から自動生成するので、
+        // そちらを見ると常に true になり、デザインふたの description と並べられない
+        has_note: !!visitComment.trim(),
         is_public: isPublic,
       });
       // 訪問記録ができたこと。完了の計測は p_photo_upload_complete が正なので、
@@ -682,16 +727,11 @@ function UploadPageInner() {
     } catch (error: any) {
       console.error('Upload failed:', error);
 
-      // API が code を返さなかったとき（ネットワーク断など）のための推測分類。
+      // API が code を返さなかったとき（ネットワーク断など）のための分類。
       // サーバーが答えた場合は responseCode の方が正確なので、そちらを error_code に使う。
-      const errorType = (() => {
-        if (error?.status === 401 || error?.message?.includes('Unauthorized')) return 'unauthorized';
-        if (error?.name === 'TypeError' || error?.message?.includes('network')) return 'network';
-        if (error?.message?.includes('size') || error?.message?.includes('large')) return 'file_size';
-        if (error?.message?.includes('GPS') || error?.message?.includes('location')) return 'gps_validation';
-        return 'unknown';
-      })();
-      trackAppError('upload_error', errorType);
+      // ここで p_app_error を別に送らない — 同じ失敗が p_submission_failed と
+      // 二重に数えられ、障害の規模が2倍に見えていた（デザインふた側は送っていない）。
+      const errorType = classifyClientSubmissionError(error, responseStatus);
 
       // 圧縮できずに止まった場合は既に blocked として数えている。
       // ここで失敗にも数えると二重になり、障害の件数が水増しされる。
@@ -704,6 +744,7 @@ function UploadPageInner() {
           error_code: responseCode,
           error_type: errorType,
           photo_source: submittedPhotoSource,
+          attempt_no: submittedAttemptNo,
         });
       }
 

@@ -2,12 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  SUBMISSION_BLOCK_CLASSES,
+  SUBMISSION_BLOCK_CLASS_BY_REASON,
+  SUBMISSION_BLOCK_PHASES,
   SUBMISSION_BLOCK_REASONS,
+  SUBMISSION_BLOCK_REASONS_BY_KIND,
   SUBMISSION_FUNNEL_EVENTS,
   pokefutaEvents,
   trackEvent,
 } from '../src/lib/analytics/gtag.ts';
 import { classifySubmissionError } from '../src/lib/api-error-code.ts';
+import {
+  SUBMISSION_ERROR_TYPES,
+  classifyClientSubmissionError,
+} from '../src/lib/analytics/submission-error.ts';
 
 /**
  * GA4 は本番ホストでしか送らない（gtag.ts の ANALYTICS_HOSTS）。
@@ -59,7 +67,11 @@ test('ファネル: 台帳の全ステップに送信ヘルパーがあり、そ
         has_gps: true,
       }),
     p_submission_blocked: () =>
-      pokefutaEvents.submissionBlocked({ submission_kind: 'character', block_reason: 'invalid_gps' }),
+      pokefutaEvents.submissionBlocked({
+        submission_kind: 'character',
+        block_reason: 'invalid_gps',
+        block_phase: 'photo',
+      }),
     p_photo_upload_start: () => pokefutaEvents.photoUploadStart({ submission_kind: 'character' }),
     p_photo_upload_complete: () => pokefutaEvents.photoUploadComplete({ submission_kind: 'character' }),
     p_submission_failed: () =>
@@ -95,7 +107,11 @@ test('ファネル: submission_kind が両系統で必ず載る', () => {
 test('ファネル: block_reason の全値を送れる', () => {
   const sent = onProduction(() => {
     for (const reason of SUBMISSION_BLOCK_REASONS) {
-      pokefutaEvents.submissionBlocked({ submission_kind: 'design', block_reason: reason });
+      pokefutaEvents.submissionBlocked({
+        submission_kind: 'design',
+        block_reason: reason,
+        block_phase: 'photo',
+      });
     }
   });
   assert.deepEqual(
@@ -224,4 +240,139 @@ test('エラー分類: cause が壊れていても例外を投げない', () => 
   // 深く埋まっていても拾う
   const deep = new Error('1', { cause: new Error('2', { cause: { code: '42501' } }) });
   assert.equal(classifySubmissionError(deep), 'DB_PERMISSION_DENIED');
+});
+
+
+// ==========================================
+// MECE — 軸が直交していること
+//
+// ファネルの読み違いは「同じ人・同じ試行を別の軸で二度数える」ときに起きる。
+// 各軸が排他かつ網羅であることを、実装ではなく台帳の側で担保する。
+// ==========================================
+
+test('MECE: block_reason は全値が1つの block_class に分類される', () => {
+  // 理由を足して分類を忘れると Record の型で落ちる。ここでは値の側を確認する
+  assert.deepEqual(
+    Object.keys(SUBMISSION_BLOCK_CLASS_BY_REASON).sort(),
+    [...SUBMISSION_BLOCK_REASONS].sort()
+  );
+  for (const reason of SUBMISSION_BLOCK_REASONS) {
+    assert.ok(
+      SUBMISSION_BLOCK_CLASSES.includes(SUBMISSION_BLOCK_CLASS_BY_REASON[reason]),
+      `${reason} の block_class が台帳の外にある`
+    );
+  }
+});
+
+test('MECE: block_class は呼び出し側が指定しなくても理由から自動で載る', () => {
+  const sent = onProduction(() => {
+    pokefutaEvents.submissionBlocked({
+      submission_kind: 'design',
+      block_reason: 'suspended',
+      block_phase: 'entry',
+    });
+    pokefutaEvents.submissionBlocked({
+      submission_kind: 'character',
+      block_reason: 'too_far',
+      block_phase: 'presend',
+    });
+  });
+  assert.deepEqual(
+    sent.map((event) => event.params.block_class),
+    ['policy', 'proximity']
+  );
+});
+
+test('MECE: block_class は呼び出し側が渡した値で上書きできない', () => {
+  // `PokefutaEventParams` に索引シグネチャがあるので、型だけでは混入を止められない。
+  // spread の後ろで台帳から載せ直していることを、実際の送信内容で確かめる。
+  const sent = onProduction(() => {
+    pokefutaEvents.submissionBlocked({
+      submission_kind: 'design',
+      block_reason: 'suspended',
+      block_phase: 'entry',
+      // 運用judgment の停止を「こちら側の障害」に見せかけようとする呼び出し
+      block_class: 'system',
+    } as unknown as Parameters<typeof pokefutaEvents.submissionBlocked>[0]);
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].params.block_class, SUBMISSION_BLOCK_CLASS_BY_REASON.suspended);
+  assert.equal(sent[0].params.block_class, 'policy');
+});
+
+test('MECE: block_phase が理由と直交して載る（同じ理由でも位置で分かれる）', () => {
+  const sent = onProduction(() => {
+    for (const phase of SUBMISSION_BLOCK_PHASES) {
+      pokefutaEvents.submissionBlocked({
+        submission_kind: 'design',
+        block_reason: 'official_manhole_nearby',
+        block_phase: phase,
+      });
+    }
+  });
+  assert.deepEqual(sent.map((event) => event.params.block_phase), [...SUBMISSION_BLOCK_PHASES]);
+  // 理由は同じまま。位置だけが変わる＝2軸が独立している
+  assert.deepEqual(
+    new Set(sent.map((event) => event.params.block_reason)),
+    new Set(['official_manhole_nearby'])
+  );
+});
+
+test('MECE: 系統ごとの理由表が、全体の台帳を過不足なく覆う', () => {
+  const declared = new Set([
+    ...SUBMISSION_BLOCK_REASONS_BY_KIND.character,
+    ...SUBMISSION_BLOCK_REASONS_BY_KIND.design,
+  ]);
+  // 網羅: どの理由も、少なくとも片方の系統で起きうると宣言されている
+  for (const reason of SUBMISSION_BLOCK_REASONS) {
+    assert.ok(declared.has(reason), `${reason} がどちらの系統でも起きないことになっている`);
+  }
+  // 逆向き: 台帳に無い理由を系統表に書けない
+  for (const reason of declared) {
+    assert.ok(
+      (SUBMISSION_BLOCK_REASONS as readonly string[]).includes(reason),
+      `${reason} は SUBMISSION_BLOCK_REASONS に無い`
+    );
+  }
+  // 重複した宣言を残さない（同じ理由を2回並べると期待件数がぶれる）
+  for (const kind of ['character', 'design'] as const) {
+    const list = SUBMISSION_BLOCK_REASONS_BY_KIND[kind];
+    assert.equal(new Set(list).size, list.length, `${kind} の理由表に重複がある`);
+  }
+});
+
+test('MECE: 送信・完了・失敗に attempt_no が載る（再送を人数に混ぜない）', () => {
+  const sent = onProduction(() => {
+    pokefutaEvents.photoUploadStart({ submission_kind: 'design', attempt_no: 2 });
+    pokefutaEvents.photoUploadComplete({ submission_kind: 'design', attempt_no: 2 });
+    pokefutaEvents.submissionFailed({ submission_kind: 'design', stage: 'upload', attempt_no: 1 });
+  });
+  assert.deepEqual(sent.map((event) => event.params.attempt_no), [2, 2, 1]);
+});
+
+test('MECE: 失敗の分類は両系統で同じ規則（ステータスが文言より優先される）', () => {
+  // サーバーが答えているならステータスが正。文言を変えても分類は動かない
+  assert.equal(classifyClientSubmissionError(new Error('セッションが切れました'), 401), 'unauthorized');
+  assert.equal(classifyClientSubmissionError(new Error('投稿に失敗しました'), 503), 'server');
+  assert.equal(classifyClientSubmissionError(new Error('投稿に失敗しました'), 409), 'rejected');
+  assert.equal(classifyClientSubmissionError(new Error('too large'), 413), 'file_size');
+
+  // 応答が無い場合だけ文言と例外の型を見る
+  assert.equal(
+    classifyClientSubmissionError(Object.assign(new Error('Failed to fetch'), { name: 'TypeError' })),
+    'network'
+  );
+  assert.equal(classifyClientSubmissionError(new Error('セッションが切れました')), 'unauthorized');
+  assert.equal(classifyClientSubmissionError(new Error('GPS座標が見つかりません')), 'gps_validation');
+  assert.equal(classifyClientSubmissionError(new Error('なにか')), 'unknown');
+  assert.equal(classifyClientSubmissionError(undefined), 'unknown');
+
+  // 返す値は必ず台帳の中
+  for (const status of [400, 401, 403, 404, 409, 413, 500, 503, undefined]) {
+    assert.ok(
+      (SUBMISSION_ERROR_TYPES as readonly string[]).includes(
+        classifyClientSubmissionError(new Error('x'), status)
+      )
+    );
+  }
 });
