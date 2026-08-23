@@ -16,6 +16,7 @@
     "test:manhole-gallery": "tsx --test tests/manhole-photo-ranking.test.ts",
     "test:manhole-label": "tsx --test tests/manhole-label.test.ts",
     "test:json-ld": "tsx --test tests/json-ld.test.ts",
+    "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
     "test:japanese-phrases": "tsx --test tests/japanese-phrases.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",

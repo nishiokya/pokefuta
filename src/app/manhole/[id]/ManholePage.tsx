@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
-  Sparkles, ChevronUp, Eye, EyeOff, Heart,
+  Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
@@ -29,6 +29,7 @@ import {
   manholeLabel,
   manholePlaceLabel,
 } from '@/lib/manhole-label';
+import { buildStatBadges, computeManholeStats, officialUrl } from '@/lib/manhole-stats';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
@@ -578,6 +579,14 @@ export default function ManholeDetailPage() {
   const titleBadges = getSortedTitles(manhole.titles);
   // h1 の括弧の中身。空なら括弧ごと出さない（図鑑の h1 と同じ規則。`manholeHeading()` 参照）
   const headingPokemons = filterPokemons(manhole.pokemons);
+  // 統計バッジ（{県}N枚 / 同じポケモンN枚 / 30km以内にN件）。抑制規則は lib 側。
+  const statBadges = buildStatBadges(
+    manhole,
+    computeManholeStats(manhole, allManholes),
+    manhole.titles
+  );
+  const officialDetailHref = officialUrl(manhole.detail_url);
+  const officialPrefectureHref = officialUrl(manhole.official_url);
 
   const renderRelatedCards = (items: Array<{ manhole: Manhole; distance?: number }>) => (
     <div className="flex flex-col gap-2">
@@ -1123,8 +1132,10 @@ export default function ManholeDetailPage() {
             })()}
           </div>
 
-          {/* ── Rarity pills ── */}
-          {titleBadges.length > 0 ? (
+          {/* ── Rarity pills + stats ──
+              図鑑と同じく、称号バッジのあとに統計バッジを続ける。
+              抑制規則（称号と内容が重なるものは出さない）は `buildStatBadges()` 側。 */}
+          {(titleBadges.length > 0 || statBadges.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {titleBadges.map((title, idx) => (
                 <span
@@ -1134,8 +1145,16 @@ export default function ManholeDetailPage() {
                   {title.emoji || '★'} {title.label}
                 </span>
               ))}
+              {statBadges.map((badge) => (
+                <span
+                  key={badge.key}
+                  className="rounded-full border border-[#e9dfc7] bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#6f6657]"
+                >
+                  {badge.label}
+                </span>
+              ))}
             </div>
-          ) : null}
+          )}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
           {!photosLoading && !photoLoadError && photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
@@ -1159,6 +1178,27 @@ export default function ManholeDetailPage() {
                   minHeight={140}
                 />
               </div>
+              {/*
+                設置場所。**住所は写真館に1文字も出ていなかった。**
+                地図は現在地からの位置関係しか伝えないので、控えたり人に伝えたりできる
+                文字列が要る。項目立ては図鑑の「設置場所」カードに合わせている。
+              */}
+              <dl className="border-t border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs">
+                <div className="flex gap-3 py-1">
+                  <dt className="w-16 shrink-0 font-bold text-[#9b917e]">都道府県</dt>
+                  <dd className="font-bold text-[#2c2a26]">{manhole.prefecture}</dd>
+                </div>
+                <div className="flex gap-3 py-1">
+                  <dt className="w-16 shrink-0 font-bold text-[#9b917e]">市区町村</dt>
+                  <dd className="font-bold text-[#2c2a26]">{municipality}</dd>
+                </div>
+                {manhole.address && (
+                  <div className="flex gap-3 py-1">
+                    <dt className="w-16 shrink-0 font-bold text-[#9b917e]">住所</dt>
+                    <dd className="font-bold leading-snug text-[#2c2a26]">{manhole.address}</dd>
+                  </div>
+                )}
+              </dl>
               <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
                 <button
                   onClick={openInMaps}
@@ -1260,6 +1300,44 @@ export default function ManholeDetailPage() {
               <span>ポケふた図鑑で{manhole.prefecture}を見る</span>
               <span className="ml-auto text-base" aria-hidden="true">›</span>
             </a>
+          )}
+
+          {/*
+            ── 公式サイト ──
+            ポケモン公式（local.pokemon.jp）の蓋ページと自治体ページ。図鑑には最初から
+            あったが写真館には無く、一次情報へ辿れなかった。
+            URLはスクレイプ由来なので `officialUrl()` で検証してから出す
+            （実データに相対パスのまま入っている行が5枚ある）。
+            `prefecture_site_url` は出さない。非空の328枚すべてで `official_url` と
+            同じ値で、並べると同じ場所へ行くリンクが2本並ぶだけになる。
+          */}
+          {(officialDetailHref || officialPrefectureHref) && (
+            <div className="flex flex-col gap-2">
+              {officialDetailHref && (
+                <a
+                  href={officialDetailHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[48px] items-center gap-2.5 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs font-bold text-[#6f6657] shadow-sm transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+                  <span>ポケモン公式のポケふた紹介ページ</span>
+                  <span className="ml-auto text-base" aria-hidden="true">›</span>
+                </a>
+              )}
+              {officialPrefectureHref && (
+                <a
+                  href={officialPrefectureHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[48px] items-center gap-2.5 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs font-bold text-[#6f6657] shadow-sm transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+                  <span>ポケモン公式の{manhole.prefecture}のページ</span>
+                  <span className="ml-auto text-base" aria-hidden="true">›</span>
+                </a>
+              )}
+            </div>
           )}
 
           {/* ── Share ── */}
