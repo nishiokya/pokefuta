@@ -589,7 +589,14 @@ export default function ManholeDetailPage() {
           className="flex items-center gap-2 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#fbf6ea]"
         >
           <MapPin className="h-4 w-4 shrink-0 text-[#9b917e]" strokeWidth={2} />
-          <span className="min-w-0 flex-1 truncate font-pixelJp text-xs font-bold text-[#2c2a26]">
+          {/*
+            **truncate を付けない。** ラベルの末尾にはその蓋を関連たらしめるポケモンが来る
+            （「同じポケモンのポケふた」なら共通のポケモン）ので、1行に収めて省略すると
+            肝心の語が消える。実測では 390px 端末で
+            「宮城県仙台のポケふた（ウミディグダ・チョンチー・ホエルコ・」まで出て
+            ラプラスが落ちていた。図鑑側も折り返しており、省略はしていない。
+          */}
+          <span className="min-w-0 flex-1 font-pixelJp text-xs font-bold leading-snug text-[#2c2a26]">
             {manholeLabel(m)}
           </span>
           {distance !== undefined && (
