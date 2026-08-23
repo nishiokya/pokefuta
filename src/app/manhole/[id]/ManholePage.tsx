@@ -607,7 +607,6 @@ export default function ManholeDetailPage() {
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
-  const remainingGalleryPhotos = Math.max(0, allDisplayPhotos.length - galleryPreviewPhotos.length);
   const photoContributorCount = new Set(
     allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
   ).size;
@@ -829,6 +828,59 @@ export default function ManholeDetailPage() {
     </div>
   );
 
+  // Every photo on this manhole, always visible — no "+N" gate, nobody's shot stays hidden.
+  const allPhotosGrid = allDisplayPhotos.length > 1 ? (
+    <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">すべての写真</span>
+        <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+        {allDisplayPhotos.map((photo, index) => (
+          <div
+            key={photo.id}
+            className={`relative aspect-square overflow-hidden rounded-[10px] border-2 ${
+              photoExpanded && featuredPhoto?.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedPhotoIdx(index);
+                setPhotoExpanded(true);
+                requestAnimationFrame(() => {
+                  document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+              }}
+              aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
+              className="block h-full w-full p-0"
+            >
+              <img
+                src={`/api/photo/${photo.id}?size=small`}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            </button>
+            {photo.visit?.id && (
+              <span className="absolute right-1 top-1 z-10">
+                <PhotoLikeButton
+                  visitId={photo.visit.id}
+                  isLoggedIn={isLoggedIn}
+                  loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                  variant="gallery"
+                />
+              </span>
+            )}
+            <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-['Outfit'] text-[9px] font-bold text-white">
+              {index + 1}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
   // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
   const promptCard = !photosLoading && !photoLoadError && photoState === 'none'
@@ -943,54 +995,6 @@ export default function ManholeDetailPage() {
                       )}
                     </div>
                   </div>
-                  {allDisplayPhotos.length > 1 && (
-                    <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">すべての写真</span>
-                        <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
-                        {allDisplayPhotos.map((photo, index) => (
-                          <div
-                            key={photo.id}
-                            className={`relative aspect-square overflow-hidden rounded-[10px] border-2 ${
-                              featuredPhoto.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedPhotoIdx(index);
-                                document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }}
-                              aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
-                              className="block h-full w-full p-0"
-                            >
-                              <img
-                                src={`/api/photo/${photo.id}?size=small`}
-                                alt=""
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                              />
-                            </button>
-                            {photo.visit?.id && (
-                              <span className="absolute right-1 top-1 z-10">
-                                <PhotoLikeButton
-                                  visitId={photo.visit.id}
-                                  isLoggedIn={isLoggedIn}
-                                  loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
-                                  variant="gallery"
-                                />
-                              </span>
-                            )}
-                            <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-['Outfit'] text-[9px] font-bold text-white">
-                              {index + 1}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : allDisplayPhotos.length === 1 ? (
                 <button
@@ -1054,11 +1058,6 @@ export default function ManholeDetailPage() {
                             </span>
                           )}
                         </span>
-                        {index === galleryPreviewPhotos.length - 1 && remainingGalleryPhotos > 0 && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/40 font-['Outfit'] text-2xl font-black text-white backdrop-blur-[1px]">
-                            +{remainingGalleryPhotos}
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -1067,21 +1066,8 @@ export default function ManholeDetailPage() {
 
               <div className="flex items-center justify-between gap-3 px-1">
                 <div className="flex min-w-0 items-center gap-1.5 font-pixelJp text-[11px] font-semibold text-[#8b816f]">
-                  {photoContributorCount > 0 && <span>{photoContributorCount}人が撮影</span>}
-                  {photoExpanded ? (
-                    <span>全{allDisplayPhotos.length}枚</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedPhotoIdx(0);
-                        setPhotoExpanded(true);
-                      }}
-                      className="rounded-full px-1.5 py-1 font-bold text-[#bf5640] underline decoration-[#dfb7aa] underline-offset-2 hover:bg-[#fdeae2]"
-                    >
-                      全{allDisplayPhotos.length}枚を見る
-                    </button>
-                  )}
+                  {photoContributorCount > 0 && <span>{photoContributorCount}人が撮影・</span>}
+                  <span>全{allDisplayPhotos.length}枚</span>
                 </div>
                 <button
                   type="button"
@@ -1091,6 +1077,8 @@ export default function ManholeDetailPage() {
                   <Plus className="h-3 w-3" strokeWidth={2.4} />写真を追加
                 </button>
               </div>
+
+              {allPhotosGrid}
             </div>
           )}
 
@@ -1103,11 +1091,6 @@ export default function ManholeDetailPage() {
             <h2 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
               {manhole.prefecture}{municipality}のポケふた
             </h2>
-            {photoState === 'community' && isLoggedIn && (
-              <p className="mt-1 font-pixelJp text-[13px] lg:text-[14.5px] font-bold text-[#bf5640]">
-                あなたの構図で塗り替える
-              </p>
-            )}
             {manhole.pokemons && manhole.pokemons.length > 0 && (
               <p className="mt-1.5 font-pixelJp text-[12.5px] lg:text-[14.5px] leading-relaxed text-[#6f6657]">
                 {manhole.pokemons.join('・')}が描かれたポケモンマンホール

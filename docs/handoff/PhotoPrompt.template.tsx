@@ -67,10 +67,10 @@ const COPY = {
     postedSub: false,
   },
   posted: {
-    subhead: 'あなたの構図で塗り替える',
+    subhead: null as string | null,
     ribbonLeft: 'あなたはまだ未記録',
     cta: 'あなたの1枚を加える',
-    postedSub: true,
+    postedSub: false,
   },
 } as const;
 

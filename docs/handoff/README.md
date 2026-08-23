@@ -73,7 +73,7 @@ type PhotoPromptProps = {
 | ヒーローbadge（左上） | `🚩 一番乗りチャンス` | `🖼 みんなの写真 {photoCount}枚` |
 | ヒーローbadge（右上） | （なし／`未訪問`） | `あなたは未投稿`（terracotta地・白文字） |
 | ヒーロー中央 | `0` ＋ `この場所の写真はまだ0枚` ＋ `あなたが最初の記録者に`(terracotta) | 既存写真サムネ（実画像）|
-| 見出し直下サブ | （なし） | `あなたの構図で塗り替える`(terracotta, 13px/700) |
+| 見出し直下サブ | （なし） | （なし）※旧仕様の `あなたの構図で塗り替える` は意味が伝わらないため廃止 |
 | カード上部リボン左 | `🚩 まだ誰も投稿していない` | `🖼 あなたはまだ未記録` |
 | カード上部リボン右 | `0人 › #1`（#1 を terracotta 強調） | `0 /1 図鑑`（0 を terracotta 強調） |
 | カード本体（A共通） | `🏆 撮ると写真図鑑も埋まる` ＋ `北海道 写真図鑑 13 → 14 /50` ＋ `+1 シリーズ進捗` | 同左 |
@@ -93,7 +93,7 @@ type PhotoPromptProps = {
 1. **ヒーロー**: `height 192px / radius 16px / overflow hidden`
    - `empty`: 点線枠 `2px dashed #cdbf9f`、地は斜めストライプ `repeating-linear-gradient(135deg,#f3ecdc 0 11px,#ece2cd 11px 22px)`。中央に大きな `0`(Outfit 800/40px, #cdbb92)＋テキスト。左上に「一番乗りチャンス」badge。
    - `posted`: 実写真（全面）。左上「みんなの写真 N枚」badge（白90%地）、右上「あなたは未投稿」badge（terracotta地）。
-2. **ロケーション＋タイトル**: `📍 北海道 / 網走`(12px/600, ink-faint) → タイトル(M PLUS Rounded 800/21px)。`posted` はサブ「あなたの構図で塗り替える」を追加。
+2. **ロケーション＋タイトル**: `📍 北海道 / 網走`(12px/600, ink-faint) → タイトル(M PLUS Rounded 800/21px)。`posted` でもサブコピーは付けない（旧「あなたの構図で塗り替える」は廃止）。
 3. **統合カード** `card / radius 18 / border 1.5px #efd9a3 / overflow hidden`:
    - 上部リボン: 地 `linear-gradient(100deg,#fdeae2,#fdf1e6)`、padding 11/14。左にflag(またはimage)アイコン＋短文、右に `0人 › #1`（または `0 /1 図鑑`）。テキストは `white-space:nowrap`。
    - 本体: padding 14。アイコンチップ(28px, 角丸8, 地#fde2c2, trophy/amber-d) ＋ 見出し「撮ると写真図鑑も埋まる」。
@@ -129,7 +129,7 @@ type PhotoPromptProps = {
 > ⚠️ 旧版にあった `1fr 372px / gap 24 / padding 28` は**この体系に置き換え済み**（372→360・gap 24→28・gutter 28→32）。混在が「横幅バラバラ」の原因だったため、**372/24/28 の旧値は使わない**。
 
 **詳細ページ（empty / posted 共通）** — 上記グリッドに乗せる。
-- **左カラム（本文）**: ヒーロー（`height 340px`、empty は大きな `0`=Outfit 800/72px、posted は実写真ギャラリー＝大写真＋サムネ列＋末尾に点線「＋追加」スロット）→ ロケーション＋タイトル（30px、posted はサブ「あなたの構図で塗り替える」15px）→ 説明文 → 希少性ピル → 地図カード。
+- **左カラム（本文）**: ヒーロー（`height 340px`、empty は大きな `0`=Outfit 800/72px、posted は実写真ギャラリー＝大写真＋サムネ列＋末尾に点線「＋追加」スロット）→ ロケーション＋タイトル（30px、サブコピーなし）→ 説明文 → 希少性ピル → 地図カード。
 - **右レール（プロンプト）**: `<PhotoPrompt withHero={false}>` を sticky 固定。リボン＋「撮ると写真図鑑も埋まる」進捗＋主CTA＋あとで＋安心コピー1行。スクロールしてもCTAが視界に残る。
 
 **スタンプ帳ホーム** — 同じグリッド。
