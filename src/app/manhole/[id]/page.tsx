@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import ManholePage from './ManholePage';
 import { loadPhotoForOgp } from '@/lib/manhole-ogp';
 import { fetchSnapshotManhole } from '@/lib/manhole-snapshot';
+import { serializeJsonLd } from '@/lib/json-ld';
 import {
-  manholeLabel,
+  manholeHeading,
   manholeLocationLabel,
   manholePlaceLabel,
   pokemonText,
+  type ManholeLabelSource,
 } from '@/lib/manhole-label';
 import { getSortedTitles } from '@/lib/shared-photo';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL, pageTitle } from '@/lib/constants';
@@ -19,14 +21,7 @@ type Props = {
 
 export const dynamic = 'force-dynamic';
 
-type ManholeMetaSource = {
-  prefecture?: string | null;
-  city?: string | null;
-  municipality?: string | null;
-  pokemons?: string[] | null;
-  title?: string | null;
-  titles?: ManholeTitle[] | null;
-};
+type ManholeMetaSource = ManholeLabelSource & { titles?: ManholeTitle[] | null };
 
 /**
  * title / description / JSON-LD は**このファイルだけ**が作る。
@@ -114,7 +109,7 @@ export default async function Page({ params }: Props) {
     ? {
         '@context': 'https://schema.org',
         '@type': 'TouristAttraction',
-        name: manholeLabel(manhole),
+        name: manholeHeading(manhole),
         description: buildManholeMeta(manhole).description,
         url: `${SITE_URL}/manhole/${manhole.id}`,
         ...(manhole.address
@@ -144,7 +139,7 @@ export default async function Page({ params }: Props) {
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       )}
       <ManholePage />

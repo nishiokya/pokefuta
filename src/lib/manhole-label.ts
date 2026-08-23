@@ -53,9 +53,27 @@ export function manholePlaceLabel(manhole: ManholeLabelSource): string {
   return `${location || manhole.title || ''}のポケふた`;
 }
 
-/** 「宮城県大河原のポケふた（チェリム・ラプラス）」。h1 と関連カードのリンク文言。 */
+/**
+ * 「宮城県大河原のポケふた（チェリム・ラプラス）」。**関連カードのリンク文言**。
+ * ポケモンが1件も無くても括弧は出し、中身は「ポケモン」になる。
+ * 図鑑の `manhole_label()` と同じ振る舞い。
+ */
 export function manholeLabel(manhole: ManholeLabelSource): string {
   return `${manholePlaceLabel(manhole)}（${pokemonText(manhole.pokemons)}）`;
+}
+
+/**
+ * 「宮城県大河原のポケふた（チェリム・ラプラス）」。**見出し（h1）と JSON-LD の name**。
+ *
+ * `manholeLabel()` と違い、ポケモンが1件も無ければ括弧ごと落とす。図鑑は h1 と
+ * 関連カードで規則を分けており（`h1 += "（…）" if pokemons` に対し
+ * `manhole_label()` は常に括弧＋「ポケモン」）、ここもそれに合わせる。
+ * 1本に畳むと、ポケモン不明の蓋の見出しが「〜のポケふた（ポケモン）」になる。
+ */
+export function manholeHeading(manhole: ManholeLabelSource): string {
+  const place = manholePlaceLabel(manhole);
+  const list = filterPokemons(manhole.pokemons);
+  return list.length > 0 ? `${place}（${list.join('・')}）` : place;
 }
 
 /**

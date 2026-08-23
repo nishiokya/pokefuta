@@ -24,10 +24,10 @@ import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { SITE_URL } from '@/lib/constants';
 import {
+  filterPokemons,
   formatDistanceKm,
   manholeLabel,
   manholePlaceLabel,
-  pokemonText,
 } from '@/lib/manhole-label';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
@@ -576,6 +576,8 @@ export default function ManholeDetailPage() {
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const prefectureDexHref = prefectureDexUrl(manhole.prefecture);
   const titleBadges = getSortedTitles(manhole.titles);
+  // h1 の括弧の中身。空なら括弧ごと出さない（図鑑の h1 と同じ規則。`manholeHeading()` 参照）
+  const headingPokemons = filterPokemons(manhole.pokemons);
 
   const renderRelatedCards = (items: Array<{ manhole: Manhole; distance?: number }>) => (
     <div className="flex flex-col gap-2">
@@ -1061,9 +1063,11 @@ export default function ManholeDetailPage() {
             */}
             <h1 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
               {manholePlaceLabel(manhole)}
-              <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
-                （{pokemonText(manhole.pokemons)}）
-              </span>
+              {headingPokemons.length > 0 && (
+                <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
+                  （{headingPokemons.join('・')}）
+                </span>
+              )}
             </h1>
             {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
             {featuredPhoto && (() => {

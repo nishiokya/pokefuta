@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   filterPokemons,
   formatDistanceKm,
+  manholeHeading,
   manholeLabel,
   manholeLocationLabel,
   manholePlaceLabel,
@@ -22,7 +23,16 @@ const manhole128 = {
 test('見出しラベルは図鑑の h1 と同一', () => {
   assert.equal(manholeLocationLabel(manhole128), '宮城県大河原');
   assert.equal(manholePlaceLabel(manhole128), '宮城県大河原のポケふた');
+  assert.equal(manholeHeading(manhole128), '宮城県大河原のポケふた（チェリム・ラプラス）');
   assert.equal(manholeLabel(manhole128), '宮城県大河原のポケふた（チェリム・ラプラス）');
+});
+
+test('ポケモンが無いとき、見出しは括弧ごと落とす / カードは「ポケモン」を出す', () => {
+  // 図鑑は h1 と関連カードで規則が違う。1本に畳むと見出しが
+  // 「〜のポケふた（ポケモン）」になってしまうので分けている。
+  const noPokemon = { prefecture: '宮城県', city: '大河原', pokemons: [] };
+  assert.equal(manholeHeading(noPokemon), '宮城県大河原のポケふた');
+  assert.equal(manholeLabel(noPokemon), '宮城県大河原のポケふた（ポケモン）');
 });
 
 test('ポケモン名は省略しない — 省略すると共通ポケモンが消える', () => {
