@@ -22,7 +22,13 @@ import { calculateDistance } from '@/lib/location';
 import { orderManholePhotosForViewer } from '@/lib/manhole-photo-ranking';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
-import { SITE_URL, pageTitle } from '@/lib/constants';
+import { SITE_URL } from '@/lib/constants';
+import {
+  formatDistanceKm,
+  manholeLabel,
+  manholePlaceLabel,
+  pokemonText,
+} from '@/lib/manhole-label';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
@@ -209,12 +215,6 @@ function PhotoLikeButton({
   );
 }
 
-const relatedManholeLabel = (m: Manhole) => {
-  const muni = m.city || m.municipality || '';
-  const poke = (m.pokemons ?? []).slice(0, 3).join('・');
-  return `${m.prefecture}${muni}のポケふた${poke ? `（${poke}）` : ''}`;
-};
-
 export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -268,52 +268,14 @@ export default function ManholeDetailPage() {
     }
   }, [manhole?.id]);
 
-  useEffect(() => {
-    if (manhole) {
-      const municipality = manhole.city || manhole.municipality || '場所未設定';
-      const pokemonList = manhole.pokemons?.length > 0 ? manhole.pokemons.join('・') : '';
-
-      document.title = pageTitle(
-        pokemonList
-          ? `${manhole.prefecture}${municipality}のポケふた｜${pokemonList}`
-          : `${manhole.prefecture}${municipality}のポケふた`
-      );
-
-      const descriptionText = pokemonList
-        ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。経路案内や写真登録にも対応。`
-        : `${manhole.prefecture}${municipality}にあるポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。`;
-
-      let metaDesc = document.querySelector('meta[name="description"]');
-      if (!metaDesc) {
-        metaDesc = document.createElement('meta');
-        metaDesc.setAttribute('name', 'description');
-        document.head.appendChild(metaDesc);
-      }
-      metaDesc.setAttribute('content', descriptionText);
-
-      const structuredData = {
-        '@context': 'https://schema.org',
-        '@type': 'TouristAttraction',
-        name: `${manhole.prefecture}${municipality}のポケふた`,
-        description: pokemonList
-          ? `${manhole.prefecture}${municipality}にある、${pokemonList}が描かれたポケモンマンホールです。`
-          : `${manhole.prefecture}${municipality}にあるポケモンマンホールです。`,
-        geo:
-          manhole.latitude && manhole.longitude
-            ? { '@type': 'GeoCoordinates', latitude: manhole.latitude, longitude: manhole.longitude }
-            : undefined,
-        url: `https://pokefuta.com/manhole/${manhole.id}`,
-      };
-
-      let script = document.querySelector('script[type="application/ld+json"]');
-      if (!script) {
-        script = document.createElement('script');
-        script.setAttribute('type', 'application/ld+json');
-        document.head.appendChild(script);
-      }
-      script.textContent = JSON.stringify(structuredData);
-    }
-  }, [manhole]);
+  // title / meta description / JSON-LD はここでは触らない。
+  // `page.tsx` の `generateMetadata` とサーバ描画の JSON-LD が唯一の出どころ。
+  //
+  // 以前はこの位置の useEffect が3点とも別ルールで上書きしており、クローラとOGPが
+  // 見るサーバ側の値と、人が見るクライアント側の値が食い違っていた。しかも図鑑
+  // （data.pokefuta.com）と形式が揃っていたのは**クライアント側だけ**で、揃っている
+  // 方が検索エンジンには届いていなかった。JSON-LD に至っては JS を実行しない
+  // クローラには1件も届いていない。
 
   const loadCurrentUser = async () => {
     try {
@@ -626,11 +588,11 @@ export default function ManholeDetailPage() {
         >
           <MapPin className="h-4 w-4 shrink-0 text-[#9b917e]" strokeWidth={2} />
           <span className="min-w-0 flex-1 truncate font-pixelJp text-xs font-bold text-[#2c2a26]">
-            {relatedManholeLabel(m)}
+            {manholeLabel(m)}
           </span>
           {distance !== undefined && (
             <span className="shrink-0 font-['Outfit'] text-xs font-bold text-[#9b917e]">
-              {distance < 10 ? distance.toFixed(1) : Math.round(distance)} km
+              {formatDistanceKm(distance)}
             </span>
           )}
         </button>
@@ -1090,14 +1052,19 @@ export default function ManholeDetailPage() {
               <MapPin className="h-3.5 w-3.5 text-[#9b917e]" strokeWidth={2.2} />
               {manhole.prefecture} / {municipality}
             </div>
-            <h2 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
-              {manhole.prefecture}{municipality}のポケふた
-            </h2>
-            {manhole.pokemons && manhole.pokemons.length > 0 && (
-              <p className="mt-1.5 font-pixelJp text-[12.5px] lg:text-[14.5px] leading-relaxed text-[#6f6657]">
-                {manhole.pokemons.join('・')}が描かれたポケモンマンホール
-              </p>
-            )}
+            {/*
+              ページの主見出し。図鑑と同じ「{都道府県}{市区町村}のポケふた（{ポケモン}）」。
+              以前は h2 で、しかもページ全体に h1 が1つも無かった。ポケモン名は
+              「{ポケモン}が描かれたポケモンマンホール」という別の段落に置いていたが、
+              見出しへ入れたことで重複するので畳んだ。
+              括弧の中だけ細くしているのは見た目の話で、テキストは図鑑の h1 と同一。
+            */}
+            <h1 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
+              {manholePlaceLabel(manhole)}
+              <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
+                （{pokemonText(manhole.pokemons)}）
+              </span>
+            </h1>
             {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
             {featuredPhoto && (() => {
               const isOwn = featuredPhoto.visit?.user_id === currentUserId;
