@@ -7,8 +7,9 @@
  * 蓋のデータはポケモン公式サイトからのスクレイプなので、こちらで内容を保証できない。
  *
  * 図鑑側は同じ問題を pokefuta-tracker の `generate_manhole_pages.py` の
- * `_js_json()` で処理済み（`</` → `<\/`）。ここは `<` を丸ごと `<` にする。
- * JSON の文字列リテラルとしては同じ値のまま、生のテキストに `</` が現れなくなる。
+ * `_js_json()` で処理済み（`</` → `<\/` に置換）。こちらは `<` をすべて
+ * `\u003c`（JSON のユニコードエスケープ）に置き換える。JSON としてデコードすれば
+ * 元の `<` に戻るので値は変わらず、生のテキストには `</script>` が現れなくなる。
  */
 export function serializeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
