@@ -14,7 +14,6 @@ import { Manhole } from '@/types/database';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ShareButtons from '@/components/ShareButtons';
-import Breadcrumb from '@/components/Breadcrumb';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
@@ -840,8 +839,6 @@ export default function ManholeDetailPage() {
     <div className="min-h-content safe-area-body bg-[#f1e8d4]">
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={promptCard}>
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
-          <Breadcrumb href="/nearby" label="ポケふたを探す" />
-
           {/* ── Gallery ── */}
           {photosLoading ? (
             <div className="flex h-[210px] items-center justify-center rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] lg:h-[360px] lg:rounded-[18px]">
