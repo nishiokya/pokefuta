@@ -97,9 +97,9 @@ export default function Error({
             こちらもおすすめ
           </h3>
           <div className="space-y-2">
-            <Link href="/manholes" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
+            <Link href="/map" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <MapPin className="w-4 h-4 text-rpg-blue" />
-              <span className="font-pixelJp text-xs text-rpg-textDark">一覧から探す</span>
+              <span className="font-pixelJp text-xs text-rpg-textDark">マップから探す</span>
             </Link>
             <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Navigation className="w-4 h-4 text-rpg-blue" />
