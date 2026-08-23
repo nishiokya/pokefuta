@@ -34,12 +34,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/manholes`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
       url: `${baseUrl}/nearby`,
       lastModified,
       changeFrequency: 'weekly',
