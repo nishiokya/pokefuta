@@ -1,4 +1,5 @@
 import 'server-only';
+import type { ManholeTitle } from '@/types/database';
 
 /**
  * data.pokefuta.com (GitHub Pages) が日次で配信する静的スナップショットを読む。
@@ -25,6 +26,10 @@ export interface SnapshotManhole {
   latitude: number;
   longitude: number;
   pokemons: string[];
+  // 称号（レアポケふた等）と住所。どちらもスナップショットに元から入っており、
+  // 詳細ページの title / JSON-LD の PostalAddress がこれを読む。
+  titles: ManholeTitle[];
+  address: string | null;
   is_visited: boolean;
   last_visit: string | null;
   photo_count: number;
@@ -84,6 +89,20 @@ async function fetchSnapshotJson<T>(path: string): Promise<T | null> {
 
 export function fetchManholeSnapshot(): Promise<ManholeSnapshot | null> {
   return fetchSnapshotJson<ManholeSnapshot>('/api/manholes.json');
+}
+
+/**
+ * 蓋1枚をスナップショットから引く。
+ *
+ * 詳細ページのメタ情報・JSON-LD はここを読む。クライアント側も同じスナップショットを
+ * `/api/manholes` 経由で読んでいるので、**サーバとクライアントで蓋の情報が食い違わない**。
+ * Supabase の `manhole` テーブルは緯度経度を PostGIS の `location` でしか持たず
+ * `city` 列も無いため、JSON-LD の geo を出せるのはこちらだけでもある。
+ */
+export async function fetchSnapshotManhole(id: number): Promise<SnapshotManhole | null> {
+  const snapshot = await fetchManholeSnapshot();
+  if (!snapshot?.manholes) return null;
+  return snapshot.manholes.find((manhole) => manhole.id === id) ?? null;
 }
 
 export function fetchSiteStatsSnapshot(): Promise<SiteStatsSnapshot | null> {

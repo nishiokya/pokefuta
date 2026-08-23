@@ -22,6 +22,8 @@ const official157: SnapshotManhole = {
   latitude: 40.537937,
   longitude: 141.558034,
   pokemons: ['イシツブテ', 'キャモメ'],
+  titles: [],
+  address: '青森県八戸市大字十八日町',
   is_visited: false,
   last_visit: null,
   photo_count: 0,
