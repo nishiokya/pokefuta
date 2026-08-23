@@ -86,7 +86,7 @@ GROUP BY cohort
 ORDER BY cohort;
 
 \echo ''
-\echo '=== 週次コホート（JST・直近12週。週境界で切るので途中の週は出ない）==='
+\echo '=== 週次コホート（JST・今週を含む直近12週。最終行は進行中の週）==='
 
 WITH s AS (
   SELECT
@@ -100,9 +100,11 @@ WITH s AS (
        FROM public.visit v WHERE v.user_id = u.id) AS post_days
   FROM auth.users u
   -- ローリング12週にすると最古の週だけ途中から始まる不完全なコホートになるので、
-  -- 週境界に揃えて切る。
+  -- 週境界に揃えて切る。今週の開始から 11 週さかのぼる＝**今週を含めて12コホート**
+  -- （`- interval '12 weeks'` にすると13週出る）。
+  -- 最終行は進行中の週なので、行数と `mature` の両方で未確定と分かるようにしている。
   WHERE (u.created_at AT TIME ZONE 'Asia/Tokyo')
-        >= date_trunc('week', (now() AT TIME ZONE 'Asia/Tokyo')) - interval '12 weeks'
+        >= date_trunc('week', (now() AT TIME ZONE 'Asia/Tokyo')) - interval '11 weeks'
 )
 SELECT
   cohort,
