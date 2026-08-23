@@ -27,10 +27,14 @@
 psql "$DATABASE_URL" -f tools/cohort-activation.sql
 ```
 
-**分母は `auth.users`。`app_user` を分母にしないこと** — `app_user` の行は初回投稿時
-（`ensureAppUser`）に作られるので、投稿しなかった人が分母から消えて活性化率が
-実際の3倍近くに見える。詳しい理由と、GA4 の `p_signup_complete` を登録数として
+**分母は `auth.users`。`app_user` を分母にしないこと** — `app_user` の行は登録時ではなく
+**何らかの書き込み操作の時**に `ensureAppUser` が作る（投稿・いいね・ブックマーク・
+各コメント・画像アップロード）。登録して何もしなかった人は行が無く、分母から消えて
+活性化率が実際の倍以上に見える。詳しい理由と、GA4 の `p_signup_complete` を登録数として
 使えない理由はファイル冒頭のコメントに書いてある。
+
+コホート同士を比べるときは `act_7d_pct`（登録から7日経ったアカウントだけで揃えた率）を見る。
+`act_pct` は古いコホートほど有利に出るので比較には使わない。`mature=false` の行は未確定。
 
 ### `migrate_manhole_prefecture_ids.sql`
 
