@@ -19,6 +19,23 @@
 - address_norm / building / official_url / titles / hashtags / title_tags フィールド対応
 - Supabase SQL Editor で手動実行しやすい UPDATE only 出力対応
 
+### `cohort-activation.sql`
+
+北極星「新規の初回投稿 → 2回目」の週次コホート集計（読み取り専用）。
+
+```bash
+psql "$DATABASE_URL" -f tools/cohort-activation.sql
+```
+
+**分母は `auth.users`。`app_user` を分母にしないこと** — `app_user` の行は登録時ではなく
+**何らかの書き込み操作の時**に `ensureAppUser` が作る（投稿・いいね・ブックマーク・
+各コメント・画像アップロード）。登録して何もしなかった人は行が無く、分母から消えて
+活性化率が実際の倍以上に見える。詳しい理由と、GA4 の `p_signup_complete` を登録数として
+使えない理由はファイル冒頭のコメントに書いてある。
+
+コホート同士を比べるときは `act_7d_pct`（登録から7日経ったアカウントだけで揃えた率）を見る。
+`act_pct` は古いコホートほど有利に出るので比較には使わない。`mature=false` の行は未確定。
+
 ### `migrate_manhole_prefecture_ids.sql`
 
 既存マンホールデータに prefecture_id と prefecture_code を埋めるヘルパースクリプト。
