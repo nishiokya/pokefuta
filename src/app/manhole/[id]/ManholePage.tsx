@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
-  Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink,
+  Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink, BookOpen,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
@@ -30,7 +30,7 @@ import {
   manholePlaceLabel,
 } from '@/lib/manhole-label';
 import { buildStatBadges, computeManholeStats, officialLinks } from '@/lib/manhole-stats';
-import { prefectureDexUrl } from '@/lib/prefectureSlug';
+import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
 const MapComponent = dynamic(
@@ -576,6 +576,7 @@ export default function ManholeDetailPage() {
   ).size;
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const prefectureDexHref = prefectureDexUrl(manhole.prefecture);
+  const manholeDexHref = manholeDexUrl(manhole.id);
   const titleBadges = getSortedTitles(manhole.titles);
   // h1 の括弧の中身。空なら括弧ごと出さない（図鑑の h1 と同じ規則。`manholeHeading()` 参照）
   const headingPokemons = filterPokemons(manhole.pokemons);
@@ -1284,6 +1285,24 @@ export default function ManholeDetailPage() {
               </h3>
               {renderRelatedCards(related.samePokemon.map((m) => ({ manhole: m })))}
             </div>
+          )}
+
+          {/* ── この蓋の図鑑ページ ──
+              **相互リンクの片側通行をここで塞ぐ。** 図鑑から写真館へは「写真を投稿」と
+              「ポケふた写真館」の2本があるのに、写真館から図鑑の同じ蓋へ戻る線が無かった。
+              図鑑にしか無い情報（ポケモンの解説・周辺のデザインマンホール・網羅リンク）へ
+              辿れず、ブランドを跨いだ人が迷子になる。
+              写真の有無に関わらず常設する（図鑑側の「ポケふた写真館」カードと同じ扱い）。 */}
+          {manholeDexHref && (
+            <a
+              href={manholeDexHref}
+              className="flex min-h-[48px] items-center gap-2.5 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs font-bold text-[#6f6657] shadow-sm transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+              aria-label="ポケふた図鑑でこのポケふたを見る"
+            >
+              <BookOpen className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+              <span>ポケふた図鑑でこのポケふたを見る</span>
+              <span className="ml-auto text-base" aria-hidden="true">›</span>
+            </a>
           )}
 
           {/* ── Prefecture dex ──
