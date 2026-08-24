@@ -37,3 +37,25 @@ export function prefectureDexUrl(prefecture: string | null | undefined): string 
   const slug = prefecture ? PREFECTURE_SLUGS[prefecture] : undefined;
   return slug ? `${DEX_SITE_ORIGIN}/prefectures/${slug}/` : null;
 }
+
+/**
+ * 図鑑の**同じ蓋**のページ URL。
+ *
+ * 図鑑側は蓋ページを写真館と同じマスター（tracker の `docs/pokefuta.ndjson`。
+ * 写真館が読む `docs/api/manholes.json` と同じ起点）から全件生成しているので、
+ * `/api/manholes` に出てくる id には必ず対応するページがある。
+ *
+ * 相互リンクは長らく片側通行だった。図鑑から写真館へは「写真を投稿」と
+ * 「ポケふた写真館」の2本があるのに、写真館から図鑑の同じ蓋へ戻る線が無い。
+ * 住所・ポケモンの解説・周辺情報を見たい人が、ブランドを跨いだ瞬間に迷子になる。
+ *
+ * 内部UTMは付けない（AGENTS.md）。ヘッダーのサイトスイッチャーや都道府県リンクと
+ * 同じく素のURLで出し、計測はクロスドメインリンカーに任せる。
+ */
+export function manholeDexUrl(id: number | string | null | undefined): string | null {
+  if (id === null || id === undefined) return null;
+  const normalized = String(id).trim();
+  // id は数値のみ。想定外の値でURLを組み立てない
+  if (!/^\d+$/.test(normalized)) return null;
+  return `${DEX_SITE_ORIGIN}/manholes/${normalized}/`;
+}
