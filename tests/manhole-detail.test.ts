@@ -42,7 +42,8 @@ test('近傍は距離順・ラベル込みで返る', () => {
 
 test('同じポケモンはラベル込み、自分は入らない', () => {
   const d = buildManholeDetail(target, [target, ...others]);
-  assert.deepEqual(d.samePokemon.map((n) => n.id), [129, 130, 131]);
+  // id 降順。旧実装が `/api/manholes` の id 降順リストを slice していたのと同じ並び
+  assert.deepEqual(d.samePokemon.map((n) => n.id), [131, 130, 129]);
   assert.ok(!d.samePokemon.some((n) => n.id === 128));
   assert.ok(!d.samePokemon.some((n) => n.id === 480));
   // 関連の理由になっているポケモンがラベルに残っている
@@ -63,6 +64,24 @@ test('緯度経度が無ければ近傍は空', () => {
   assert.deepEqual(d.nearby, []);
   // 同じポケモンは座標に依存しないので残る
   assert.ok(d.samePokemon.length > 0);
+});
+
+test('入力の並び順が変わっても結果は変わらない', () => {
+  // 候補の並びは呼び出し側（スナップショットの生成順）に依存させない。
+  // 生成側が `order=id.desc` をやめただけで、出る10件が黙って入れ替わるのを防ぐ。
+  const many = Array.from({ length: 20 }, (_, i) =>
+    near(200 + i, `市${i}`, ['ラプラス'], 38.05 + i * 0.002, 140.74)
+  );
+  const asc = buildManholeDetail(target, [target, ...many]);
+  const desc = buildManholeDetail(target, [target, ...[...many].reverse()]);
+  const shuffled = buildManholeDetail(target, [...many.slice(7), target, ...many.slice(0, 7)]);
+
+  assert.deepEqual(asc.samePokemon, desc.samePokemon);
+  assert.deepEqual(asc.samePokemon, shuffled.samePokemon);
+  assert.deepEqual(asc.nearby, desc.nearby);
+  assert.deepEqual(asc.nearby, shuffled.nearby);
+  // 旧実装（/api/manholes の id 降順リストを slice）と同じ並び
+  assert.deepEqual(asc.samePokemon.map((n) => n.id), [219, 218, 217, 216, 215, 214, 213, 212, 211, 210]);
 });
 
 test('統計とバッジも一緒に返る', () => {

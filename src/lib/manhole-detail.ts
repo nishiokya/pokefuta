@@ -64,7 +64,14 @@ export function buildManholeDetail(
   manhole: DetailSource,
   allManholes: DetailSource[]
 ): ManholeDetailDerived {
-  const others = allManholes.filter((m) => m.id !== manhole.id);
+  // **並びをここで確定させる。** 旧実装は `/api/manholes` が返す id 降順のリストを
+  // slice していた（route.ts の `sort((a, b) => b.id - a.id)`）。スナップショットは
+  // 今のところ生成側が `order=id.desc` で書き出しているので同じ順になるが、それは
+  // 上流の設定に依存しているだけで、変われば「同じポケモンのポケふた」に出る10件が
+  // 黙って入れ替わる。ここで並べ直して、入力の順序に依存しないようにする。
+  const others = allManholes
+    .filter((m) => m.id !== manhole.id)
+    .sort((a, b) => b.id - a.id);
 
   const nearby: RelatedManhole[] =
     manhole.latitude != null && manhole.longitude != null
@@ -81,7 +88,8 @@ export function buildManholeDetail(
             ),
           }))
           .filter((e) => e.distanceKm <= NEARBY_RADIUS_KM)
-          .sort((a, b) => a.distanceKm - b.distanceKm)
+          // 同じ距離の蓋が並んだときも順序が揺れないよう id を第2キーにする
+          .sort((a, b) => a.distanceKm - b.distanceKm || b.id - a.id)
           .slice(0, NEARBY_LIMIT)
       : [];
 
