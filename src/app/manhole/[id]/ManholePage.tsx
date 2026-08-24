@@ -18,7 +18,6 @@ import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { calculateDistance } from '@/lib/location';
 import { orderManholePhotosForViewer } from '@/lib/manhole-photo-ranking';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
@@ -26,10 +25,10 @@ import { SITE_URL } from '@/lib/constants';
 import {
   filterPokemons,
   formatDistanceKm,
-  manholeLabel,
   manholePlaceLabel,
 } from '@/lib/manhole-label';
-import { buildStatBadges, computeManholeStats, officialLinks } from '@/lib/manhole-stats';
+import { officialLinks, type StatBadge } from '@/lib/manhole-stats';
+import type { RelatedManhole } from '@/lib/manhole-detail';
 import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
@@ -220,7 +219,13 @@ export default function ManholeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [manhole, setManhole] = useState<Manhole | null>(null);
-  const [allManholes, setAllManholes] = useState<Manhole[]>([]);
+  // サーバが組み立てた派生値（統計バッジ・関連する蓋）。
+  // 全件を持たなくなったので、この画面ではもう計算しない。
+  const [derived, setDerived] = useState<{
+    statBadges: StatBadge[];
+    nearby: RelatedManhole[];
+    samePokemon: RelatedManhole[];
+  }>({ statBadges: [], nearby: [], samePokemon: [] });
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -294,23 +299,44 @@ export default function ManholeDetailPage() {
     }
   };
 
+  // 1枚ぶんだけ取る。
+  //
+  // 取得開始時に state を初期化する。
+  //
+  // 実測では、蓋を移ると App Router がこのコンポーネントを作り直すので、初期化が
+  // 無くても前の蓋の内容やエラーは残らない（3秒遅らせて遷移しても全画面ローディングのまま）。
+  // ただしそれは**作り直されること頼み**で、コードからは読み取れない暗黙の前提だった。
+  // 共有レイアウトで使い回す形に変えたり、同じ画面で再取得する導線が増えれば崩れる。
+  // ここで明示的に戻して、再生成に依存しないようにする。
+  //
+  // 以前は `/api/manholes` で**全482件・730KB** を落としてから `find` で1件を探し、
+  // 近傍・同じポケモン・統計もこの画面で計算していた。1枚見るために全国分を運んでいた。
+  // 派生値はサーバが組み立てて返すので、ここは受け取って置くだけ。
   const loadManholeDetail = async (id: string) => {
+    setLoading(true);
+    setError(null);
+    setManhole(null);
+    setDerived({ statBadges: [], nearby: [], samePokemon: [] });
     try {
-      const response = await fetch('/api/manholes');
+      const response = await fetch(`/api/manholes/${encodeURIComponent(id)}`);
       if (response.ok) {
         const data = await response.json();
-        const manholesList: Manhole[] = data.manholes || [];
-        setAllManholes(manholesList);
-        const foundManhole = manholesList.find((m: Manhole) => m.id.toString() === id);
-        if (foundManhole) {
-          setManhole(foundManhole);
-          const prefTotal = manholesList.filter((m) => m.prefecture === foundManhole.prefecture).length;
+        if (data?.manhole) {
+          setManhole(data.manhole);
+          setDerived({
+            statBadges: data.statBadges ?? [],
+            nearby: data.nearby ?? [],
+            samePokemon: data.samePokemon ?? [],
+          });
+          const prefTotal = Number(data.stats?.prefTotal) || 0;
           setPrefectureDex((prev) =>
             prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal }
           );
         } else {
           setError('マンホールが見つかりませんでした');
         }
+      } else if (response.status === 404) {
+        setError('マンホールが見つかりませんでした');
       } else {
         setError('データの取得に失敗しました');
       }
@@ -498,31 +524,6 @@ export default function ManholeDetailPage() {
   }, [manhole, photos, currentUserId]);
 
   // 周辺・同ポケモンの回遊リスト
-  const related = useMemo(() => {
-    if (!manhole || allManholes.length === 0) {
-      return { nearby: [] as Array<{ manhole: Manhole; distance: number }>, samePokemon: [] as Manhole[] };
-    }
-    const others = allManholes.filter((m) => m.id !== manhole.id);
-    const nearby =
-      manhole.latitude && manhole.longitude
-        ? others
-            .filter((m) => m.latitude && m.longitude)
-            .map((m) => ({
-              manhole: m,
-              distance: calculateDistance(manhole.latitude!, manhole.longitude!, m.latitude!, m.longitude!),
-            }))
-            .filter((e) => e.distance <= 30)
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 5)
-        : [];
-    const pokemonSet = new Set(manhole.pokemons ?? []);
-    const samePokemon =
-      pokemonSet.size > 0
-        ? others.filter((m) => (m.pokemons ?? []).some((p) => pokemonSet.has(p))).slice(0, 6)
-        : [];
-    return { nearby, samePokemon };
-  }, [manhole, allManholes]);
-
   const detailMapManholes = useMemo(() => manhole ? [manhole] : [], [manhole]);
 
   // 早期 return より前に呼ぶ（フックの呼び出し順を固定するため）
@@ -580,22 +581,18 @@ export default function ManholeDetailPage() {
   const titleBadges = getSortedTitles(manhole.titles);
   // h1 の括弧の中身。空なら括弧ごと出さない（図鑑の h1 と同じ規則。`manholeHeading()` 参照）
   const headingPokemons = filterPokemons(manhole.pokemons);
-  // 統計バッジ（{県}N枚 / 同じポケモンN枚 / 30km以内にN件）。抑制規則は lib 側。
-  const statBadges = buildStatBadges(
-    manhole,
-    computeManholeStats(manhole, allManholes),
-    manhole.titles
-  );
+  // 統計バッジ（{県}N枚 / 同じポケモンN枚 / 30km以内にN件）はサーバで組み立て済み。
+  const statBadges = derived.statBadges;
   const { detail: officialDetailHref, prefecture: officialPrefectureHref } =
     officialLinks(manhole);
 
-  const renderRelatedCards = (items: Array<{ manhole: Manhole; distance?: number }>) => (
+  const renderRelatedCards = (items: RelatedManhole[]) => (
     <div className="flex flex-col gap-2">
-      {items.map(({ manhole: m, distance }) => (
+      {items.map(({ id, label, distanceKm }) => (
         <button
-          key={m.id}
+          key={id}
           type="button"
-          onClick={() => router.push(`/manhole/${m.id}`)}
+          onClick={() => router.push(`/manhole/${id}`)}
           className="flex items-center gap-2 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#fbf6ea]"
         >
           <MapPin className="h-4 w-4 shrink-0 text-[#9b917e]" strokeWidth={2} />
@@ -607,11 +604,11 @@ export default function ManholeDetailPage() {
             ラプラスが落ちていた。図鑑側も折り返しており、省略はしていない。
           */}
           <span className="min-w-0 flex-1 font-pixelJp text-xs font-bold leading-snug text-[#2c2a26]">
-            {manholeLabel(m)}
+            {label}
           </span>
-          {distance !== undefined && (
+          {distanceKm !== undefined && (
             <span className="shrink-0 font-['Outfit'] text-xs font-bold text-[#9b917e]">
-              {formatDistanceKm(distance)}
+              {formatDistanceKm(distanceKm)}
             </span>
           )}
         </button>
@@ -1135,7 +1132,7 @@ export default function ManholeDetailPage() {
 
           {/* ── Rarity pills + stats ──
               図鑑と同じく、称号バッジのあとに統計バッジを続ける。
-              抑制規則（称号と内容が重なるものは出さない）は `buildStatBadges()` 側。 */}
+              抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
           {(titleBadges.length > 0 || statBadges.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {titleBadges.map((title, idx) => (
@@ -1266,24 +1263,24 @@ export default function ManholeDetailPage() {
           )}
 
           {/* ── Nearby manholes ── */}
-          {related.nearby.length > 0 && (
+          {derived.nearby.length > 0 && (
             <div>
               <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
                 <Navigation className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
                 次に寄れるポケふた
               </h3>
-              {renderRelatedCards(related.nearby)}
+              {renderRelatedCards(derived.nearby)}
             </div>
           )}
 
           {/* ── Same Pokemon ── */}
-          {related.samePokemon.length > 0 && (
+          {derived.samePokemon.length > 0 && (
             <div>
               <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
                 <Sparkles className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
                 同じポケモンのポケふた
               </h3>
-              {renderRelatedCards(related.samePokemon.map((m) => ({ manhole: m })))}
+              {renderRelatedCards(derived.samePokemon)}
             </div>
           )}
 
