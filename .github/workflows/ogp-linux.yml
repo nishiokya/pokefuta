@@ -35,6 +35,7 @@ jobs:
       - run: npm run test:json-ld
       - run: npm run test:manhole-stats
       - run: npm run test:dex-url
+      - run: npm run test:manhole-detail
       - run: npm run test:japanese-phrases
       - run: npm run type-check
       - run: npm run build
