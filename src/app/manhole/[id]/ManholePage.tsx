@@ -29,7 +29,7 @@ import {
   manholeLabel,
   manholePlaceLabel,
 } from '@/lib/manhole-label';
-import { buildStatBadges, computeManholeStats, officialUrl } from '@/lib/manhole-stats';
+import { buildStatBadges, computeManholeStats, officialLinks } from '@/lib/manhole-stats';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
@@ -585,8 +585,8 @@ export default function ManholeDetailPage() {
     computeManholeStats(manhole, allManholes),
     manhole.titles
   );
-  const officialDetailHref = officialUrl(manhole.detail_url);
-  const officialPrefectureHref = officialUrl(manhole.official_url);
+  const { detail: officialDetailHref, prefecture: officialPrefectureHref } =
+    officialLinks(manhole);
 
   const renderRelatedCards = (items: Array<{ manhole: Manhole; distance?: number }>) => (
     <div className="flex flex-col gap-2">
@@ -1310,6 +1310,8 @@ export default function ManholeDetailPage() {
             （実データに相対パスのまま入っている行が5枚ある）。
             `prefecture_site_url` は出さない。非空の328枚すべてで `official_url` と
             同じ値で、並べると同じ場所へ行くリンクが2本並ぶだけになる。
+            `official_url` 自体も482枚中154枚が `detail_url` と同じURLなので、
+            `officialLinks()` が実際のURLで重複を落とす。
           */}
           {(officialDetailHref || officialPrefectureHref) && (
             <div className="flex flex-col gap-2">

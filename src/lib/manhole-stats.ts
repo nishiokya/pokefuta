@@ -134,3 +134,23 @@ export function officialUrl(value?: string | null): string | null {
     return null;
   }
 }
+
+/**
+ * 詳細ページに出す公式リンク。**同じURLを2本出さない。**
+ *
+ * `official_url`（自治体ページのつもりの列）には、蓋の詳細ページと同じURLが
+ * 入っている行が**482枚中154枚**ある。そのまま2本並べると、行き先が同じなのに
+ * 2本目だけ「{県}のページ」と名乗る、ラベルが嘘のリンクになる。
+ * 列の意味ではなく**実際のURL**で重複を判定する。
+ */
+export function officialLinks(manhole: {
+  detail_url?: string | null;
+  official_url?: string | null;
+}): { detail: string | null; prefecture: string | null } {
+  const detail = officialUrl(manhole.detail_url);
+  const prefecture = officialUrl(manhole.official_url);
+  return {
+    detail,
+    prefecture: prefecture && prefecture !== detail ? prefecture : null,
+  };
+}

@@ -4,6 +4,7 @@ import {
   NEARBY_RADIUS_KM,
   buildStatBadges,
   computeManholeStats,
+  officialLinks,
   officialUrl,
 } from '../src/lib/manhole-stats.ts';
 
@@ -73,6 +74,28 @@ test('称号と内容が重なるバッジは抑制する（図鑑 §2.3）', ()
   assert.ok(!buildStatBadges(target, s, t('lone')).some((b) => b.key === 'nearby'));
   // 無関係な称号では抑制しない
   assert.ok(buildStatBadges(target, s, t('rare_pokemon')).some((b) => b.key === 'pref'));
+});
+
+test('同じURLの公式リンクを2本出さない', () => {
+  const desc = 'https://local.pokemon.jp/manhole/desc/486/?is_modal=1';
+  // official_url に詳細ページと同じURLが入っている行（本番482枚のうち154枚がこれ）。
+  // 落とさないと2本目だけ「{県}のページ」と名乗る、ラベルが嘘のリンクになる。
+  assert.deepEqual(officialLinks({ detail_url: desc, official_url: desc }), {
+    detail: desc,
+    prefecture: null,
+  });
+  // 別URLならどちらも出す
+  const muni = 'https://local.pokemon.jp/municipality/miyagi/';
+  assert.deepEqual(officialLinks({ detail_url: desc, official_url: muni }), {
+    detail: desc,
+    prefecture: muni,
+  });
+  // 検証に落ちる値は null（長崎県5枚の相対パス）
+  assert.deepEqual(officialLinks({ detail_url: desc, official_url: '/municipality/nagasaki/' }), {
+    detail: desc,
+    prefecture: null,
+  });
+  assert.deepEqual(officialLinks({}), { detail: null, prefecture: null });
 });
 
 test('公式URLは local.pokemon.jp の https だけ通す', () => {
