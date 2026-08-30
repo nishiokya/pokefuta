@@ -36,11 +36,3 @@ export async function loadManholeDetail(manholeId: number): Promise<ManholeDetai
 
   return { ok: true, payload: { manhole, ...buildManholeDetail(manhole, snapshot.manholes) } };
 }
-
-/** サーバ描画用。失敗の理由を分ける必要がないので payload か null で受ける。 */
-export async function loadManholeDetailPayload(
-  manholeId: number
-): Promise<ManholeDetailPayload | null> {
-  const result = await loadManholeDetail(manholeId);
-  return result.ok ? result.payload : null;
-}
