@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import ManholePage from './ManholePage';
 import { loadPhotoForOgp } from '@/lib/manhole-ogp';
 import { fetchSnapshotManhole } from '@/lib/manhole-snapshot';
@@ -112,48 +113,51 @@ export default async function Page({ params }: Props) {
   // h1 が0個）。図鑑側は同じ蓋を66KBのHTMLとして返しており、図鑑から渡ってきた
   // 人が最初に見るのが空白とローディングになっていた。
   const payload = manholeId === null ? null : await loadManholeDetailPayload(manholeId);
-  const manhole = payload?.manhole ?? null;
+  // 不正なidも存在しないidも、ここで本物の 404 を返す。以前は「マンホールが
+  // 見つかりません」の本文を **HTTP 200 で** 配っており、検索エンジンには
+  // 実在するページとして見える（ソフト404）。同じ作りの
+  // `design-manholes/[id]/page.tsx` は既に notFound() に倒している。
+  if (!payload) {
+    notFound();
+  }
+  const manhole = payload.manhole;
 
   // JSON-LD もサーバで出す。クライアントで `document.head` に差し込んでいた頃は、
   // JS を実行しないクローラには構造化データが1件も届いていなかった。
   // 形は図鑑の TouristAttraction に合わせる（name は h1、address / geo つき）。
-  const jsonLd = manhole
-    ? {
-        '@context': 'https://schema.org',
-        '@type': 'TouristAttraction',
-        name: manholeHeading(manhole),
-        description: buildManholeMeta(manhole).description,
-        url: `${SITE_URL}/manhole/${manhole.id}`,
-        ...(manhole.address
-          ? {
-              address: {
-                '@type': 'PostalAddress',
-                addressRegion: manhole.prefecture,
-                addressLocality: manhole.city || manhole.municipality || undefined,
-                streetAddress: manhole.address,
-              },
-            }
-          : {}),
-        ...(manhole.latitude != null && manhole.longitude != null
-          ? {
-              geo: {
-                '@type': 'GeoCoordinates',
-                latitude: manhole.latitude,
-                longitude: manhole.longitude,
-              },
-            }
-          : {}),
-      }
-    : null;
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristAttraction',
+    name: manholeHeading(manhole),
+    description: buildManholeMeta(manhole).description,
+    url: `${SITE_URL}/manhole/${manhole.id}`,
+    ...(manhole.address
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            addressRegion: manhole.prefecture,
+            addressLocality: manhole.city || manhole.municipality || undefined,
+            streetAddress: manhole.address,
+          },
+        }
+      : {}),
+    ...(manhole.latitude != null && manhole.longitude != null
+      ? {
+          geo: {
+            '@type': 'GeoCoordinates',
+            latitude: manhole.latitude,
+            longitude: manhole.longitude,
+          },
+        }
+      : {}),
+  };
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <ManholePage initial={payload} />
     </>
   );

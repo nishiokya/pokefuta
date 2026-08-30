@@ -25,7 +25,6 @@ import {
 } from '@/lib/manhole-stats';
 import type { ManholeTitle } from '@/types/database';
 
-/** 図鑑の「次に寄れるポケふた」と同じ件数。 */
 /**
  * URL のセグメントを蓋のidとして受け取る。**サーバ描画と単体GETで同じ判定を使う。**
  *
@@ -35,9 +34,13 @@ import type { ManholeTitle } from '@/types/database';
  *
  * id は 1 始まりなので `0` も弾く。
  */
-export const parseManholeIdParam = (raw: string | undefined | null): number | null =>
-  typeof raw === 'string' && /^\d+$/.test(raw) && Number(raw) >= 1 ? Number(raw) : null;
+export const parseManholeIdParam = (raw: string | undefined | null): number | null => {
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return id >= 1 ? id : null;
+};
 
+/** 図鑑の「次に寄れるポケふた」と同じ件数。 */
 export const NEARBY_LIMIT = 5;
 /** 図鑑の「同じポケモンのポケふた」と同じ件数。写真館は6件だったので図鑑に寄せる。 */
 export const SAME_POKEMON_LIMIT = 10;
