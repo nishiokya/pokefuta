@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import ManholePage from './ManholePage';
 import { loadPhotoForOgp } from '@/lib/manhole-ogp';
-import { fetchSnapshotManhole } from '@/lib/manhole-snapshot';
 import { loadManholeDetail } from '@/lib/manhole-detail-payload';
 import { parseManholeIdParam } from '@/lib/manhole-detail';
 import { serializeJsonLd } from '@/lib/json-ld';
@@ -62,10 +61,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     return { title: `マンホールが見つかりません | ${SITE_NAME}` };
   }
 
-  const manhole = await fetchSnapshotManhole(manholeId);
-  if (!manhole) {
+  // 本文と同じ入り口を使う。`fetchSnapshotManhole()` は「引けない」と「無い」を
+  // どちらも null に潰すので、ここだけ別経路にすると Page 側の 404 / 500 の
+  // 切り分けとズレる。metadata 自体はどちらでも同じ文言でよい（HTTPステータスを
+  // 決めるのは Page の側で、障害時はそちらが投げてエラーページになる）。
+  const result = await loadManholeDetail(manholeId);
+  if (!result.ok) {
     return { title: `マンホールが見つかりません | ${SITE_NAME}` };
   }
+  const manhole = result.payload.manhole;
 
   const { title, ogTitle, description } = buildManholeMeta(manhole);
   const photoIdParam = searchParams?.photo;

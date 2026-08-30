@@ -104,6 +104,14 @@ test('parseManholeIdParam rejects Number-coercible but non-canonical segments', 
   assert.equal(parseManholeIdParam('82abc'), null);
   assert.equal(parseManholeIdParam('8e1'), null);
   assert.equal(parseManholeIdParam('+82'), null);
+  // 先頭ゼロは Number() が 82 にするので、同じ蓋に別URLが無限に作れてしまう
+  assert.equal(parseManholeIdParam('082'), null);
+  assert.equal(parseManholeIdParam('0082'), null);
+});
+
+test('parseManholeIdParam rejects ids beyond safe integers', () => {
+  assert.equal(parseManholeIdParam('9007199254740993'), null);
+  assert.equal(parseManholeIdParam('9007199254740991'), 9007199254740991);
 });
 
 test('parseManholeIdParam rejects 0 and negatives because ids start at 1', () => {
