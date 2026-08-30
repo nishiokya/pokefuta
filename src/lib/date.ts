@@ -26,14 +26,17 @@ const JST_YMD = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 });
 
-const jstYmd = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+const jstYmdOf = (date: Date) => {
   const parts = JST_YMD.formatToParts(date);
   const pick = (type: 'year' | 'month' | 'day') =>
     Number(parts.find((part) => part.type === type)?.value);
   const ymd = { year: pick('year'), month: pick('month'), day: pick('day') };
   return Object.values(ymd).every(Number.isFinite) ? ymd : null;
+};
+
+const jstYmd = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : jstYmdOf(date);
 };
 
 /** JST の「2026/8/30」。読めない値は空文字。 */
@@ -51,6 +54,7 @@ export const formatPhotoDateJstCompact = (value: string) => {
   const ymd = jstYmd(value);
   if (!ymd) return '';
   const md = `${ymd.month}/${ymd.day}`;
-  const currentYear = jstYmd(new Date().toISOString())?.year;
+  // 現在時刻は Date のまま渡す。ISO 文字列に起こして読み直す往復は要らない。
+  const currentYear = jstYmdOf(new Date())?.year;
   return ymd.year === currentYear ? md : `${ymd.year}/${md}`;
 };
