@@ -8,6 +8,7 @@ import {
   MapPin, ArrowLeft, Navigation, Building2,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink, BookOpen,
+  MessageCircle,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
@@ -18,10 +19,15 @@ import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { orderManholePhotosForViewer } from '@/lib/manhole-photo-ranking';
+import {
+  orderManholePhotosChronologically,
+  orderManholePhotosForViewer,
+  photoChronologyDate,
+} from '@/lib/manhole-photo-ranking';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { SITE_URL } from '@/lib/constants';
+import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
   filterPokemons,
   formatDistanceKm,
@@ -94,10 +100,11 @@ const getTitlePillClass = (index: number) => {
   return classes[index] || classes[0];
 };
 
-const formatPhotoDate = (shot_at: string) => {
-  const d = new Date(shot_at);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-};
+// 日付は JST 固定（`src/lib/date.ts`）。閲覧者のタイムゾーンで組み立てると、
+// 深夜前後の1枚が前日/翌日にずれて「撮影日」として嘘になる。
+const formatPhotoDate = formatPhotoDateJst;
+const formatPhotoDateCompact = formatPhotoDateJstCompact;
+
 
 function PhotoLikeButton({
   visitId,
@@ -575,6 +582,10 @@ export default function ManholeDetailPage() {
   const photoContributorCount = new Set(
     allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
   ).size;
+  // 「すべての写真」は撮影日の古い順＝その蓋が撮られてきた記録として左上から読ませる。
+  // ヒーロー側の代表写真（allDisplayPhotos[0]）は「今の顔」なので並びは触らない。
+  // 拡大表示は allDisplayPhotos の添字で動くので、並べ替えても元の添字を持ち回る。
+  const chronologicalPhotos = orderManholePhotosChronologically(allDisplayPhotos);
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const prefectureDexHref = prefectureDexUrl(manhole.prefecture);
   const manholeDexHref = manholeDexUrl(manhole.id);
@@ -812,51 +823,109 @@ export default function ManholeDetailPage() {
   const allPhotosGrid = allDisplayPhotos.length > 1 ? (
     <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">すべての写真</span>
+        <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
+          すべての写真
+          <span className="ml-1.5 font-normal text-[10.5px] text-[#9b917e]">古い順</span>
+        </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
-        {allDisplayPhotos.map((photo, index) => (
-          <div
-            key={photo.id}
-            className={`relative aspect-square overflow-hidden rounded-[10px] border-2 ${
-              photoExpanded && featuredPhoto?.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedPhotoIdx(index);
-                setPhotoExpanded(true);
-                requestAnimationFrame(() => {
-                  document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-              }}
-              aria-label={`${index + 1}枚目、@${getPhotoUserLabel(photo)}さんの写真を表示`}
-              className="block h-full w-full p-0"
+      {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
+          元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        {chronologicalPhotos.map(({ photo, index }) => {
+          const userLabel = getPhotoUserLabel(photo);
+          // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
+          // 並んでいるので、表示だけ shot_at を見ると日付欄が空になり、
+          // 読み上げの「撮影」も事実とズレる。
+          const dated = photoChronologyDate(photo);
+          const dateLabel = dated ? formatPhotoDateCompact(dated.iso) : '';
+          const dateKind = dated?.source === 'upload' ? '投稿' : '撮影';
+          const comment = photo.visit?.comment?.trim();
+          // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
+          // 拡大表示側（:941）と同じくリンクにしない。
+          const profileHref =
+            photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
+              ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
+              : null;
+          return (
+            <div
+              key={photo.id}
+              className={`overflow-hidden rounded-[10px] border-2 bg-[#fbf6ea] ${
+                photoExpanded && featuredPhoto?.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
+              }`}
             >
-              <img
-                src={`/api/photo/${photo.id}?size=small`}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </button>
-            {photo.visit?.id && (
-              <span className="absolute right-1 top-1 z-10">
-                <PhotoLikeButton
-                  visitId={photo.visit.id}
-                  isLoggedIn={isLoggedIn}
-                  loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
-                  variant="gallery"
-                />
-              </span>
-            )}
-            <span className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-['Outfit'] text-[9px] font-bold text-white">
-              {index + 1}
-            </span>
-          </div>
-        ))}
+              <div className="relative aspect-square">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPhotoIdx(index);
+                    setPhotoExpanded(true);
+                    requestAnimationFrame(() => {
+                      document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
+                  aria-label={
+                    `@${userLabel}さんの写真を表示` +
+                    (dateLabel ? `（${dateLabel}${dateKind}）` : '') +
+                    (comment ? '、コメントあり' : '')
+                  }
+                  className="block h-full w-full p-0"
+                >
+                  <img
+                    src={`/api/photo/${photo.id}?size=small`}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </button>
+                {photo.visit?.id && (
+                  <span className="absolute right-1 top-1 z-10">
+                    <PhotoLikeButton
+                      visitId={photo.visit.id}
+                      isLoggedIn={isLoggedIn}
+                      loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                      variant="gallery"
+                    />
+                  </span>
+                )}
+                {comment && (
+                  <span
+                    className="pointer-events-none absolute bottom-1 left-1 inline-flex items-center rounded-full bg-black/60 p-1 text-white"
+                    aria-hidden="true"
+                  >
+                    <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
+                  </span>
+                )}
+              </div>
+              {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
+                  投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
+              <div className="flex flex-col gap-0.5 px-1.5 py-1">
+                {profileHref ? (
+                  <Link
+                    href={profileHref}
+                    className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
+                  >
+                    @{userLabel}
+                  </Link>
+                ) : (
+                  <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
+                    @{userLabel}
+                  </span>
+                )}
+                {dateLabel && (
+                  // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
+                  // title と aria-label で補う。
+                  <span
+                    title={`${dateLabel}${dateKind}`}
+                    className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
+                  >
+                    {dateLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   ) : null;

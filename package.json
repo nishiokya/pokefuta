@@ -13,6 +13,7 @@
     "test:design-manhole": "tsx --test tests/design-manhole-*.test.ts",
     "test:analytics": "tsx --test tests/analytics-*.test.ts",
     "test:pokemon-go": "tsx --test tests/pokemon-go-*.test.ts",
+    "test:date": "tsx --test tests/date.test.ts",
     "test:manhole-gallery": "tsx --test tests/manhole-photo-ranking.test.ts",
     "test:manhole-label": "tsx --test tests/manhole-label.test.ts",
     "test:json-ld": "tsx --test tests/json-ld.test.ts",

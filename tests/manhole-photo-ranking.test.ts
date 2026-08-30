@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { orderManholePhotosForViewer, rankManholePhotos } from '../src/lib/manhole-photo-ranking';
+import {
+  orderManholePhotosChronologically,
+  orderManholePhotosForViewer,
+  photoChronologyDate,
+  rankManholePhotos,
+} from '../src/lib/manhole-photo-ranking';
 
 const photo = (
   id: string,
@@ -53,4 +58,80 @@ test('logged-out viewers use the global score leader and cannot see private phot
 
   assert.deepEqual(result.orderedPhotos.map(({ id }) => id), ['public']);
   assert.equal(result.representativePhoto?.id, 'public');
+});
+
+// ── 撮影日の古い順（詳細ページの「すべての写真」） ─────────────────────
+
+const shot = (id: string, shotAt: string | null, createdAt: string) => ({
+  id,
+  created_at: createdAt,
+  visit: { user_id: 'community', is_public: true, shot_at: shotAt },
+});
+
+test('chronological order uses shot_at, not upload time', () => {
+  // manhole/82 の実データ。8/11 に撮って 8/24 に上げた1枚が、created_at 順だと
+  // 8/19 撮影より新しい扱いになって時系列が壊れていた。
+  const ordered = orderManholePhotosChronologically([
+    shot('aug30', '2026-08-30T04:48:32Z', '2026-08-30T04:48:58Z'),
+    shot('aug28', '2026-08-28T00:00:00Z', '2026-08-28T00:00:00Z'),
+    shot('aug11', '2026-08-11T00:00:00Z', '2026-08-24T00:00:00Z'),
+    shot('aug19', '2026-08-19T00:00:00Z', '2026-08-19T00:00:00Z'),
+    shot('y2024', '2024-07-13T00:00:00Z', '2026-08-13T00:00:00Z'),
+  ]);
+
+  assert.deepEqual(
+    ordered.map(({ photo }) => photo.id),
+    ['y2024', 'aug11', 'aug19', 'aug28', 'aug30']
+  );
+});
+
+test('chronological order carries the original index so the lightbox still opens the right photo', () => {
+  const ordered = orderManholePhotosChronologically([
+    shot('newest', '2026-08-30T00:00:00Z', '2026-08-30T00:00:00Z'),
+    shot('oldest', '2024-07-13T00:00:00Z', '2026-08-13T00:00:00Z'),
+  ]);
+
+  assert.deepEqual(ordered.map(({ photo, index }) => [photo.id, index]), [
+    ['oldest', 1],
+    ['newest', 0],
+  ]);
+});
+
+test('photos without a usable shot_at fall back to upload time', () => {
+  const ordered = orderManholePhotosChronologically([
+    shot('no-shot-at', null, '2026-08-05T00:00:00Z'),
+    shot('shot-later', '2026-08-20T00:00:00Z', '2026-08-01T00:00:00Z'),
+  ]);
+
+  assert.deepEqual(ordered.map(({ photo }) => photo.id), ['no-shot-at', 'shot-later']);
+});
+
+test('undated photos sink to the end instead of posing as the oldest', () => {
+  const ordered = orderManholePhotosChronologically([
+    shot('undated', 'not-a-date', 'also-not-a-date'),
+    shot('dated', '2026-08-20T00:00:00Z', '2026-08-20T00:00:00Z'),
+  ]);
+
+  assert.deepEqual(ordered.map(({ photo }) => photo.id), ['dated', 'undated']);
+});
+
+test('the display date comes from the same judgement as the sort', () => {
+  // 並びと表示を別々に実装すると、created_at で並べた写真の日付欄だけが空になる。
+  // 表示側が撮影日と言い切れないケースを source で見分けられること。
+  assert.deepEqual(photoChronologyDate(shot('shot', '2026-08-20T00:00:00Z', '2026-08-01T00:00:00Z')), {
+    iso: '2026-08-20T00:00:00Z',
+    time: Date.parse('2026-08-20T00:00:00Z'),
+    source: 'shot',
+  });
+  assert.deepEqual(photoChronologyDate(shot('fallback', null, '2026-08-05T00:00:00Z')), {
+    iso: '2026-08-05T00:00:00Z',
+    time: Date.parse('2026-08-05T00:00:00Z'),
+    source: 'upload',
+  });
+  assert.deepEqual(photoChronologyDate(shot('broken-shot-at', 'not-a-date', '2026-08-05T00:00:00Z')), {
+    iso: '2026-08-05T00:00:00Z',
+    time: Date.parse('2026-08-05T00:00:00Z'),
+    source: 'upload',
+  });
+  assert.equal(photoChronologyDate(shot('undated', 'not-a-date', 'also-not-a-date')), null);
 });
