@@ -27,6 +27,7 @@ import {
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { SITE_URL } from '@/lib/constants';
+import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
   filterPokemons,
   formatDistanceKm,
@@ -99,19 +100,10 @@ const getTitlePillClass = (index: number) => {
   return classes[index] || classes[0];
 };
 
-const formatPhotoDate = (shot_at: string) => {
-  const d = new Date(shot_at);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-};
-
-// グリッドのセルは狭い。同じ年なら年を省いて「8/30」、跨いだら「2024/7/13」と出す。
-// 何年前の1枚かは省いた瞬間に読めなくなるので、そこだけは削らない。
-const formatPhotoDateCompact = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const md = `${d.getMonth() + 1}/${d.getDate()}`;
-  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}/${md}`;
-};
+// 日付は JST 固定（`src/lib/date.ts`）。閲覧者のタイムゾーンで組み立てると、
+// 深夜前後の1枚が前日/翌日にずれて「撮影日」として嘘になる。
+const formatPhotoDate = formatPhotoDateJst;
+const formatPhotoDateCompact = formatPhotoDateJstCompact;
 
 
 function PhotoLikeButton({

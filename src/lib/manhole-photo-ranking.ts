@@ -34,6 +34,8 @@ export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
 
 export type PhotoChronologyDate = {
   iso: string;
+  /** ミリ秒。判定のために既にパース済みなので、並べ替え側が起こし直さずに済むよう持たせる */
+  time: number;
   /** 'shot' = 撮影日(shot_at) / 'upload' = アップロード日(created_at) へのフォールバック */
   source: 'shot' | 'upload';
 };
@@ -55,7 +57,9 @@ export const photoChronologyDate = (photo: RankableManholePhoto): PhotoChronolog
     [photo.created_at, 'upload'],
   ];
   for (const [raw, source] of candidates) {
-    if (raw && Number.isFinite(new Date(raw).getTime())) return { iso: raw, source };
+    if (!raw) continue;
+    const time = new Date(raw).getTime();
+    if (Number.isFinite(time)) return { iso: raw, time, source };
   }
   return null;
 };
@@ -64,10 +68,8 @@ export const photoChronologyDate = (photo: RankableManholePhoto): PhotoChronolog
  * 並べ替えの基準時刻。日付が1つも読めない写真は MAX_SAFE_INTEGER にして末尾へ寄せる。
  * 0 を返すと「日付不明」が最古として先頭に居座り、古い順の一覧で目立ってしまう。
  */
-export const photoChronologyTime = (photo: RankableManholePhoto) => {
-  const dated = photoChronologyDate(photo);
-  return dated ? new Date(dated.iso).getTime() : Number.MAX_SAFE_INTEGER;
-};
+export const photoChronologyTime = (photo: RankableManholePhoto) =>
+  photoChronologyDate(photo)?.time ?? Number.MAX_SAFE_INTEGER;
 
 /**
  * 撮影日の古い順。蓋の詳細ページの「すべての写真」が、その蓋が撮られてきた

@@ -120,14 +120,17 @@ test('the display date comes from the same judgement as the sort', () => {
   // 表示側が撮影日と言い切れないケースを source で見分けられること。
   assert.deepEqual(photoChronologyDate(shot('shot', '2026-08-20T00:00:00Z', '2026-08-01T00:00:00Z')), {
     iso: '2026-08-20T00:00:00Z',
+    time: Date.parse('2026-08-20T00:00:00Z'),
     source: 'shot',
   });
   assert.deepEqual(photoChronologyDate(shot('fallback', null, '2026-08-05T00:00:00Z')), {
     iso: '2026-08-05T00:00:00Z',
+    time: Date.parse('2026-08-05T00:00:00Z'),
     source: 'upload',
   });
   assert.deepEqual(photoChronologyDate(shot('broken-shot-at', 'not-a-date', '2026-08-05T00:00:00Z')), {
     iso: '2026-08-05T00:00:00Z',
+    time: Date.parse('2026-08-05T00:00:00Z'),
     source: 'upload',
   });
   assert.equal(photoChronologyDate(shot('undated', 'not-a-date', 'also-not-a-date')), null);
