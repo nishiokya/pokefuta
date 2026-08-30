@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
-import { buildManholeDetail } from '@/lib/manhole-detail';
+import { loadManholeDetailPayload } from '@/lib/manhole-detail-payload';
 
 /**
  * ログイン中の利用者の訪問状態を1枚ぶんだけ引く。
@@ -92,6 +92,8 @@ export async function GET(
     }
     const manholeId = Number(params.manholeId);
 
+    // 素材の組み立てはサーバ描画と共有する（`loadManholeDetailPayload`）。
+    // ここで別に組み立てると、初期HTMLと再取得後で中身が食い違う余地ができる。
     const snapshot = await fetchManholeSnapshot();
     if (!snapshot?.manholes) {
       return NextResponse.json(
@@ -100,12 +102,12 @@ export async function GET(
       );
     }
 
-    const manhole = snapshot.manholes.find((m) => m.id === manholeId);
-    if (!manhole) {
+    const payload = await loadManholeDetailPayload(manholeId);
+    if (!payload) {
       return NextResponse.json({ error: 'Manhole not found' }, { status: 404 });
     }
 
-    const derived = buildManholeDetail(manhole, snapshot.manholes);
+    const { manhole, ...derived } = payload;
     const visitState = await loadVisitState(manholeId);
 
     return NextResponse.json({

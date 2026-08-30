@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import ManholePage from './ManholePage';
 import { loadPhotoForOgp } from '@/lib/manhole-ogp';
 import { fetchSnapshotManhole } from '@/lib/manhole-snapshot';
+import { loadManholeDetailPayload } from '@/lib/manhole-detail-payload';
 import { serializeJsonLd } from '@/lib/json-ld';
 import {
   manholeHeading,
@@ -100,7 +101,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function Page({ params }: Props) {
   const manholeId = Number(params.id);
-  const manhole = isNaN(manholeId) ? null : await fetchSnapshotManhole(manholeId);
+  // 詳細の素材をサーバで組み立てて `ManholePage` に渡す。
+  //
+  // 以前は蓋そのものだけを引いて JSON-LD に使い、本文は `ManholePage` が
+  // マウント後に `/api/manholes/{id}` を叩いてから描いていた。そのため
+  // **初期HTMLに h1 も本文も1文字も入っていなかった**（本番の /manhole/82 で
+  // h1 が0個）。図鑑側は同じ蓋を66KBのHTMLとして返しており、図鑑から渡ってきた
+  // 人が最初に見るのが空白とローディングになっていた。
+  const payload = isNaN(manholeId) ? null : await loadManholeDetailPayload(manholeId);
+  const manhole = payload?.manhole ?? null;
 
   // JSON-LD もサーバで出す。クライアントで `document.head` に差し込んでいた頃は、
   // JS を実行しないクローラには構造化データが1件も届いていなかった。
@@ -142,7 +151,7 @@ export default async function Page({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       )}
-      <ManholePage />
+      <ManholePage initial={payload} />
     </>
   );
 }
