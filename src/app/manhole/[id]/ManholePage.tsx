@@ -22,6 +22,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
   orderManholePhotosChronologically,
   orderManholePhotosForViewer,
+  photoChronologyDate,
 } from '@/lib/manhole-photo-ranking';
 import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
@@ -841,8 +842,12 @@ export default function ManholeDetailPage() {
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {chronologicalPhotos.map(({ photo, index }) => {
           const userLabel = getPhotoUserLabel(photo);
-          const shotAt = photo.visit?.shot_at;
-          const dateLabel = shotAt ? formatPhotoDateCompact(shotAt) : '';
+          // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
+          // 並んでいるので、表示だけ shot_at を見ると日付欄が空になり、
+          // 読み上げの「撮影」も事実とズレる。
+          const dated = photoChronologyDate(photo);
+          const dateLabel = dated ? formatPhotoDateCompact(dated.iso) : '';
+          const dateKind = dated?.source === 'upload' ? '投稿' : '撮影';
           const comment = photo.visit?.comment?.trim();
           // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
           // 拡大表示側（:941）と同じくリンクにしない。
@@ -869,7 +874,7 @@ export default function ManholeDetailPage() {
                   }}
                   aria-label={
                     `@${userLabel}さんの写真を表示` +
-                    (dateLabel ? `（${dateLabel}撮影）` : '') +
+                    (dateLabel ? `（${dateLabel}${dateKind}）` : '') +
                     (comment ? '、コメントあり' : '')
                   }
                   className="block h-full w-full p-0"
@@ -916,7 +921,14 @@ export default function ManholeDetailPage() {
                   </span>
                 )}
                 {dateLabel && (
-                  <span className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]">{dateLabel}</span>
+                  // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
+                  // title と aria-label で補う。
+                  <span
+                    title={`${dateLabel}${dateKind}`}
+                    className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
+                  >
+                    {dateLabel}
+                  </span>
                 )}
               </div>
             </div>
