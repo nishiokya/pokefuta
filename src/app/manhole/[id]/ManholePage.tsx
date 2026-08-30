@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Manhole } from '@/types/database';
+import type { SnapshotManhole } from '@/lib/manhole-snapshot';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ShareButtons from '@/components/ShareButtons';
@@ -236,7 +237,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   // 初期値をサーバから受け取る。これがあることで、このクライアントコンポーネントの
   // **サーバ描画パスが本文を実際に吐く**（h1・場所・住所・統計バッジ・関連する蓋）。
   // null 始まりだった頃は、初期HTMLがローディング状態のまま出ていた。
-  const [manhole, setManhole] = useState<Manhole | null>((initial?.manhole as Manhole | undefined) ?? null);
+  // 型は実際に入るもの＝スナップショット形にそろえる。`Manhole` は DB の行の型で
+  // 16列ぶん形が違い、以前は `as` で潰していた。単体GETが返すのもスナップショット形
+  // なので、この状態が `Manhole` だったことは元から実態と合っていなかった。
+  const [manhole, setManhole] = useState<SnapshotManhole | null>(initial?.manhole ?? null);
   // サーバが組み立てた派生値（統計バッジ・関連する蓋）。
   // 全件を持たなくなったので、この画面ではもう計算しない。
   const [derived, setDerived] = useState<{
@@ -253,9 +257,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(
-    initial ? { current: 0, total: initial.stats.prefTotal } : null
-  );
+  // ここはサーバ描画ぶんで埋めない。表示箇所がすべて isLoggedIn の内側なので
+  // サーバ描画（未ログイン相当）では出ず、埋めても得が無い。逆にログイン中は
+  // /api/visits が返るまで「0 / N 達成」という嘘の進捗が一瞬出る。
+  const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [photosLoading, setPhotosLoading] = useState(true);
@@ -463,7 +468,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     }
   };
 
-  const handleManholeClick = (clickedManhole: Manhole) => {
+  const handleManholeClick = (clickedManhole: { id: number }) => {
     router.push(`/manhole/${clickedManhole.id}`);
   };
 

@@ -8,10 +8,30 @@ import { applyLeafletDefaultIcon } from '@/components/Map/leafletDefaultIcon';
 
 applyLeafletDefaultIcon();
 
+/**
+ * 地図が実際に読む項目だけを要求する。`Manhole`（DBの行）を要求していたが、
+ * 詳細ページが渡すのはスナップショット形で、DBの行とは16列ぶん形が違う。
+ * 読む項目を並べておけば、`Manhole` を渡している既存の呼び出し側もそのまま通る。
+ */
+export type MappableManhole = {
+  id: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_visited?: boolean | null;
+  title?: string | null;
+  name?: string | null;
+  prefecture?: string | null;
+  city?: string | null;
+  municipality?: string | null;
+  address?: string | null;
+  description?: string | null;
+  pokemons?: string[] | null;
+};
+
 interface MapComponentProps {
   center: { lat: number; lng: number };
-  manholes: Manhole[];
-  onManholeClick: (manhole: Manhole) => void;
+  manholes: MappableManhole[];
+  onManholeClick: (manhole: MappableManhole) => void;
   userLocation?: { lat: number; lng: number } | null;
   zoom?: number;
   minHeight?: number | string;

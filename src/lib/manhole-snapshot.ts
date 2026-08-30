@@ -30,6 +30,11 @@ export interface SnapshotManhole {
   // 詳細ページの title / JSON-LD の PostalAddress がこれを読む。
   titles: ManholeTitle[];
   address: string | null;
+  // 詳細ページが実際に読む項目。スナップショットは482件すべてに持っている。
+  // 宣言せずインデックスシグネチャ経由で読むと `unknown` になり、型が守ってくれない。
+  building: string | null;
+  detail_url: string | null;
+  official_url: string | null;
   is_visited: boolean;
   last_visit: string | null;
   photo_count: number;
