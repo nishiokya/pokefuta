@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
-import { loadManholeDetailPayload } from '@/lib/manhole-detail-payload';
+import { loadManholeDetail } from '@/lib/manhole-detail-payload';
 
 /**
  * ログイン中の利用者の訪問状態を1枚ぶんだけ引く。
@@ -92,22 +91,23 @@ export async function GET(
     }
     const manholeId = Number(params.manholeId);
 
-    // 素材の組み立てはサーバ描画と共有する（`loadManholeDetailPayload`）。
+    // 素材の組み立てはサーバ描画と共有する（`loadManholeDetail`）。
     // ここで別に組み立てると、初期HTMLと再取得後で中身が食い違う余地ができる。
-    const snapshot = await fetchManholeSnapshot();
-    if (!snapshot?.manholes) {
-      return NextResponse.json(
-        { error: 'Manhole data is temporarily unavailable. Please try again later.' },
-        { status: 503 }
-      );
+    //
+    // スナップショットを引くのは中で1回だけ。ここで先に引いて 503 を判定してから
+    // もう一度引く形にしていたが、1回目が成功して2回目が失敗すると
+    // **「その蓋は存在しない」(404) と嘘をつく**。失敗の理由を返してもらって分岐する。
+    const result = await loadManholeDetail(manholeId);
+    if (!result.ok) {
+      return result.reason === 'unavailable'
+        ? NextResponse.json(
+            { error: 'Manhole data is temporarily unavailable. Please try again later.' },
+            { status: 503 }
+          )
+        : NextResponse.json({ error: 'Manhole not found' }, { status: 404 });
     }
 
-    const payload = await loadManholeDetailPayload(manholeId);
-    if (!payload) {
-      return NextResponse.json({ error: 'Manhole not found' }, { status: 404 });
-    }
-
-    const { manhole, ...derived } = payload;
+    const { manhole, ...derived } = result.payload;
     const visitState = await loadVisitState(manholeId);
 
     return NextResponse.json({

@@ -261,8 +261,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const [photosLoading, setPhotosLoading] = useState(true);
   const [photoLoadError, setPhotoLoadError] = useState(false);
   const photoRequestIdRef = useRef(0);
-  // サーバ描画ぶんで埋まっている蓋のid。一度使ったら捨てる。
-  const ssrHydratedIdRef = useRef<string | null>(initial ? String(initial.manhole.id) : null);
+
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
@@ -274,12 +273,17 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     if (manholeId) {
       setSelectedPhotoIdx(0);
       setPhotoExpanded(false);
-      // サーバ描画ぶんが手元にある初回は、状態を消さずに再取得する。
-      // 再取得する理由は訪問状態（is_visited）で、これは利用者ごとに違うため
-      // サーバ描画には混ぜていない（`manhole-detail-payload.ts` 参照）。
-      const hydratedId = ssrHydratedIdRef.current;
-      ssrHydratedIdRef.current = null;
-      loadManholeDetail(manholeId as string, { keepCurrent: hydratedId === manholeId });
+      // 既にこの蓋を表示できているなら状態を消さずに再取得する。初回は
+      // サーバ描画ぶんが入っているのでここが真になる。再取得する理由は
+      // 訪問状態（is_visited）で、これは利用者ごとに違うためサーバ描画には
+      // 混ぜていない（`manhole-detail-payload.ts` 参照）。
+      //
+      // 「一度使ったら捨てる ref」で初回を見分けていたが、**StrictMode が
+      // この effect を二重に走らせるため1回目で消費され、2回目は false に
+      // なっていた**。今表示している蓋のidと比べれば、何回走っても答えは同じ。
+      loadManholeDetail(manholeId as string, {
+        keepCurrent: manhole?.id === Number(manholeId),
+      });
       loadPhotos(manholeId as string);
       loadCurrentUser();
     }
@@ -358,6 +362,17 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       setManhole(null);
       setDerived(EMPTY_DERIVED);
     }
+    // サーバ描画ぶんを表示したままの再取得（`keepCurrent`）では、失敗しても
+    // エラー画面に倒さない。この再取得の目的は訪問状態を重ねることだけで、
+    // 本文は既にHTMLとして描けている。**通信が一瞬こけただけで、読めていた
+    // ページが「取得に失敗しました」に置き換わるほうが損**なので、記録して黙る。
+    const failWith = (message: string) => {
+      if (keepCurrent) {
+        console.warn(`Manhole detail refresh failed, keeping server-rendered content: ${message}`);
+        return;
+      }
+      setError(message);
+    };
     try {
       const response = await fetch(`/api/manholes/${encodeURIComponent(id)}`);
       if (response.ok) {
@@ -374,16 +389,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal }
           );
         } else {
-          setError('マンホールが見つかりませんでした');
+          failWith('マンホールが見つかりませんでした');
         }
       } else if (response.status === 404) {
-        setError('マンホールが見つかりませんでした');
+        failWith('マンホールが見つかりませんでした');
       } else {
-        setError('データの取得に失敗しました');
+        failWith('データの取得に失敗しました');
       }
     } catch (err) {
       console.error('Failed to load manhole detail:', err);
-      setError('データの取得に失敗しました');
+      failWith('データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
