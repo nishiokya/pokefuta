@@ -26,6 +26,18 @@ import {
 import type { ManholeTitle } from '@/types/database';
 
 /** 図鑑の「次に寄れるポケふた」と同じ件数。 */
+/**
+ * URL のセグメントを蓋のidとして受け取る。**サーバ描画と単体GETで同じ判定を使う。**
+ *
+ * `Number()` に任せると `/manhole/82.0` や `/manhole/0x52`（16進で82）が
+ * 黙って 82 になる。サーバ描画は中身を出すのに単体GETは 400 を返すので、
+ * 偽のURLで本文だけが出る状態になっていた（PR #247 で Codex が指摘）。
+ *
+ * id は 1 始まりなので `0` も弾く。
+ */
+export const parseManholeIdParam = (raw: string | undefined | null): number | null =>
+  typeof raw === 'string' && /^\d+$/.test(raw) && Number(raw) >= 1 ? Number(raw) : null;
+
 export const NEARBY_LIMIT = 5;
 /** 図鑑の「同じポケモンのポケふた」と同じ件数。写真館は6件だったので図鑑に寄せる。 */
 export const SAME_POKEMON_LIMIT = 10;

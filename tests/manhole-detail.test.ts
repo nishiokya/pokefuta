@@ -4,6 +4,7 @@ import {
   NEARBY_LIMIT,
   SAME_POKEMON_LIMIT,
   buildManholeDetail,
+  parseManholeIdParam,
 } from '../src/lib/manhole-detail.ts';
 
 const target = {
@@ -89,4 +90,30 @@ test('統計とバッジも一緒に返る', () => {
   assert.equal(d.stats.prefTotal, 4);
   assert.equal(d.stats.samePokemonTotal, 3);
   assert.ok(d.statBadges.some((b) => b.key === 'pref'));
+});
+
+// ── ルートセグメントの検証（サーバ描画と単体GETで共有） ─────────────────
+
+test('parseManholeIdParam rejects Number-coercible but non-canonical segments', () => {
+  // Number() に任せると 82 になってしまう形。サーバ描画が中身を出すのに
+  // 単体GETが 400 を返す食い違いになっていた（PR #247）。
+  assert.equal(parseManholeIdParam('82'), 82);
+  assert.equal(parseManholeIdParam('82.0'), null);
+  assert.equal(parseManholeIdParam('0x52'), null); // 16進で82
+  assert.equal(parseManholeIdParam(' 82'), null);
+  assert.equal(parseManholeIdParam('82abc'), null);
+  assert.equal(parseManholeIdParam('8e1'), null);
+  assert.equal(parseManholeIdParam('+82'), null);
+});
+
+test('parseManholeIdParam rejects 0 and negatives because ids start at 1', () => {
+  assert.equal(parseManholeIdParam('0'), null);
+  assert.equal(parseManholeIdParam('-1'), null);
+  assert.equal(parseManholeIdParam('1'), 1);
+});
+
+test('parseManholeIdParam handles a missing segment', () => {
+  assert.equal(parseManholeIdParam(undefined), null);
+  assert.equal(parseManholeIdParam(null), null);
+  assert.equal(parseManholeIdParam(''), null);
 });

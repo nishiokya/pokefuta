@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { loadManholeDetail } from '@/lib/manhole-detail-payload';
+import { parseManholeIdParam } from '@/lib/manhole-detail';
 
 /**
  * ログイン中の利用者の訪問状態を1枚ぶんだけ引く。
@@ -81,15 +82,15 @@ export async function GET(
   { params }: { params: { manholeId: string } }
 ) {
   try {
-    // 前方一致で数字を拾う parseInt は使わない。`1foo` や `1.9` が黙って 1 になる。
-    // `0` も弾く（id は 1 始まり）。`/api/manholes` の limit 検証と同じ形にそろえる。
-    if (!/^\d+$/.test(params.manholeId) || Number(params.manholeId) < 1) {
+    // 判定はサーバ描画と共有する（`parseManholeIdParam`）。ここだけ厳しくすると、
+    // サーバ描画が中身を出すのにこちらが 400 を返す食い違いが起きる。
+    const manholeId = parseManholeIdParam(params.manholeId);
+    if (manholeId === null) {
       return NextResponse.json(
         { error: 'manholeId must be a positive integer' },
         { status: 400 }
       );
     }
-    const manholeId = Number(params.manholeId);
 
     // 素材の組み立てはサーバ描画と共有する（`loadManholeDetail`）。
     // ここで別に組み立てると、初期HTMLと再取得後で中身が食い違う余地ができる。
