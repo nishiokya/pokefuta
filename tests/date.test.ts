@@ -18,7 +18,12 @@ test('photo dates are formatted in JST, not the viewer timezone', () => {
 });
 
 test('the year is dropped only for photos from the current JST year', () => {
-  const thisYear = new Date().getFullYear();
+  // 「今年」も JST で求める。実行環境ローカルの getFullYear() で組み立てると、
+  // UTC の CI ランナー上では 12/31 15:00〜24:00 UTC（= JST の元日）の9時間だけ
+  // 年がズレて落ちる。JST の正しさを見るテストが TZ に依存しては意味がない。
+  const thisYear = Number(
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(new Date())
+  );
   assert.equal(formatPhotoDateJstCompact(`${thisYear}-08-30T04:48:32+00:00`), '8/30');
   assert.equal(formatPhotoDateJstCompact('2024-07-13T00:00:00Z'), '2024/7/13');
 });
