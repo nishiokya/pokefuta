@@ -11,7 +11,6 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { Manhole } from '@/types/database';
 import type { SnapshotManhole } from '@/lib/manhole-snapshot';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
