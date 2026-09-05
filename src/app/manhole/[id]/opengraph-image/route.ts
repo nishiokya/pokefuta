@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { parseManholeIdParam } from '@/lib/manhole-detail';
 import { SITE_NAME } from '@/lib/constants';
 import { renderOgpFallback, renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
 import {
@@ -28,8 +29,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const manholeId = Number(params.id);
-  if (isNaN(manholeId)) {
+  // ページ・単体GET と同じ判定を使う。ここだけ Number() のままだと、
+  // `82.0` に対してページは 404 なのに OGP 画像だけ 82 のものが返る。
+  const manholeId = parseManholeIdParam(params.id);
+  if (manholeId === null) {
     return new Response(await buildDefaultFallback() as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' },
     });

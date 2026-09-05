@@ -11,7 +11,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { Manhole } from '@/types/database';
+import type { SnapshotManhole } from '@/lib/manhole-snapshot';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ShareButtons from '@/components/ShareButtons';
@@ -35,6 +35,7 @@ import {
 } from '@/lib/manhole-label';
 import { officialLinks, type StatBadge } from '@/lib/manhole-stats';
 import type { RelatedManhole } from '@/lib/manhole-detail';
+import type { ManholeDetailPayload } from '@/lib/manhole-detail-payload';
 import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
 
@@ -222,19 +223,32 @@ function PhotoLikeButton({
   );
 }
 
-export default function ManholeDetailPage() {
+const EMPTY_DERIVED = { statBadges: [] as StatBadge[], nearby: [] as RelatedManhole[], samePokemon: [] as RelatedManhole[] };
+
+const derivedOf = (payload: ManholeDetailPayload | null) =>
+  payload
+    ? { statBadges: payload.statBadges, nearby: payload.nearby, samePokemon: payload.samePokemon }
+    : EMPTY_DERIVED;
+
+export default function ManholeDetailPage({ initial = null }: { initial?: ManholeDetailPayload | null }) {
   const params = useParams();
   const router = useRouter();
-  const [manhole, setManhole] = useState<Manhole | null>(null);
+  // 初期値をサーバから受け取る。これがあることで、このクライアントコンポーネントの
+  // **サーバ描画パスが本文を実際に吐く**（h1・場所・住所・統計バッジ・関連する蓋）。
+  // null 始まりだった頃は、初期HTMLがローディング状態のまま出ていた。
+  // 型は実際に入るもの＝スナップショット形にそろえる。`Manhole` は DB の行の型で
+  // 16列ぶん形が違い、以前は `as` で潰していた。単体GETが返すのもスナップショット形
+  // なので、この状態が `Manhole` だったことは元から実態と合っていなかった。
+  const [manhole, setManhole] = useState<SnapshotManhole | null>(initial?.manhole ?? null);
   // サーバが組み立てた派生値（統計バッジ・関連する蓋）。
   // 全件を持たなくなったので、この画面ではもう計算しない。
   const [derived, setDerived] = useState<{
     statBadges: StatBadge[];
     nearby: RelatedManhole[];
     samePokemon: RelatedManhole[];
-  }>({ statBadges: [], nearby: [], samePokemon: [] });
+  }>(derivedOf(initial));
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -242,12 +256,16 @@ export default function ManholeDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // ここはサーバ描画ぶんで埋めない。表示箇所がすべて isLoggedIn の内側なので
+  // サーバ描画（未ログイン相当）では出ず、埋めても得が無い。逆にログイン中は
+  // /api/visits が返るまで「0 / N 達成」という嘘の進捗が一瞬出る。
   const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [photosLoading, setPhotosLoading] = useState(true);
   const [photoLoadError, setPhotoLoadError] = useState(false);
   const photoRequestIdRef = useRef(0);
+
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
@@ -259,7 +277,17 @@ export default function ManholeDetailPage() {
     if (manholeId) {
       setSelectedPhotoIdx(0);
       setPhotoExpanded(false);
-      loadManholeDetail(manholeId as string);
+      // 既にこの蓋を表示できているなら状態を消さずに再取得する。初回は
+      // サーバ描画ぶんが入っているのでここが真になる。再取得する理由は
+      // 訪問状態（is_visited）で、これは利用者ごとに違うためサーバ描画には
+      // 混ぜていない（`manhole-detail-payload.ts` 参照）。
+      //
+      // 「一度使ったら捨てる ref」で初回を見分けていたが、**StrictMode が
+      // この effect を二重に走らせるため1回目で消費され、2回目は false に
+      // なっていた**。今表示している蓋のidと比べれば、何回走っても答えは同じ。
+      loadManholeDetail(manholeId as string, {
+        keepCurrent: manhole?.id === Number(manholeId),
+      });
       loadPhotos(manholeId as string);
       loadCurrentUser();
     }
@@ -271,14 +299,23 @@ export default function ManholeDetailPage() {
     }
   }, [manhole?.prefecture, prefectureDex?.total, currentUserId]);
 
+  // 1枚につき1回だけ送る。**依存配列だけでは足りない。**
+  //
+  // サーバ描画ぶんを初期値に持つようになったので、この effect は manhole が
+  // 埋まった状態でマウントされる。dev の StrictMode はその effect を二重に走らせ、
+  // さらにアンマウント/再マウントで状態がサーバ描画ぶんに戻るため、同じ蓋で
+  // 3回発火していた（サーバ描画にする前は null 始まりで、埋まる瞬間の1回だけだった）。
+  // 送信済みのidを ref で覚えて、再描画・再マウントのどちらでも増えないようにする。
+  const trackedManholeIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (manhole) {
-      trackManholeDetailOpen({
-        manhole_id: manhole.id,
-        prefecture: manhole.prefecture,
-        pokemon_ids: manhole.pokemons?.join(','),
-      });
-    }
+    if (!manhole) return;
+    if (trackedManholeIdRef.current === manhole.id) return;
+    trackedManholeIdRef.current = manhole.id;
+    trackManholeDetailOpen({
+      manhole_id: manhole.id,
+      prefecture: manhole.prefecture,
+      pokemon_ids: manhole.pokemons?.join(','),
+    });
   }, [manhole?.id]);
 
   // title / meta description / JSON-LD はここでは触らない。
@@ -319,11 +356,27 @@ export default function ManholeDetailPage() {
   // 以前は `/api/manholes` で**全482件・730KB** を落としてから `find` で1件を探し、
   // 近傍・同じポケモン・統計もこの画面で計算していた。1枚見るために全国分を運んでいた。
   // 派生値はサーバが組み立てて返すので、ここは受け取って置くだけ。
-  const loadManholeDetail = async (id: string) => {
-    setLoading(true);
-    setError(null);
-    setManhole(null);
-    setDerived({ statBadges: [], nearby: [], samePokemon: [] });
+  // `keepCurrent` はサーバ描画ぶんを既に持っている初回だけ立てる。ここで消すと、
+  // せっかくHTMLに入っていた本文が hydrate 直後に一瞬ローディングへ戻る。
+  // 別の蓋へ遷移したときは従来どおり消す（前の蓋の内容を残さないため）。
+  const loadManholeDetail = async (id: string, { keepCurrent = false } = {}) => {
+    if (!keepCurrent) {
+      setLoading(true);
+      setError(null);
+      setManhole(null);
+      setDerived(EMPTY_DERIVED);
+    }
+    // サーバ描画ぶんを表示したままの再取得（`keepCurrent`）では、失敗しても
+    // エラー画面に倒さない。この再取得の目的は訪問状態を重ねることだけで、
+    // 本文は既にHTMLとして描けている。**通信が一瞬こけただけで、読めていた
+    // ページが「取得に失敗しました」に置き換わるほうが損**なので、記録して黙る。
+    const failWith = (message: string) => {
+      if (keepCurrent) {
+        console.warn(`Manhole detail refresh failed, keeping server-rendered content: ${message}`);
+        return;
+      }
+      setError(message);
+    };
     try {
       const response = await fetch(`/api/manholes/${encodeURIComponent(id)}`);
       if (response.ok) {
@@ -340,16 +393,16 @@ export default function ManholeDetailPage() {
             prev ? { ...prev, total: prefTotal } : { current: 0, total: prefTotal }
           );
         } else {
-          setError('マンホールが見つかりませんでした');
+          failWith('マンホールが見つかりませんでした');
         }
       } else if (response.status === 404) {
-        setError('マンホールが見つかりませんでした');
+        failWith('マンホールが見つかりませんでした');
       } else {
-        setError('データの取得に失敗しました');
+        failWith('データの取得に失敗しました');
       }
     } catch (err) {
       console.error('Failed to load manhole detail:', err);
-      setError('データの取得に失敗しました');
+      failWith('データの取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -414,7 +467,7 @@ export default function ManholeDetailPage() {
     }
   };
 
-  const handleManholeClick = (clickedManhole: Manhole) => {
+  const handleManholeClick = (clickedManhole: { id: number }) => {
     router.push(`/manhole/${clickedManhole.id}`);
   };
 

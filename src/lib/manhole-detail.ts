@@ -25,6 +25,24 @@ import {
 } from '@/lib/manhole-stats';
 import type { ManholeTitle } from '@/types/database';
 
+/**
+ * URL のセグメントを蓋のidとして受け取る。**サーバ描画と単体GETで同じ判定を使う。**
+ *
+ * `Number()` に任せると `/manhole/82.0` や `/manhole/0x52`（16進で82）が
+ * 黙って 82 になる。サーバ描画は中身を出すのに単体GETは 400 を返すので、
+ * 偽のURLで本文だけが出る状態になっていた（PR #247 で Codex が指摘）。
+ *
+ * id は 1 始まりなので `0` と先頭ゼロも弾く。
+ */
+export const parseManholeIdParam = (raw: string | undefined | null): number | null => {
+  // 先頭ゼロ（`082`）も弾く。`Number()` は 82 にするので、同じ蓋に対して
+  // 別URLが無限に作れてしまう（`/manhole/082`, `/manhole/0082`, …）。
+  // `[1-9]` 始まりを要求することで `0` も同時に落ちる（id は 1 始まり）。
+  if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) ? id : null;
+};
+
 /** 図鑑の「次に寄れるポケふた」と同じ件数。 */
 export const NEARBY_LIMIT = 5;
 /** 図鑑の「同じポケモンのポケふた」と同じ件数。写真館は6件だったので図鑑に寄せる。 */

@@ -277,7 +277,7 @@ export default function MapPage() {
     trackFilterApply('prefecture', prefecture.name, prefecture.count);
   };
 
-  const handleManholeClick = (manhole: Manhole) => {
+  const handleManholeClick = (manhole: { id: number }) => {
     window.location.href = `/manhole/${manhole.id}`;
   };
 

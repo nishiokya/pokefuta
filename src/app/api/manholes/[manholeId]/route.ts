@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
-import { buildManholeDetail } from '@/lib/manhole-detail';
+import { loadManholeDetail } from '@/lib/manhole-detail-payload';
+import { parseManholeIdParam } from '@/lib/manhole-detail';
 
 /**
  * ログイン中の利用者の訪問状態を1枚ぶんだけ引く。
@@ -82,30 +82,33 @@ export async function GET(
   { params }: { params: { manholeId: string } }
 ) {
   try {
-    // 前方一致で数字を拾う parseInt は使わない。`1foo` や `1.9` が黙って 1 になる。
-    // `0` も弾く（id は 1 始まり）。`/api/manholes` の limit 検証と同じ形にそろえる。
-    if (!/^\d+$/.test(params.manholeId) || Number(params.manholeId) < 1) {
+    // 判定はサーバ描画と共有する（`parseManholeIdParam`）。ここだけ厳しくすると、
+    // サーバ描画が中身を出すのにこちらが 400 を返す食い違いが起きる。
+    const manholeId = parseManholeIdParam(params.manholeId);
+    if (manholeId === null) {
       return NextResponse.json(
         { error: 'manholeId must be a positive integer' },
         { status: 400 }
       );
     }
-    const manholeId = Number(params.manholeId);
 
-    const snapshot = await fetchManholeSnapshot();
-    if (!snapshot?.manholes) {
-      return NextResponse.json(
-        { error: 'Manhole data is temporarily unavailable. Please try again later.' },
-        { status: 503 }
-      );
+    // 素材の組み立てはサーバ描画と共有する（`loadManholeDetail`）。
+    // ここで別に組み立てると、初期HTMLと再取得後で中身が食い違う余地ができる。
+    //
+    // スナップショットを引くのは中で1回だけ。ここで先に引いて 503 を判定してから
+    // もう一度引く形にしていたが、1回目が成功して2回目が失敗すると
+    // **「その蓋は存在しない」(404) と嘘をつく**。失敗の理由を返してもらって分岐する。
+    const result = await loadManholeDetail(manholeId);
+    if (!result.ok) {
+      return result.reason === 'unavailable'
+        ? NextResponse.json(
+            { error: 'Manhole data is temporarily unavailable. Please try again later.' },
+            { status: 503 }
+          )
+        : NextResponse.json({ error: 'Manhole not found' }, { status: 404 });
     }
 
-    const manhole = snapshot.manholes.find((m) => m.id === manholeId);
-    if (!manhole) {
-      return NextResponse.json({ error: 'Manhole not found' }, { status: 404 });
-    }
-
-    const derived = buildManholeDetail(manhole, snapshot.manholes);
+    const { manhole, ...derived } = result.payload;
     const visitState = await loadVisitState(manholeId);
 
     return NextResponse.json({
