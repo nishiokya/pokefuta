@@ -21,6 +21,7 @@ const SVG_TEMPLATE_PATH = path.join(ROOT, 'public', 'ogp', 'pokefuta_ogp_templat
 const MOSAIC_RELATIVE_PATH = path.join('public', 'ogp', 'manhole-photo-mosaic-left-600x630.webp');
 const MOSAIC_PATH = path.join(ROOT, MOSAIC_RELATIVE_PATH);
 const MOSAIC_BUILD_PATH = path.join(ROOT, '.next', MOSAIC_RELATIVE_PATH);
+const NEXT_CONFIG_PATH = path.join(ROOT, 'next.config.js');
 
 function fail(message) {
   console.error(`[verify:ogp-linux] ${message}`);
@@ -110,6 +111,34 @@ async function main() {
     fail('OGP font path is not resolved as an absolute path from process.cwd()');
   }
   pass('sharp text overlay uses an absolute fontfile path');
+
+  // outputFileTracingIncludes から漏れると、.next/public へのコピーは通るのに
+  // トレース済みの成果物にアセットが同梱されず、本番だけカードが落ちる。
+  // 2026-09-06 に旧背景PNGを消した際、この一覧の更新が漏れていた。
+  const nextConfig = readRequired(NEXT_CONFIG_PATH);
+  if (nextConfig.includes('pokefuta_ogp_background_1200x630.png')) {
+    fail('next.config.js still references the deleted OGP background asset');
+  }
+  pass('next.config.js does not reference the deleted OGP background asset');
+
+  const CARD_ROUTES = [
+    '/manhole/[id]/opengraph-image',
+    '/share/photo/[photoId]/opengraph-image',
+    '/p/[photoId]/opengraph-image',
+    '/design-manholes/[id]/opengraph-image',
+  ];
+  for (const route of CARD_ROUTES) {
+    const block = nextConfig.split(`'${route}'`)[1];
+    if (!block) fail(`next.config.js has no outputFileTracingIncludes entry for ${route}`);
+    const listed = block.split(']')[0];
+    if (!listed.includes('manhole-photo-mosaic-left-600x630.webp')) {
+      fail(`next.config.js does not trace the baked mosaic for ${route}`);
+    }
+    if (!listed.includes('pokefuta_ogp_template.svg')) {
+      fail(`next.config.js does not trace the OGP template for ${route}`);
+    }
+  }
+  pass(`next.config.js traces the template and mosaic for ${CARD_ROUTES.length} card routes`);
 
   // 左面のモザイクは焼き込み済みの固定アセット。これが build 出力に無いと
   // 実行時にカードの左半分が落ちる（写真を集め直す実装にはしない）。

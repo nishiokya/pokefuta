@@ -94,9 +94,17 @@ async function main() {
   const shouldBootstrap = process.argv.includes('--bootstrap');
   let sources;
 
-  if (shouldBootstrap || !fs.existsSync(MANIFEST_PATH)) {
+  if (shouldBootstrap) {
     sources = await bootstrap();
   } else {
+    // マニフェストが無いまま黙って選び直すと、焼くたびに別の絵になる。
+    // ネットワークから選ぶのは --bootstrap を明示したときだけにする。
+    if (!fs.existsSync(MANIFEST_PATH)) {
+      throw new Error(
+        `マニフェストが無い: ${MANIFEST_PATH}\n` +
+        '素材を選び直してよいなら --bootstrap を付けて実行すること。'
+      );
+    }
     sources = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8')).photos;
   }
 

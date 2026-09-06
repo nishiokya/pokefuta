@@ -25,11 +25,9 @@ const COL = { left: 76, width: 430 } as const;
 
 const INK = {
   cream: '#FFF8EB',
-  paper: '#FFFDF7',
   /** 紫の上に置く控えめな文字 */
   muted: '#D9CFE6',
   gold: '#F0C46A',
-  brown: '#4F3828',
 } as const;
 
 type TextLayerInput = {
@@ -85,19 +83,35 @@ function imageDataUri(buffer: Buffer, mimeType: string): string {
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
+type TemplateAssets = { template: string; mosaicDataUri: string };
+
 /**
- * テンプレートと焼き込み済みモザイクはモジュール初期化時に一度だけ読む。
- * モザイクは WebP のままだと librsvg が展開できないので、ここで JPEG へ変換して
- * data URI にしておく。リクエストごとにディスクへは触らない。
+ * テンプレートと焼き込み済みモザイクは最初の描画時に一度だけ読み、以後使い回す。
+ * モザイクは WebP のままだと librsvg が展開できないので、その一度で JPEG へ変換する。
+ *
+ * **失敗した Promise はキャッシュしない。** モジュール初期化時に即実行して結果を
+ * 抱えると、一時的な読み込み失敗がプロセスの寿命ぶん固定され、以後すべての
+ * カードが落ち続ける。呼ばれたときに読み、失敗したら次の呼び出しでやり直す。
  */
-const templateAssetsPromise = (async () => {
-  const [template, mosaicFile] = await Promise.all([
-    readFile(TEMPLATE_PATH, 'utf8'),
-    readFile(MOSAIC_PATH),
-  ]);
-  const mosaicJpeg = await sharp(mosaicFile).jpeg({ quality: 82 }).toBuffer();
-  return { template, mosaicDataUri: imageDataUri(mosaicJpeg, 'image/jpeg') };
-})();
+let templateAssetsPromise: Promise<TemplateAssets> | null = null;
+
+function loadTemplateAssets(): Promise<TemplateAssets> {
+  if (!templateAssetsPromise) {
+    templateAssetsPromise = (async (): Promise<TemplateAssets> => {
+      const [template, mosaicFile] = await Promise.all([
+        readFile(TEMPLATE_PATH, 'utf8'),
+        readFile(MOSAIC_PATH),
+      ]);
+      const mosaicJpeg = await sharp(mosaicFile).jpeg({ quality: 82 }).toBuffer();
+      return { template, mosaicDataUri: imageDataUri(mosaicJpeg, 'image/jpeg') };
+    })().catch((error) => {
+      templateAssetsPromise = null;
+      throw error;
+    });
+  }
+
+  return templateAssetsPromise;
+}
 
 function textTopFromBaseline(baseline: number, fontSize: number): number {
   return Math.max(0, Math.round(baseline - fontSize * 0.9));
@@ -219,8 +233,44 @@ const PERSON_ICON = `<g transform="translate(${COL.left} 413)">
 
 const GOLD_RULE = `<rect x="${COL.left}" y="208" width="64" height="5" rx="2.5" fill="#C47E0F"/>`;
 
+/**
+ * テンプレートもモザイクもフォントも使わない最後の受け皿。
+ *
+ * 通常カード・写真なしカード・fallback はすべて renderCard() を通るので、
+ * アセットやフォントが欠けると全経路が同時に落ちる。そのとき 500 を返すより、
+ * 図形だけのカードを返して共有そのものは成立させる。文字は入れない
+ * （日本語を描くにはフォントが要り、それ自体が落ちている可能性があるため）。
+ */
+async function renderAssetlessFallback(): Promise<Buffer> {
+  const svg = `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${WIDTH}" height="${HEIGHT}" fill="#FFF8EB"/>
+    <rect x="0" y="0" width="566" height="${HEIGHT}" fill="#574276"/>
+    <line x1="588" y1="24" x2="588" y2="606" stroke="#8C6A4A" stroke-opacity="0.42" stroke-width="3" stroke-dasharray="10 12"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="#F3E7D2"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="none" stroke="#FFFDF7" stroke-width="11"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="196" fill="none" stroke="#8C6A4A" stroke-opacity="0.26" stroke-width="3"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="96" fill="none" stroke="#B5483C" stroke-opacity="0.55" stroke-width="4"/>
+    <g transform="translate(76 297)">
+      <circle cx="18" cy="18" r="18" fill="#FFF8EB"/>
+      <circle cx="18" cy="18" r="7.5" fill="none" stroke="#574276" stroke-width="3"/>
+      <circle cx="18" cy="18" r="14" fill="none" stroke="#574276" stroke-width="2" stroke-dasharray="4 4"/>
+    </g>
+  </svg>`;
+
+  return sharp(Buffer.from(svg)).resize(WIDTH, HEIGHT).png().toBuffer();
+}
+
 async function renderCard(slots: CardSlots): Promise<Buffer> {
-  const { template, mosaicDataUri } = await templateAssetsPromise;
+  try {
+    return await renderCardWithAssets(slots);
+  } catch (error) {
+    console.error('OGP card assets are unavailable; falling back to the assetless card:', error);
+    return renderAssetlessFallback();
+  }
+}
+
+async function renderCardWithAssets(slots: CardSlots): Promise<Buffer> {
+  const { template, mosaicDataUri } = await loadTemplateAssets();
 
   const withPin = slots.pill?.withPin === true;
   const withPerson = slots.accent?.withPerson === true;
@@ -438,7 +488,6 @@ export async function renderPokefutaNoPhotoTemplate(input: {
 export async function renderOgpFallback(input: {
   title: string;
   subtitle: string;
-  siteLabel?: string;
 }): Promise<Buffer> {
   return renderCard({
     hero: heroMark(),
