@@ -22,7 +22,7 @@ export const SITE_URL = 'https://pokefuta.com';
  * URL が変わらないと SNS のクローラが古い画像を配り続ける。
  * 20260808: 画像に焼いていたサイト名を「ポケふた写真館」に変更したため更新
  */
-export const OGP_IMAGE_VERSION = '20260808-site-name';
+export const OGP_IMAGE_VERSION = '20260906-mosaic-card';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
 /**

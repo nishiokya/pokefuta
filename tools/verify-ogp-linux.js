@@ -18,6 +18,9 @@ const BUILT_ROUTE_PATH = path.join(
 );
 const SOURCE_TEMPLATE_PATH = path.join(ROOT, 'src', 'lib', 'pokefuta-ogp-template.ts');
 const SVG_TEMPLATE_PATH = path.join(ROOT, 'public', 'ogp', 'pokefuta_ogp_template.svg');
+const MOSAIC_RELATIVE_PATH = path.join('public', 'ogp', 'manhole-photo-mosaic-left-600x630.webp');
+const MOSAIC_PATH = path.join(ROOT, MOSAIC_RELATIVE_PATH);
+const MOSAIC_BUILD_PATH = path.join(ROOT, '.next', MOSAIC_RELATIVE_PATH);
 
 function fail(message) {
   console.error(`[verify:ogp-linux] ${message}`);
@@ -107,6 +110,18 @@ async function main() {
     fail('OGP font path is not resolved as an absolute path from process.cwd()');
   }
   pass('sharp text overlay uses an absolute fontfile path');
+
+  // 左面のモザイクは焼き込み済みの固定アセット。これが build 出力に無いと
+  // 実行時にカードの左半分が落ちる（写真を集め直す実装にはしない）。
+  if (!fs.existsSync(MOSAIC_PATH)) {
+    fail(`Missing baked mosaic asset: ${MOSAIC_PATH}. Run: node tools/build-ogp-mosaic.js`);
+  }
+  pass(`Baked mosaic present: ${path.relative(ROOT, MOSAIC_PATH)}`);
+
+  if (!fs.existsSync(MOSAIC_BUILD_PATH)) {
+    fail(`Baked mosaic missing from build output: ${MOSAIC_BUILD_PATH}`);
+  }
+  pass(`Baked mosaic included in build output: ${path.relative(ROOT, MOSAIC_BUILD_PATH)}`);
 
   const svgTemplate = readRequired(SVG_TEMPLATE_PATH);
   if (svgTemplate.includes('@font-face')) {

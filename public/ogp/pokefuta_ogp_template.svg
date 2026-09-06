@@ -1,59 +1,60 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <!--
-    ポケふた/デザインマンホール共通のOGPカード。
-    文字は sharp のテキストレイヤで後から重ねるので、ここには一切入れない
-    （Linux の librsvg は Web フォントを解決できないため、SVG 側にフォント指定は置かない）。
-    {{hero}} には写真か「写真なし」のプレート、{{rule}} には前置きの罫が入る。
+    OGPカードの版面。左が情報（蓋のモザイク＋紫）、右が主役写真。
+    日本語は sharp のテキストレイヤで後から重ねるので、ここには文字を置かない
+    （Linux の librsvg は Web のフォント読み込み規則を解決できないため）。
+    プレースホルダ:
+      {{mosaic}}     焼き込み済みモザイクの data URI
+      {{hero}}       主役の写真か、写真なしのプレート
+      {{pill}}       左上の丸ピル（場所・種別）
+      {{rule}}       前置きの上の金色の罫
+      {{accentIcon}} 投稿者行の人アイコン
+    円の中心と半径は src/lib/pokefuta-ogp-template.ts の HERO / PANEL と一致させること。
   -->
   <defs>
-    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0C241D"/>
-      <stop offset="0.55" stop-color="#12382E"/>
-      <stop offset="1" stop-color="#0A1C17"/>
-    </linearGradient>
-
-    <radialGradient id="glow" cx="0.26" cy="0.46" r="0.62">
-      <stop offset="0" stop-color="#2F7D64" stop-opacity="0.42"/>
-      <stop offset="1" stop-color="#2F7D64" stop-opacity="0"/>
-    </radialGradient>
-
-    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
-      <circle cx="1.6" cy="1.6" r="1.6" fill="#F5EEDD" fill-opacity="0.05"/>
-    </pattern>
-
-    <clipPath id="heroClip">
-      <circle cx="318" cy="315" r="222"/>
-    </clipPath>
-
-    <filter id="heroShadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.55"/>
+    <clipPath id="panelClip"><rect x="0" y="0" width="566" height="630"/></clipPath>
+    <clipPath id="heroClip"><circle cx="886" cy="315" r="258"/></clipPath>
+    <filter id="heroShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#4F3828" flood-opacity="0.22"/>
     </filter>
   </defs>
 
-  <rect width="1200" height="630" fill="url(#ground)"/>
-  <rect width="1200" height="630" fill="url(#dots)"/>
-  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- 右面: クリームの紙 -->
+  <rect width="1200" height="630" fill="#FFF8EB"/>
 
-  <!-- 右端から見切れる大きなリム。蓋の縁を思わせる奥行きだけを足す -->
-  <circle cx="1206" cy="316" r="322" fill="none" stroke="#F5EEDD" stroke-opacity="0.07" stroke-width="1.5"/>
-  <circle cx="1206" cy="316" r="268" fill="none" stroke="#F5EEDD" stroke-opacity="0.05" stroke-width="1.5"/>
-
-  <!-- 版面の内枠 -->
-  <rect x="28" y="28" width="1144" height="574" rx="18" fill="none" stroke="#F5EEDD" stroke-opacity="0.16" stroke-width="1.5"/>
-
-  <!-- 主役の円。マンホールが円なので、角丸square ではなく円で抜く -->
-  <g filter="url(#heroShadow)">
-    <circle cx="318" cy="315" r="240" fill="#0A1C17" fill-opacity="0.55"/>
-    <circle cx="318" cy="315" r="222" fill="#123A30"/>
+  <!-- 右上の消印。主役より目立たせない -->
+  <g fill="none" stroke="#B5483C" stroke-opacity="0.13">
+    <circle cx="1128" cy="86" r="74" stroke-width="3"/>
+    <circle cx="1128" cy="86" r="58" stroke-width="1.5" stroke-dasharray="7 9"/>
   </g>
-  <g clip-path="url(#heroClip)">
-    {{hero}}
-  </g>
-  <circle cx="318" cy="315" r="222" fill="none" stroke="#0A1C17" stroke-opacity="0.55" stroke-width="7"/>
-  <circle cx="318" cy="315" r="230" fill="none" stroke="#F5EEDD" stroke-opacity="0.26" stroke-width="1.5"/>
-  <circle cx="318" cy="315" r="243" fill="none" stroke="#F5EEDD" stroke-opacity="0.11" stroke-width="1"/>
+  <path d="M604 612 C 700 556, 820 592, 906 566" fill="none" stroke="#C47E0F" stroke-opacity="0.16" stroke-width="2" stroke-dasharray="9 10"/>
 
-  <!-- 右カラムの罫 -->
+  <!-- 左面: 焼き込み済みの蓋モザイク＋紫 -->
+  <g clip-path="url(#panelClip)">
+    <image href="{{mosaic}}" x="-10" y="0" width="600" height="630" preserveAspectRatio="xMidYMid slice"/>
+    <rect x="0" y="0" width="566" height="630" fill="#574276" fill-opacity="0.78"/>
+  </g>
+
+  <!-- スタンプ帳のミシン目 -->
+  <line x1="588" y1="24" x2="588" y2="606" stroke="#8C6A4A" stroke-opacity="0.42" stroke-width="3" stroke-dasharray="10 12" stroke-linecap="round"/>
+
+  <!-- 主役の写真。マンホールが円なので円で抜く -->
+  <g filter="url(#heroShadow)"><circle cx="886" cy="315" r="270" fill="#FFFDF7"/></g>
+  <circle cx="886" cy="315" r="258" fill="#EDE3D0"/>
+  <g clip-path="url(#heroClip)">{{hero}}</g>
+  <circle cx="886" cy="315" r="258" fill="none" stroke="#FFFDF7" stroke-width="11"/>
+  <circle cx="886" cy="315" r="265" fill="none" stroke="#B5483C" stroke-opacity="0.5" stroke-width="2"/>
+
+  <!-- 左カラムの部品 -->
+  {{pill}}
   {{rule}}
-  <rect x="600" y="498" width="528" height="1" fill="#F5EEDD" fill-opacity="0.16"/>
+  <rect x="76" y="478" width="430" height="1.5" fill="#FFF8EB" fill-opacity="0.34"/>
+  {{accentIcon}}
+
+  <!-- サイトのマーク -->
+  <g transform="translate(76 550)">
+    <circle cx="18" cy="18" r="18" fill="#FFF8EB"/>
+    <circle cx="18" cy="18" r="7.5" fill="none" stroke="#574276" stroke-width="3"/>
+    <circle cx="18" cy="18" r="14" fill="none" stroke="#574276" stroke-width="2" stroke-dasharray="4 4"/>
+  </g>
 </svg>

@@ -9,19 +9,28 @@ const HEIGHT = 630;
 const OGP_FONT_NAME = 'Noto Sans CJK JP';
 const OGP_FONT_RELATIVE_PATH = path.join('public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf');
 const TEMPLATE_RELATIVE_PATH = path.join('public', 'ogp', 'pokefuta_ogp_template.svg');
+const MOSAIC_RELATIVE_PATH = path.join('public', 'ogp', 'manhole-photo-mosaic-left-600x630.webp');
 const OGP_FONT_PATH = resolveOgpAssetPath(OGP_FONT_RELATIVE_PATH);
 const TEMPLATE_PATH = resolveOgpAssetPath(TEMPLATE_RELATIVE_PATH);
+const MOSAIC_PATH = resolveOgpAssetPath(MOSAIC_RELATIVE_PATH);
 
-/** 暗い地の上に置く文字色。pango は foreground に不透明度を持てないので明度で作る */
+/** 主役の円。テンプレート SVG の heroClip と必ず一致させること */
+const HERO = { cx: 886, cy: 315, r: 258 } as const;
+
+/** 写真の周囲に足す台紙の色。テンプレートの円の下地と同じにする */
+const HERO_MAT_COLOR = '#EDE3D0';
+
+/** 左カラムの版面 */
+const COL = { left: 76, width: 430 } as const;
+
 const INK = {
-  cream: '#F5EEDD',
-  muted: '#9FBDB1',
-  accent: '#F2CD45',
-  footer: '#BFD4CB',
+  cream: '#FFF8EB',
+  paper: '#FFFDF7',
+  /** 紫の上に置く控えめな文字 */
+  muted: '#D9CFE6',
+  gold: '#F0C46A',
+  brown: '#4F3828',
 } as const;
-
-/** 円の中心と半径。テンプレート SVG の clipPath と必ず一致させること */
-const HERO = { cx: 318, cy: 315, r: 222 } as const;
 
 type TextLayerInput = {
   text: string;
@@ -76,7 +85,19 @@ function imageDataUri(buffer: Buffer, mimeType: string): string {
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
-const templatePromise = readFile(TEMPLATE_PATH, 'utf8');
+/**
+ * テンプレートと焼き込み済みモザイクはモジュール初期化時に一度だけ読む。
+ * モザイクは WebP のままだと librsvg が展開できないので、ここで JPEG へ変換して
+ * data URI にしておく。リクエストごとにディスクへは触らない。
+ */
+const templateAssetsPromise = (async () => {
+  const [template, mosaicFile] = await Promise.all([
+    readFile(TEMPLATE_PATH, 'utf8'),
+    readFile(MOSAIC_PATH),
+  ]);
+  const mosaicJpeg = await sharp(mosaicFile).jpeg({ quality: 82 }).toBuffer();
+  return { template, mosaicDataUri: imageDataUri(mosaicJpeg, 'image/jpeg') };
+})();
 
 function textTopFromBaseline(baseline: number, fontSize: number): number {
   return Math.max(0, Math.round(baseline - fontSize * 0.9));
@@ -148,8 +169,6 @@ async function renderBaseSvg(template: string, replacements: Record<string, stri
   // 依存していないことを描画直前に保証する。
   // ビルド成果物にこのトークンの文字列が残ると tools/verify-ogp-linux.js の検査に
   // 引っかかるので、正規表現のエスケープ(\x2D = ハイフン)で literal を避ける。
-  // 配列 join による分割は minifier に定数畳み込みされて literal に戻ることがあるが、
-  // 正規表現リテラルは書き換えられないため import 構成が変わっても安定する。
   // エラーメッセージにもトークンを埋め込まないこと。
   if (/@font\x2Dface/.test(svg)) {
     throw new Error('OGP SVG must not depend on a web font at-rule');
@@ -158,44 +177,82 @@ async function renderBaseSvg(template: string, replacements: Record<string, stri
   return sharp(Buffer.from(svg)).resize(WIDTH, HEIGHT).png().toBuffer();
 }
 
-/**
- * カードの中身。左の円に入る SVG（`hero`）と、右カラムの4行。
- *
- * 文字の大きさは `fontSize` ではなく**箱の寸法**で決まる。sharp の text は
- * width と height を両方渡すと箱いっぱいに自動スケールするため、行間や
- * 見出しの大きさを変えたいときは height を動かすこと。
- */
 type CardSlots = {
+  /** 右の円に入る SVG */
   hero: string;
-  /** 小さい前置き。都道府県・カテゴリ */
+  /** 左上のピル。場所なら pin を付ける */
+  pill?: { text: string; withPin?: boolean };
+  /** 種別などの小さい前置き */
   eyebrow?: string;
-  /** 主役の1行。長ければ2行に折り返る */
+  /** 主役の1行。2行まで折り返す */
   headline: string;
-  /** 黄色の1行。登場ポケモン・投稿者 */
-  accent?: string;
-  /** 補足。雑学・誘い文句 */
+  /** 投稿者やポケモン名。人アイコンを付けるかは icon で決める */
+  accent?: { text: string; withPerson?: boolean };
+  /** 補足 */
   note?: string;
 };
 
-async function renderCard(slots: CardSlots): Promise<Buffer> {
-  const template = await templatePromise;
-  // 前置きが無いカードで罫だけが宙に浮かないよう、罫は eyebrow とセットで出す
-  const rule = slots.eyebrow
-    ? '<rect x="600" y="150" width="56" height="4" rx="2" fill="#F2CD45"/>'
+function pillSvg(text: string, withPin: boolean): string {
+  const paddingX = 26;
+  const iconRoom = withPin ? 34 : 0;
+  const textWidth = estimateTextWidth(text, 27);
+  const width = Math.round(paddingX * 2 + iconRoom + textWidth);
+  const pin = withPin
+    ? `<g transform="translate(${COL.left + 26} 111)" fill="#574276">
+         <path d="M11 0 C4.9 0 0 4.9 0 11 C0 19 11 30 11 30 C11 30 22 19 22 11 C22 4.9 17.1 0 11 0 Z"/>
+         <circle cx="11" cy="11" r="4.2" fill="#FFF8EB"/>
+       </g>`
     : '';
+  return `<rect x="${COL.left}" y="96" width="${width}" height="52" rx="26" fill="#FFF8EB" fill-opacity="0.94"/>${pin}`;
+}
+
+function pillTextLeft(withPin: boolean): number {
+  return COL.left + 26 + (withPin ? 34 : 0);
+}
+
+/** 投稿者行の人アイコン */
+const PERSON_ICON = `<g transform="translate(${COL.left} 413)">
+    <circle cx="17" cy="17" r="17" fill="#FFF8EB" fill-opacity="0.18"/>
+    <circle cx="17" cy="13" r="5.6" fill="#FFF8EB" fill-opacity="0.85"/>
+    <path d="M6.5 27 C 8.5 21.5, 25.5 21.5, 27.5 27 Z" fill="#FFF8EB" fill-opacity="0.85"/>
+  </g>`;
+
+const GOLD_RULE = `<rect x="${COL.left}" y="208" width="64" height="5" rx="2.5" fill="#C47E0F"/>`;
+
+async function renderCard(slots: CardSlots): Promise<Buffer> {
+  const { template, mosaicDataUri } = await templateAssetsPromise;
+
+  const withPin = slots.pill?.withPin === true;
+  const withPerson = slots.accent?.withPerson === true;
+
   const base = await renderBaseSvg(template, {
+    '{{mosaic}}': mosaicDataUri,
     '{{hero}}': slots.hero,
-    '{{rule}}': rule,
+    '{{pill}}': slots.pill ? pillSvg(slots.pill.text, withPin) : '',
+    '{{rule}}': slots.eyebrow ? GOLD_RULE : '',
+    '{{accentIcon}}': slots.accent && withPerson ? PERSON_ICON : '',
   });
 
   const layers: TextLayerInput[] = [];
 
+  if (slots.pill) {
+    layers.push({
+      text: truncate(slots.pill.text, 14),
+      left: pillTextLeft(withPin),
+      top: textTopFromBaseline(131, 27),
+      width: Math.ceil(estimateTextWidth(truncate(slots.pill.text, 14), 27)) + 8,
+      height: 28,
+      fontSize: 27,
+      color: '#574276',
+    });
+  }
+
   if (slots.eyebrow) {
     layers.push({
-      text: truncate(slots.eyebrow, 18),
-      left: 600,
-      top: textTopFromBaseline(200, 26),
-      width: 420,
+      text: truncate(slots.eyebrow, 16),
+      left: COL.left,
+      top: textTopFromBaseline(264, 26),
+      width: COL.width,
       height: 26,
       fontSize: 26,
       color: INK.muted,
@@ -203,50 +260,50 @@ async function renderCard(slots: CardSlots): Promise<Buffer> {
   }
 
   layers.push({
-    text: truncate(slots.headline, 20),
-    left: 598,
-    top: textTopFromBaseline(300, 62),
-    width: 528,
-    height: 84,
+    text: truncate(slots.headline, 22),
+    left: COL.left - 2,
+    top: textTopFromBaseline(356, 62),
+    width: COL.width,
+    height: 104,
     fontSize: 62,
-    minFontSize: 38,
+    minFontSize: 34,
     color: INK.cream,
   });
 
   if (slots.accent) {
     layers.push({
-      text: truncate(slots.accent, 22),
-      left: 600,
-      top: textTopFromBaseline(372, 32),
-      width: 528,
+      text: truncate(slots.accent.text, 20),
+      left: COL.left + (withPerson ? 46 : 0),
+      top: textTopFromBaseline(442, 32),
+      width: COL.width - (withPerson ? 46 : 0),
       height: 34,
       fontSize: 32,
-      minFontSize: 24,
-      color: INK.accent,
+      minFontSize: 22,
+      color: INK.gold,
     });
   }
 
   if (slots.note) {
     layers.push({
       text: truncate(slots.note, 26),
-      left: 600,
-      top: textTopFromBaseline(444, 27),
-      width: 528,
+      left: COL.left,
+      top: textTopFromBaseline(524, 27),
+      width: COL.width,
       height: 28,
       fontSize: 27,
-      minFontSize: 21,
+      minFontSize: 20,
       color: INK.muted,
     });
   }
 
   layers.push({
-    text: 'pokefuta.com',
-    left: 600,
-    top: textTopFromBaseline(552, 25),
-    width: 190,
-    height: 25,
-    fontSize: 25,
-    color: INK.footer,
+    text: 'ポケふた写真館',
+    left: COL.left + 48,
+    top: textTopFromBaseline(578, 27),
+    width: 280,
+    height: 28,
+    fontSize: 27,
+    color: INK.cream,
   });
 
   return sharp(base).composite(await buildTextLayers(layers)).png().toBuffer();
@@ -260,45 +317,58 @@ function heroPhoto(photoDataUri: string): string {
 
 /**
  * 写真がまだ無いときの「空の蓋」。
- *
- * 同心円と放射のリブで鋳鉄の蓋そのものに見せる。空白を空白のまま出さず、
- * 「ここにあなたの1枚が入る」と読める絵にするのが狙い。
+ * 同心円と放射のリブで鋳鉄の蓋そのものに見せ、白紙のカードを出さない。
  */
 function heroEmptyPlate(): string {
   const ticks = Array.from({ length: 24 }, (_, index) => {
     const angle = (Math.PI * 2 * index) / 24;
-    const inner = 168;
-    const outer = 200;
-    const x1 = HERO.cx + Math.cos(angle) * inner;
-    const y1 = HERO.cy + Math.sin(angle) * inner;
-    const x2 = HERO.cx + Math.cos(angle) * outer;
-    const y2 = HERO.cy + Math.sin(angle) * outer;
-    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#F5EEDD" stroke-opacity="0.14" stroke-width="6" stroke-linecap="round"/>`;
+    const x1 = HERO.cx + Math.cos(angle) * 196;
+    const y1 = HERO.cy + Math.sin(angle) * 196;
+    const x2 = HERO.cx + Math.cos(angle) * 232;
+    const y2 = HERO.cy + Math.sin(angle) * 232;
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#B5483C" stroke-opacity="0.22" stroke-width="7" stroke-linecap="round"/>`;
   }).join('');
 
-  return `<circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="#153F34"/>
+  return `<circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="#F3E7D2"/>
     ${ticks}
-    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="152" fill="none" stroke="#F5EEDD" stroke-opacity="0.20" stroke-width="2" stroke-dasharray="12 14"/>
-    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="118" fill="none" stroke="#F5EEDD" stroke-opacity="0.10" stroke-width="2"/>
-    <g fill="#F5EEDD" fill-opacity="0.30">
-      <rect x="${HERO.cx - 66}" y="${HERO.cy - 28}" width="132" height="94" rx="18"/>
-      <rect x="${HERO.cx - 28}" y="${HERO.cy - 44}" width="56" height="24" rx="9"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="176" fill="none" stroke="#B5483C" stroke-opacity="0.28" stroke-width="3" stroke-dasharray="13 15"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="136" fill="none" stroke="#8C6A4A" stroke-opacity="0.22" stroke-width="2"/>
+    <g fill="#8C6A4A" fill-opacity="0.42">
+      <rect x="${HERO.cx - 76}" y="${HERO.cy - 32}" width="152" height="108" rx="20"/>
+      <rect x="${HERO.cx - 32}" y="${HERO.cy - 50}" width="64" height="28" rx="10"/>
     </g>
-    <circle cx="${HERO.cx}" cy="${HERO.cy + 19}" r="31" fill="#153F34"/>
-    <circle cx="${HERO.cx}" cy="${HERO.cy + 19}" r="17" fill="#F5EEDD" fill-opacity="0.30"/>`;
+    <circle cx="${HERO.cx}" cy="${HERO.cy + 22}" r="36" fill="#F3E7D2"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy + 22}" r="20" fill="#8C6A4A" fill-opacity="0.42"/>`;
 }
 
-/** 個別の情報が無いときのマーク。同心円だけ */
+/** 個別の情報が引けないときのマーク */
 function heroMark(): string {
-  return `<circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="#153F34"/>
-    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="170" fill="none" stroke="#F5EEDD" stroke-opacity="0.16" stroke-width="2"/>
-    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="126" fill="none" stroke="#F5EEDD" stroke-opacity="0.12" stroke-width="2"/>
-    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="82" fill="none" stroke="#F2CD45" stroke-opacity="0.55" stroke-width="3"/>`;
+  return `<circle cx="${HERO.cx}" cy="${HERO.cy}" r="${HERO.r}" fill="#F3E7D2"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="196" fill="none" stroke="#8C6A4A" stroke-opacity="0.26" stroke-width="3"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="146" fill="none" stroke="#8C6A4A" stroke-opacity="0.20" stroke-width="2"/>
+    <circle cx="${HERO.cx}" cy="${HERO.cy}" r="96" fill="none" stroke="#B5483C" stroke-opacity="0.55" stroke-width="4"/>`;
 }
 
+/**
+ * 主役写真だけを取得・変換する。OGP1枚あたりの外部取得はこれ1回に保つ
+ * （左のモザイクは焼き込み済みアセット）。表示は直径516pxなので、
+ * Retina 相当の余裕を見て 620px 角へ落とす。
+ */
 async function toHeroPhotoUri(photoBuffer: Buffer): Promise<string> {
+  // 正方形に切ったあと、周囲へ台紙の色で余白を足してから円に入れる。
+  // 余白なしだと蓋が正方形いっぱいに写っている写真で、円の上下左右が
+  // 蓋を削ってしまう（内接円は正方形の辺の中点にしか触れないため）。
+  const inset = 34;
+  const inner = 620 - inset * 2;
   const resized = await sharp(photoBuffer)
-    .resize(HERO.r * 2, HERO.r * 2, { fit: 'cover' })
+    .resize(inner, inner, { fit: 'cover', position: 'centre' })
+    .extend({
+      top: inset,
+      bottom: inset,
+      left: inset,
+      right: inset,
+      background: HERO_MAT_COLOR,
+    })
     .jpeg({ quality: 90 })
     .toBuffer();
   return imageDataUri(resized, 'image/jpeg');
@@ -313,9 +383,10 @@ export async function renderPokefutaOgpTemplate(input: {
 }): Promise<Buffer> {
   return renderCard({
     hero: heroPhoto(await toHeroPhotoUri(input.photoBuffer)),
-    eyebrow: input.prefecture,
+    pill: { text: `${input.prefecture}・${truncate(input.city, 8)}`, withPin: true },
+    eyebrow: 'ポケふた',
     headline: `${truncate(input.city, 10)}のポケふた`,
-    accent: input.pokemonNames,
+    accent: { text: input.pokemonNames },
     note: input.badgeLabel || '旅先で見つける、全国のポケふたマップ',
   });
 }
@@ -326,14 +397,17 @@ export async function renderDesignManholeOgpTemplate(input: {
   submitterName?: string | null;
 }): Promise<Buffer> {
   // design_manhole の title は実際には null のことが多い（投稿フォームが必須にしていない）。
-  // 見出しを空にすると版面が崩れるので、カテゴリを言い切る文言に落とす。
-  const headline = input.title?.trim() || 'まちのデザインマンホール';
+  // 緯度経度から地名を推測したりせず、安全な既定の文言へ落とす。
+  const headline = input.title?.trim() || 'みんなのデザインマンホール';
 
   return renderCard({
     hero: heroPhoto(await toHeroPhotoUri(input.photoBuffer)),
-    eyebrow: 'デザインマンホール',
+    pill: { text: 'デザインマンホール' },
+    eyebrow: 'みんなの投稿',
     headline,
-    accent: input.submitterName ? `${truncate(input.submitterName, 12)}さんの投稿` : 'みんなの投稿',
+    accent: input.submitterName
+      ? { text: `${truncate(input.submitterName, 12)}さんの投稿`, withPerson: true }
+      : undefined,
     note: 'ご当地のマンホールを、みんなで集める',
   });
 }
@@ -343,7 +417,7 @@ export async function renderDesignManholeOgpTemplate(input: {
  *
  * ここは以前タイトルとドメインだけのほぼ白紙が出ていた（2026-09-06 時点で
  * 482枚中22枚が該当し、うち5枚は離島）。シェアしたい蓋ほど白紙になるので、
- * 空の蓋の絵を主役に据えて、そのまま投稿への誘いにする。
+ * 空の蓋を主役に据えて、そのまま投稿への誘いにする。
  */
 export async function renderPokefutaNoPhotoTemplate(input: {
   prefecture: string;
@@ -352,9 +426,10 @@ export async function renderPokefutaNoPhotoTemplate(input: {
 }): Promise<Buffer> {
   return renderCard({
     hero: heroEmptyPlate(),
-    eyebrow: input.prefecture,
+    pill: { text: `${input.prefecture}・${truncate(input.city, 8)}`, withPin: true },
+    eyebrow: 'ポケふた',
     headline: `${truncate(input.city, 10)}のポケふた`,
-    accent: input.pokemonNames,
+    accent: { text: input.pokemonNames },
     note: 'まだ誰も写真を投稿していません',
   });
 }
@@ -368,6 +443,6 @@ export async function renderOgpFallback(input: {
   return renderCard({
     hero: heroMark(),
     headline: input.title,
-    accent: input.subtitle,
+    note: input.subtitle,
   });
 }
