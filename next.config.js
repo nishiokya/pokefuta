@@ -47,27 +47,28 @@ const nextConfig = {
       '/manhole/[id]/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
         './public/ogp/pokefuta_ogp_template.svg',
-        './public/ogp/pokefuta_ogp_background_1200x630.png',
+        './public/ogp/manhole-photo-mosaic-left-600x630.webp',
       ],
       '/share/photo/[photoId]/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
         './public/ogp/pokefuta_ogp_template.svg',
-        './public/ogp/pokefuta_ogp_background_1200x630.png',
+        './public/ogp/manhole-photo-mosaic-left-600x630.webp',
       ],
       '/p/[photoId]/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
         './public/ogp/pokefuta_ogp_template.svg',
-        './public/ogp/pokefuta_ogp_background_1200x630.png',
+        './public/ogp/manhole-photo-mosaic-left-600x630.webp',
       ],
       '/users/[userId]/prefectures/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
       ],
-      // フォントに加えテンプレート一式を含める（pokefuta-ogp-template の
-      // モジュールロード時に template/background を読むため）
+      // フォントに加えテンプレート一式を含める。renderCard() がテンプレートSVGと
+      // 焼き込みモザイクを読むので、トレース対象から漏れると本番でカードが描けない。
+      // tools/verify-ogp-linux.js がこの一覧とアセット名の一致を検査する。
       '/design-manholes/[id]/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
         './public/ogp/pokefuta_ogp_template.svg',
-        './public/ogp/pokefuta_ogp_background_1200x630.png',
+        './public/ogp/manhole-photo-mosaic-left-600x630.webp',
       ],
     },
   },

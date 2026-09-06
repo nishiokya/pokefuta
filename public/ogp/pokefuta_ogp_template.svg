@@ -1,42 +1,60 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    OGPカードの版面。左が情報（蓋のモザイク＋紫）、右が主役写真。
+    日本語は sharp のテキストレイヤで後から重ねるので、ここには文字を置かない
+    （Linux の librsvg は Web のフォント読み込み規則を解決できないため）。
+    プレースホルダ:
+      {{mosaic}}     焼き込み済みモザイクの data URI
+      {{hero}}       主役の写真か、写真なしのプレート
+      {{pill}}       左上の丸ピル（場所・種別）
+      {{rule}}       前置きの上の金色の罫
+      {{accentIcon}} 投稿者行の人アイコン
+    円の中心と半径は src/lib/pokefuta-ogp-template.ts の HERO / PANEL と一致させること。
+  -->
   <defs>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000000" flood-opacity="0.24"/>
+    <clipPath id="panelClip"><rect x="0" y="0" width="566" height="630"/></clipPath>
+    <clipPath id="heroClip"><circle cx="886" cy="315" r="258"/></clipPath>
+    <filter id="heroShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#4F3828" flood-opacity="0.22"/>
     </filter>
-    <clipPath id="photoClip">
-      <rect x="54" y="48" width="410" height="410" rx="36"/>
-    </clipPath>
   </defs>
 
-  <image href="./pokefuta_ogp_background_1200x630.png" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
+  <!-- 右面: クリームの紙 -->
+  <rect width="1200" height="630" fill="#FFF8EB"/>
 
-  <g filter="url(#shadow)">
-    <rect x="42" y="36" width="434" height="434" rx="48" fill="#F9F1DC"/>
-    <rect x="54" y="48" width="410" height="410" rx="36" fill="#D8D8D8"/>
-    <image href="{{photoDataUri}}" x="54" y="48" width="410" height="410" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>
-    <rect x="54" y="48" width="410" height="410" rx="36" fill="none" stroke="#FFFFFF" stroke-width="8"/>
+  <!-- 右上の消印。主役より目立たせない -->
+  <g fill="none" stroke="#B5483C" stroke-opacity="0.13">
+    <circle cx="1128" cy="86" r="74" stroke-width="3"/>
+    <circle cx="1128" cy="86" r="58" stroke-width="1.5" stroke-dasharray="7 9"/>
+  </g>
+  <path d="M604 612 C 700 556, 820 592, 906 566" fill="none" stroke="#C47E0F" stroke-opacity="0.16" stroke-width="2" stroke-dasharray="9 10"/>
+
+  <!-- 左面: 焼き込み済みの蓋モザイク＋紫 -->
+  <g clip-path="url(#panelClip)">
+    <image href="{{mosaic}}" x="-10" y="0" width="600" height="630" preserveAspectRatio="xMidYMid slice"/>
+    <rect x="0" y="0" width="566" height="630" fill="#574276" fill-opacity="0.78"/>
   </g>
 
-  <g filter="url(#shadow)">
-    <rect x="70" y="420" width="330" height="54" rx="10" fill="#17614F"/>
-    <path d="M400 420 L438 447 L400 474 Z" fill="#17614F"/>
-  </g>
+  <!-- スタンプ帳のミシン目 -->
+  <line x1="588" y1="24" x2="588" y2="606" stroke="#8C6A4A" stroke-opacity="0.42" stroke-width="3" stroke-dasharray="10 12" stroke-linecap="round"/>
 
-  <g transform="translate(535 56) rotate(-3)">
-    <rect x="0" y="0" width="205" height="50" rx="8" fill="#17614F"/>
-    <rect x="8" y="8" width="189" height="34" rx="5" fill="none" stroke="#F3E0A8" stroke-width="2" stroke-dasharray="8 5"/>
-  </g>
+  <!-- 主役の写真。マンホールが円なので円で抜く -->
+  <g filter="url(#heroShadow)"><circle cx="886" cy="315" r="270" fill="#FFFDF7"/></g>
+  <circle cx="886" cy="315" r="258" fill="#EDE3D0"/>
+  <g clip-path="url(#heroClip)">{{hero}}</g>
+  <circle cx="886" cy="315" r="258" fill="none" stroke="#FFFDF7" stroke-width="11"/>
+  <circle cx="886" cy="315" r="265" fill="none" stroke="#B5483C" stroke-opacity="0.5" stroke-width="2"/>
 
-  <rect x="520" y="202" width="430" height="18" rx="9" fill="#F2CD45" opacity="0.75"/>
+  <!-- 左カラムの部品 -->
+  {{pill}}
+  {{rule}}
+  <rect x="76" y="478" width="430" height="1.5" fill="#FFF8EB" fill-opacity="0.34"/>
+  {{accentIcon}}
 
-  <g filter="url(#shadow)">
-    <rect x="520" y="304" width="475" height="68" rx="34" fill="#FFF9EA"/>
-    <rect x="535" y="316" width="445" height="44" rx="22" fill="none" stroke="#B88950" stroke-width="2" stroke-dasharray="9 5"/>
-  </g>
-
-  <g filter="url(#shadow)">
-    <rect x="900" y="553" width="240" height="50" rx="25" fill="#FFF9EA"/>
-    <circle cx="1120" cy="578" r="18" fill="#1C2E28"/>
-    <path d="M1115 568 L1115 588 L1130 578 Z" fill="#FFFFFF"/>
+  <!-- サイトのマーク -->
+  <g transform="translate(76 550)">
+    <circle cx="18" cy="18" r="18" fill="#FFF8EB"/>
+    <circle cx="18" cy="18" r="7.5" fill="none" stroke="#574276" stroke-width="3"/>
+    <circle cx="18" cy="18" r="14" fill="none" stroke="#574276" stroke-width="2" stroke-dasharray="4 4"/>
   </g>
 </svg>

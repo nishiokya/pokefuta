@@ -5,7 +5,8 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSET_PATHS = [
   path.join('public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf'),
   path.join('public', 'ogp', 'pokefuta_ogp_template.svg'),
-  path.join('public', 'ogp', 'pokefuta_ogp_background_1200x630.png'),
+  // 左面に敷く焼き込み済みモザイク。実行時に写真を集め直さないための固定アセット
+  path.join('public', 'ogp', 'manhole-photo-mosaic-left-600x630.webp'),
 ];
 
 for (const relativePath of ASSET_PATHS) {
