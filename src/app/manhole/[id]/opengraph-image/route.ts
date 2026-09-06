@@ -1,13 +1,17 @@
 import { NextRequest } from 'next/server';
 import { parseManholeIdParam } from '@/lib/manhole-detail';
 import { SITE_NAME } from '@/lib/constants';
-import { renderOgpFallback, renderPokefutaOgpTemplate } from '@/lib/pokefuta-ogp-template';
+import {
+  renderOgpFallback,
+  renderPokefutaNoPhotoTemplate,
+  renderPokefutaOgpTemplate,
+} from '@/lib/pokefuta-ogp-template';
 import {
   loadManholeForOgp,
   loadPhotoForOgp,
   loadFirstPublicPhotoForManhole,
 } from '@/lib/manhole-ogp';
-import { getManholeLocationLabel, getSortedTitles } from '@/lib/shared-photo';
+import { getSortedTitles } from '@/lib/shared-photo';
 
 export const runtime = 'nodejs';
 
@@ -18,10 +22,18 @@ function buildDefaultFallback(): Promise<Buffer> {
   });
 }
 
-function buildFallback(locationLabel: string): Promise<Buffer> {
-  return renderOgpFallback({
-    title: `${locationLabel}のポケふた`,
-    subtitle: '旅先で見つける全国のポケモンマンホール',
+// 写真がまだ無い蓋。ここが renderOgpFallback だと、タイトルとドメインだけの
+// ほぼ白紙のカードが出る（2026-09-06 時点で482枚中22枚が該当、うち5枚は離島）。
+// 蓋そのものの情報は持っているので、写真枠を「写真募集中」として見せる。
+function buildNoPhotoCard(manhole: {
+  prefecture: string;
+  municipality?: string | null;
+  pokemons: string[];
+}): Promise<Buffer> {
+  return renderPokefutaNoPhotoTemplate({
+    prefecture: manhole.prefecture,
+    city: manhole.municipality || manhole.prefecture,
+    pokemonNames: manhole.pokemons.slice(0, 3).join('・'),
   });
 }
 
@@ -45,7 +57,6 @@ export async function GET(
     });
   }
 
-  const locationLabel = getManholeLocationLabel(manhole);
   const photoIdParam = request.nextUrl.searchParams.get('photo');
 
   let photo = null;
@@ -57,7 +68,7 @@ export async function GET(
   }
 
   if (!photo?.signed_url) {
-    const png = await buildFallback(locationLabel);
+    const png = await buildNoPhotoCard(manhole);
     return new Response(png as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' },
     });
@@ -89,7 +100,7 @@ export async function GET(
     });
   } catch (error) {
     console.error('Failed to render manhole OGP:', error);
-    const png = await buildFallback(locationLabel);
+    const png = await buildNoPhotoCard(manhole);
     return new Response(png as unknown as BodyInit, {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' },
     });
