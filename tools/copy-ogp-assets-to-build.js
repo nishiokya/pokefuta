@@ -5,7 +5,6 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSET_PATHS = [
   path.join('public', 'ogp', 'fonts', 'NotoSansCJKjp-Bold.otf'),
   path.join('public', 'ogp', 'pokefuta_ogp_template.svg'),
-  path.join('public', 'ogp', 'pokefuta_ogp_background_1200x630.png'),
 ];
 
 for (const relativePath of ASSET_PATHS) {
