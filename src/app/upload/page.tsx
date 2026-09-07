@@ -26,6 +26,49 @@ import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
  */
 const reportedManholeListProblems = new Set<string>();
 
+/**
+ * 投稿フォームの公開設定の引き継ぎ。
+ *
+ * 以前は Cookie `pokefuta_is_public` に **365日** 焼き付けていた。そのため一度でも
+ * 非公開トグルを倒すと、以後1年間すべての投稿が非公開で初期化され続け、本人が
+ * 気づく手がかりはフォーム下部の注意書きだけだった。倒した人にだけ溜まる一方なので
+ * ラチェットとして効き、非公開比率は 2026-07 の 9% から 2026-09 の週次 68%
+ * (171件中116件) まで単調に上がっていた。
+ *
+ * 引き継ぐ範囲を**そのセッション内だけ**に狭める。1回の投稿作業で複数枚上げるときに
+ * 毎回倒し直さずに済むという本来の便益は保ったまま、日をまたいだ焼き付きを断つ。
+ */
+const IS_PUBLIC_SESSION_KEY = 'pokefuta:is_public';
+const LEGACY_IS_PUBLIC_COOKIE = 'pokefuta_is_public';
+
+function readSessionIsPublic(): boolean | null {
+  try {
+    const raw = sessionStorage.getItem(IS_PUBLIC_SESSION_KEY);
+    if (raw === null) return null;
+    return raw === 'true';
+  } catch {
+    // プライベートブラウズ等で読めなければ既定（公開）に任せる
+    return null;
+  }
+}
+
+function writeSessionIsPublic(value: boolean): void {
+  try {
+    sessionStorage.setItem(IS_PUBLIC_SESSION_KEY, value.toString());
+  } catch {
+    // 書けなくても投稿自体は続けられる。引き継ぎを諦めるだけ
+  }
+}
+
+/**
+ * 旧 Cookie を消す。**読まずに消す**のが要点で、残しておくと過去に倒した人の
+ * 非公開が今後も引き継がれ続け、この修正が既存ユーザーに届かない。
+ */
+function clearLegacyIsPublicCookie(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${LEGACY_IS_PUBLIC_COOKIE}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+}
+
 interface PhotoMetadata {
   latitude?: number;
   longitude?: number;
@@ -130,28 +173,13 @@ function UploadPageInner() {
     funnel.start();
 
     loadManholes();
-    // Cookieから公開設定を読み込み
-    const savedIsPublic = getCookie('pokefuta_is_public');
+    // 公開設定はこのセッション内だけ引き継ぐ。旧 Cookie は読まずに捨てる
+    clearLegacyIsPublicCookie();
+    const savedIsPublic = readSessionIsPublic();
     if (savedIsPublic !== null) {
-      setIsPublic(savedIsPublic === 'true');
+      setIsPublic(savedIsPublic);
     }
   }, []);
-
-  // Cookie操作ヘルパー関数
-  const getCookie = (name: string): string | null => {
-    if (typeof document === 'undefined') return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-    return null;
-  };
-
-  const setCookie = (name: string, value: string, days: number = 365) => {
-    if (typeof document === 'undefined') return;
-    const expires = new Date();
-    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
-  };
 
   /**
    * 蓋の一覧が不完全なことを通知する。
@@ -1079,7 +1107,7 @@ function UploadPageInner() {
                     onClick={() => {
                       const newValue = !isPublic;
                       setIsPublic(newValue);
-                      setCookie('pokefuta_is_public', newValue.toString());
+                      writeSessionIsPublic(newValue);
                     }}
                     className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
                       isPublic ? 'bg-[#7B63A8]' : 'bg-[#2A2A2A]/25'
