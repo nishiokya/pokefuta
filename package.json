@@ -27,6 +27,7 @@
     "verify:photo-visibility": "node tools/verify-photo-visibility.js",
     "verify:app-user-visibility": "node tools/verify-app-user-visibility.js",
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
+    "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
     "capture": "node tools/capture/capture.js"
   },
   "dependencies": {
