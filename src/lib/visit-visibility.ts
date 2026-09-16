@@ -23,6 +23,27 @@ export async function updateVisitVisibility(
 }
 
 /**
+ * POST /api/visits/publish-all を叩いて、自分の非公開の訪問記録をまとめて公開する。
+ *
+ * 単体の PATCH を件数分ループしないのは、非公開が数十件たまっている人がいるため
+ * （2026-09-06 時点で非公開592件）。1リクエストで済ませ、途中で失敗して
+ * 半端に公開された状態が残らないようにする。
+ *
+ * @returns 公開できた件数。失敗したら null
+ */
+export async function publishAllPrivateVisits(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/visits/publish-all', { method: 'POST' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.success !== true) return null;
+    return typeof data.published_count === 'number' ? data.published_count : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 簡易トースト。グローバルなトースト基盤が無いので
  * ShareButtons.tsx の showCopyToast と同じ DOM 差し込み方式に揃えている。
  */

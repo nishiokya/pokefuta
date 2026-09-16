@@ -10,7 +10,7 @@ import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import ProfileCard from '@/components/users/ProfileCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
+import { updateVisitVisibility, publishAllPrivateVisits, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
 import { pageTitle } from '@/lib/constants';
 
@@ -52,6 +52,10 @@ export default function MyTripPage() {
   const [showPrivateOnly, setShowPrivateOnly] = useState(false);
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+  // 一括公開は「押す → 確認 → 実行」の2段。件数が大きい操作なので、単体の公開
+  // （望ましい操作なので即時）とは分けて、取り消せる余地を1タップぶん残す。
+  const [bulkPublishConfirming, setBulkPublishConfirming] = useState(false);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
   const { trackView, trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
   useEffect(() => {
@@ -139,6 +143,32 @@ export default function MyTripPage() {
       showVisibilityToast('公開設定の変更に失敗しました', false);
     }
     setVisibilitySavingVisitId(null);
+  };
+
+  // 非公開の記録をまとめて公開する。楽観更新せず、成功件数を受け取ってから反映する
+  // （何件通ったかはサーバ側の実際の UPDATE 件数でしか分からない）。
+  const handlePublishAll = async () => {
+    if (bulkPublishing) return;
+    setBulkPublishing(true);
+    const published = await publishAllPrivateVisits();
+
+    if (published === null) {
+      showVisibilityToast('公開設定の変更に失敗しました', false);
+    } else {
+      setVisits((prev) =>
+        prev.map((v) => (v.is_public === false ? { ...v, is_public: true } : v))
+      );
+      trackVisitVisibilityChange({
+        is_public: true,
+        surface: 'my_trip_bulk',
+        visit_count: published,
+      });
+      showVisibilityToast(`${published}件を公開しました`);
+      setShowPrivateOnly(false);
+    }
+
+    setBulkPublishing(false);
+    setBulkPublishConfirming(false);
   };
 
   const handleVisibilityToggle = (visitId: string, currentIsPublic: boolean) => {
@@ -302,6 +332,36 @@ export default function MyTripPage() {
                   </p>
                 </div>
               </div>
+              {privateCount > 0 && (
+                bulkPublishConfirming ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBulkPublishConfirming(false)}
+                      disabled={bulkPublishing}
+                      className="rounded-[10px] border border-[#e9dfc7] bg-[#efe6cf] px-4 py-2.5 font-pixelJp text-xs font-bold text-[#4F3828] disabled:opacity-60"
+                    >
+                      やめる
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handlePublishAll()}
+                      disabled={bulkPublishing}
+                      className="rounded-[10px] border border-[#7B63A8] bg-[#7B63A8] px-4 py-2.5 font-pixelJp text-xs font-bold text-white disabled:opacity-60"
+                    >
+                      {bulkPublishing ? '公開中...' : `${privateCount}件を公開する`}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setBulkPublishConfirming(true)}
+                    className="w-full rounded-[10px] border border-[#7B63A8] bg-[#7B63A8] px-4 py-2.5 font-pixelJp text-xs font-bold text-white"
+                  >
+                    非公開の{privateCount}件をすべて公開する
+                  </button>
+                )
+              )}
               <button
                 type="button"
                 onClick={() => {
