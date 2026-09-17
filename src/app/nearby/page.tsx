@@ -4,9 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
-  CircleDot,
-  Compass,
-  ExternalLink,
   MapPin,
   Navigation,
   RefreshCw,
@@ -15,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
+import VisitPhotoCard from '@/components/VisitPhotoCard';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
@@ -29,6 +27,8 @@ interface ManholeWithDistance extends Manhole {
       id: string;
       storage_key: string;
       url?: string;
+      /** /api/photo/<id>?size=small。一覧のサムネはこちらを使う */
+      thumbnail_url?: string;
     }>;
   };
 }
@@ -265,15 +265,8 @@ export default function NearbyPage() {
     return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
   };
 
-  const openInMaps = (manhole: ManholeWithDistance, event: React.MouseEvent) => {
-    event.stopPropagation();
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`;
-    window.open(url, '_blank');
-  };
-
-  const viewManholeDetail = (manhole: ManholeWithDistance) => {
-    window.location.href = `/manhole/${manhole.id}`;
-  };
+  // 経路案内は詳細ページの「経路案内」（緑の全幅ボタン）に一本化した。
+  // 一覧の全カードに経路ボタンを置くのをやめ、タイル全体を詳細への導線にしている。
 
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
@@ -306,10 +299,17 @@ export default function NearbyPage() {
   const NUM = '"Outfit", system-ui, sans-serif';
   const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 
-  const displayManholes = activeTab === 'nearby' || activeTab === 'unvisited'
-    ? nearbyManholes
-    : filteredAllManholes;
-  const nearestDistance = nearbyManholes[0]?.distance;
+  /*
+    実際に一覧へ並ぶ配列。以前はここと一覧側の IIFE に別々の定義があり、
+    「未訪問」タブでレールの《発見》だけが絞り込み前の件数を出していた
+    （一覧は0件なのにレールは7と表示される）。数える対象は1か所に持つ。
+  */
+  const displayManholes =
+    activeTab === 'all' ? filteredAllManholes :
+    activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit) :
+    nearbyManholes;
+  // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
+  const nearestDistance = displayManholes[0]?.distance;
 
   const authNearbyRail = (
     <div className="space-y-3">
@@ -378,16 +378,33 @@ export default function NearbyPage() {
     </div>
   );
 
-  const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
+  /*
+    セッション判定が付くまではゲスト扱いにする（isLoggedIn の初期値が false）。
+    判定待ちに undefined を返すと PCShell が1カラムで描いてから2カラムに
+    切り替わり、横にもズレる。初回訪問者は実際に未ログインなので、
+    ゲスト表示を初期状態にするのが当たっている場合が多い。
+  */
+  const nearbyRail = isLoggedIn ? authNearbyRail : guestNearbyRail;
 
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
 
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
       <main className="relative px-0 lg:px-0">
-        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
+        {/*
+          判定待ちを「ログイン済み扱い」にすると、未ログインの全アクセスで
+          コンパクト見出し → 背の高いゲストヒーロー と入れ替わり、タブと一覧が
+          下にずれる。ゲスト側を初期状態にして、判定が付いたときだけ縮める。
+        */}
+        <section
+          className={
+            !isLoggedIn
+              ? 'relative overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-4 shadow-sm sm:px-10 sm:py-10'
+              : 'relative'
+          }
+        >
           <div className="relative max-w-3xl">
-            {sessionChecked && !isLoggedIn ? (
+            {!isLoggedIn ? (
               <>
                 <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
                   <Stamp className="h-3 w-3" />
@@ -422,15 +439,14 @@ export default function NearbyPage() {
                 </div>
               </>
             ) : (
+              /*
+                ログイン済みは検索が目的なので、デザインふた一覧と同じ
+                「見出し1行＋補足1行」に留める。大きなヒーローは未ログインの
+                勧誘用（下の分岐）だけに残す。
+              */
               <>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
-                  <Compass className="h-3.5 w-3.5" />
-                  旅先で探す
-                </div>
-                <h1 className="text-2xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-                  ポケふたを探す
-                </h1>
-                <p className="mt-2 text-sm font-medium leading-snug sm:mt-4 sm:text-lg sm:leading-relaxed">
+                <h1 className="text-lg font-bold sm:text-xl">ポケふたを探す</h1>
+                <p className="mt-1 text-sm text-[#2A2A2A]/70">
                   <PhraseText text="現在地の近くから、全国一覧まで。次に会いに行くポケふたをここで見つけよう。" />
                 </p>
               </>
@@ -438,7 +454,8 @@ export default function NearbyPage() {
           </div>
         </section>
 
-        {sessionChecked && !isLoggedIn && (
+        {/* ヒーロー直下なので、上と同じくゲスト側を初期状態にする */}
+        {!isLoggedIn && (
           <div className="mt-4 lg:hidden rounded-[8px] border border-[#7B63A8]/10 bg-white/70 px-4 py-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
@@ -472,36 +489,49 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {userLocation && (
-          <section id="nearby-controls" className="mt-3 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mt-5 sm:p-5">
-            <div className="grid gap-3">
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
-                  <div className="text-lg font-extrabold leading-none text-[#7B63A8] sm:text-xl">{nearbyManholes.length}</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">発見</div>
+        {/*
+          「一覧」タブでは出さない。半径も最寄りも近傍検索の話なので、全国一覧の
+          横に並べると《発見 482 / 範囲 30km》のように矛盾した組になる
+          （一覧タブの件数は下の検索パネルの「総数 / 表示中」が持つ）。
+        */}
+        {userLocation && activeTab !== 'all' && (
+          <section id="nearby-controls" className="mt-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm sm:mt-5 sm:p-4">
+            {/*
+              PC で同じ数字を2か所に出さない。ただし隠してよいのは
+              **レールが統計を出しているログイン時だけ** で、未ログインの
+              レールは勧誘カードなので、隠すと数字がどこにも出なくなる。
+            */}
+            <div
+              className={`grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] ${
+                isLoggedIn ? 'lg:hidden' : ''
+              }`}
+            >
+              {([
+                ['発見', displayManholes.length, '#2c2a26'],
+                ['範囲', `${radius}km`, '#6f6657'],
+                /*
+                  最寄りも並んでいる一覧に合わせる。nearbyManholes[0] だと
+                  「未訪問」タブで、一覧に出ていない訪問済みの蓋までの距離を
+                  出してしまう（近傍結果は距離順なので絞り込んでも先頭が最寄り）。
+                */
+                ['最寄り', displayManholes.length > 0 ? formatDistance(displayManholes[0].distance) : '-', '#6f6657'],
+              ] as [string, string | number, string][]).map(([label, value, color]) => (
+                <div key={label} className="bg-[#fffdf7] px-2 py-2.5 text-center">
+                  <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
+                  <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 18, color }}>{value}</p>
                 </div>
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
-                  <div className="text-lg font-extrabold leading-none text-[#FF8F1F] sm:text-xl">{radius}km</div>
-                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">範囲</div>
-                </div>
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-2.5 sm:p-3">
-                  <div className="text-lg font-extrabold leading-none text-[#2D846C] sm:text-xl">
-                    {nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-'}
-                  </div>
-                  <div className="mt-0.5 text-[11px] font-bold text-[#6B6B6B] sm:mt-1 sm:text-xs">最寄り</div>
-                </div>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 lg:mt-0">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="min-w-0 text-xs font-bold text-[#6B6B6B]">
+                <div className="min-w-0" style={{ fontFamily: ROUND, fontSize: 11, fontWeight: 700, color: '#9b917e' }}>
                   <span>検索範囲</span>
-                  <span className="ml-2 text-[#9B8D78]">1km - 100km</span>
+                  <span className="ml-2">1km - 100km</span>
                 </div>
                 <button
                   onClick={getCurrentLocationAndLoadManholes}
-                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-bold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:bg-[#FFB347]/20 sm:gap-2 sm:px-4 sm:text-sm"
+                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-[#e9dfc7] bg-white px-3 text-xs font-bold text-[#6f6657] shadow-sm transition hover:bg-[#f4ecda] sm:gap-2 sm:px-4 sm:text-sm"
                   title="現在地を更新"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -515,9 +545,10 @@ export default function NearbyPage() {
                 max="100"
                 value={radius}
                 onChange={(e) => setRadius(parseInt(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#E2CFAE]"
+                className="h-2 w-full cursor-pointer appearance-none rounded-full"
                 style={{
-                  background: `linear-gradient(to right, #FFB347 0%, #FFB347 ${radius}%, #E2CFAE ${radius}%, #E2CFAE 100%)`
+                  // 進捗の色はマイ旅の達成率バーと同じ（#e2a015 → #bf5640）
+                  background: `linear-gradient(to right, #e2a015 0%, #bf5640 ${radius}%, #e9dfc7 ${radius}%, #e9dfc7 100%)`
                 }}
               />
             </div>
@@ -526,7 +557,7 @@ export default function NearbyPage() {
 
         <section className="mt-3 sm:mt-5">
           <div className="-mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4">
-            <div className="flex min-w-max gap-1.5 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB]/80 p-0.5 shadow-sm sm:min-w-0 sm:gap-2 sm:p-1">
+            <div className="flex min-w-max gap-1.5 rounded-[12px] border border-[#e9dfc7] bg-[#fffdf7] p-1 shadow-sm sm:min-w-0 sm:gap-2">
               {visibleSearchTabs.map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
@@ -534,10 +565,10 @@ export default function NearbyPage() {
                     key={tab.key}
                     type="button"
                     onClick={() => handleTabChange(tab.key)}
-                    className={`min-h-[44px] rounded-[7px] px-4 text-sm font-bold transition sm:px-5 ${
+                    className={`min-h-[44px] rounded-[9px] px-4 text-sm font-bold transition sm:px-5 ${
                       isActive
-                        ? 'bg-[#7B63A8] text-white shadow-sm'
-                        : 'text-[#2A2A2A] hover:bg-white'
+                        ? 'bg-[#e9dfc7] text-[#2c2a26]'
+                        : 'text-[#6f6657] hover:bg-[#f4ecda]'
                     }`}
                   >
                     {tab.label}
@@ -549,27 +580,33 @@ export default function NearbyPage() {
         </section>
 
         {activeTab === 'all' && (
-          <section className="mt-3 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] p-3 shadow-sm sm:mt-5 sm:p-5">
+          <section className="mt-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm sm:mt-5 sm:p-4">
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
               <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7B63A8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9b917e]" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   aria-label="地域名・ポケモン名で検索"
-                  className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/15 bg-white/80 py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#7B63A8]"
+                  className="min-h-[44px] w-full rounded-[10px] border border-[#e9dfc7] bg-white py-2 pl-10 pr-3 text-sm font-bold outline-none focus:border-[#c47e0f]"
                   placeholder="地域名・ポケモン名で検索"
                 />
               </label>
-              <div className="grid grid-cols-2 gap-3 sm:min-w-[15rem]">
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-                  <div className="text-xl font-extrabold leading-none text-[#7B63A8]">{allManholes.length}</div>
-                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">総数</div>
-                </div>
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-white/70 p-3">
-                  <div className="text-xl font-extrabold leading-none text-[#2D846C]">{filteredAllManholes.length}</div>
-                  <div className="mt-1 text-xs font-bold text-[#6B6B6B]">表示中</div>
-                </div>
+              {/* PC はレールが「発見 / 総数」を出す。未ログインのレールは勧誘カードなので隠さない */}
+              <div
+                className={`grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] sm:min-w-[15rem] ${
+                  isLoggedIn ? 'lg:hidden' : ''
+                }`}
+              >
+                {([
+                  ['総数', allManholes.length, '#6f6657'],
+                  ['表示中', filteredAllManholes.length, '#2c2a26'],
+                ] as [string, number, string][]).map(([label, value, color]) => (
+                  <div key={label} className="bg-[#fffdf7] px-2 py-2.5 text-center">
+                    <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
+                    <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 18, color }}>{value}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -578,7 +615,7 @@ export default function NearbyPage() {
         {(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
           <div className="flex items-center justify-center py-7 sm:py-10">
             <div className="text-center">
-              <div className="font-bold text-[#7B63A8]">
+              <div className="font-bold text-[#6f6657]">
                 {activeTab === 'all' ? '全ポケふたを読み込み中' : '検索中'}<span className="rpg-loading"></span>
               </div>
             </div>
@@ -588,124 +625,52 @@ export default function NearbyPage() {
         {!(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-3 sm:mt-5">
             {(() => {
-              const displayManholes =
-                activeTab === 'all' ? filteredAllManholes :
-                activeTab === 'unvisited' ? nearbyManholes.filter(m => !m.visit) :
-                nearbyManholes;
-
               return displayManholes.length === 0 ? (
-                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-7 text-center shadow-sm sm:px-5 sm:py-10">
-                  <MapPin className="mx-auto mb-2 h-9 w-9 text-[#7B63A8]/60 sm:mb-3 sm:h-10 sm:w-10" />
-                  <p className="text-sm font-bold text-[#2A2A2A]">
+                <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-7 text-center shadow-sm sm:px-5 sm:py-10">
+                  <MapPin className="mx-auto mb-2 h-9 w-9 text-[#c9bda4] sm:mb-3 sm:h-10 sm:w-10" />
+                  <p className="text-sm font-bold text-[#2c2a26]">
                     {activeTab === 'unvisited'
                       ? '近くに未訪問のポケふたが見つかりませんでした'
                       : activeTab === 'all'
                       ? 'ポケふたが見つかりませんでした'
                       : '近くにポケふたが見つかりませんでした'}
                   </p>
-                  <p className="mt-1 text-xs font-bold text-[#6B6B6B]">
+                  <p className="mt-1 text-xs font-bold text-[#9b917e]">
                     {activeTab === 'nearby' && '検索範囲を広げてみてください'}
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {displayManholes.map((manhole) => (
-                  <article
-                    key={manhole.id}
-                    className="cursor-pointer overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-                    onClick={() => viewManholeDetail(manhole)}
-                  >
-                    <div className="bg-[#F6EEDC] p-1">
-                      {manhole.visit?.photos && manhole.visit.photos.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-1">
-                          {manhole.visit.photos.slice(0, 3).map((photo: any) => (
-                            <div
-                              key={photo.id}
-                              className="relative aspect-[4/3] overflow-hidden rounded-[6px] bg-white"
-                            >
-                              <img
-                                src={photo.url || `/api/image-upload?key=${photo.storage_key}`}
-                                alt="ポケふた写真"
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex aspect-[4/1] items-center justify-center rounded-[6px] bg-[#E9DEC9] sm:aspect-[3/1]">
-                          <div className="flex flex-col items-center text-[#B8AB96]">
-                            <CircleDot className="h-6 w-6 sm:h-8 sm:w-8" />
-                            <p className="mt-1 font-pixel text-[9px] leading-none">POKEFUTA</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3 sm:p-4">
-                      <div className="mb-2 flex items-start justify-between gap-2 sm:mb-3 sm:gap-3">
-                        <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
-                            {manhole.prefecture}
-                            {manhole.municipality || manhole.city || ''}{(manhole.municipality || manhole.city) && manhole.building && `・${manhole.building}`}
-                          </h2>
-                          <div className="mt-1 text-xs font-bold text-[#6B6B6B]">
-                            ポケふた #{manhole.id}
-                          </div>
-                        </div>
-                        {activeTab !== 'all' && (
-                          <div className="shrink-0 rounded-[8px] bg-white px-2.5 py-1.5 text-right shadow-sm ring-1 ring-[#7B63A8]/15 sm:px-3 sm:py-2">
-                            <div className="text-sm font-extrabold leading-none text-[#7B63A8] sm:text-base">
-                              {manhole.distance !== undefined ? formatDistance(manhole.distance) : '-'}
-                            </div>
-                            <div className="mt-1 text-[10px] font-bold text-[#6B6B6B]">現在地から</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {manhole.visit && (
-                        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#2D846C]/10 px-3 py-1 text-xs font-bold text-[#2D846C] sm:mb-3">
-                          <Camera className="h-3.5 w-3.5" />
-                          訪問済み {formatDate(manhole.visit.shot_at)}
-                        </div>
-                      )}
-
-                      {manhole.pokemons && manhole.pokemons.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-1.5 sm:mb-4">
-                          {manhole.pokemons.slice(0, 3).map((pokemon, index) => (
-                            <span
-                              key={index}
-                              className="rounded-full bg-[#FFB347]/25 px-2.5 py-1 text-xs font-bold text-[#2A2A2A]"
-                            >
-                              {pokemon}
-                            </span>
-                          ))}
-                          {manhole.pokemons.length > 3 && (
-                            <span className="px-1 py-1 text-xs font-bold text-[#6B6B6B]">
-                              +{manhole.pokemons.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <button
-                        onClick={(e) => openInMaps(manhole, e)}
-                        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-                        title="Google Mapsで経路を表示"
-                      >
-                        <Navigation className="h-4 w-4" />
-                        経路を見る
-                        <ExternalLink className="h-4 w-4" />
-                      </button>
-
-                      {manhole.visit && manhole.visit.photos && manhole.visit.photos.length > 3 && (
-                        <p className="mt-2 text-center text-xs font-bold text-[#6B6B6B]">
-                          +{manhole.visit.photos.length - 3} 枚
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                  ))}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {displayManholes.map((manhole) => {
+                    const photo = manhole.visit?.photos?.[0];
+                    return (
+                      <VisitPhotoCard
+                        key={manhole.id}
+                        manholeId={manhole.id}
+                        // マイ旅と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
+                        // 一覧に数十枚並べると読み込みが終わらない。
+                        thumbnailUrl={photo?.thumbnail_url || photo?.url}
+                        // 見出しは詳細ページ・マイ旅と同じ「〈県〉〈市区町村〉のポケふた」。
+                        title={`${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}のポケふた`}
+                        date={`#${manhole.id}`}
+                        // 建物名と訪問日はここ。VisitPhotoCard 側で省略記号付きに切り詰まる。
+                        posterName={
+                          [
+                            manhole.building,
+                            manhole.visit ? `訪問 ${formatDate(manhole.visit.shot_at)}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' ・ ') || undefined
+                        }
+                        tags={(manhole.pokemons || []).slice(0, 2)}
+                        cornerLabel={
+                          activeTab !== 'all' && manhole.distance !== undefined
+                            ? formatDistance(manhole.distance)
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
                 </div>
               );
             })()}
@@ -717,7 +682,9 @@ export default function NearbyPage() {
 
       <Link
         href={uploadHref}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-3 z-40 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7B63A8] px-4 py-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(123,99,168,0.30)] transition hover:bg-[#6A5299] sm:bottom-6 sm:right-6 sm:gap-2 sm:px-5 sm:py-4 sm:text-sm"
+        // 投稿は唯一の主要CTA なので、ヘッダーの「投稿する」やレールと同じ
+        // --chrome-cta（#bf5640）に揃える。紫はナビ／サインアップ用のアクセント。
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] right-3 z-40 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#bf5640] px-4 py-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(168,70,47,0.30)] transition hover:bg-[#a8462f] sm:bottom-6 sm:right-6 sm:gap-2 sm:px-5 sm:py-4 sm:text-sm"
       >
         <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
         写真を投稿
