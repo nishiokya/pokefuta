@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -24,6 +25,11 @@ export interface VisitPhotoCardProps {
   /** 未指定ならバッジを描画しない（他ページからの利用に影響を出さないため）。 */
   onToggleVisibility?: () => void;
   isVisibilitySaving?: boolean;
+  /**
+   * 写真の右上に重ねる短いラベル（/nearby の距離など）。
+   * 公開トグルと同じ位置なので、**トグルを渡すページでは使わない**。
+   */
+  cornerLabel?: ReactNode;
 }
 
 export default function VisitPhotoCard({
@@ -36,6 +42,7 @@ export default function VisitPhotoCard({
   isPublic,
   onToggleVisibility,
   isVisibilitySaving = false,
+  cornerLabel,
 }: VisitPhotoCardProps) {
   const visiblePosterName = posterName?.trim();
   const isPrivate = isPublic === false;
@@ -113,6 +120,26 @@ export default function VisitPhotoCard({
               background: 'linear-gradient(to top, rgba(30,22,10,.62) 0%, rgba(30,22,10,0) 46%)',
             }}
           />
+          {cornerLabel && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'rgba(255,253,247,.94)',
+                color: '#2c2a26',
+                fontFamily: NUM,
+                fontWeight: 800,
+                fontSize: 11,
+                lineHeight: 1.4,
+                boxShadow: '0 1px 3px rgba(30,22,10,.25)',
+              }}
+            >
+              {cornerLabel}
+            </span>
+          )}
           <div style={{ position: 'absolute', left: 12, bottom: 10, right: 12, color: '#fff' }}>
             <div
               style={{
