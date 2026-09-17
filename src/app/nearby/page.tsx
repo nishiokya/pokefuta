@@ -378,22 +378,33 @@ export default function NearbyPage() {
     </div>
   );
 
-  const nearbyRail = sessionChecked ? (isLoggedIn ? authNearbyRail : guestNearbyRail) : undefined;
+  /*
+    セッション判定が付くまではゲスト扱いにする（isLoggedIn の初期値が false）。
+    判定待ちに undefined を返すと PCShell が1カラムで描いてから2カラムに
+    切り替わり、横にもズレる。初回訪問者は実際に未ログインなので、
+    ゲスト表示を初期状態にするのが当たっている場合が多い。
+  */
+  const nearbyRail = isLoggedIn ? authNearbyRail : guestNearbyRail;
 
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
 
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={nearbyRail}>
       <main className="relative px-0 lg:px-0">
+        {/*
+          判定待ちを「ログイン済み扱い」にすると、未ログインの全アクセスで
+          コンパクト見出し → 背の高いゲストヒーロー と入れ替わり、タブと一覧が
+          下にずれる。ゲスト側を初期状態にして、判定が付いたときだけ縮める。
+        */}
         <section
           className={
-            sessionChecked && !isLoggedIn
+            !isLoggedIn
               ? 'relative overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-4 shadow-sm sm:px-10 sm:py-10'
               : 'relative'
           }
         >
           <div className="relative max-w-3xl">
-            {sessionChecked && !isLoggedIn ? (
+            {!isLoggedIn ? (
               <>
                 <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-2.5 py-1 text-[11px] font-bold text-[#7B63A8] sm:mb-4 sm:px-3 sm:text-xs">
                   <Stamp className="h-3 w-3" />
@@ -443,7 +454,8 @@ export default function NearbyPage() {
           </div>
         </section>
 
-        {sessionChecked && !isLoggedIn && (
+        {/* ヒーロー直下なので、上と同じくゲスト側を初期状態にする */}
+        {!isLoggedIn && (
           <div className="mt-4 lg:hidden rounded-[8px] border border-[#7B63A8]/10 bg-white/70 px-4 py-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="font-bold text-sm text-[#7B63A8]">無料でポケふたスタンプ帳を作れます</p>
