@@ -308,7 +308,8 @@ export default function NearbyPage() {
     activeTab === 'all' ? filteredAllManholes :
     activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit) :
     nearbyManholes;
-  const nearestDistance = nearbyManholes[0]?.distance;
+  // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
+  const nearestDistance = displayManholes[0]?.distance;
 
   const authNearbyRail = (
     <div className="space-y-3">
@@ -476,7 +477,12 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {userLocation && (
+        {/*
+          「一覧」タブでは出さない。半径も最寄りも近傍検索の話なので、全国一覧の
+          横に並べると《発見 482 / 範囲 30km》のように矛盾した組になる
+          （一覧タブの件数は下の検索パネルの「総数 / 表示中」が持つ）。
+        */}
+        {userLocation && activeTab !== 'all' && (
           <section id="nearby-controls" className="mt-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm sm:mt-5 sm:p-4">
             {/*
               PC で同じ数字を2か所に出さない。ただし隠してよいのは
@@ -491,7 +497,12 @@ export default function NearbyPage() {
               {([
                 ['発見', displayManholes.length, '#2c2a26'],
                 ['範囲', `${radius}km`, '#6f6657'],
-                ['最寄り', nearbyManholes.length > 0 ? formatDistance(nearbyManholes[0].distance) : '-', '#6f6657'],
+                /*
+                  最寄りも並んでいる一覧に合わせる。nearbyManholes[0] だと
+                  「未訪問」タブで、一覧に出ていない訪問済みの蓋までの距離を
+                  出してしまう（近傍結果は距離順なので絞り込んでも先頭が最寄り）。
+                */
+                ['最寄り', displayManholes.length > 0 ? formatDistance(displayManholes[0].distance) : '-', '#6f6657'],
               ] as [string, string | number, string][]).map(([label, value, color]) => (
                 <div key={label} className="bg-[#fffdf7] px-2 py-2.5 text-center">
                   <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
