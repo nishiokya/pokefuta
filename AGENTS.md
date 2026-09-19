@@ -9,6 +9,7 @@
 - GA4 は `pokefuta.com` / `www.pokefuta.com` だけで送信する。`localhost`、プレビューURL、開発端末名からは送らない。
 - ページ表示は標準の `page_view` を1回だけ送る。`page_location` は `code`・token・OAuthエラーを除去し、`from=data`など安全な計測情報は残す。
 - `data.pokefuta.com` からの遷移はクロスドメインリンカーを正とし、内部UTMは付けない。`from=data` を `source_app=tracker` と `p_data_referral` で計測する。
+- 図鑑の `pref` は47県slugを検証し、`referral_prefecture` として投稿まで引き継ぐ。投稿先の `prefecture` と混ぜない。保持期限・GA4登録手順は `docs/tracker-referral-analytics.md` を参照。
 - `/about` を `pokefuta.com` と `data.pokefuta.com` 共通のAbout・お問い合わせページの正本とする。両ドメインを「姉妹サイト」と表現せず、同じサービス内の「ポケふた写真館」と「ポケふた図鑑」として扱う。運営者名は `nishiokya` と表記する。
 - AdSenseのサイト登録は `pokefuta.com`、パブリッシャーIDは `pub-6885302916426075`。ルートの `public/ads.txt` と所有確認metaを維持する。広告枠は当初 `data.pokefuta.com` の都道府県・詳細ページだけに置き、写真館には置かない。
 - イベント発生箇所は `surface` で表す。GA4の流入元予約語 `source` をカスタムイベント引数に使わない。
@@ -105,7 +106,7 @@
    `submission_kind` / `block_reason` / `block_phase` / `block_class` / `is_repeat` / `attempt_no` /
    `error_code` / `error_type` / `stage` / `last_step` /
    `photo_source` / `review_status` / `surface` / `prefecture` / `page_type` / `is_logged_in` /
-   `source_app` / `site_type` / `is_open` / `has_note`
+   `source_app` / `referral_prefecture` / `site_type` / `is_open` / `has_note`
    （`attempt_no` は件数ではなく「何回目か」で分解したいのでディメンション。
    `is_repeat` は真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
    （`is_open` / `has_note` は `p_go_friend_saved` の設定率・公開率を分けて見るため。

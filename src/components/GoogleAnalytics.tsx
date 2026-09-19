@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { isProductionAnalyticsHost } from '@/lib/analytics/gtag';
+import { getTrackerReferralParams } from '@/lib/analytics/tracker-referral';
 
 const SENSITIVE_QUERY_KEYS = [
   'code',
@@ -32,6 +33,7 @@ export default function GoogleAnalytics({ measurementId }: { measurementId: stri
   const dataReferralTracked = useRef(false);
 
   useEffect(() => {
+    if (isProductionAnalyticsHost(window.location.hostname)) getTrackerReferralParams();
     setEnabled(isProductionAnalyticsHost(window.location.hostname));
   }, []);
 
@@ -49,19 +51,21 @@ export default function GoogleAnalytics({ measurementId }: { measurementId: stri
     let timer = 0;
 
     const send = () => {
+      const referralParams = getTrackerReferralParams();
       window.gtag!('set', { page_location: pageLocation });
       window.gtag!('event', 'page_view', {
         page_path: pathname,
         page_location: pageLocation,
         page_title: document.title,
         site_type: 'photo',
-        source_app: fromData ? 'tracker' : undefined,
+        ...referralParams,
       });
 
       if (fromData && !dataReferralTracked.current) {
         dataReferralTracked.current = true;
         window.gtag!('event', 'p_data_referral', {
           source_app: 'tracker',
+          ...referralParams,
           destination_path: pathname,
         });
       }
@@ -105,9 +109,6 @@ export default function GoogleAnalytics({ measurementId }: { measurementId: stri
               accept_incoming: true
             });
             var analyticsGlobalParams = { page_location: analyticsPageLocation };
-            if (analyticsUrl.searchParams.get('from') === 'data') {
-              analyticsGlobalParams.source_app = 'tracker';
-            }
             window.gtag('set', analyticsGlobalParams);
             window.gtag('config', ${JSON.stringify(measurementId)}, {
               send_page_view: false,
