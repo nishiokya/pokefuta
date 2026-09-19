@@ -13,7 +13,7 @@
 
 export const DEX_SITE_ORIGIN = 'https://data.pokefuta.com';
 
-const PREFECTURE_SLUGS: Record<string, string> = {
+export const PREFECTURE_SLUGS: Readonly<Record<string, string>> = {
   北海道: 'hokkaido', 青森県: 'aomori', 岩手県: 'iwate',
   宮城県: 'miyagi', 秋田県: 'akita', 山形県: 'yamagata',
   福島県: 'fukushima', 茨城県: 'ibaraki', 栃木県: 'tochigi',

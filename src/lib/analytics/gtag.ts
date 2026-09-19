@@ -4,6 +4,7 @@
  */
 
 import type { SubmissionErrorType } from './submission-error';
+import { getTrackerReferralParams } from './tracker-referral';
 
 // ==========================================
 // 型定義
@@ -22,6 +23,7 @@ export interface PokefutaEventParams extends GAEventParams {
   site_type?: 'photo' | 'map';
   manhole_id?: string | number;
   prefecture?: string;
+  referral_prefecture?: string; // 図鑑の流入元県slug。投稿先のprefectureとは別の軸
   pokemon_ids?: string;    // カンマ区切り文字列 (GA4は配列非対応)
   is_logged_in?: boolean;
   source_app?: 'tracker' | 'map';
@@ -402,6 +404,7 @@ export function trackEvent(
     is_logged_in: _analyticsIsLoggedIn !== null ? _analyticsIsLoggedIn : undefined,
     ...context,
     ...eventParams,
+    ...getTrackerReferralParams(),
   };
 
   if (process.env.NODE_ENV === 'development') {
