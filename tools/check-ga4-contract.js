@@ -153,6 +153,50 @@ expect(analytics.includes("trackEvent('p_page_view'"), 'legacy helper must not e
 expect(provider.includes("'code'") && provider.includes("'access_token'"), 'sensitive query filtering is missing');
 expect(provider.includes("get('from') === 'data'"), 'data-site referral tracking is missing');
 expect(provider.includes("'p_data_referral'"), 'data-site referral event is missing');
+
+// 図鑑が付けてくる pref / tag。落とすと「どの県・どのテーマのページが
+// 投稿に繋がったか」が永久に分からない（図鑑側は送っている）。
+const trackerReferral = stripComments(read('src/lib/analytics/tracker-referral.ts'));
+expect(
+  provider.includes('getTrackerReferralParams()') && provider.includes('...referralParams'),
+  'tracker referral params must be attached to page_view and p_data_referral'
+);
+expect(
+  trackerReferral.includes('referral_prefecture') && trackerReferral.includes('referral_tag'),
+  'tracker referral must carry both the prefecture and the theme tag'
+);
+expect(
+  /TAG_PATTERN\s*=\s*\//.test(trackerReferral),
+  'theme tag must be validated by shape (図鑑側がテーマ一覧を持つため allowlist にしない)'
+);
+expect(
+  trackerReferral.includes('STORAGE_KEY') && trackerReferral.includes('REFERRAL_TIMEOUT_MS'),
+  'tracker referral must survive in-session navigation with an expiry'
+);
+
+// 半径スライダーを標準イベント `search` に載せていたため、GA4 の検索レポートが
+// `radius:30km` だけで埋まっていた。`search` は本物の検索のために空けておく。
+const nearbyPage = stripComments(read('src/app/nearby/page.tsx'));
+expect(
+  !/trackSearch\s*\(/.test(nearbyPage),
+  'nearby page must not send the standard search event for the radius slider'
+);
+expect(
+  nearbyPage.includes('trackNearbyRadiusChange('),
+  'radius changes must be sent as p_nearby_radius_change'
+);
+expect(
+  /radius_km:\s*radius/.test(nearbyPage),
+  'radius must be sent as a number (radius_km), not as a string like radius:30km'
+);
+expect(
+  nearbyPage.includes('loadedRadiusRef'),
+  'radius change must not fire on the first load (default 30km)'
+);
+expect(
+  analytics.includes("trackEvent('p_nearby_radius_change'"),
+  'p_nearby_radius_change is missing from the event registry'
+);
 expect(provider.includes('page_location: analyticsPageLocation'), 'sanitized page_location must be configured globally');
 expect(provider.includes('(function() {'), 'analytics bootstrap must not leak variables to window');
 expect(

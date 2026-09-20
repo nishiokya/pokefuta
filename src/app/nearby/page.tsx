@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
@@ -54,7 +54,9 @@ export default function NearbyPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
   const [query, setQuery] = useState('');
-  const { trackSearch, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
+  const { trackNearbyRadiusChange, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
+  // 直前に読み込んだ半径。初回ロード（既定30km）では送らず、実際に動かしたときだけ送る。
+  const loadedRadiusRef = useRef<number | null>(null);
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   useEffect(() => {
@@ -241,7 +243,15 @@ export default function NearbyPage() {
 
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
       setNearbyManholes(manholesWithVisits);
-      trackSearch(`radius:${radius}km`, manholesWithVisits.length);
+      const previousRadius = loadedRadiusRef.current;
+      loadedRadiusRef.current = radius;
+      if (previousRadius !== null && previousRadius !== radius) {
+        trackNearbyRadiusChange({
+          radius_km: radius,
+          result_count: manholesWithVisits.length,
+          surface: 'nearby_radius_slider',
+        });
+      }
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
       setDataError(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);

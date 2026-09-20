@@ -17,6 +17,7 @@ import {
   SubmissionCompleteParams,
   SubmissionEntryParams,
   SubmissionEventParams,
+  NearbyRadiusChangeParams,
   SubmissionFailedParams,
   SubmissionPhotoSelectedParams,
 } from '@/lib/analytics/gtag';
@@ -98,6 +99,10 @@ export function useAnalytics() {
 
   // --- 旅・位置情報系 ---
   const trackNearbyOpen       = useCallback((p?: PokefutaEventParams) => pokefutaEvents.nearbyOpen(p), []);
+  const trackNearbyRadiusChange = useCallback(
+    (p: NearbyRadiusChangeParams) => pokefutaEvents.nearbyRadiusChange(p),
+    []
+  );
   const trackGeolocationEnable= useCallback((p?: PokefutaEventParams) => pokefutaEvents.geolocationEnable(p), []);
   const trackRouteOpen        = useCallback((p?: PokefutaEventParams) => pokefutaEvents.routeOpen(p), []);
 
@@ -195,6 +200,7 @@ export function useAnalytics() {
     trackAppError,
 
     // 後方互換
+    trackNearbyRadiusChange,
     trackSearch,
     trackFilterApply,
     trackNavClick,
