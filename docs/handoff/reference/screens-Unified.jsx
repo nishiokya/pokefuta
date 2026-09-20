@@ -118,7 +118,10 @@ function U_Detail() {
         </div>
       </div>
 
-      {/* ⑤ 共有（SNS拡散はKPIなので常設で下部に） */}
+      {/* ⑤ 共有（SNS拡散はKPIなので常設で下部に）
+           → 実装からは削除済み。90日で X 1・LINE 1・共有シート3 の計5クリック
+           しか無く、KPI の置き場としては機能していなかった。共有導線は
+           /p/{photoId}・マイ旅・県別達成ページ側に残っている。 */
       <div>
         <U_SecHead icon={I.users}>このポケふたを共有</U_SecHead>
         <div style={{ display: "flex", gap: 8 }}>
