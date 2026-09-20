@@ -136,6 +136,13 @@ export type PhotoSource = 'camera' | 'library';
  */
 export type SubmissionStep = 'start' | 'photo_selected' | 'blocked' | 'submitting' | 'failed';
 
+export interface NearbyRadiusChangeParams extends PokefutaEventParams {
+  /** 検索半径（km）。文字列 `radius:30km` ではなく数値で送る。 */
+  radius_km: number;
+  /** その半径で返ってきた件数。 */
+  result_count: number;
+}
+
 export interface SubmissionEventParams extends PokefutaEventParams {
   submission_kind: SubmissionKind;
   photo_source?: PhotoSource;
@@ -566,6 +573,10 @@ export const pokefutaEvents = {
 
   // --- 旅・位置情報系 ---
   nearbyOpen:          (p?: PokefutaEventParams) => trackEvent('p_nearby_open', p),
+  /** 「現在地の近く」の検索半径を変えた。標準イベント `search` を半径スライダーに
+   *  使っていたため、GA4 の検索レポートが `radius:30km` で汚染されていた。
+   *  半径は数値（`radius_km`）で送る。 */
+  nearbyRadiusChange:  (p: NearbyRadiusChangeParams) => trackEvent('p_nearby_radius_change', p),
   geolocationEnable:   (p?: PokefutaEventParams) => trackEvent('p_geolocation_enable', p),
   routeOpen:           (p?: PokefutaEventParams) => trackEvent('p_route_open', p),
 

@@ -13,6 +13,9 @@
 - `/about` を `pokefuta.com` と `data.pokefuta.com` 共通のAbout・お問い合わせページの正本とする。両ドメインを「姉妹サイト」と表現せず、同じサービス内の「ポケふた写真館」と「ポケふた図鑑」として扱う。運営者名は `nishiokya` と表記する。
 - AdSenseのサイト登録は `pokefuta.com`、パブリッシャーIDは `pub-6885302916426075`。ルートの `public/ads.txt` と所有確認metaを維持する。広告枠は当初 `data.pokefuta.com` の都道府県・詳細ページだけに置き、写真館には置かない。
 - イベント発生箇所は `surface` で表す。GA4の流入元予約語 `source` をカスタムイベント引数に使わない。
+- 標準イベント `search` は**本物のテキスト検索**にだけ使う。絞り込みや半径の変更は
+  `p_` 付きの専用イベントにする（半径スライダーを `search{search_term:'radius:30km'}` で
+  送っていたため、GA4の検索レポートが丸ごと汚染されていた）。
 - エラーイベントは `p_api_error` / `p_auth_error` / `p_app_error` を使う。旧キーイベント名 `error_event` / `auth_error` は送信しない。
 
 ## 投稿ファネル
@@ -106,13 +109,16 @@
    `submission_kind` / `block_reason` / `block_phase` / `block_class` / `is_repeat` / `attempt_no` /
    `error_code` / `error_type` / `stage` / `last_step` /
    `photo_source` / `review_status` / `surface` / `prefecture` / `page_type` / `is_logged_in` /
-   `source_app` / `referral_prefecture` / `site_type` / `is_open` / `has_note`
+   `source_app` / `referral_prefecture` / `referral_tag` / `site_type` / `is_open` / `has_note`
+   （`referral_tag` は図鑑のテーマページ `/tags/<slug>/` からの流入。県と同じ軸で、
+   テーマの一覧は図鑑側が持つので写真館は slug の形だけを見る）
    （`attempt_no` は件数ではなく「何回目か」で分解したいのでディメンション。
    `is_repeat` は真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
    （`is_open` / `has_note` は `p_go_friend_saved` の設定率・公開率を分けて見るため。
    真偽値だが GA4 は文字列として受けるのでディメンションで登録する）
 2. カスタム指標:
    - `upload_duration_ms`、`dwell_ms`（いずれもミリ秒）
+   - `radius_km`（「現在地の近く」の検索半径。`p_nearby_radius_change` に載る）
    - `manhole_loaded`、`manhole_total`（件数・標準）
      — 蓋の一覧が切り捨てられたときの規模を見るため。
      `p_app_error{error_code:'manhole_list_truncated' | 'manhole_list_total_invalid'}` に載る

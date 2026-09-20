@@ -27,6 +27,54 @@ test('47県を許可し、図鑑由来でないpref・未知値は県として�
   }
 });
 
+test('テーマページからの流入は referral_tag として送る', () => {
+  const read = createTrackerReferralStore(memoryStorage());
+  assert.deepEqual(read('?from=data&pref=hokkaido&tag=roadside'), {
+    source_app: 'tracker', referral_prefecture: 'hokkaido', referral_tag: 'roadside',
+  });
+});
+
+test('テーマ単体（県なし）の流入も拾う', () => {
+  // /tags/<slug>/ のリンクは県を持たないことがある
+  const read = createTrackerReferralStore(memoryStorage());
+  assert.deepEqual(read('?from=data&tag=world_heritage'), {
+    source_app: 'tracker', referral_tag: 'world_heritage',
+  });
+});
+
+test('テーマは形だけ見る。一覧を持つのは図鑑側なので、未知のテーマも通す', () => {
+  // テーマが増えるたびに写真館をデプロイし直さないための判断。
+  // ただし slug の形から外れた値は送らない。
+  const read = createTrackerReferralStore(memoryStorage());
+  assert.equal(read('?from=data&tag=future_theme').referral_tag, 'future_theme');
+  for (const tag of ['', '道の駅', '<script>', 'A'.repeat(33), '_leading', 'toString']) {
+    const fresh = createTrackerReferralStore(memoryStorage());
+    assert.equal(
+      fresh(`?from=data&tag=${encodeURIComponent(tag)}`).referral_tag,
+      undefined,
+      `${tag} を通してはいけない`
+    );
+  }
+});
+
+test('新しい図鑑流入にテーマが無ければ、古いテーマは消える', () => {
+  // 県と同じ規則。古い帰属を引きずらない
+  const storage = memoryStorage();
+  const read = createTrackerReferralStore(storage);
+  assert.equal(read('?from=data&pref=mie&tag=roadside').referral_tag, 'roadside');
+  assert.equal(read('?from=data&pref=mie').referral_tag, undefined);
+});
+
+test('保存値のテーマが壊れていれば、その保存値ごと捨てる（県も引き継がない）', () => {
+  const storage = memoryStorage();
+  storage.setItem(
+    'pokefuta:tracker-referral:v1',
+    JSON.stringify({ prefecture: 'kagawa', tag: '<script>', lastActivityAt: Date.now() })
+  );
+  const read = createTrackerReferralStore(storage);
+  assert.deepEqual(read(''), {});
+});
+
 test('画面遷移と認証後の再読み込みでも保持し、新しい図鑑流入で置き換える', () => {
   const storage = memoryStorage();
   const read = createTrackerReferralStore(storage);
