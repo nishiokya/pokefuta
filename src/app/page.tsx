@@ -261,6 +261,42 @@ export default function HomePage() {
             </p>
 
             {/*
+              残りの都道府県は「写真がまだないポケふた」の中に置いていたので、
+              最新の投稿を全部見終わるまで目に入らなかった。すぐ上の
+              「残りN都道府県」の内訳なので、その文の直下に出す。並びは残り
+              枚数の少ない順（先頭が「次に終わる県」）、行き先は /manholes の
+              検索で県名に絞った一覧。
+            */}
+            {completion && completion.incompleteCount > 0 && (
+              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
+                <p className="text-sm font-bold text-[#4A4A4A]">
+                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
+                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
+                  都道府県は、設置済みのポケふた全てに写真が集まりました。
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
+                  残りは{' '}
+                  <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
+                  都道府県です。
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {completion.incomplete.map((entry) => (
+                    <Link
+                      key={entry.prefecture}
+                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
+                    >
+                      <span>{entry.prefecture}</span>
+                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
+                        あと {entry.missing} 枚
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/*
               新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
               並んでいて、どちらが主かが読めなかった。登録側だけを一段大きくし、
               スタンプ帳は枠線を外して副次的な見た目に落とす。
@@ -285,42 +321,6 @@ export default function HomePage() {
             )}
           </div>
         </section>
-
-        {/*
-          残りの都道府県は「写真がまだないポケふた」の中に置いていたので、
-          最新の投稿を全部見終わるまで目に入らなかった。ヒーローが出す
-          「残りN都道府県」の内訳なので、そのすぐ下に出す。並びは残り枚数の
-          少ない順（先頭が「次に終わる県」）、行き先は /manholes の検索で
-          県名に絞った一覧。
-        */}
-        {completion && completion.incompleteCount > 0 && (
-          <section className="mt-6 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-            <p className="text-sm font-bold text-[#4A4A4A]">
-              ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-              <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-              都道府県は、設置済みのポケふた全てに写真が集まりました。
-            </p>
-            <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-              残りは{' '}
-              <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-              都道府県です。
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {completion.incomplete.map((entry) => (
-                <Link
-                  key={entry.prefecture}
-                  href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                >
-                  <span>{entry.prefecture}</span>
-                  <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                    あと {entry.missing} 枚
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Loading State */}
         {loading && (
