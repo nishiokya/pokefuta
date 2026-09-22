@@ -21,6 +21,7 @@ import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { SITE_NAME } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
+import type { CompletionRollup } from '@/lib/prefecture-completion';
 
 type FeedVisit = {
   id: string;
@@ -70,6 +71,7 @@ export default function HomePage() {
   const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
+  const [completion, setCompletion] = useState<CompletionRollup | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
@@ -95,6 +97,7 @@ export default function HomePage() {
 
     loadSiteStats();
     loadRareManholes();
+    loadCompletion();
   }, []);
 
   useEffect(() => {
@@ -133,6 +136,18 @@ export default function HomePage() {
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadCompletion = async () => {
+    try {
+      const response = await fetch('/api/prefecture-completion');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.success) return;
+      setCompletion(data as CompletionRollup);
     } catch {
       // ignore
     }
@@ -215,8 +230,19 @@ export default function HomePage() {
               {totalPosts != null && totalPosts > 0 ? (
                 <>
                   ポケふたの写真が <span className="whitespace-nowrap"><b>{totalPosts}</b> 枚</span>集まっています。
-                  {unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                    <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
+                  {/*
+                    残り枚数だけを出していたときは、全国の残りが十数枚しかなく
+                    埋まるのも遅いので、数字が何週間も動かなかった。動かない数字は
+                    進捗として読めない。残っている蓋は少数の都道府県に固まって
+                    いるので、都道府県を単位にして「残りN都道府県」を主役にし、
+                    枚数はその内訳として添える。
+                  */}
+                  {completion && completion.incompleteCount > 0 ? (
+                    <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
+                  ) : (
+                    unmetPhotoCount != null && unmetPhotoCount > 0 && (
+                      <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
+                    )
                   )}
                 </>
               ) : (
@@ -493,6 +519,39 @@ export default function HomePage() {
               </h2>
               <span className="text-sm font-bold text-[#B5483C]">募集中</span>
             </div>
+            {/*
+              下のタイルは蓋を12枚並べるだけで、残りがどこに固まっているかが
+              読めなかった。残り枚数の少ない都道府県から並べる（先頭が「次に
+              終わる県」）。行き先は /manholes の検索で、県名で絞った一覧。
+            */}
+            {completion && completion.incompleteCount > 0 && (
+              <div className="mb-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
+                <p className="text-sm font-bold text-[#4A4A4A]">
+                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
+                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
+                  都道府県は、設置済みのポケふた全てに写真が集まりました。
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
+                  残りは{' '}
+                  <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
+                  都道府県です。
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {completion.incomplete.map((entry) => (
+                    <Link
+                      key={entry.prefecture}
+                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
+                    >
+                      <span>{entry.prefecture}</span>
+                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
+                        あと {entry.missing} 枚
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
               {rareManholes.map((manhole) => {
                 const label = manhole.building
