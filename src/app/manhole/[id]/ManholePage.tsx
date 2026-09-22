@@ -14,7 +14,6 @@ import dynamic from 'next/dynamic';
 import type { SnapshotManhole } from '@/lib/manhole-snapshot';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
-import ShareButtons from '@/components/ShareButtons';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
@@ -24,9 +23,7 @@ import {
   orderManholePhotosForViewer,
   photoChronologyDate,
 } from '@/lib/manhole-photo-ranking';
-import { manholeShareText, photoShareText } from '@/lib/share';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
-import { SITE_URL } from '@/lib/constants';
 import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
   filterPokemons,
@@ -85,12 +82,6 @@ const getPhotoUserLabel = (photo: Photo) => {
 
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
   [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-
-const getTopTitleHashtags = (titles?: ManholeTitle[] | null) =>
-  getSortedTitles(titles)
-    .slice(0, 2)
-    .map((title) => title.hashtag)
-    .filter((hashtag): hashtag is string => Boolean(hashtag));
 
 const getTitlePillClass = (index: number) => {
   const classes = [
@@ -565,23 +556,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     setSelectedPhotoId(null);
     setSelectedVisitId(null);
   };
-
-  const sharePayload = useMemo(() => {
-    if (!manhole) return null;
-    const municipality = manhole.city || manhole.municipality || '場所未設定';
-    const titleHashtags = getTopTitleHashtags(manhole.titles);
-    const shareablePhoto = photos.find(
-      (photo) => currentUserId && photo.visit?.user_id === currentUserId && photo.visit?.is_public === true
-    );
-    const pokemons = manhole.pokemons ?? [];
-    const shareText = shareablePhoto
-      ? photoShareText(`${manhole.prefecture}${municipality}`, titleHashtags, pokemons)
-      : manholeShareText(`${manhole.prefecture}${municipality}`, pokemons);
-    const shareUrl = shareablePhoto
-      ? `${SITE_URL}/p/${shareablePhoto.id}`
-      : `${SITE_URL}/manhole/${manhole.id}`;
-    return { shareText, shareUrl, hashtags: titleHashtags, analyticsParams: { manhole_id: manhole.id, prefecture: manhole.prefecture } };
-  }, [manhole, photos, currentUserId]);
 
   // 周辺・同ポケモンの回遊リスト
   const detailMapManholes = useMemo(() => manhole ? [manhole] : [], [manhole]);
@@ -1477,23 +1451,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   <span className="ml-auto text-base" aria-hidden="true">›</span>
                 </a>
               )}
-            </div>
-          )}
-
-          {/* ── Share ── */}
-          {sharePayload && (
-            <div>
-              <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
-                <Users className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
-                このポケふたを共有
-              </h3>
-              <ShareButtons
-                label=""
-                shareText={sharePayload.shareText}
-                shareUrl={sharePayload.shareUrl}
-                hashtags={sharePayload.hashtags}
-                analyticsParams={sharePayload.analyticsParams}
-              />
             </div>
           )}
 
