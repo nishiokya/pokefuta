@@ -72,6 +72,8 @@ export default function HomePage() {
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
+  // 取得が終わったか（成否を問わない）。終わるまで残りの文を出さないための旗。
+  const [completionLoaded, setCompletionLoaded] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
@@ -150,6 +152,8 @@ export default function HomePage() {
       setCompletion(data as CompletionRollup);
     } catch {
       // ignore
+    } finally {
+      setCompletionLoaded(true);
     }
   };
 
@@ -237,13 +241,19 @@ export default function HomePage() {
                     いるので、都道府県を単位にして「残りN都道府県」を主役にし、
                     枚数はその内訳として添える。
                   */}
-                  {completion && completion.incompleteCount > 0 ? (
-                    <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
-                  ) : (
-                    unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                      <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
-                    )
-                  )}
+                  {/*
+                    取得が終わるまでは残りの文を出さない。先に枚数版を出して
+                    から県版へ差し替えると、長さの違う文がヒーローの中で
+                    書き換わって行が送られる。
+                  */}
+                  {completionLoaded &&
+                    (completion && completion.incompleteCount > 0 ? (
+                      <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
+                    ) : (
+                      unmetPhotoCount != null && unmetPhotoCount > 0 && (
+                        <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
+                      )
+                    ))}
                 </>
               ) : (
                 <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>

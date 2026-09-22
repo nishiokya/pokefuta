@@ -12,8 +12,6 @@
 export interface CompletionInput {
   prefecture: string | null;
   photo_count: number;
-  /** スナップショットに無いこともあるので optional。false のときだけ除外する。 */
-  installed?: boolean | null;
 }
 
 export interface PrefectureCompletion {
@@ -37,22 +35,28 @@ export interface CompletionRollup {
 }
 
 /**
- * コンプリート判定に数える1枚かどうか。
+ * 既知の穴: **設置予定の蓋を除外できない。**
  *
- * `installed === false`（設置予定でまだ現地に無い蓋）は「写真が足りない」に
- * 数えない。数えると、撮りに行きようのない残数が永遠に残ってしまう。
+ * 図鑑側のデータ（pokefuta.ndjson）は `installed: false`（登録済みだが現地に
+ * まだ設置されていない蓋）を持っているが、アプリが読む
+ * data.pokefuta.com のスナップショットにはこの項目が無い。Supabase の
+ * `manhole` テーブル自体に相当する列が無く、スナップショットはそこから
+ * 焼かれているため。スナップショットの `is_active` は「レコードが生きて
+ * いるか」であって設置状況ではないので、代わりには使えない。
+ *
+ * 結果として、設置予定の蓋は「写真が無い普通の蓋」として残り枚数に入る。
+ * その県は撮りに行きようのない1枚のせいで永久にコンプリートしない。
+ * 現時点の実データでは該当は1枚（id 461 / 福島県小野町）だけで、しかも既に
+ * 写真があるため表に出ていないが、次に写真の無い設置予定が焼かれた時点で
+ * 顕在化する。根本的には Supabase 側に設置状況を持たせてスナップショットに
+ * 載せる必要がある。
  */
-function isCountable(manhole: CompletionInput): boolean {
-  return manhole.installed !== false;
-}
-
 export function buildPrefectureCompletion(
   manholes: CompletionInput[]
 ): CompletionRollup {
   const byPrefecture = new Map<string, { total: number; withPhoto: number }>();
 
   for (const manhole of manholes) {
-    if (!isCountable(manhole)) continue;
     const prefecture = (manhole.prefecture ?? '').trim();
     // 都道府県が空のレコードはどの県にも積めないので数えない。混ぜると
     // listedCount と各県の合計が合わなくなる。

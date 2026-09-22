@@ -5,12 +5,8 @@ import {
   type CompletionInput,
 } from '../src/lib/prefecture-completion';
 
-function manhole(
-  prefecture: string,
-  photoCount: number,
-  installed?: boolean
-): CompletionInput {
-  return { prefecture, photo_count: photoCount, installed };
+function manhole(prefecture: string, photoCount: number): CompletionInput {
+  return { prefecture, photo_count: photoCount };
 }
 
 test('都道府県ごとに残り枚数を数える', () => {
@@ -39,27 +35,19 @@ test('全ての蓋に写真がある県はコンプリート扱いで incomplete
   assert.equal(rollup.missingTotal, 0);
 });
 
-test('設置予定(installed:false)の蓋は残り枚数に数えない', () => {
-  // 現地にまだ無い蓋を「写真が足りない」に数えると、撮りに行きようのない
-  // 残数が永遠に残り、その県は絶対にコンプリートしない。
+test('設置状況は見ない（スナップショットが持っていないため）', () => {
+  // 既知の穴。図鑑側の installed:false（現地にまだ無い蓋）に相当する項目が
+  // data.pokefuta.com のスナップショットに無いので、設置予定の蓋も
+  // 「写真が無い蓋」として残り枚数に入る。
+  //
+  // このテストは現状を固定するためのもので、望ましい挙動ではない。
+  // スナップショットに設置状況が載ったら、除外する実装に変えてここも直す。
   const rollup = buildPrefectureCompletion([
     manhole('香川県', 1),
-    manhole('香川県', 0, false),
+    manhole('香川県', 0),
   ]);
 
-  assert.equal(rollup.incompleteCount, 0);
-  assert.equal(rollup.completeCount, 1);
-});
-
-test('installed が無いスナップショットでも数える', () => {
-  // data.pokefuta.com のスナップショットは installed を持たないことがある。
-  // undefined を「未設置」と読むと全部が母数から消える。
-  const rollup = buildPrefectureCompletion([
-    { prefecture: '香川県', photo_count: 0 },
-    { prefecture: '香川県', photo_count: 1 },
-  ]);
-
-  assert.equal(rollup.listedCount, 1);
+  assert.equal(rollup.incompleteCount, 1);
   assert.equal(rollup.missingTotal, 1);
 });
 

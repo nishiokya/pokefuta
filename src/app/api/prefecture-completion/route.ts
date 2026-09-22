@@ -34,8 +34,6 @@ export async function GET() {
     snapshot.manholes.map((manhole) => ({
       prefecture: manhole.prefecture,
       photo_count: manhole.photo_count,
-      installed:
-        typeof manhole.installed === 'boolean' ? manhole.installed : undefined,
     }))
   );
 
