@@ -24,9 +24,13 @@ export async function GET() {
   if (!snapshot?.manholes) {
     // 取れない日は success:false を返し、呼び出し側は何も出さない。
     // 0件として描くと「残り0都道府県 = 全国達成」になってしまう。
+    //
+    // 成功応答を CDN に1時間持たせている以上、失敗側は明示的に no-store に
+    // しないと 503 が同じだけキャッシュされ、スナップショットが復旧しても
+    // トップが枚数表示のフォールバックのままになる（/api/site-stats と同じ）。
     return NextResponse.json(
       { success: false, error: 'snapshot_unavailable' },
-      { status: 503 }
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
