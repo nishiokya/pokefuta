@@ -286,6 +286,42 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/*
+          残りの都道府県は「写真がまだないポケふた」の中に置いていたので、
+          最新の投稿を全部見終わるまで目に入らなかった。ヒーローが出す
+          「残りN都道府県」の内訳なので、そのすぐ下に出す。並びは残り枚数の
+          少ない順（先頭が「次に終わる県」）、行き先は /manholes の検索で
+          県名に絞った一覧。
+        */}
+        {completion && completion.incompleteCount > 0 && (
+          <section className="mt-6 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
+            <p className="text-sm font-bold text-[#4A4A4A]">
+              ポケふたがある {completion.listedCount} 都道府県のうち{' '}
+              <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
+              都道府県は、設置済みのポケふた全てに写真が集まりました。
+            </p>
+            <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
+              残りは{' '}
+              <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
+              都道府県です。
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {completion.incomplete.map((entry) => (
+                <Link
+                  key={entry.prefecture}
+                  href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
+                >
+                  <span>{entry.prefecture}</span>
+                  <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
+                    あと {entry.missing} 枚
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Loading State */}
         {loading && (
           <div className="mt-6 flex items-center justify-center py-12">
@@ -529,39 +565,6 @@ export default function HomePage() {
               </h2>
               <span className="text-sm font-bold text-[#B5483C]">募集中</span>
             </div>
-            {/*
-              下のタイルは蓋を12枚並べるだけで、残りがどこに固まっているかが
-              読めなかった。残り枚数の少ない都道府県から並べる（先頭が「次に
-              終わる県」）。行き先は /manholes の検索で、県名で絞った一覧。
-            */}
-            {completion && completion.incompleteCount > 0 && (
-              <div className="mb-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                <p className="text-sm font-bold text-[#4A4A4A]">
-                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-                  都道府県は、設置済みのポケふた全てに写真が集まりました。
-                </p>
-                <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-                  残りは{' '}
-                  <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-                  都道府県です。
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {completion.incomplete.map((entry) => (
-                    <Link
-                      key={entry.prefecture}
-                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                    >
-                      <span>{entry.prefecture}</span>
-                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                        あと {entry.missing} 枚
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
               {rareManholes.map((manhole) => {
                 const label = manhole.building
