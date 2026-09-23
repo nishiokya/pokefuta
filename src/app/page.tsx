@@ -532,7 +532,12 @@ export default function HomePage() {
             {/*
               下のタイルは蓋を12枚並べるだけで、残りがどこに固まっているかが
               読めなかった。残り枚数の少ない都道府県から並べる（先頭が「次に
-              終わる県」）。行き先は /manholes の検索で、県名で絞った一覧。
+              終わる県」）。行き先は都道府県ページ。
+
+              以前は /manholes?q=<県名> に送っていたが、あれは全件（482件・
+              約700KB）をクライアントで取ってから部分一致で絞るだけの検索で、
+              残りの蓋がどれかも、その県に何が投稿されたかも出ない。ここから
+              期待されているのはその2つなので、専用ページへ送る。
             */}
             {completion && completion.incompleteCount > 0 && (
               <div className="mb-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
@@ -550,7 +555,7 @@ export default function HomePage() {
                   {completion.incomplete.map((entry) => (
                     <Link
                       key={entry.prefecture}
-                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                      href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
                       className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
                     >
                       <span>{entry.prefecture}</span>
