@@ -10,7 +10,6 @@ import {
   manholeLabel,
   manholeLocationLabel,
   manholePlaceLabel,
-  municipalityLabel,
   pokemonMetaLabel,
   pokemonText,
 } from '../src/lib/manhole-label.ts';
@@ -82,46 +81,36 @@ test('距離は常に小数1桁 — 図鑑と同じ丸め', () => {
   assert.equal(formatDistanceKm(8), '8.0 km');
 });
 
-// 図鑑（data.pokefuta.com）の地図の見出し・詳細ページの実測値（2026-09-23）。
+// 図鑑（data.pokefuta.com）のスナップショットと詳細ページの実測値（2026-09-23）。
 const manhole273 = {
   prefecture: '愛知県',
   city: '豊橋',
   municipality: '豊橋',
   title: '愛知県/豊橋市',
-  address: '愛知県豊橋市東七根町一の沢113-2',
   building: '道の駅とよはし',
+  name: '豊橋市 道の駅とよはし',
   pokemons: ['スターミー', 'デンヂムシ'],
 };
 
-test('一覧の名前は図鑑の見出しと同じ「市区町村 施設名」— 「豊橋・道の駅とよはし」にしない', () => {
+test('一覧の名前はスナップショットの name をそのまま使う — 写真館で組み立て直さない', () => {
   assert.equal(manholeDisplayName(manhole273), '豊橋市 道の駅とよはし');
+  // 同じ自治体で区別が要るものは図鑑が住所やポケモン名で区別済み。building から作り直すと崩れる
   assert.equal(
-    manholeDisplayName({
-      prefecture: '愛知県', city: '名古屋市中区', municipality: '名古屋市中区', title: '愛知県/名古屋市',
-      building: '金シャチ横丁　宗春ゾーン（東門エリア）',
-    }),
-    '名古屋市中区 金シャチ横丁 宗春ゾーン（東門エリア）'
+    manholeDisplayName({ title: '奈良県/斑鳩町', municipality: '斑鳩', building: null, name: '斑鳩町 興留7' }),
+    '斑鳩町 興留7'
   );
 });
 
-test('施設名が無ければ title の「県/市」のまま', () => {
-  assert.equal(
-    manholeDisplayName({ prefecture: '岩手県', city: '宮古', municipality: '宮古', title: '岩手県/宮古市', building: null }),
-    '岩手県/宮古市'
-  );
+test('name が無いときは title → 県/市 → ポケふた に落とす（暫定。図鑑の規則ではない）', () => {
+  assert.equal(manholeDisplayName({ ...manhole273, name: null }), '愛知県/豊橋市');
+  assert.equal(manholeDisplayName({ ...manhole273, name: '  ' }), '愛知県/豊橋市');
   assert.equal(manholeDisplayName({ prefecture: '岩手県', municipality: '宮古' }), '岩手県/宮古');
   assert.equal(manholeDisplayName({}), 'ポケふた');
 });
 
-test('自治体名の接尾辞は住所 → title の順で補う', () => {
-  assert.equal(municipalityLabel({ city: '豊橋', address: '愛知県豊橋市東七根町' }), '豊橋市');
-  assert.equal(municipalityLabel({ city: '斜里', title: '北海道/斜里町' }), '斜里町');
-  assert.equal(municipalityLabel({ city: '斜里' }), '');
-});
-
 test('施設名は全角スペースと先頭の自治体名を整える', () => {
-  assert.equal(landmarkLabel({ building: '指宿警察署　指宿中央交番', city: '指宿', title: '鹿児島県/指宿市' }), '指宿警察署 指宿中央交番');
-  assert.equal(landmarkLabel({ building: '指宿市 指宿図書館', city: '指宿', title: '鹿児島県/指宿市' }), '指宿図書館');
+  assert.equal(landmarkLabel({ building: '指宿警察署　指宿中央交番', city: '指宿' }), '指宿警察署 指宿中央交番');
+  assert.equal(landmarkLabel({ building: '指宿市 指宿図書館', city: '指宿' }), '指宿図書館');
 });
 
 test('詳細の見出しは施設名入り、<title> 用は今の形のまま', () => {

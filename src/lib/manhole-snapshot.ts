@@ -110,6 +110,29 @@ export async function fetchSnapshotManhole(id: number): Promise<SnapshotManhole 
   return snapshot.manholes.find((manhole) => manhole.id === id) ?? null;
 }
 
+/**
+ * 蓋 id → 表示名（`name`）。**表示名の正本は図鑑が日次スナップショットで計算した `name`**
+ * （pokefuta-tracker `display_names.py` の `place_label` / `place_ambiguous` から組み立てる）。
+ * Supabase を直接引く API（訪問・口コミ）はこれで `name` を付けてから返す。
+ * 写真館側で同じ規則を再実装すると、同じ自治体に複数枚あるときの区別
+ * （「斑鳩町 興留7」「町田市（フシギダネ）」）などが図鑑とずれるため。
+ * スナップショットが取れないときは空の Map を返す（表示側は title に落ちる）。
+ */
+export async function fetchSnapshotNames(): Promise<Map<number, string>> {
+  const snapshot = await fetchManholeSnapshot();
+  return new Map((snapshot?.manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
+}
+
+/** 蓋オブジェクトにスナップショットの `name` を足す。id が無い・見つからないときはそのまま。 */
+export function withSnapshotName<T extends { id?: number | null }>(
+  manhole: T | null | undefined,
+  names: Map<number, string>
+): (T & { name?: string }) | null | undefined {
+  if (!manhole || typeof manhole.id !== 'number') return manhole;
+  const name = names.get(manhole.id);
+  return name ? { ...manhole, name } : manhole;
+}
+
 export function fetchSiteStatsSnapshot(): Promise<SiteStatsSnapshot | null> {
   return fetchSnapshotJson<SiteStatsSnapshot>('/api/site-stats.json');
 }

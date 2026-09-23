@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
+import { fetchSnapshotNames, withSnapshotName } from '@/lib/manhole-snapshot';
 import {
   LATEST_COMMENT_LOOKBACK,
   LATEST_COMMENT_MAX_MANHOLES,
@@ -360,6 +361,9 @@ export async function GET(request: NextRequest) {
       bookmarksSet.add(bookmark.visit_id);
     });
 
+    // 蓋の表示名は図鑑のスナップショットの name を正本にする（Supabase の manhole には無い）
+    const snapshotNames = await fetchSnapshotNames();
+
     // Post-process data
     const processedVisits = (visits || []).map(visit => {
       const photos = Array.isArray(visit.photos) ? visit.photos : [];
@@ -374,7 +378,7 @@ export async function GET(request: NextRequest) {
         id: visit.id,
         user_id: visit.user_id,
         manhole_id: visit.manhole_id,
-        manhole: visit.manhole,
+        manhole: withSnapshotName(visit.manhole as any, snapshotNames),
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
         // 未ログイン(anon)レスポンスは note を select していないため、
