@@ -1,3 +1,5 @@
+import { isMeaningfulVisitComment } from './visit-comment-quality';
+
 export type RankableManholePhoto = {
   id: string;
   created_at: string;
@@ -8,6 +10,7 @@ export type RankableManholePhoto = {
     user_id?: string | null;
     is_public?: boolean;
     shot_at?: string | null;
+    comment?: string | null;
   } | null;
 };
 
@@ -28,6 +31,13 @@ export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
       if (bScore === null) return -1;
       if (aScore !== bScore) return bScore - aScore;
     }
+
+    // 画質スコアで差が付かなければ、ひとこと付きの写真を先に出す。代表写真に
+    // コメント欄が添えられるので、蓋を開いた人が最初に読める情報が増える。
+    // ゴミ判定されたコメント（数字だけ等）は「付いていない」と同じ扱い。
+    const aCommented = isMeaningfulVisitComment(a.visit?.comment);
+    const bCommented = isMeaningfulVisitComment(b.visit?.comment);
+    if (aCommented !== bCommented) return aCommented ? -1 : 1;
 
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
