@@ -53,8 +53,9 @@ const FRESHLY_SHOT_DAYS = 3;
  * ヒーローに並べる「写真が残っている都道府県」チップの上限。
  *
  * /api/prefecture-completion は残り県を全件返す。今は数県だが、日次スナップショット
- * が壊れて photo_count が落ちると最大47県ぶんのチップ（各 min-h-11）がヒーローに
- * 積まれ、CTAもフィードも画面外へ出る。上限で止めて、超過分は件数だけ添える。
+ * が壊れて photo_count が落ちると最大47県ぶんのチップ（各 min-h-11）がヒーローの
+ * 末尾に積まれ、その下のフィードが画面外へ出る。上限で止めて、超過分は一覧への
+ * リンクに畳む。
  */
 const INCOMPLETE_CHIP_LIMIT = 12;
 
@@ -308,14 +309,27 @@ export default function HomePage() {
             {completion && completion.incompleteCount > 0 && (
               <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
                 {/*
-                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言っている。
-                  ここで繰り返さず、本文が持っていない「もう終わった県」の側を出す。
+                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言うので、
+                  ここでは繰り返さず、本文が持っていない「もう終わった県」の側を出す。
                 */}
                 <p className="text-sm font-bold text-[#4A4A4A]">
                   ポケふたがある {completion.listedCount} 都道府県のうち{' '}
                   <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
                   都道府県は、設置済みのポケふた全てに写真が集まりました。
                 </p>
+                {/*
+                  ただし本文の枚数の文は totalPosts（/api/site-stats）に依存していて、
+                  こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
+                  「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
+                  出なくなる。そのときだけパネルが引き受ける。
+                */}
+                {!(totalPosts != null && totalPosts > 0) && (
+                  <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
+                    残りは{' '}
+                    <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
+                    都道府県です。
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
                     <Link
@@ -329,10 +343,17 @@ export default function HomePage() {
                       </span>
                     </Link>
                   ))}
+                  {/*
+                    ただの文字にすると、打ち切った県は探しようがなくなる。
+                    県名で絞れる一覧（/manholes の検索）へ逃がす。
+                  */}
                   {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
-                    <span className="text-xs font-bold text-[#6B6B6B]">
+                    <Link
+                      href="/manholes"
+                      className="inline-flex min-h-11 items-center text-xs font-bold text-[#7B63A8] underline underline-offset-4"
+                    >
                       ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
-                    </span>
+                    </Link>
                   )}
                 </div>
               </div>
