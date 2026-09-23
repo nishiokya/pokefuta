@@ -13,6 +13,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { updateVisitVisibility, publishAllPrivateVisits, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
 import { pageTitle } from '@/lib/constants';
+import { manholeHeadingPlace } from '@/lib/manhole-label';
 
 // 全国のポケふた総数と、ポケふたが1枚以上設置されている都道府県数。
 // 47県のうち群馬・山梨・広島・熊本・大分には設置がないため分母は42
@@ -402,7 +403,8 @@ export default function MyTripPage() {
                       const manholeId = visit.manhole?.id ?? visit.manhole_id;
                       if (!manholeId) return null;
                       const municipality = getMunicipality(visit.manhole);
-                      const title = `${visit.manhole?.prefecture ?? ''}${municipality}のポケふた`;
+                      // 詳細ページの h1 と同じ（施設名があれば「〈県〉〈市区町村〉 〈施設名〉のポケふた」）
+                      const title = visit.manhole ? manholeHeadingPlace(visit.manhole) : `${municipality}のポケふた`;
                       const d = new Date(visit.shot_at);
                       const dateStr = isNaN(d.getTime()) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                       return (

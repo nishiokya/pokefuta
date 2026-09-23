@@ -6,6 +6,7 @@ import {
   pickRecentComments,
   type RecentCommentCandidate,
 } from '@/lib/recent-comments';
+import { fetchSnapshotNames } from '@/lib/manhole-snapshot';
 
 /**
  * トップの「最近の口コミ」。蓋の掲示板コメントと写真のひとことを新しい順に混ぜ、
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
     new Set(picked.filter((item) => !item.photo_id).map((item) => item.manhole_id))
   );
 
-  const [manholesResult, photosResult] = await Promise.all([
+  const [manholesResult, photosResult, snapshotNames] = await Promise.all([
     manholeIds.length > 0
       ? supabase
         .from('manhole')
@@ -138,6 +139,8 @@ export async function GET(request: NextRequest) {
         return [manholeId, firstPhotoId((data as any[])?.[0]?.photos)] as const;
       })
     ),
+    // 表示名は図鑑のスナップショットの name を正本にする
+    fetchSnapshotNames(),
   ]);
 
   if (manholesResult.error) {
@@ -168,6 +171,7 @@ export async function GET(request: NextRequest) {
         prefecture: manhole.prefecture,
         municipality: manhole.municipality,
         building: manhole.building,
+        name: snapshotNames.get(manhole.id),
       },
       thumbnail_url: photoId ? `/api/photo/${photoId}?size=small` : null,
     }];

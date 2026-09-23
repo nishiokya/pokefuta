@@ -16,6 +16,9 @@ const FALLBACK_BASE =
 
 const REVALIDATE_SECONDS = 3600;
 
+/** fetchSnapshotNames() の待ち時間の上限。キャッシュが効いていれば即座に返る。 */
+const SNAPSHOT_NAMES_TIMEOUT_MS = 1500;
+
 export interface SnapshotManhole {
   id: number;
   title: string;
@@ -108,6 +111,44 @@ export async function fetchSnapshotManhole(id: number): Promise<SnapshotManhole 
   const snapshot = await fetchManholeSnapshot();
   if (!snapshot?.manholes) return null;
   return snapshot.manholes.find((manhole) => manhole.id === id) ?? null;
+}
+
+/**
+ * 蓋 id → 表示名（`name`）。**表示名の正本は図鑑が日次スナップショットで計算した `name`**
+ * （pokefuta-tracker `display_names.py` の `place_label` / `place_ambiguous` から組み立てる）。
+ * Supabase を直接引く API（訪問・口コミ）はこれで `name` を付けてから返す。
+ * 写真館側で同じ規則を再実装すると、同じ自治体に複数枚あるときの区別
+ * （「斑鳩町 興留7」「町田市（フシギダネ）」）などが図鑑とずれるため。
+ * スナップショットが取れないときは空の Map を返す（表示側は title に落ちる）。
+ */
+export async function fetchSnapshotNames(
+  timeoutMs = SNAPSHOT_NAMES_TIMEOUT_MS
+): Promise<Map<number, string>> {
+  // 名前は見た目だけの情報なので、data.pokefuta.com が遅い・落ちているときに
+  // 訪問・口コミの API ごと待たせない。時間切れなら空の Map（表示は title に落ちる）
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  try {
+    const snapshot = await Promise.race([fetchManholeSnapshot(), timeout]);
+    if (!snapshot) {
+      console.warn(`Snapshot names unavailable within ${timeoutMs}ms; falling back to title`);
+    }
+    return new Map((snapshot?.manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 蓋オブジェクトにスナップショットの `name` を足す。id が無い・見つからないときはそのまま。 */
+export function withSnapshotName<T extends { id?: number | null }>(
+  manhole: T | null | undefined,
+  names: Map<number, string>
+): (T & { name?: string }) | null | undefined {
+  if (!manhole || typeof manhole.id !== 'number') return manhole;
+  const name = names.get(manhole.id);
+  return name ? { ...manhole, name } : manhole;
 }
 
 export function fetchSiteStatsSnapshot(): Promise<SiteStatsSnapshot | null> {

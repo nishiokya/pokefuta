@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
+import { fetchSnapshotNames, withSnapshotName } from '@/lib/manhole-snapshot';
 import {
   LATEST_COMMENT_LOOKBACK,
   LATEST_COMMENT_MAX_MANHOLES,
@@ -158,6 +159,10 @@ export async function GET(request: NextRequest) {
     // まさにこの形で、ページごとに枚数が揃わない）。写真が1枚も無い訪問記録を
     // join で落とせば、limit の意味が「写真つきをN件」になる。
     const photoEmbed = withPhotos === 'true' ? 'photos:photo!inner' : 'photos:photo';
+
+    // 蓋の表示名は図鑑のスナップショットの name を正本にする（Supabase の manhole には無い）。
+    // Supabase の問い合わせと並行して取りに行く（上限つき。時間切れなら title に落ちる）
+    const snapshotNamesPromise = fetchSnapshotNames();
 
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
@@ -360,6 +365,8 @@ export async function GET(request: NextRequest) {
       bookmarksSet.add(bookmark.visit_id);
     });
 
+    const snapshotNames = await snapshotNamesPromise;
+
     // Post-process data
     const processedVisits = (visits || []).map(visit => {
       const photos = Array.isArray(visit.photos) ? visit.photos : [];
@@ -374,7 +381,7 @@ export async function GET(request: NextRequest) {
         id: visit.id,
         user_id: visit.user_id,
         manhole_id: visit.manhole_id,
-        manhole: visit.manhole,
+        manhole: withSnapshotName(visit.manhole as any, snapshotNames),
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
         // 未ログイン(anon)レスポンスは note を select していないため、

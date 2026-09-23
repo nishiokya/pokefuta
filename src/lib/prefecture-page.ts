@@ -26,6 +26,8 @@ export interface PrefectureManholeInput {
   city?: string | null;
   building?: string | null;
   title?: string | null;
+  /** 図鑑が計算した表示名（表示名の正本）。 */
+  name?: string | null;
   pokemons?: string[] | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -39,6 +41,7 @@ export interface PrefectureManhole {
   city: string | null;
   building: string | null;
   title: string | null;
+  name: string | null;
   pokemons: string[];
   latitude: number | null;
   longitude: number | null;
@@ -102,6 +105,7 @@ function normalize(manhole: PrefectureManholeInput): PrefectureManhole {
     city: manhole.city ?? null,
     building: manhole.building ?? null,
     title: manhole.title ?? null,
+    name: manhole.name ?? null,
     pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
     latitude: typeof manhole.latitude === 'number' ? manhole.latitude : null,
     longitude: typeof manhole.longitude === 'number' ? manhole.longitude : null,
