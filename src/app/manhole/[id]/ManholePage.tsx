@@ -1345,6 +1345,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               surface="manhole_detail"
               photoComments={photoCommentEntries}
               viewerHasVisited={myPhotos.length > 0}
+              photosLoading={photosLoading}
             />
           )}
 

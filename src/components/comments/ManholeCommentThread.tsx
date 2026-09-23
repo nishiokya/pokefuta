@@ -54,6 +54,11 @@ interface Props {
    * 呼びかけを「行ったあなたへ」に変える。入力欄そのものは誰でも同じ1つ。
    */
   viewerHasVisited?: boolean;
+  /**
+   * 写真（＝写真のひとこと・行った記録）をまだ読み込み中か。写真は掲示板より遅れて届くので、
+   * この間に「0件」と判定すると、ひとことがある蓋でも最初のコメントのカードが一瞬出る。
+   */
+  photosLoading?: boolean;
 }
 
 /**
@@ -70,6 +75,7 @@ export default function ManholeCommentThread({
   surface = 'manhole_detail',
   photoComments = [],
   viewerHasVisited = false,
+  photosLoading = false,
 }: Props) {
   const [comments, setComments] = useState<PublicComment[]>([]);
   const [total, setTotal] = useState(0);
@@ -167,6 +173,8 @@ export default function ManholeCommentThread({
 
   useEffect(() => {
     threadViewSentRef.current = false;
+    // 別の蓋で押した候補の印を持ち越さない（used_suggestion が汚れる）
+    usedSuggestionRef.current = false;
     composeStartSentRef.current = false;
     setReportedIds(new Set());
     setDraft('');
@@ -348,7 +356,11 @@ export default function ManholeCommentThread({
   const threadComposer = (
     <CommentComposer
       value={draft}
-      onChange={setDraft}
+      onChange={(next) => {
+        // 候補を入れたあと全部消して書き直した場合は、候補を使ったことにしない
+        if (!next.trim()) usedSuggestionRef.current = false;
+        setDraft(next);
+      }}
       onSubmit={handleSubmit}
       submitting={submitting}
       isLoggedIn={isLoggedIn}
@@ -370,7 +382,7 @@ export default function ManholeCommentThread({
   // コメントが1件も無い蓋（掲示板も写真のひとことも0件）では、入力欄を目立つカードに
   // 入れて最初の1件を頼む。以前は「まだコメントはありません…」の1行だけで、
   // 482枚のほとんどがこの状態だった。
-  const isEmpty = !loading && timeline.length === 0;
+  const isEmpty = !loading && !photosLoading && timeline.length === 0;
 
   return (
     <div>
@@ -389,20 +401,31 @@ export default function ManholeCommentThread({
         {/*
           入力欄は一覧の上。新しい順に並べるので、書いたものが入力欄のすぐ下に出る。
         */}
-        {isEmpty ? (
-          <div className="rounded-[18px] border-[1.5px] border-[#efd9a3] bg-gradient-to-br from-[#fdf1e6] to-[#fffaf0] p-4 shadow-sm">
-            <p className="flex items-center gap-1.5 font-pixelJp text-[15px] font-black text-[#7d4536]">
-              <Sparkles className="h-4 w-4 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
-              {viewerHasVisited ? '行ったあなたへ: 次の人へのアドバイスを' : 'この蓋の最初のコメントを書こう'}
-            </p>
-            <p className="mb-3 mt-1 font-pixelJp text-[11.5px] leading-relaxed text-[#8b816f]">
-              見つけた場所・駐車場・行き方など。次に来る人の役に立ちます。
-            </p>
-            {threadComposer}
-          </div>
-        ) : (
-          threadComposer
-        )}
+        {/*
+          カードの有無で入力欄の置き場所（親要素）を変えない。変えると React が
+          textarea を作り直し、書いている途中の人のフォーカスが外れる。
+          外枠の div は常に置き、見た目と見出しだけを切り替える。
+        */}
+        <div
+          className={
+            isEmpty
+              ? 'rounded-[18px] border-[1.5px] border-[#efd9a3] bg-gradient-to-br from-[#fdf1e6] to-[#fffaf0] p-4 shadow-sm'
+              : ''
+          }
+        >
+          {isEmpty && (
+            <>
+              <p className="flex items-center gap-1.5 font-pixelJp text-[15px] font-black text-[#7d4536]">
+                <Sparkles className="h-4 w-4 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
+                {viewerHasVisited ? '行ったあなたへ: 次の人へのアドバイスを' : 'この蓋の最初のコメントを書こう'}
+              </p>
+              <p className="mb-3 mt-1 font-pixelJp text-[11.5px] leading-relaxed text-[#8b816f]">
+                見つけた場所・駐車場・行き方など。次に来る人の役に立ちます。
+              </p>
+            </>
+          )}
+          {threadComposer}
+        </div>
 
         {error && <p className="font-pixelJp text-xs text-[#bf5640]">{error}</p>}
 
