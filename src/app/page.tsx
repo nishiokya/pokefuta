@@ -22,6 +22,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { SITE_NAME } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { CompletionRollup } from '@/lib/prefecture-completion';
+import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 
 type FeedVisit = {
   id: string;
@@ -37,6 +38,7 @@ type FeedVisit = {
   likes_count: number;
   comments_count: number;
   manhole_comments_count?: number;
+  latest_manhole_comment?: LatestManholeComment | null;
   display_name?: string | null;
 };
 
@@ -122,7 +124,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at`,
+        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -397,6 +399,7 @@ export default function HomePage() {
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
+                    const latestComment = commentCount > 0 ? visit.latest_manhole_comment ?? null : null;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
                     const isFresh = isFreshlyShot(visit.shot_at);
@@ -408,6 +411,7 @@ export default function HomePage() {
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
                       commentCount > 0 ? `口コミ ${commentCount}件` : null,
+                      latestComment ? `最新の口コミ「${latestComment.content}」` : null,
                     ].filter(Boolean).join('、');
                     const cardContent = (
                       <>
@@ -430,6 +434,13 @@ export default function HomePage() {
                             新着投稿
                           </span>
                         )}
+                        {/* 口コミの有無は写真の上で一目でわかるようにする（下の帯に置くと文字に埋もれる） */}
+                        {commentCount > 0 && (
+                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-xs font-extrabold text-[#7B63A8] shadow-sm">
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            {commentCount}
+                          </span>
+                        )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
@@ -443,22 +454,46 @@ export default function HomePage() {
                               <span className="truncate">{posterLabel}</span>
                             </div>
                           )}
-                          {commentCount > 0 && (
-                            <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-white/85">
-                              <span className="inline-flex items-center gap-1">
-                                <MessageCircle className="h-4 w-4" />
-                                口コミ {commentCount}件
-                              </span>
-                            </div>
-                          )}
                         </div>
+
+                        {/*
+                          マウスを乗せると最新の口コミを写真の上に出す。タッチ端末ではタップが
+                          そのまま遷移になるので出さない（hover: hover の端末に限る）。
+                          読み上げはカードの aria-label に同じ内容を入れてある。
+                        */}
+                        {latestComment && (
+                          <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-[#2E2346]/90 p-4 text-white opacity-0 transition-opacity duration-200 [@media(hover:hover)]:group-hover:opacity-100 group-focus-visible:opacity-100 sm:p-5"
+                          >
+                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#FFB347]">
+                              <MessageCircle className="h-4 w-4" />
+                              最新の口コミ（全{commentCount}件）
+                            </div>
+                            <p className="mt-2 line-clamp-5 text-sm font-semibold leading-relaxed">
+                              「{latestComment.content}」
+                            </p>
+                            <div className="mt-2 text-xs font-semibold text-white/70">
+                              {formatDateJaJst(latestComment.created_at)}
+                            </div>
+                            {canNavigate && (
+                              <div className="mt-3 inline-flex items-center gap-0.5 text-xs font-extrabold text-[#FFB347]">
+                                蓋のページで読む
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     );
 
                     if (!canNavigate) {
                       return (
+                        // 素の div の aria-label は読み上げられない（generic 要素は名前を持てない）。
+                        // 口コミ件数はバッジの数字だけなので、group にしてラベルを効かせる。
                         <div
                           key={visit.id}
+                          role="group"
                           className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15"
                           aria-label={commonAriaLabel}
                         >
