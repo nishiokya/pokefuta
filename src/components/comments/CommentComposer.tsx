@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import SuggestionChips from './SuggestionChips';
 
 const MAX_LENGTH = 1000;
 
@@ -18,6 +19,8 @@ interface Props {
   /** 未ログインで導線を叩いた。ゲート撤去の効果を示す唯一の数字 */
   onLoginPromptClick: () => void;
   placeholder?: string;
+  /** 候補ボタンで文を足した。used_suggestion の集計は親が持つ */
+  onSuggestionPick?: () => void;
 }
 
 export default function CommentComposer({
@@ -30,6 +33,7 @@ export default function CommentComposer({
   onComposeStart,
   onLoginPromptClick,
   placeholder = 'この場所のことを書いてみる（駐車場、行き方、見つけたときのこと…）',
+  onSuggestionPick,
 }: Props) {
   // ログイン判定が返る前は、どちらの顔も出さない。
   // ここで未ログイン扱いにすると、ログイン済みの人に一瞬ログインCTAが出て、
@@ -94,6 +98,16 @@ export default function CommentComposer({
         // maxLength は付けない。上限で黙って切り捨てると、書いた本人に
         // 「なぜ途中で止まるのか」が見えない。カウンタで見せて送信側で弾く。
         className="w-full resize-y rounded-[12px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-xs leading-relaxed text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-1 focus:ring-[#bf5640]"
+      />
+      <SuggestionChips
+        value={value}
+        disabled={submitting}
+        onPick={(next) => {
+          // 候補から書き始めた場合も「書き始めた」に数える（キーストロークが無いので）
+          if (value.length === 0) onComposeStart();
+          onChange(next);
+          onSuggestionPick?.();
+        }}
       />
       <div className="flex items-center justify-between">
         <span

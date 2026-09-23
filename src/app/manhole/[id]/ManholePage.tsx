@@ -16,8 +16,8 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
+import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
-import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
   orderManholePhotosNewestFirst,
@@ -272,9 +272,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
-  // ひとことを保存した直後も「ありがとう」を出し続けるため、保存した訪問を覚えておく。
-  // これが無いと保存で条件（ひとこと未記入）が崩れ、フォームごと消えて礼が見えない。
-  const [tipSavedVisitId, setTipSavedVisitId] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -437,7 +434,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     const requestId = ++photoRequestIdRef.current;
     setPhotosLoading(true);
     setPhotoLoadError(false);
-    setTipSavedVisitId(null);
     try {
       const pageSize = 100;
       const loadedPhotos: Photo[] = [];
@@ -1000,37 +996,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     })
   );
 
-  // 行ったことがあるのに、ひとことをまだ書いていない人へのお願い。
-  // 何か書いてあれば（ゴミ判定に落ちる短さでも）本人は書いたつもりなので頼まない。
-  const tipVisitId =
-    tipSavedVisitId ??
-    (isLoggedIn && !myPhotos.some((photo) => photo.visit?.comment?.trim())
-      ? myPhotos[0]?.visit?.id ?? null
-      : null);
-  const tipComposer = tipVisitId
-    ? {
-        switchLabel: '写真とは別にコメントを書く',
-        node: (
-          <NextVisitorTipForm
-            key={tipVisitId}
-            visitId={tipVisitId}
-            manholeId={manhole.id}
-            surface="manhole_detail"
-            title="行ったあなたへ: 次の人へのアドバイスを"
-            description="あなたの写真のひとことになって、ここに並びます"
-            onSaved={(comment) => {
-              setTipSavedVisitId(tipVisitId);
-              setPhotos((prev) =>
-                prev.map((p) =>
-                  p.visit?.id === tipVisitId ? { ...p, visit: { ...p.visit, comment } } : p
-                )
-              );
-            }}
-          />
-        ),
-      }
-    : undefined;
-
   // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
   // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
   const promptCard = !photosLoading && !photoLoadError && photoState === 'none'
@@ -1068,6 +1033,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               図鑑と同じく、称号バッジのあとに統計バッジを続ける。
               抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
           {(titleBadges.length > 0 || statBadges.length > 0) && (
+            <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-1.5">
               {titleBadges.map((title, idx) => (
                 <span
@@ -1085,6 +1051,13 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   {badge.label}
                 </span>
               ))}
+            </div>
+            {/* 指摘できるのは称号タグだけ。統計バッジ（同じポケモンN枚 等）は集計値なので対象外 */}
+            <TitleReport
+              manholeId={manhole.id}
+              titles={titleBadges}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
+            />
             </div>
           )}
 
@@ -1371,7 +1344,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               isLoggedIn={authChecked ? currentUserId !== null : null}
               surface="manhole_detail"
               photoComments={photoCommentEntries}
-              composerAlternative={tipComposer}
+              viewerHasVisited={myPhotos.length > 0}
+              photosLoading={photosLoading}
             />
           )}
 

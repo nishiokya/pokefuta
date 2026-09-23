@@ -525,14 +525,26 @@ for (const helper of ['visitTipPromptView', 'visitTipSaved']) {
     `${helper} がどこからも呼ばれていない（ひとことの計測に穴が空く）`
   );
 }
-// 投稿画面・投稿完了画面・蓋の詳細の3か所すべてから saved が出ていること
-for (const surface of ['upload_form', 'upload_complete', 'manhole_detail']) {
+// 投稿画面・投稿完了画面の2か所から saved が出ていること
+// （蓋の詳細は掲示板の入力欄に一本化し、p_comment_posted で数える）
+for (const surface of ['upload_form', 'upload_complete']) {
   // JSX 属性（surface="upload_complete"）とオブジェクト（surface: 'upload_form'）の両方を拾う
   expect(
     callerCode.includes(`'${surface}'`) || callerCode.includes(`"${surface}"`),
     `ひとことの surface '${surface}' がどこからも送られていない`
   );
 }
+
+// 4e. タグの間違い指摘。受け皿（manhole_title_report）を読む運用の手前で、
+//     指摘がどれだけ来ているかを GA4 からも見られるようにしておく。
+expect(
+  analyticsCode.includes("trackEvent('p_title_report'"),
+  'p_title_report を送るヘルパーが gtag.ts に無い'
+);
+expect(
+  callerCode.includes('titleReport({'),
+  'titleReport がどこからも呼ばれていない（タグの間違い指摘の計測に穴が空く）'
+);
 
 // 5. 投稿導線のクリックが計測されている
 expect(

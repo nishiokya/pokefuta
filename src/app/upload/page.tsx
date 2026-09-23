@@ -14,7 +14,8 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
 import { pokefutaEvents, type SubmissionBlockReason, type SubmissionStage } from '@/lib/analytics/gtag';
-import NextVisitorTipForm, { VisitTipSuggestionChips } from '@/components/visit-tip/NextVisitorTipForm';
+import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
+import SuggestionChips from '@/components/comments/SuggestionChips';
 import { collectVisitComments } from '@/lib/visit-comment-quality';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { pageTitle } from '@/lib/constants';
@@ -1155,7 +1156,7 @@ function UploadPageInner() {
                   maxLength={VISIT_COMMENT_MAX_LENGTH}
                 />
                 <div className="mt-1.5">
-                  <VisitTipSuggestionChips
+                  <SuggestionChips
                     value={visitComment}
                     onPick={(next) => {
                       setVisitComment(next.slice(0, VISIT_COMMENT_MAX_LENGTH));

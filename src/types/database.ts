@@ -206,6 +206,34 @@ export interface Database {
         };
         Relationships: [];
       };
+      // 蓋のタグ（manhole.titles）の間違い指摘。SELECT できるのは service_role のみ
+      manhole_title_report: {
+        Row: {
+          id: string;
+          manhole_id: number;
+          title_key: string;
+          title_label: string | null;
+          reporter_user_id: string | null;
+          reason: string | null;
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          manhole_id: number;
+          title_key: string;
+          title_label?: string | null;
+          reporter_user_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+          resolved_at?: string | null;
+        };
+        Update: {
+          reason?: string | null;
+          resolved_at?: string | null;
+        };
+        Relationships: [];
+      };
       visit: {
         Row: {
           id: string;

@@ -293,6 +293,8 @@ export interface CommentThreadViewParams extends CommentEventParams {
 export interface CommentPostedParams extends CommentEventParams {
   /** 返信か。Phase 1b では常に false（返信UIは通知と同時に出す）。 */
   is_reply: boolean;
+  /** 候補ボタンを1つでも使ったか（p_visit_tip_saved と同じカスタムディメンション） */
+  used_suggestion: boolean;
 }
 
 export interface CommentFailedParams extends CommentEventParams {
@@ -344,12 +346,15 @@ export const COMMENT_EVENTS = [
  *   （surface / manhole_id は登録済み）
  */
 export const VISIT_TIP_EVENTS = [
-  'p_visit_tip_prompt_view', // 1. 後から書く導線が表示された（投稿完了画面・蓋の詳細）
+  'p_visit_tip_prompt_view', // 1. 後から書く導線が表示された（投稿完了画面）
   'p_visit_tip_saved',       // 2. ひとことを保存した（キーイベント）
 ] as const;
 
-/** ひとことの書き込み口。投稿画面 / 投稿完了画面 / 蓋の詳細 */
-export type VisitTipSurface = 'upload_form' | 'upload_complete' | 'manhole_detail';
+/**
+ * ひとことの書き込み口。投稿画面 / 投稿完了画面。
+ * 蓋の詳細は入力欄を掲示板に一本化したので、そちらは p_comment_posted で数える。
+ */
+export type VisitTipSurface = 'upload_form' | 'upload_complete';
 
 export interface VisitTipEventParams extends GAEventParams {
   /** 発生箇所。GA4 予約語の source は使わない。 */
@@ -360,6 +365,14 @@ export interface VisitTipEventParams extends GAEventParams {
 export interface VisitTipSavedParams extends VisitTipEventParams {
   /** 候補ボタンを1つでも使ったか。候補が書き出しの壁を下げているかを見る */
   used_suggestion: boolean;
+}
+
+export interface TitleReportParams extends GAEventParams {
+  /** 発生箇所。GA4 予約語の source は使わない。 */
+  surface: string;
+  manhole_id: number;
+  /** 指摘されたタグ（manhole.titles[].key）。どのタグの生成規則が外れやすいかを見る */
+  title_key: string;
 }
 
 export interface ApiErrorEventParams extends GAEventParams {
@@ -637,6 +650,9 @@ export const pokefutaEvents = {
   // 次に来る人へひとこと（VISIT_TIP_EVENTS）
   visitTipPromptView:  (p: VisitTipEventParams)  => trackEvent('p_visit_tip_prompt_view', p),
   visitTipSaved:       (p: VisitTipSavedParams)  => trackEvent('p_visit_tip_saved', p),
+
+  // タグ（称号）の間違い指摘
+  titleReport:         (p: TitleReportParams)    => trackEvent('p_title_report', p),
 };
 
 // ==========================================

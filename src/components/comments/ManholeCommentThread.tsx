@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Camera, MessageCircle } from 'lucide-react';
+import { Camera, MessageCircle, Sparkles } from 'lucide-react';
 import { commentThreadState, pokefutaEvents } from '@/lib/analytics/gtag';
 import CommentComposer from './CommentComposer';
 import CommentItem, { type PublicComment } from './CommentItem';
@@ -50,11 +50,15 @@ interface Props {
   /** 写真のひとこと。掲示板コメントと混ぜて新しい順に並べる */
   photoComments?: PhotoCommentEntry[];
   /**
-   * 掲示板の入力欄の代わりに先に見せる入力。蓋に行ったことがあるのに
-   * ひとことを書いていない人へ「次の人へのアドバイス」を頼むのに使う。
-   * 入力欄が2つ並ぶと迷うので、掲示板の入力欄は switchLabel のボタンで切り替えて出す。
+   * 閲覧者がこの蓋に行った記録を持っているか。コメントが0件のときのカードの
+   * 呼びかけを「行ったあなたへ」に変える。入力欄そのものは誰でも同じ1つ。
    */
-  composerAlternative?: { node: ReactNode; switchLabel: string };
+  viewerHasVisited?: boolean;
+  /**
+   * 写真（＝写真のひとこと・行った記録）をまだ読み込み中か。写真は掲示板より遅れて届くので、
+   * この間に「0件」と判定すると、ひとことがある蓋でも最初のコメントのカードが一瞬出る。
+   */
+  photosLoading?: boolean;
 }
 
 /**
@@ -70,9 +74,9 @@ export default function ManholeCommentThread({
   isLoggedIn,
   surface = 'manhole_detail',
   photoComments = [],
-  composerAlternative,
+  viewerHasVisited = false,
+  photosLoading = false,
 }: Props) {
-  const [showThreadComposer, setShowThreadComposer] = useState(false);
   const [comments, setComments] = useState<PublicComment[]>([]);
   const [total, setTotal] = useState(0);
   // 続きの有無はサーバに直接答えてもらう。保持件数と total の差から導かない。
@@ -88,6 +92,8 @@ export default function ManholeCommentThread({
   // 1スレッドにつき1回だけ送るもの。件数の水増しを防ぐ。
   const threadViewSentRef = useRef(false);
   const composeStartSentRef = useRef(false);
+  // 今の下書きで候補ボタンを使ったか。投稿で戻す
+  const usedSuggestionRef = useRef(false);
 
   // 取得の世代。古い世代の応答は state に反映しない。
   //
@@ -167,6 +173,8 @@ export default function ManholeCommentThread({
 
   useEffect(() => {
     threadViewSentRef.current = false;
+    // 別の蓋で押した候補の印を持ち越さない（used_suggestion が汚れる）
+    usedSuggestionRef.current = false;
     composeStartSentRef.current = false;
     setReportedIds(new Set());
     setDraft('');
@@ -243,7 +251,13 @@ export default function ManholeCommentThread({
         setTotal((prev) => prev + 1);
         setDraft('');
         composeStartSentRef.current = false;
-        pokefutaEvents.commentPosted({ surface, thread_state: threadState, is_reply: false });
+        pokefutaEvents.commentPosted({
+          surface,
+          thread_state: threadState,
+          is_reply: false,
+          used_suggestion: usedSuggestionRef.current,
+        });
+        usedSuggestionRef.current = false;
         return;
       }
 
@@ -342,7 +356,11 @@ export default function ManholeCommentThread({
   const threadComposer = (
     <CommentComposer
       value={draft}
-      onChange={setDraft}
+      onChange={(next) => {
+        // 候補を入れたあと全部消して書き直した場合は、候補を使ったことにしない
+        if (!next.trim()) usedSuggestionRef.current = false;
+        setDraft(next);
+      }}
       onSubmit={handleSubmit}
       submitting={submitting}
       isLoggedIn={isLoggedIn}
@@ -355,8 +373,16 @@ export default function ManholeCommentThread({
       onLoginPromptClick={() => {
         pokefutaEvents.commentLoginPrompt({ surface, thread_state: threadState });
       }}
+      onSuggestionPick={() => {
+        usedSuggestionRef.current = true;
+      }}
     />
   );
+
+  // コメントが1件も無い蓋（掲示板も写真のひとことも0件）では、入力欄を目立つカードに
+  // 入れて最初の1件を頼む。以前は「まだコメントはありません…」の1行だけで、
+  // 482枚のほとんどがこの状態だった。
+  const isEmpty = !loading && !photosLoading && timeline.length === 0;
 
   return (
     <div>
@@ -375,30 +401,35 @@ export default function ManholeCommentThread({
         {/*
           入力欄は一覧の上。新しい順に並べるので、書いたものが入力欄のすぐ下に出る。
         */}
-        {composerAlternative && !showThreadComposer ? (
-          <>
-            {composerAlternative.node}
-            <button
-              type="button"
-              onClick={() => setShowThreadComposer(true)}
-              className="self-start font-pixelJp text-[11px] text-[#6f6657] underline decoration-[#e9dfc7] underline-offset-2"
-            >
-              {composerAlternative.switchLabel}
-            </button>
-          </>
-        ) : (
-          threadComposer
-        )}
+        {/*
+          カードの有無で入力欄の置き場所（親要素）を変えない。変えると React が
+          textarea を作り直し、書いている途中の人のフォーカスが外れる。
+          外枠の div は常に置き、見た目と見出しだけを切り替える。
+        */}
+        <div
+          className={
+            isEmpty
+              ? 'rounded-[18px] border-[1.5px] border-[#efd9a3] bg-gradient-to-br from-[#fdf1e6] to-[#fffaf0] p-4 shadow-sm'
+              : ''
+          }
+        >
+          {isEmpty && (
+            <>
+              <p className="flex items-center gap-1.5 font-pixelJp text-[15px] font-black text-[#7d4536]">
+                <Sparkles className="h-4 w-4 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
+                {viewerHasVisited ? '行ったあなたへ: 次の人へのアドバイスを' : 'この蓋の最初のコメントを書こう'}
+              </p>
+              <p className="mb-3 mt-1 font-pixelJp text-[11.5px] leading-relaxed text-[#8b816f]">
+                見つけた場所・駐車場・行き方など。次に来る人の役に立ちます。
+              </p>
+            </>
+          )}
+          {threadComposer}
+        </div>
 
         {error && <p className="font-pixelJp text-xs text-[#bf5640]">{error}</p>}
 
         {loading && <p className="font-pixelJp text-xs text-[#9b917e]">読み込み中…</p>}
-
-        {!loading && timeline.length === 0 && (
-          <p className="font-pixelJp text-xs leading-relaxed text-[#9b917e]">
-            まだコメントはありません。最初のひとことを書いてみませんか。
-          </p>
-        )}
 
         {timeline.map((item) =>
           item.kind === 'thread' ? (
