@@ -25,6 +25,28 @@ export type MappableManhole = {
   address?: string | null;
   description?: string | null;
   pokemons?: string[] | null;
+  photo_count?: number | null;
+};
+
+/**
+ * マーカーの色分けと、吹き出しのバッジが表す状態。
+ *
+ * 既定は訪問状況。ページによって地図で見たい軸が違うので、そこだけ差し替えられる
+ * ようにしてある（都道府県ページは「現地写真があるか」で塗る）。色は変えない:
+ * 同じ赤が画面ごとに別の意味になると、地図を跨いだときに読み違える。
+ * **どちらの意味で塗っているかはバッジの文言が担う**ので、`on` / `off` は必ず
+ * その地図の軸に合わせること。
+ */
+export type MarkerStatus = {
+  of: (manhole: MappableManhole) => boolean;
+  on: string;
+  off: string;
+};
+
+const DEFAULT_MARKER_STATUS: MarkerStatus = {
+  of: (manhole) => Boolean(manhole.is_visited),
+  on: '✓ 訪問済み',
+  off: '? 未訪問',
 };
 
 interface MapComponentProps {
@@ -34,6 +56,7 @@ interface MapComponentProps {
   userLocation?: { lat: number; lng: number } | null;
   zoom?: number;
   minHeight?: number | string;
+  markerStatus?: MarkerStatus;
 }
 
 export default function MapComponent({
@@ -43,15 +66,21 @@ export default function MapComponent({
   userLocation,
   zoom,
   minHeight = 400,
+  markerStatus = DEFAULT_MARKER_STATUS,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const onManholeClickRef = useRef(onManholeClick);
+  const markerStatusRef = useRef(markerStatus);
 
   useEffect(() => {
     onManholeClickRef.current = onManholeClick;
   }, [onManholeClick]);
+
+  useEffect(() => {
+    markerStatusRef.current = markerStatus;
+  }, [markerStatus]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -138,7 +167,8 @@ export default function MapComponent({
       }
       if (manhole.latitude != null && manhole.longitude != null) {
         try {
-          const isVisited = manhole.is_visited;
+          const status = markerStatusRef.current;
+          const isVisited = status.of(manhole);
 
           // Create custom icon based on visit status
           const markerIcon = L.divIcon({
@@ -200,7 +230,7 @@ export default function MapComponent({
               ${pokemonInfo}
               <div class="flex items-center justify-between pt-3 border-t">
                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isVisited ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
-                  ${isVisited ? '✓ 訪問済み' : '? 未訪問'}
+                  ${isVisited ? status.on : status.off}
                 </span>
                 <button
                   onclick="window.location.href='/manhole/${manhole.id}'"

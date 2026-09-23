@@ -65,8 +65,6 @@ export default function HomePage() {
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
-  const [totalManholes, setTotalManholes] = useState<number | null>(null);
-  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
@@ -137,8 +135,6 @@ export default function HomePage() {
       // 写真館で見えるのは公開訪問の写真だけ。全写真数 posts を出すと、
       // 非公開にした写真まで「集まっています」に含まれて表示と食い違う。
       setTotalPosts(typeof data.public_posts === 'number' ? data.public_posts : null);
-      setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
-      setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
@@ -182,11 +178,6 @@ export default function HomePage() {
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
 
-  const unmetPhotoCount =
-    manholesWithPhotos != null && totalManholes != null
-      ? totalManholes - manholesWithPhotos
-      : null;
-
   // PC の右レール（未ログイン向けの「写真ゼロを埋めよう」募集カード）は外した。
   // 登録導線はヒーロー内のボタンが担っており重複していた上に、レールが出ると
   // 本文カラムが 1064px → 618px まで縮み、見出しが折り返す原因になっていた。
@@ -219,7 +210,7 @@ export default function HomePage() {
               親の max-w-3xl（672px）には収まるのに自分の上限だけで折り返っていた。
               行長は親の max-w-3xl で決める。
             */}
-            <h1 className="whitespace-nowrap text-[clamp(1.05rem,5.15vw,1.875rem)] font-extrabold leading-tight tracking-[-0.03em] sm:text-5xl sm:tracking-normal">
+            <h1 className="whitespace-nowrap text-[clamp(0.95rem,5.15vw,1.875rem)] font-extrabold leading-tight tracking-[-0.03em] md:text-5xl md:tracking-normal">
               全国のポケふたを写真で埋めよう
             </h1>
             <p className="mt-2 text-sm font-medium leading-relaxed sm:mt-4 sm:text-lg">
@@ -247,14 +238,9 @@ export default function HomePage() {
                     から県版へ差し替えると、長さの違う文がヒーローの中で
                     書き換わって行が送られる。
                   */}
-                  {completionLoaded &&
-                    (completion && completion.incompleteCount > 0 ? (
-                      <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
-                    ) : (
-                      unmetPhotoCount != null && unmetPhotoCount > 0 && (
-                        <>写真がまだ無いポケふたは残り <span className="whitespace-nowrap"><b className="text-[#B5483C]">{unmetPhotoCount}</b> 枚。</span></>
-                      )
-                    ))}
+                  {completionLoaded && completion && completion.incompleteCount > 0 && (
+                    <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
+                  )}
                 </>
               ) : (
                 <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
