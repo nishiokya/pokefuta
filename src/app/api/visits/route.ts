@@ -160,6 +160,10 @@ export async function GET(request: NextRequest) {
     // join で落とせば、limit の意味が「写真つきをN件」になる。
     const photoEmbed = withPhotos === 'true' ? 'photos:photo!inner' : 'photos:photo';
 
+    // 蓋の表示名は図鑑のスナップショットの name を正本にする（Supabase の manhole には無い）。
+    // Supabase の問い合わせと並行して取りに行く（上限つき。時間切れなら title に落ちる）
+    const snapshotNamesPromise = fetchSnapshotNames();
+
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
@@ -361,8 +365,7 @@ export async function GET(request: NextRequest) {
       bookmarksSet.add(bookmark.visit_id);
     });
 
-    // 蓋の表示名は図鑑のスナップショットの name を正本にする（Supabase の manhole には無い）
-    const snapshotNames = await fetchSnapshotNames();
+    const snapshotNames = await snapshotNamesPromise;
 
     // Post-process data
     const processedVisits = (visits || []).map(visit => {

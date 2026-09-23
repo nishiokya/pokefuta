@@ -337,9 +337,9 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                       key={visit.id}
                       manholeId={visit.manhole_id ?? manhole?.id ?? 0}
                       thumbnailUrl={photo?.thumbnail_url || photo?.url}
-                      // 県ページなので県名は省く（12枚すべてに「宮崎県」が付くと読めない）。
-                      // 市区町村が無い蓋は県名に落とす。空文字のまま繋ぐと
-                      // 「のポケふた」だけの見出しになる。
+                      // 見出しは詳細ページの h1 と同じ正本の名前（図鑑のスナップショットの name）。
+                      // 施設名の無い蓋は「宮崎県/延岡市」と県名から始まるが、県ページでも
+                      // 名前はどの画面でも同じにする方針なので、ここで県名を削らない。
                       title={manhole ? manholeHeadingPlace(manhole) : 'ポケふた'}
                       date={formatDateJa(visit.shot_at)}
                       posterName={visit.display_name || undefined}

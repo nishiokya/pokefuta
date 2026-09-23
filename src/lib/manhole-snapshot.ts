@@ -16,6 +16,9 @@ const FALLBACK_BASE =
 
 const REVALIDATE_SECONDS = 3600;
 
+/** fetchSnapshotNames() の待ち時間の上限。キャッシュが効いていれば即座に返る。 */
+const SNAPSHOT_NAMES_TIMEOUT_MS = 1500;
+
 export interface SnapshotManhole {
   id: number;
   title: string;
@@ -118,9 +121,24 @@ export async function fetchSnapshotManhole(id: number): Promise<SnapshotManhole 
  * （「斑鳩町 興留7」「町田市（フシギダネ）」）などが図鑑とずれるため。
  * スナップショットが取れないときは空の Map を返す（表示側は title に落ちる）。
  */
-export async function fetchSnapshotNames(): Promise<Map<number, string>> {
-  const snapshot = await fetchManholeSnapshot();
-  return new Map((snapshot?.manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
+export async function fetchSnapshotNames(
+  timeoutMs = SNAPSHOT_NAMES_TIMEOUT_MS
+): Promise<Map<number, string>> {
+  // 名前は見た目だけの情報なので、data.pokefuta.com が遅い・落ちているときに
+  // 訪問・口コミの API ごと待たせない。時間切れなら空の Map（表示は title に落ちる）
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  try {
+    const snapshot = await Promise.race([fetchManholeSnapshot(), timeout]);
+    if (!snapshot) {
+      console.warn(`Snapshot names unavailable within ${timeoutMs}ms; falling back to title`);
+    }
+    return new Map((snapshot?.manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** 蓋オブジェクトにスナップショットの `name` を足す。id が無い・見つからないときはそのまま。 */
