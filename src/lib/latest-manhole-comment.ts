@@ -13,41 +13,39 @@ export type LatestManholeComment = {
 /** カードに収まる長さで切る。全文は蓋ページで読める。 */
 export const LATEST_COMMENT_PREVIEW_CHARS = 80;
 
+/**
+ * 1つの蓋について何件さかのぼって読むか。
+ * 最新が空白だけの投稿だったときに、次の1件へ落とすための余裕。
+ */
+export const LATEST_COMMENT_LOOKBACK = 3;
+
+/**
+ * 最新の口コミを引く蓋の数の上限。蓋1つにつき1問い合わせになるので、
+ * トップの1ページ（24件）に収まる数で打ち切る。
+ */
+export const LATEST_COMMENT_MAX_MANHOLES = 24;
+
 type CommentRow = {
-  manhole_id: number | null;
   content: string | null;
   created_at: string | null;
 };
 
 /**
- * 蓋ごとの口コミ件数と、いちばん新しい1件（抜粋）を求める。
- * 空白だけの本文は件数には数えるが、抜粋には選ばない。
+ * 新しい順に並んだ1つの蓋の口コミから、抜粋を1件作る。空白だけの本文は飛ばす。
+ *
+ * 蓋をまたいで1回で取って JS 側で「最新」を選ぶ形にはしないこと。
+ * PostgREST の max_rows（1000）で黙って切られ、古い部分集合から選んでしまう。
  */
-export function summarizeManholeComments(rows: CommentRow[]): {
-  counts: Map<number, number>;
-  latest: Map<number, LatestManholeComment>;
-} {
-  const counts = new Map<number, number>();
-  const latest = new Map<number, LatestManholeComment>();
-
-  for (const row of rows) {
-    const manholeId = row.manhole_id;
-    if (typeof manholeId !== 'number') continue;
-    counts.set(manholeId, (counts.get(manholeId) || 0) + 1);
-
+export function toLatestCommentPreview(rowsNewestFirst: CommentRow[]): LatestManholeComment | null {
+  for (const row of rowsNewestFirst) {
     const content = (row.content ?? '').replace(/\s+/g, ' ').trim();
     if (!content || !row.created_at) continue;
-    const createdAt = Date.parse(row.created_at);
-    if (Number.isNaN(createdAt)) continue;
-    const current = latest.get(manholeId);
-    if (current && Date.parse(current.created_at) >= createdAt) continue;
-    latest.set(manholeId, {
+    return {
       content: truncate(content, LATEST_COMMENT_PREVIEW_CHARS),
       created_at: row.created_at,
-    });
+    };
   }
-
-  return { counts, latest };
+  return null;
 }
 
 function truncate(text: string, max: number): string {

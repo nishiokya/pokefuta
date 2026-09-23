@@ -3,7 +3,12 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
-import { summarizeManholeComments } from '@/lib/latest-manhole-comment';
+import {
+  LATEST_COMMENT_LOOKBACK,
+  LATEST_COMMENT_MAX_MANHOLES,
+  toLatestCommentPreview,
+  type LatestManholeComment,
+} from '@/lib/latest-manhole-comment';
 
 /**
  * @swagger
@@ -122,6 +127,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     const orderByRaw = searchParams.get('order_by');
     const includeManholeTags = searchParams.get('include_manhole_tags') === 'true';
+    // 蓋1つにつき1問い合わせ増えるので、トップのフィードだけが明示して求める
+    const withLatestComment = searchParams.get('with_latest_comment') === 'true';
     const manholeTagFields = includeManholeTags
       ? `,
             titles,
@@ -255,7 +262,8 @@ export async function GET(request: NextRequest) {
     const [
       { data: likes },
       { data: commentCounts },
-      { data: manholeCommentCounts },
+      { data: manholeCommentStats },
+      latestManholeCommentEntries,
       { data: bookmarks },
       displayNameMap,
       publicUserIdsResult,
@@ -268,13 +276,35 @@ export async function GET(request: NextRequest) {
         .from('visit_comment')
         .select('visit_id')
         .in('visit_id', visitIds),
+      // 件数は集計ビューから取る。行を全部持ってきて数えると、蓋の口コミが
+      // 合計で max_rows（1000）を超えたところで黙って切られて少なく出る。
+      // ビューは型定義に無いので any で通す。
       manholeIds.length > 0
-        ? supabase
-          .from('manhole_comment')
-          .select('manhole_id, content, created_at')
+        ? (supabase as any)
+          .from('manhole_comment_stats')
+          .select('manhole_id, comment_count')
           .in('manhole_id', manholeIds)
-          .is('parent_comment_id', null)
         : Promise.resolve({ data: [] as any[] }),
+      withLatestComment
+        ? Promise.all(
+          manholeIds.slice(0, LATEST_COMMENT_MAX_MANHOLES).map(async (manholeId) => {
+            const { data, error } = await supabase
+              .from('manhole_comment')
+              .select('content, created_at')
+              .eq('manhole_id', manholeId)
+              .is('parent_comment_id', null)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false })
+              .limit(LATEST_COMMENT_LOOKBACK);
+            if (error) {
+              // 抜粋は飾り。取れなくても一覧は返す
+              console.warn('Failed to load latest manhole comment:', manholeId, error);
+              return [manholeId, null] as const;
+            }
+            return [manholeId, toLatestCommentPreview(data || [])] as const;
+          })
+        )
+        : Promise.resolve([] as Array<readonly [number, LatestManholeComment | null]>),
       viewerUserId
         ? supabase
           .from('visit_bookmark')
@@ -299,10 +329,12 @@ export async function GET(request: NextRequest) {
     // 各訪問記録のいいね数・コメント数・状態を集計
     const likesMap = new Map<string, { count: number; isLiked: boolean }>();
     const commentsMap = new Map<string, number>();
-    const {
-      counts: manholeCommentsMap,
-      latest: latestManholeCommentMap,
-    } = summarizeManholeComments(manholeCommentCounts || []);
+    const manholeCommentsMap = new Map<number, number>();
+    ((manholeCommentStats as any[]) || []).forEach((row: any) => {
+      if (typeof row?.manhole_id !== 'number') return;
+      manholeCommentsMap.set(row.manhole_id, Number(row.comment_count) || 0);
+    });
+    const latestManholeCommentMap = new Map(latestManholeCommentEntries);
     const bookmarksSet = new Set<string>();
 
     visitIds.forEach(id => {
