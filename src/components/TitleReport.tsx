@@ -8,7 +8,8 @@ import type { ManholeTitle } from '@/types/database';
 
 /** 提案の選択肢を表す番兵。タグの key と衝突しないよう記号で始める */
 const SUGGEST = '@suggest';
-const SUGGESTED_LABEL_MAX = 50;
+/** 提案名の上限。API と DB（title_label は100文字まで）に合わせる */
+const SUGGESTED_LABEL_MAX = 100;
 
 interface Props {
   manholeId: number;

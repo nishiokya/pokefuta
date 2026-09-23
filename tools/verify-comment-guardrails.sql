@@ -3,7 +3,6 @@
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 -- マイグレーション: supabase/migrations/20260811150000_manhole_comment_guardrails.sql
 --               supabase/migrations/20260923150000_manhole_title_report.sql（[11]）
---               supabase/migrations/20260923170000_manhole_title_report_suggest.sql（[11] 提案）
 --
 -- なぜ SQL で書くか: Supabase は anon/authenticated キーで PostgREST を直接叩ける設計なので、
 -- **アプリの API 層はセキュリティ境界ではない**。境界は GRANT・RLS・制約・トリガだけ。
@@ -411,39 +410,17 @@ BEGIN
     NULL;
   END;
 
-  -- 足りないタグの提案（kind = 'suggest'、20260923170000）
-  INSERT INTO public.manhole_title_report (manhole_id, kind, suggested_label, reporter_user_id)
-  VALUES (target_manhole, 'suggest', '温泉のポケふた', commenter);
+  -- 足りないタグの提案は title_key = '@suggest:<提案名>' で同じ表に入る（列は増やさない）。
+  -- 名前が違えば何件でも入り、同じ名前の連打は一意索引で1件になること。
+  INSERT INTO public.manhole_title_report (manhole_id, title_key, title_label, reporter_user_id)
+  VALUES (target_manhole, '@suggest:温泉のポケふた', '温泉のポケふた', commenter),
+         (target_manhole, '@suggest:足湯のポケふた', '足湯のポケふた', commenter);
 
   BEGIN
-    INSERT INTO public.manhole_title_report (manhole_id, kind, suggested_label, reporter_user_id)
-    VALUES (target_manhole, 'suggest', ' 温泉のポケふた ', commenter);
-    RAISE EXCEPTION '[11] 同じ名前の提案が2件入ってしまった（空白違いを同一視していない）';
+    INSERT INTO public.manhole_title_report (manhole_id, title_key, title_label, reporter_user_id)
+    VALUES (target_manhole, '@suggest:温泉のポケふた', '温泉のポケふた', commenter);
+    RAISE EXCEPTION '[11] 同じ名前の提案が2件入ってしまった';
   EXCEPTION WHEN unique_violation THEN
-    NULL;
-  END;
-
-  BEGIN
-    INSERT INTO public.manhole_title_report (manhole_id, kind, reporter_user_id)
-    VALUES (target_manhole, 'suggest', commenter);
-    RAISE EXCEPTION '[11] 名前の無い提案が入ってしまった';
-  EXCEPTION WHEN check_violation THEN
-    NULL;
-  END;
-
-  BEGIN
-    INSERT INTO public.manhole_title_report (manhole_id, kind, reporter_user_id)
-    VALUES (target_manhole, 'wrong', commenter);
-    RAISE EXCEPTION '[11] 対象タグの無い間違い指摘が入ってしまった';
-  EXCEPTION WHEN check_violation THEN
-    NULL;
-  END;
-
-  BEGIN
-    INSERT INTO public.manhole_title_report (manhole_id, kind, suggested_label, reporter_user_id)
-    VALUES (target_manhole, 'suggest', repeat('あ', 51), commenter);
-    RAISE EXCEPTION '[11] 51文字の提案が入ってしまった';
-  EXCEPTION WHEN check_violation THEN
     NULL;
   END;
 

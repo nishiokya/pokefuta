@@ -3,6 +3,11 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import type { ManholeTitle } from '@/types/database';
 
+/** 提案の行の title_key の接頭辞。運営は `title_key LIKE '@suggest:%'` で提案だけを拾える */
+const SUGGEST_KEY_PREFIX = '@suggest:';
+/** 提案名の上限。title_label の CHECK（100文字）に合わせる */
+const SUGGESTED_LABEL_MAX = 100;
+
 /**
  * @swagger
  * /api/manholes/{manholeId}/title-reports:
@@ -12,6 +17,7 @@ import type { ManholeTitle } from '@/types/database';
  *     description: >
  *       タグは図鑑側で自動生成したもので、ここでは直さない。指摘を貯めて運営が図鑑側で直す。
  *       同じ人が同じタグを再指摘・同じ名前を再提案しても 200（件数は増えない）。
+ *       提案は何件でも出せる（名前が違えば別の行になる）。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -36,7 +42,7 @@ import type { ManholeTitle } from '@/types/database';
  *                 description: kind=wrong のとき必須。manhole.titles[].key
  *               suggested_label:
  *                 type: string
- *                 maxLength: 50
+ *                 maxLength: 100
  *                 description: kind=suggest のとき必須。提案するタグの名前
  *               reason:
  *                 type: string
@@ -91,8 +97,8 @@ export async function POST(
       if (!suggestedLabel) {
         return NextResponse.json({ success: false, error: 'suggested_label is required' }, { status: 400 });
       }
-      // DB の CHECK（char_length <= 50）と同じ単位で数える
-      if (Array.from(suggestedLabel).length > 50) {
+      // title_label の CHECK（char_length <= 100）と同じ単位で数える
+      if (Array.from(suggestedLabel).length > SUGGESTED_LABEL_MAX) {
         return NextResponse.json({ success: false, error: 'suggested_label is too long' }, { status: 400 });
       }
     }
@@ -123,15 +129,23 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Unknown title for this manhole' }, { status: 400 });
     }
 
+    // 提案はテーブルを変えずに既存の列へ入れる（マイグレーションを増やさない）:
+    //   title_key   = '@suggest:' + 提案名 … 一意索引 (manhole_id, title_key, 人) の単位が
+    //                 「提案名ごと」になるので、違う名前なら何件でも出せ、同じ名前の連打は1件になる
+    //   title_label = 提案名
+    // 既存タグの key は英数字なので '@' で始まるものと衝突しない。
+    const reportKey =
+      kind === 'suggest'
+        ? `${SUGGEST_KEY_PREFIX}${Array.from(suggestedLabel).slice(0, 100 - SUGGEST_KEY_PREFIX.length).join('')}`
+        : titleKey;
+
     // **`.select()` を付けないこと。** SELECT ポリシーが無いので RETURNING は 42501 で落ちる。
     const { error: insertError } = await supabase
       .from('manhole_title_report')
       .insert({
         manhole_id: manholeId,
-        kind,
-        title_key: kind === 'wrong' ? titleKey : null,
-        title_label: title?.label ?? null,
-        suggested_label: kind === 'suggest' ? suggestedLabel : null,
+        title_key: reportKey,
+        title_label: kind === 'suggest' ? suggestedLabel : title?.label ?? null,
         reporter_user_id: session.user.id,
         reason,
       });
