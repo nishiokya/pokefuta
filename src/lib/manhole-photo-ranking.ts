@@ -97,6 +97,25 @@ export const orderManholePhotosChronologically = <T extends RankableManholePhoto
     .sort((a, b) => a.time - b.time || a.index - b.index)
     .map(({ photo, index }) => ({ photo, index }));
 
+/**
+ * 撮影日の新しい順。蓋の詳細ページの「すべての写真」の並び。
+ * 見に来た人が知りたいのは「今どうなっているか」なので、最近の1枚を左上に置く。
+ *
+ * 日付の判定は古い順と同じ `photoChronologyTime()`。日付が読めない写真は
+ * 新しい順でも末尾に寄せる（MAX_SAFE_INTEGER をそのまま降順にすると先頭に来てしまう）。
+ * 元の添字の持ち回りと同時刻の安定化も古い順と同じ。
+ */
+export const orderManholePhotosNewestFirst = <T extends RankableManholePhoto>(photos: T[]) =>
+  photos
+    .map((photo, index) => ({ photo, index, time: photoChronologyTime(photo) }))
+    .sort((a, b) => {
+      const aUndated = a.time === Number.MAX_SAFE_INTEGER;
+      const bUndated = b.time === Number.MAX_SAFE_INTEGER;
+      if (aUndated !== bUndated) return aUndated ? 1 : -1;
+      return b.time - a.time || a.index - b.index;
+    })
+    .map(({ photo, index }) => ({ photo, index }));
+
 export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(
   photos: T[],
   currentUserId: string | null

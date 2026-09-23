@@ -19,7 +19,7 @@ import PCShell from '@/components/PCShell';
 import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
-  orderManholePhotosChronologically,
+  orderManholePhotosNewestFirst,
   orderManholePhotosForViewer,
   photoChronologyDate,
 } from '@/lib/manhole-photo-ranking';
@@ -90,14 +90,6 @@ const getPhotoCaption = (photo: Photo) =>
   isMeaningfulVisitComment(photo.visit?.comment)
     ? normalizeVisitComment(photo.visit?.comment).replace(/\s*\n\s*/g, ' ')
     : null;
-
-/** 「すべての写真」を畳んでいる間、1行（SP 3列 / sm 4列 / lg 5列）に入らないセルを隠す */
-const collapsedGridCellClass = (position: number) =>
-  position >= 5 ? 'hidden' : position === 4 ? 'hidden lg:block' : position === 3 ? 'hidden sm:block' : '';
-
-/** 1行に全部収まるブレークポイントでは「すべて見る」を出さない */
-const collapsedGridButtonClass = (count: number) =>
-  count > 5 ? '' : count === 5 ? 'lg:hidden' : 'sm:hidden';
 
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
   [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -280,7 +272,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
   const [showAllVisitComments, setShowAllVisitComments] = useState(false);
-  const [showAllPhotosGrid, setShowAllPhotosGrid] = useState(false);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -444,7 +435,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     setPhotosLoading(true);
     setPhotoLoadError(false);
     setShowAllVisitComments(false);
-    setShowAllPhotosGrid(false);
     try {
       const pageSize = 100;
       const loadedPhotos: Photo[] = [];
@@ -632,10 +622,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const photoContributorCount = new Set(
     allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
   ).size;
-  // 「すべての写真」は撮影日の古い順＝その蓋が撮られてきた記録として左上から読ませる。
-  // ヒーロー側の代表写真（allDisplayPhotos[0]）は「今の顔」なので並びは触らない。
+  // 「すべての写真」は撮影日の新しい順。見に来た人が知りたいのは今の姿なので、
+  // 最近の1枚を左上に置く（以前は古い順で、最新の写真が一番下に埋もれていた）。
+  // ヒーロー側の代表写真（allDisplayPhotos[0]）はひとこと付きを優先するので並びは触らない。
   // 拡大表示は allDisplayPhotos の添字で動くので、並べ替えても元の添字を持ち回る。
-  const chronologicalPhotos = orderManholePhotosChronologically(allDisplayPhotos);
+  const newestFirstPhotos = orderManholePhotosNewestFirst(allDisplayPhotos);
   const municipality = manhole.city || manhole.municipality || '場所未設定';
   const prefectureDexHref = prefectureDexUrl(manhole.prefecture);
   const manholeDexHref = manholeDexUrl(manhole.id);
@@ -875,16 +866,14 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
           すべての写真
-          <span className="ml-1.5 font-normal text-[10.5px] text-[#9b917e]">古い順</span>
+          <span className="ml-1.5 font-normal text-[10.5px] text-[#9b917e]">新しい順</span>
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      {/* 畳んでいる間は1行だけ出す。列数がブレークポイントで 3/4/5 と変わるので、
-          何枚目から隠すかも CSS で合わせる（JS で幅を測ると初回描画でガタつく）。 */}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
           元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-        {chronologicalPhotos.map(({ photo, index }, position) => {
+        {newestFirstPhotos.map(({ photo, index }) => {
           const userLabel = getPhotoUserLabel(photo);
           // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
           // 並んでいるので、表示だけ shot_at を見ると日付欄が空になり、
@@ -905,8 +894,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             <div
               key={photo.id}
               className={`overflow-hidden rounded-[10px] border-2 bg-[#fbf6ea] ${
-                showAllPhotosGrid ? '' : collapsedGridCellClass(position)
-              } ${
                 photoExpanded && featuredPhoto?.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
               }`}
             >
@@ -983,15 +970,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
-      {!showAllPhotosGrid && allDisplayPhotos.length > 3 && (
-        <button
-          type="button"
-          onClick={() => setShowAllPhotosGrid(true)}
-          className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640] ${collapsedGridButtonClass(allDisplayPhotos.length)}`}
-        >
-          すべて見る（{allDisplayPhotos.length}枚）
-        </button>
-      )}
     </div>
   ) : null;
 
@@ -1442,23 +1420,18 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               {/*
                 設置場所。**住所は写真館に1文字も出ていなかった。**
                 地図は現在地からの位置関係しか伝えないので、控えたり人に伝えたりできる
-                文字列が要る。項目立ては図鑑の「設置場所」カードに合わせている。
+                文字列が要る。
+                住所1行だけにしている。都道府県・市区町村の行は住所の先頭と同じ文字の
+                繰り返しで、タイトル上の「{都道府県} / {市区町村}」とも重なっていた。
+                住所が未登録の蓋だけ、都道府県＋市区町村で代わりにする。
               */}
               <dl className="border-t border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs">
                 <div className="flex gap-3 py-1">
-                  <dt className="w-16 shrink-0 font-bold text-[#9b917e]">都道府県</dt>
-                  <dd className="font-bold text-[#2c2a26]">{manhole.prefecture}</dd>
+                  <dt className="shrink-0 font-bold text-[#9b917e]">住所</dt>
+                  <dd className="font-bold leading-snug text-[#2c2a26]">
+                    {manhole.address || `${manhole.prefecture}${manhole.city || manhole.municipality || ''}`}
+                  </dd>
                 </div>
-                <div className="flex gap-3 py-1">
-                  <dt className="w-16 shrink-0 font-bold text-[#9b917e]">市区町村</dt>
-                  <dd className="font-bold text-[#2c2a26]">{municipality}</dd>
-                </div>
-                {manhole.address && (
-                  <div className="flex gap-3 py-1">
-                    <dt className="w-16 shrink-0 font-bold text-[#9b917e]">住所</dt>
-                    <dd className="font-bold leading-snug text-[#2c2a26]">{manhole.address}</dd>
-                  </div>
-                )}
               </dl>
               <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
                 <button
