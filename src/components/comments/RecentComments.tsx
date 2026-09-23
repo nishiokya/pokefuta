@@ -17,6 +17,8 @@ type RecentCommentItem = {
     prefecture: string | null;
     municipality: string | null;
     building: string | null;
+    /** 図鑑のスナップショットが計算した表示名。API が id から付ける */
+    name?: string | null;
   };
   thumbnail_url: string | null;
 };
