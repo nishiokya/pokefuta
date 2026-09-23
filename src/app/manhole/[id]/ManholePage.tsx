@@ -85,6 +85,20 @@ const getPhotoUserLabel = (photo: Photo) => {
   return '名無しのトレーナー';
 };
 
+/** 写真の上に重ねる一言。ゴミ判定を通ったものだけ、改行を空白に畳んで返す */
+const getPhotoCaption = (photo: Photo) =>
+  isMeaningfulVisitComment(photo.visit?.comment)
+    ? normalizeVisitComment(photo.visit?.comment).replace(/\s*\n\s*/g, ' ')
+    : null;
+
+/** 「すべての写真」を畳んでいる間、1行（SP 3列 / sm 4列 / lg 5列）に入らないセルを隠す */
+const collapsedGridCellClass = (position: number) =>
+  position >= 5 ? 'hidden' : position === 4 ? 'hidden lg:block' : position === 3 ? 'hidden sm:block' : '';
+
+/** 1行に全部収まるブレークポイントでは「すべて見る」を出さない */
+const collapsedGridButtonClass = (count: number) =>
+  count > 5 ? '' : count === 5 ? 'lg:hidden' : 'sm:hidden';
+
 const getSortedTitles = (titles?: ManholeTitle[] | null) =>
   [...(Array.isArray(titles) ? titles : [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
@@ -266,6 +280,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
   const [showAllVisitComments, setShowAllVisitComments] = useState(false);
+  const [showAllPhotosGrid, setShowAllPhotosGrid] = useState(false);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -429,6 +444,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     setPhotosLoading(true);
     setPhotoLoadError(false);
     setShowAllVisitComments(false);
+    setShowAllPhotosGrid(false);
     try {
       const pageSize = 100;
       const loadedPhotos: Photo[] = [];
@@ -863,10 +879,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
+      {/* 畳んでいる間は1行だけ出す。列数がブレークポイントで 3/4/5 と変わるので、
+          何枚目から隠すかも CSS で合わせる（JS で幅を測ると初回描画でガタつく）。 */}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
           元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-        {chronologicalPhotos.map(({ photo, index }) => {
+        {chronologicalPhotos.map(({ photo, index }, position) => {
           const userLabel = getPhotoUserLabel(photo);
           // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
           // 並んでいるので、表示だけ shot_at を見ると日付欄が空になり、
@@ -887,6 +905,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             <div
               key={photo.id}
               className={`overflow-hidden rounded-[10px] border-2 bg-[#fbf6ea] ${
+                showAllPhotosGrid ? '' : collapsedGridCellClass(position)
+              } ${
                 photoExpanded && featuredPhoto?.id === photo.id ? 'border-[#bf5640]' : 'border-transparent'
               }`}
             >
@@ -963,6 +983,15 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
+      {!showAllPhotosGrid && allDisplayPhotos.length > 3 && (
+        <button
+          type="button"
+          onClick={() => setShowAllPhotosGrid(true)}
+          className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640] ${collapsedGridButtonClass(allDisplayPhotos.length)}`}
+        >
+          すべて見る（{allDisplayPhotos.length}枚）
+        </button>
+      )}
     </div>
   ) : null;
 
@@ -1068,6 +1097,53 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     <div className="min-h-content safe-area-body bg-[#f1e8d4]">
       <PCShell className="pb-32 pt-3 lg:pt-6" rail={promptCard}>
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
+          {/* ── Title block ── */}
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 font-pixelJp text-[12px] lg:text-[13px] font-semibold text-[#9b917e]">
+              <MapPin className="h-3.5 w-3.5 text-[#9b917e]" strokeWidth={2.2} />
+              {manhole.prefecture} / {municipality}
+            </div>
+            {/*
+              ページの主見出し。図鑑と同じ「{都道府県}{市区町村}のポケふた（{ポケモン}）」。
+              以前は h2 で、しかもページ全体に h1 が1つも無かった。ポケモン名は
+              「{ポケモン}が描かれたポケモンマンホール」という別の段落に置いていたが、
+              見出しへ入れたことで重複するので畳んだ。
+              括弧の中だけ細くしているのは見た目の話で、テキストは図鑑の h1 と同一。
+            */}
+            <h1 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
+              {manholePlaceLabel(manhole)}
+              {headingPokemons.length > 0 && (
+                <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
+                  （{headingPokemons.join('・')}）
+                </span>
+              )}
+            </h1>
+          </div>
+
+          {/* ── Rarity pills + stats ──
+              図鑑と同じく、称号バッジのあとに統計バッジを続ける。
+              抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
+          {(titleBadges.length > 0 || statBadges.length > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {titleBadges.map((title, idx) => (
+                <span
+                  key={`${title.key}-${idx}`}
+                  className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
+                >
+                  {title.emoji || '★'} {title.label}
+                </span>
+              ))}
+              {statBadges.map((badge) => (
+                <span
+                  key={badge.key}
+                  className="rounded-full border border-[#e9dfc7] bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#6f6657]"
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* ── Gallery ── */}
           {photosLoading ? (
             <div className="flex h-[210px] items-center justify-center rounded-[16px] border border-[#e9dfc7] bg-[#ece2cd] lg:h-[360px] lg:rounded-[18px]">
@@ -1133,6 +1209,18 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     >
                       <ChevronUp className="h-3 w-3" strokeWidth={2.6} />一覧に戻る
                     </button>
+                    {/* 拡大時は2行まで。「訪れた人のひとこと」から写真を開いた人が、
+                        どの一言の写真なのかを見失わないように。 */}
+                    {featuredPhoto.visit?.user_id !== currentUserId && getPhotoCaption(featuredPhoto) && (
+                      <span className="absolute inset-x-3 bottom-12 z-[2] flex">
+                        <span className="inline-flex min-w-0 max-w-full items-start gap-1.5 rounded-[12px] rounded-bl-[4px] bg-white/95 px-2.5 py-1.5 text-left shadow-sm">
+                          <MessageCircle className="mt-0.5 h-3 w-3 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
+                          <span className="line-clamp-2 min-w-0 font-pixelJp text-xs font-bold leading-snug text-[#2c2a26]">
+                            {getPhotoCaption(featuredPhoto)}
+                          </span>
+                        </span>
+                      </span>
+                    )}
                     <div className="absolute inset-x-0 bottom-0 z-[1] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-10 text-white">
                       {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
                         <Link
@@ -1185,6 +1273,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     alt={`@${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
                   />
+                  {getPhotoCaption(allDisplayPhotos[0]) && (
+                    <span className="absolute inset-x-3 bottom-11 z-[1] flex">
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[12px] rounded-bl-[4px] bg-white/95 px-2.5 py-1.5 text-left shadow-sm">
+                        <MessageCircle className="h-3 w-3 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
+                        <span className="min-w-0 truncate font-pixelJp text-xs font-bold text-[#2c2a26]">
+                          {getPhotoCaption(allDisplayPhotos[0])}
+                        </span>
+                      </span>
+                    </span>
+                  )}
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
                     <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
                     {allDisplayPhotos[0].visit?.shot_at && (
@@ -1225,6 +1323,18 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                             <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
                           </span>
                         )}
+                        {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
+                            蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
+                        {isRepresentative && getPhotoCaption(photo) && (
+                          <span className="absolute inset-x-2.5 bottom-9 z-[1] flex lg:bottom-10">
+                            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[12px] rounded-bl-[4px] bg-white/95 px-2.5 py-1.5 text-left shadow-sm">
+                              <MessageCircle className="h-3 w-3 shrink-0 text-[#b87d0a]" strokeWidth={2.4} />
+                              <span className="min-w-0 truncate font-pixelJp text-[11px] font-bold text-[#2c2a26] lg:text-xs">
+                                {getPhotoCaption(photo)}
+                              </span>
+                            </span>
+                          </span>
+                        )}
                         <span className="absolute inset-x-0 bottom-0 flex items-end gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
                           <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
                             @{getPhotoUserLabel(photo)}
@@ -1254,109 +1364,58 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   <Plus className="h-3 w-3" strokeWidth={2.4} />写真を追加
                 </button>
               </div>
-
-              {allPhotosGrid}
             </div>
           )}
 
-          {/* ── Title block ── */}
-          <div>
-            <div className="mb-1 flex items-center gap-1.5 font-pixelJp text-[12px] lg:text-[13px] font-semibold text-[#9b917e]">
-              <MapPin className="h-3.5 w-3.5 text-[#9b917e]" strokeWidth={2.2} />
-              {manhole.prefecture} / {municipality}
-            </div>
-            {/*
-              ページの主見出し。図鑑と同じ「{都道府県}{市区町村}のポケふた（{ポケモン}）」。
-              以前は h2 で、しかもページ全体に h1 が1つも無かった。ポケモン名は
-              「{ポケモン}が描かれたポケモンマンホール」という別の段落に置いていたが、
-              見出しへ入れたことで重複するので畳んだ。
-              括弧の中だけ細くしているのは見た目の話で、テキストは図鑑の h1 と同一。
-            */}
-            <h1 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
-              {manholePlaceLabel(manhole)}
-              {headingPokemons.length > 0 && (
-                <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
-                  （{headingPokemons.join('・')}）
-                </span>
-              )}
-            </h1>
-            {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
-            {featuredPhoto && (() => {
-              const isOwn = featuredPhoto.visit?.user_id === currentUserId;
-              // 自分の記録は何を書いていても自分には見せる。他人のひとことは
-              // ゴミ判定（数字だけ・テスト等）を通ったものだけを代表写真に添える。
-              const communityComment = isMeaningfulVisitComment(featuredPhoto.visit?.comment)
-                ? normalizeVisitComment(featuredPhoto.visit?.comment)
-                : undefined;
-              const memo = isOwn
-                ? featuredPhoto.visit?.note || featuredPhoto.visit?.comment
-                : communityComment;
-              const isPublic = featuredPhoto.visit?.is_public;
-              if (!memo && !isOwn) return null;
-              return (
-                <div className="mt-3 flex items-start gap-2.5 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] px-[13px] py-[11px]">
-                  <Sparkles className="mt-0.5 h-[15px] w-[15px] shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
-                  <div className="flex-1 min-w-0">
-                    {memo && (
-                      <p className="whitespace-pre-line break-words font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
-                    )}
-                    {isOwn && featuredPhoto.visit?.id && (() => {
-                      const visitId = featuredPhoto.visit!.id;
-                      const isPrivate = isPublic === false;
-                      const saving = visibilitySavingVisitId === visitId;
-                      return (
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleVisibilityToggle(visitId, !isPrivate)}
-                            disabled={saving}
-                            aria-pressed={!isPrivate}
-                            aria-label={isPrivate ? 'この記録を公開する' : 'この記録を非公開にする'}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold disabled:opacity-50"
-                            style={{ background: isPrivate ? '#f3e8dc' : '#e2f2e9', color: isPrivate ? '#9a5c2a' : '#1f9d63' }}
-                          >
-                            {isPrivate
-                              ? <EyeOff className="h-[11px] w-[11px]" strokeWidth={2.4} />
-                              : <Eye className="h-[11px] w-[11px]" strokeWidth={2.4} />}
-                            {saving ? '変更中…' : isPrivate ? '非公開' : '公開中'}
-                          </button>
-                          <span className="font-pixelJp text-[10px] text-[#9b917e]">
-                            {isPrivate
-                              ? 'タップで公開 — みんなに見てもらえます'
-                              : 'タップで公開設定を変更'}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
+          {/*
+            自分の記録のメモと公開設定。以前はタイトル下で他人のひとことも出していたが、
+            「訪れた人のひとこと」の1位と同じ文が二重に並ぶので、他人の分はそちらと
+            写真上の吹き出しに任せ、ここは自分の記録の操作に絞った。
+          */}
+          {featuredPhoto && featuredPhoto.visit?.user_id === currentUserId && (() => {
+            const memo = featuredPhoto.visit?.note || featuredPhoto.visit?.comment;
+            const isPublic = featuredPhoto.visit?.is_public;
+            return (
+              <div className="flex items-start gap-2.5 rounded-[12px] border border-[#e9dfc7] bg-[#fbf6ea] px-[13px] py-[11px]">
+                <Sparkles className="mt-0.5 h-[15px] w-[15px] shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
+                <div className="flex-1 min-w-0">
+                  {memo && (
+                    <p className="whitespace-pre-line break-words font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
+                  )}
+                  {featuredPhoto.visit?.id && (() => {
+                    const visitId = featuredPhoto.visit!.id;
+                    const isPrivate = isPublic === false;
+                    const saving = visibilitySavingVisitId === visitId;
+                    return (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleVisibilityToggle(visitId, !isPrivate)}
+                          disabled={saving}
+                          aria-pressed={!isPrivate}
+                          aria-label={isPrivate ? 'この記録を公開する' : 'この記録を非公開にする'}
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-pixelJp text-[10px] font-bold disabled:opacity-50"
+                          style={{ background: isPrivate ? '#f3e8dc' : '#e2f2e9', color: isPrivate ? '#9a5c2a' : '#1f9d63' }}
+                        >
+                          {isPrivate
+                            ? <EyeOff className="h-[11px] w-[11px]" strokeWidth={2.4} />
+                            : <Eye className="h-[11px] w-[11px]" strokeWidth={2.4} />}
+                          {saving ? '変更中…' : isPrivate ? '非公開' : '公開中'}
+                        </button>
+                        <span className="font-pixelJp text-[10px] text-[#9b917e]">
+                          {isPrivate
+                            ? 'タップで公開 — みんなに見てもらえます'
+                            : 'タップで公開設定を変更'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
-              );
-            })()}
-          </div>
+              </div>
+            );
+          })()}
 
-          {/* ── Rarity pills + stats ──
-              図鑑と同じく、称号バッジのあとに統計バッジを続ける。
-              抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
-          {(titleBadges.length > 0 || statBadges.length > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {titleBadges.map((title, idx) => (
-                <span
-                  key={`${title.key}-${idx}`}
-                  className={`rounded-full px-2.5 py-1 font-pixelJp text-xs font-bold ${getTitlePillClass(idx)}`}
-                >
-                  {title.emoji || '★'} {title.label}
-                </span>
-              ))}
-              {statBadges.map((badge) => (
-                <span
-                  key={badge.key}
-                  className="rounded-full border border-[#e9dfc7] bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-xs font-bold text-[#6f6657]"
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          )}
+          {visitCommentsSection}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
           {!photosLoading && !photoLoadError && photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
@@ -1428,6 +1487,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             </div>
           )}
 
+          {allPhotosGrid}
+
           {/* ── Pokemon ── */}
           {manhole.pokemons && manhole.pokemons.length > 0 && (
             <div>
@@ -1458,8 +1519,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             関連リンク3種とシェアの**上**に置く。以前は全1261行の最下部にあり、
             スクロールしきった人しか到達できなかった。ここは部屋の主コンテンツ。
           */}
-          {visitCommentsSection}
-
           {manhole && (
             <ManholeCommentThread
               manholeId={manhole.id}
