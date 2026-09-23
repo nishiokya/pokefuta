@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildPrefectureCompletion,
+  buildPrefectureCompletionFromAggregates,
   type CompletionInput,
 } from '../src/lib/prefecture-completion';
 
@@ -90,4 +91,34 @@ test('残り枚数の少ない順に並ぶ（先頭が次に終わる県）', ()
     ]
   );
   assert.equal(rollup.missingTotal, 14);
+});
+
+test('公開写真のDB集計から都道府県別の残り枚数を作る', () => {
+  const rollup = buildPrefectureCompletionFromAggregates([
+    { prefecture: '香川県', total: 18, with_photo: 15 },
+    { prefecture: '徳島県', total: 12, with_photo: 12 },
+    { prefecture: '宮崎県', total: 26, with_photo: 20 },
+  ]);
+
+  assert.equal(rollup.listedCount, 3);
+  assert.equal(rollup.completeCount, 1);
+  assert.equal(rollup.missingTotal, 9);
+  assert.deepEqual(
+    rollup.incomplete.map((entry) => [entry.prefecture, entry.missing, entry.coverage]),
+    [
+      ['香川県', 3, 83],
+      ['宮崎県', 6, 77],
+    ]
+  );
+});
+
+test('不正な公開写真集計は県数や残り枚数を壊さない', () => {
+  const rollup = buildPrefectureCompletionFromAggregates([
+    { prefecture: '', total: 10, with_photo: 1 },
+    { prefecture: '香川県', total: 2, with_photo: 5 },
+  ]);
+
+  assert.equal(rollup.listedCount, 1);
+  assert.equal(rollup.completeCount, 1);
+  assert.equal(rollup.missingTotal, 0);
 });
