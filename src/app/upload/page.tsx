@@ -13,7 +13,10 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { useSubmissionFunnel } from '@/lib/hooks/useSubmissionFunnel';
-import type { SubmissionBlockReason, SubmissionStage } from '@/lib/analytics/gtag';
+import { pokefutaEvents, type SubmissionBlockReason, type SubmissionStage } from '@/lib/analytics/gtag';
+import NextVisitorTipForm, { VisitTipSuggestionChips } from '@/components/visit-tip/NextVisitorTipForm';
+import { collectVisitComments } from '@/lib/visit-comment-quality';
+import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
@@ -105,7 +108,13 @@ function UploadPageInner() {
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
   const [loading, setLoading] = useState(false);
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
-  const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント
+  const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント（次に来る人へひとこと）
+  // 候補ボタンを使ったか。p_visit_tip_saved の used_suggestion に載せる
+  const [usedTipSuggestion, setUsedTipSuggestion] = useState(false);
+  // 同じ蓋に前の人が残したひとこと（最新の1件）。何を書けばいいかの手本として見せる
+  const [previousTip, setPreviousTip] = useState<string | null>(null);
+  // 完了画面で「ひとことを後から残す」ための訪問ID
+  const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number } | null>(null);
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -743,6 +752,19 @@ function UploadPageInner() {
         is_logged_in: true,
       });
 
+      // 投稿時にひとことを書いた分。完了画面・蓋の詳細から後で書いた分と同じイベントで数える
+      // （p_visit_tip_saved はキーイベント。surface で書き込み口を見分ける）
+      if (visitComment.trim()) {
+        pokefutaEvents.visitTipSaved({
+          surface: 'upload_form',
+          manhole_id: photo.matchedManhole?.id,
+          used_suggestion: usedTipSuggestion,
+        });
+      }
+      if (typeof uploadResult.visit_id === 'string') {
+        setCompletedVisit({ visitId: uploadResult.visit_id, manholeId: photo.matchedManhole?.id });
+      }
+
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -816,6 +838,24 @@ function UploadPageInner() {
   // 1枚のみ投稿なので先頭が選択中の写真
   const selectedPhoto = photos[0];
 
+  // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
+  const matchedManholeId = selectedPhoto?.matchedManhole?.id;
+  useEffect(() => {
+    setPreviousTip(null);
+    if (!matchedManholeId) return;
+    let cancelled = false;
+    fetch(`/api/image-upload?manhole_id=${matchedManholeId}&limit=100&offset=0`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.success || !Array.isArray(data.images)) return;
+        setPreviousTip(collectVisitComments(data.images)[0]?.text ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [matchedManholeId]);
+
   // プレビューURLは差し替え時・アンマウント時に解放する
   const previewUrlToRevoke = selectedPhoto?.preview;
   useEffect(() => {
@@ -838,6 +878,25 @@ function UploadPageInner() {
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
             写真を訪問記録に登録しました。
           </p>
+          {/*
+            投稿時にひとことを書かなかった人（約87%）にだけ、もう一度だけ頼む。
+            書き込み先はこの訪問のひとことなので、蓋の詳細のコメント欄に写真付きで並ぶ。
+          */}
+          {completedVisit && !visitComment.trim() && (
+            <div className="mt-6 text-left">
+              <NextVisitorTipForm
+                visitId={completedVisit.visitId}
+                manholeId={completedVisit.manholeId}
+                surface="upload_complete"
+                title="次に来る人へ、ひとことどうですか？"
+                description={
+                  isPublic
+                    ? '蓋のページのコメント欄に、あなたの写真と一緒に並びます'
+                    : 'この記録は非公開なので、あなただけが見られます'
+                }
+              />
+            </div>
+          )}
           <div className="mt-6 flex justify-center gap-3">
             <Link
               href="/visits"
@@ -1069,23 +1128,43 @@ function UploadPageInner() {
         <section className="mt-6">
             <div className="space-y-4">
               <div>
+                {/*
+                  以前は「感想を書こう！例: ピカチュウのデザインがかわいい！」だったが、
+                  実際に書かれていたのは大半が現地の案内（場所・駐車場）で、読む側に役立つのも
+                  そちらだった。見出し・例文・候補を案内寄りにそろえている。
+                */}
                 <label htmlFor="up-comment" className="text-sm font-bold">
-                  訪問コメント <span className="text-xs font-normal text-[#2A2A2A]/50">（任意）</span>
+                  次に来る人へひとこと <span className="text-xs font-normal text-[#2A2A2A]/50">（任意）</span>
                 </label>
                 <p className="mt-0.5 text-xs text-[#2A2A2A]/60">
-                  公開設定がONの場合、他のユーザーも閲覧できます
+                  公開設定がONの場合、蓋のページのコメント欄に写真と一緒に並びます
                 </p>
+                {previousTip && (
+                  <p className="mt-1.5 rounded-md bg-white/70 px-2.5 py-1.5 text-xs text-[#2A2A2A]/70">
+                    <span className="font-bold">前に来た人は: </span>
+                    <span className="line-clamp-2">{previousTip}</span>
+                  </p>
+                )}
                 <textarea
                   id="up-comment"
                   className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
-                  placeholder="このポケふたの感想を書こう！例: ピカチュウのデザインがかわいい！"
+                  placeholder="見つけた場所・駐車場・行き方など"
                   rows={3}
                   value={visitComment}
                   onChange={(e) => setVisitComment(e.target.value)}
-                  maxLength={500}
+                  maxLength={VISIT_COMMENT_MAX_LENGTH}
                 />
+                <div className="mt-1.5">
+                  <VisitTipSuggestionChips
+                    value={visitComment}
+                    onPick={(next) => {
+                      setVisitComment(next.slice(0, VISIT_COMMENT_MAX_LENGTH));
+                      setUsedTipSuggestion(true);
+                    }}
+                  />
+                </div>
                 <p className="mt-1 text-right text-xs text-[#2A2A2A]/50">
-                  {visitComment.length}/500文字
+                  {visitComment.length}/{VISIT_COMMENT_MAX_LENGTH}文字
                 </p>
               </div>
 

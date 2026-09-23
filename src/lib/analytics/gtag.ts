@@ -331,6 +331,37 @@ export const COMMENT_EVENTS = [
   'p_comment_report',             // 7. 通報した
 ] as const;
 
+/**
+ * 「次に来る人へひとこと」の台帳。`tools/check-ga4-contract.js` が送信漏れを落とす。
+ *
+ * 見るのは `p_visit_tip_saved / p_visit_tip_prompt_view` を surface で割ったもの。
+ * 投稿画面（upload_form）には prompt_view が無い。こちらの分母は
+ * `p_photo_upload_complete`（has_note で既に取れている）。
+ *
+ * `p_visit_tip_saved` は GA4 でキーイベントに登録する。
+ * デプロイ前に GA4 管理画面で登録が要る（遡及しない）:
+ *   カスタムディメンション … used_suggestion
+ *   （surface / manhole_id は登録済み）
+ */
+export const VISIT_TIP_EVENTS = [
+  'p_visit_tip_prompt_view', // 1. 後から書く導線が表示された（投稿完了画面・蓋の詳細）
+  'p_visit_tip_saved',       // 2. ひとことを保存した（キーイベント）
+] as const;
+
+/** ひとことの書き込み口。投稿画面 / 投稿完了画面 / 蓋の詳細 */
+export type VisitTipSurface = 'upload_form' | 'upload_complete' | 'manhole_detail';
+
+export interface VisitTipEventParams extends GAEventParams {
+  /** 発生箇所。GA4 予約語の source は使わない。 */
+  surface: VisitTipSurface;
+  manhole_id?: number;
+}
+
+export interface VisitTipSavedParams extends VisitTipEventParams {
+  /** 候補ボタンを1つでも使ったか。候補が書き出しの壁を下げているかを見る */
+  used_suggestion: boolean;
+}
+
 export interface ApiErrorEventParams extends GAEventParams {
   api_path: string;
   endpoint?: string;
@@ -602,6 +633,10 @@ export const pokefutaEvents = {
   commentFailed:       (p: CommentFailedParams)  => trackEvent('p_comment_failed', p),
   commentDelete:       (p: CommentEventParams)   => trackEvent('p_comment_delete', p),
   commentReport:       (p: CommentEventParams)   => trackEvent('p_comment_report', p),
+
+  // 次に来る人へひとこと（VISIT_TIP_EVENTS）
+  visitTipPromptView:  (p: VisitTipEventParams)  => trackEvent('p_visit_tip_prompt_view', p),
+  visitTipSaved:       (p: VisitTipSavedParams)  => trackEvent('p_visit_tip_saved', p),
 };
 
 // ==========================================

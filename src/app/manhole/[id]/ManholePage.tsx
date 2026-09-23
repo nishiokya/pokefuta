@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  MapPin, ArrowLeft, Navigation, Building2,
+  MapPin, ArrowLeft, Navigation,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink, BookOpen,
   MessageCircle,
@@ -16,7 +16,8 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
-import ManholeCommentThread from '@/components/comments/ManholeCommentThread';
+import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
+import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
   orderManholePhotosNewestFirst,
@@ -26,7 +27,7 @@ import {
 import {
   isMeaningfulVisitComment,
   normalizeVisitComment,
-  rankVisitComments,
+  collectVisitComments,
 } from '@/lib/visit-comment-quality';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
@@ -271,7 +272,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
-  const [showAllVisitComments, setShowAllVisitComments] = useState(false);
+  // ひとことを保存した直後も「ありがとう」を出し続けるため、保存した訪問を覚えておく。
+  // これが無いと保存で条件（ひとこと未記入）が崩れ、フォームごと消えて礼が見えない。
+  const [tipSavedVisitId, setTipSavedVisitId] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -434,7 +437,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     const requestId = ++photoRequestIdRef.current;
     setPhotosLoading(true);
     setPhotoLoadError(false);
-    setShowAllVisitComments(false);
+    setTipSavedVisitId(null);
     try {
       const pageSize = 100;
       const loadedPhotos: Photo[] = [];
@@ -973,97 +976,60 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     </div>
   ) : null;
 
-  // ── 訪れた人のひとこと ─────────────────────────────────────────────
-  // 投稿時に添えられたコメントを、読む価値のあるものだけ長い順に並べる。
-  // 「すべての写真」ではアイコンしか出ず、拡大しないと読めなかった。
-  // 下の「コメント」欄（蓋への掲示板）とは別物: こちらは写真に付いた一言。
-  const VISIT_COMMENT_PREVIEW = 3;
-  const rankedVisitComments = rankVisitComments(allDisplayPhotos);
-  const shownVisitComments = showAllVisitComments
-    ? rankedVisitComments
-    : rankedVisitComments.slice(0, VISIT_COMMENT_PREVIEW);
-  const visitCommentsSection = rankedVisitComments.length > 0 ? (
-    <div>
-      <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
-        <Sparkles className="h-3.5 w-3.5 text-[#b87d0a]" strokeWidth={2.2} />
-        訪れた人のひとこと
-        <span className="font-pixelJp text-[11px] font-normal text-[#9b917e]">
-          {rankedVisitComments.length}
-        </span>
-      </h3>
-      <ul className="flex flex-col gap-2.5">
-        {shownVisitComments.map(({ photo, index, text }) => {
-          const userLabel = getPhotoUserLabel(photo);
-          const dated = photoChronologyDate(photo);
-          const profileHref =
-            photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
-              ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
-              : null;
-          return (
-            <li
-              key={photo.visit?.id ?? photo.id}
-              className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPhotoIdx(index);
-                  setPhotoExpanded(true);
-                  requestAnimationFrame(() => {
-                    document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  });
-                }}
-                aria-label={`@${userLabel}さんの写真を表示`}
-                className="h-14 w-14 shrink-0 overflow-hidden rounded-[10px] bg-[#fbf6ea] p-0"
-              >
-                <img
-                  src={`/api/photo/${photo.id}?size=small`}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="whitespace-pre-line break-words font-pixelJp text-[12.5px] leading-relaxed text-[#2c2a26]">
-                  {text}
-                </p>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {profileHref ? (
-                    <Link
-                      href={profileHref}
-                      className="font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
-                    >
-                      @{userLabel}
-                    </Link>
-                  ) : (
-                    <span className="font-pixelJp text-[10.5px] font-bold text-[#8b816f]">@{userLabel}</span>
-                  )}
-                  {dated && (
-                    <span className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]">
-                      {formatPhotoDateCompact(dated.iso)}
-                      {dated.source === 'upload' ? ' 投稿' : ''}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {rankedVisitComments.length > VISIT_COMMENT_PREVIEW && (
-        <button
-          type="button"
-          onClick={() => setShowAllVisitComments((v) => !v)}
-          aria-expanded={showAllVisitComments}
-          className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640]"
-        >
-          {showAllVisitComments
-            ? 'たたむ'
-            : `もっと見る（残り${rankedVisitComments.length - VISIT_COMMENT_PREVIEW}件）`}
-        </button>
-      )}
-    </div>
-  ) : null;
+  // ── 写真のひとこと（コメント欄に混ぜる） ─────────────────────────────
+  // 掲示板コメントと同じ欄に、書かれた新しい順で並べる。サムネを押すとその写真を拡大する。
+  const openPhotoAt = (index: number) => {
+    setSelectedPhotoIdx(index);
+    setPhotoExpanded(true);
+    requestAnimationFrame(() => {
+      document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  const photoCommentEntries: PhotoCommentEntry[] = collectVisitComments(allDisplayPhotos).map(
+    ({ photo, index, text, postedAt }) => ({
+      key: photo.visit?.id ?? photo.id,
+      text,
+      postedAt,
+      userLabel: getPhotoUserLabel(photo),
+      profileHref:
+        photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
+          ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
+          : null,
+      photoSrc: `/api/photo/${photo.id}?size=small`,
+      onOpenPhoto: () => openPhotoAt(index),
+    })
+  );
+
+  // 行ったことがあるのに、ひとことをまだ書いていない人へのお願い。
+  // 何か書いてあれば（ゴミ判定に落ちる短さでも）本人は書いたつもりなので頼まない。
+  const tipVisitId =
+    tipSavedVisitId ??
+    (isLoggedIn && !myPhotos.some((photo) => photo.visit?.comment?.trim())
+      ? myPhotos[0]?.visit?.id ?? null
+      : null);
+  const tipComposer = tipVisitId
+    ? {
+        switchLabel: '写真とは別にコメントを書く',
+        node: (
+          <NextVisitorTipForm
+            key={tipVisitId}
+            visitId={tipVisitId}
+            manholeId={manhole.id}
+            surface="manhole_detail"
+            title="行ったあなたへ: 次の人へのアドバイスを"
+            description="あなたの写真のひとことになって、ここに並びます"
+            onSaved={(comment) => {
+              setTipSavedVisitId(tipVisitId);
+              setPhotos((prev) =>
+                prev.map((p) =>
+                  p.visit?.id === tipVisitId ? { ...p, visit: { ...p.visit, comment } } : p
+                )
+              );
+            }}
+          />
+        ),
+      }
+    : undefined;
 
   // Rail wrapper: hidden on mobile so PCShell doesn't render it above the gallery.
   // PCShell's own hidden lg:block wrapper makes it appear only in the sticky right column.
@@ -1393,7 +1359,21 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             );
           })()}
 
-          {visitCommentsSection}
+          {/*
+            ── Comments ──
+            写真のひとことと掲示板を1本にした欄。写真の直下に置く: 中身の多くは
+            「道の駅の入り口にありました」「駐車場は無料」のような現地の案内で、
+            写真を見た流れのまま地図の手前で読めるのが自然。
+          */}
+          {manhole && (
+            <ManholeCommentThread
+              manholeId={manhole.id}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
+              surface="manhole_detail"
+              photoComments={photoCommentEntries}
+              composerAlternative={tipComposer}
+            />
+          )}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
           {!photosLoading && !photoLoadError && photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}
@@ -1425,40 +1405,35 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 繰り返しで、タイトル上の「{都道府県} / {市区町村}」とも重なっていた。
                 住所が未登録の蓋だけ、都道府県＋市区町村で代わりにする。
               */}
+              {/* 経路案内は住所の行の右端。以前は全幅の緑ボタンで1行を使っていた。 */}
               <dl className="border-t border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs">
-                <div className="flex gap-3 py-1">
+                <div className="flex items-center gap-3 py-1">
                   <dt className="shrink-0 font-bold text-[#9b917e]">住所</dt>
-                  <dd className="font-bold leading-snug text-[#2c2a26]">
+                  <dd className="min-w-0 flex-1 font-bold leading-snug text-[#2c2a26]">
                     {manhole.address || `${manhole.prefecture}${manhole.city || manhole.municipality || ''}`}
                   </dd>
+                  <dd className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={openInMaps}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#1f9d63] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white transition-colors hover:bg-[#1a8a56]"
+                    >
+                      <Navigation className="h-3 w-3" strokeWidth={2.6} />
+                      経路案内
+                    </button>
+                  </dd>
                 </div>
+                {/* 建物・目印は住所のすぐ下。以前は地図カードの外の別カードで、
+                    住所と目印を突き合わせるのに視線が往復していた。 */}
+                {manhole.building && (
+                  <div className="flex gap-3 py-1">
+                    <dt className="shrink-0 font-bold text-[#9b917e]">目印</dt>
+                    <dd className="font-bold leading-snug text-[#2c2a26]">{manhole.building}</dd>
+                  </div>
+                )}
               </dl>
-              <div className="border-t border-[#e9dfc7] bg-[#fffdf7] p-3">
-                <button
-                  onClick={openInMaps}
-                  className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#1f9d63] py-2.5 font-pixelJp text-sm font-bold text-white transition-colors hover:bg-[#1a8a56]"
-                >
-                  <Navigation className="h-4 w-4" strokeWidth={2.4} />
-                  経路案内
-                </button>
-              </div>
             </div>
           </div>
-
-          {/* ── Building ── */}
-          {manhole.building && (
-            <div className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-              <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-[#eef2f7]">
-                <Building2 className="h-5 w-5 text-[#5b667b]" strokeWidth={2} />
-              </span>
-              <div>
-                <p className="font-pixelJp text-[11px] font-bold text-[#9b917e]">建物・目印</p>
-                <p className="mt-0.5 font-pixelJp text-sm font-bold leading-snug text-[#2c2a26]">
-                  {manhole.building}
-                </p>
-              </div>
-            </div>
-          )}
 
           {allPhotosGrid}
 
@@ -1487,18 +1462,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             </div>
           )}
 
-          {/*
-            ── Comments ──
-            関連リンク3種とシェアの**上**に置く。以前は全1261行の最下部にあり、
-            スクロールしきった人しか到達できなかった。ここは部屋の主コンテンツ。
-          */}
-          {manhole && (
-            <ManholeCommentThread
-              manholeId={manhole.id}
-              isLoggedIn={authChecked ? currentUserId !== null : null}
-              surface="manhole_detail"
-            />
-          )}
 
           {/* ── Nearby manholes ── */}
           {derived.nearby.length > 0 && (

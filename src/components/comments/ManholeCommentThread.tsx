@@ -1,13 +1,39 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { MessageCircle } from 'lucide-react';
+import { Camera, MessageCircle } from 'lucide-react';
 import { commentThreadState, pokefutaEvents } from '@/lib/analytics/gtag';
 import CommentComposer from './CommentComposer';
 import CommentItem, { type PublicComment } from './CommentItem';
 
 const PAGE_SIZE = 50;
+
+/**
+ * 掲示板コメントと同じ欄に並べる、写真に付いたひとこと（visit.comment）。
+ * 読む人から見ればどちらも「この蓋についての情報」なので1本の時系列にし、
+ * 写真のひとことにはサムネと「写真のひとこと」の印を付けて見分けられるようにする。
+ * 削除・通報は持たない（写真ごと自分の記録から消す／写真の公開設定で扱う）。
+ */
+export interface PhotoCommentEntry {
+  key: string;
+  text: string;
+  /** 書かれた日時。掲示板コメントの created_at と同じ軸で並べる */
+  postedAt: string;
+  userLabel: string;
+  profileHref: string | null;
+  photoSrc: string;
+  onOpenPhoto: () => void;
+}
+
+type TimelineItem =
+  | { kind: 'thread'; time: number; comment: PublicComment }
+  | { kind: 'photo'; time: number; entry: PhotoCommentEntry };
+
+const toTime = (iso: string) => {
+  const time = new Date(iso).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
 
 interface Props {
   manholeId: number | string;
@@ -21,6 +47,14 @@ interface Props {
   isLoggedIn: boolean | null;
   /** 発生箇所。GA4 予約語の source は使わない。 */
   surface?: string;
+  /** 写真のひとこと。掲示板コメントと混ぜて新しい順に並べる */
+  photoComments?: PhotoCommentEntry[];
+  /**
+   * 掲示板の入力欄の代わりに先に見せる入力。蓋に行ったことがあるのに
+   * ひとことを書いていない人へ「次の人へのアドバイス」を頼むのに使う。
+   * 入力欄が2つ並ぶと迷うので、掲示板の入力欄は switchLabel のボタンで切り替えて出す。
+   */
+  composerAlternative?: { node: ReactNode; switchLabel: string };
 }
 
 /**
@@ -31,7 +65,14 @@ interface Props {
  * 未ログイン訪問者にはコメント欄が存在しなかった。新規定着がゴールである以上、
  * 「人がいる／書いてよい」と最初に気づくべき相手にだけ見えていなかったことになる。
  */
-export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 'manhole_detail' }: Props) {
+export default function ManholeCommentThread({
+  manholeId,
+  isLoggedIn,
+  surface = 'manhole_detail',
+  photoComments = [],
+  composerAlternative,
+}: Props) {
+  const [showThreadComposer, setShowThreadComposer] = useState(false);
   const [comments, setComments] = useState<PublicComment[]>([]);
   const [total, setTotal] = useState(0);
   // 続きの有無はサーバに直接答えてもらう。保持件数と total の差から導かない。
@@ -63,6 +104,8 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
   // 「別の蓋のコメントが混ざる」に戻る。3行の保険でその失敗を静かでなくする。
   const requestGenerationRef = useRef(0);
 
+  // GA4 の thread_state / thread_size は掲示板コメントだけで数える。写真のひとことを
+  // 混ぜると、既存の p_comment_posted / p_comment_thread_view の比が過去と比べられなくなる。
   const threadState = commentThreadState(comments.length);
 
   const loadComments = useCallback(async () => {
@@ -288,26 +331,89 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
     }
   };
 
+  // 掲示板（内部では古い順に保持）と写真のひとことを1本にし、新しい順に並べる。
+  // 同時刻は掲示板を先にする（並びを毎回同じにするため）。
+  const timeline: TimelineItem[] = [
+    ...comments.map((comment): TimelineItem => ({ kind: 'thread', time: toTime(comment.created_at), comment })),
+    ...photoComments.map((entry): TimelineItem => ({ kind: 'photo', time: toTime(entry.postedAt), entry })),
+  ].sort((a, b) => b.time - a.time || (a.kind === b.kind ? 0 : a.kind === 'thread' ? -1 : 1));
+  const headingCount = total + photoComments.length;
+
+  const threadComposer = (
+    <CommentComposer
+      value={draft}
+      onChange={setDraft}
+      onSubmit={handleSubmit}
+      submitting={submitting}
+      isLoggedIn={isLoggedIn}
+      loginRedirectPath={`/manhole/${manholeId}`}
+      onComposeStart={() => {
+        if (composeStartSentRef.current) return;
+        composeStartSentRef.current = true;
+        pokefutaEvents.commentComposeStart({ surface, thread_state: threadState });
+      }}
+      onLoginPromptClick={() => {
+        pokefutaEvents.commentLoginPrompt({ surface, thread_state: threadState });
+      }}
+    />
+  );
+
   return (
     <div>
       <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
         <MessageCircle className="h-3.5 w-3.5 text-[#6f6657]" strokeWidth={2.2} />
         コメント
         {/* 件数がゼロのときは件数を出さない。「0件」を482枚に並べるのが最悪の選択肢。 */}
-        {total > 0 && (
+        {headingCount > 0 && (
           <span className="font-pixelJp text-[11px] font-normal text-[#9b917e]">
-            {total}
+            {headingCount}
           </span>
         )}
       </h3>
 
       <div className="flex flex-col gap-3">
+        {/*
+          入力欄は一覧の上。新しい順に並べるので、書いたものが入力欄のすぐ下に出る。
+        */}
+        {composerAlternative && !showThreadComposer ? (
+          <>
+            {composerAlternative.node}
+            <button
+              type="button"
+              onClick={() => setShowThreadComposer(true)}
+              className="self-start font-pixelJp text-[11px] text-[#6f6657] underline decoration-[#e9dfc7] underline-offset-2"
+            >
+              {composerAlternative.switchLabel}
+            </button>
+          </>
+        ) : (
+          threadComposer
+        )}
+
+        {error && <p className="font-pixelJp text-xs text-[#bf5640]">{error}</p>}
+
         {loading && <p className="font-pixelJp text-xs text-[#9b917e]">読み込み中…</p>}
 
-        {!loading && comments.length === 0 && (
+        {!loading && timeline.length === 0 && (
           <p className="font-pixelJp text-xs leading-relaxed text-[#9b917e]">
             まだコメントはありません。最初のひとことを書いてみませんか。
           </p>
+        )}
+
+        {timeline.map((item) =>
+          item.kind === 'thread' ? (
+            <CommentItem
+              key={`thread:${item.comment.id}`}
+              comment={item.comment}
+              busy={busyCommentId === item.comment.id}
+              canReport={isLoggedIn === true}
+              reported={reportedIds.has(item.comment.id)}
+              onDelete={handleDelete}
+              onReport={handleReport}
+            />
+          ) : (
+            <PhotoCommentItem key={`photo:${item.entry.key}`} entry={item.entry} />
+          )
         )}
 
         {hasMore && (
@@ -321,43 +427,52 @@ export default function ManholeCommentThread({ manholeId, isLoggedIn, surface = 
           </button>
         )}
 
-        {comments.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            busy={busyCommentId === comment.id}
-            canReport={isLoggedIn === true}
-            reported={reportedIds.has(comment.id)}
-            onDelete={handleDelete}
-            onReport={handleReport}
-          />
-        ))}
-
-        <CommentComposer
-          value={draft}
-          onChange={setDraft}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          isLoggedIn={isLoggedIn}
-          loginRedirectPath={`/manhole/${manholeId}`}
-          onComposeStart={() => {
-            if (composeStartSentRef.current) return;
-            composeStartSentRef.current = true;
-            pokefutaEvents.commentComposeStart({ surface, thread_state: threadState });
-          }}
-          onLoginPromptClick={() => {
-            pokefutaEvents.commentLoginPrompt({ surface, thread_state: threadState });
-          }}
-        />
-
-        {error && <p className="font-pixelJp text-xs text-[#bf5640]">{error}</p>}
-
         <p className="font-pixelJp text-[10px] leading-relaxed text-[#9b917e]">
           投稿すると
           <Link href="/terms" className="underline decoration-[#e9dfc7] underline-offset-2">
             利用規約
           </Link>
           に同意したことになります。
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PhotoCommentItem({ entry }: { entry: PhotoCommentEntry }) {
+  return (
+    <div className="flex gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
+      <button
+        type="button"
+        onClick={entry.onOpenPhoto}
+        aria-label={`@${entry.userLabel}さんの写真を表示`}
+        className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-[#fbf6ea] p-0"
+      >
+        <img src={entry.photoSrc} alt="" className="h-full w-full object-cover" loading="lazy" />
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          {entry.profileHref ? (
+            <Link
+              href={entry.profileHref}
+              className="font-pixelJp text-xs font-bold text-[#2c2a26] underline decoration-[#e9dfc7] underline-offset-2"
+            >
+              {entry.userLabel}
+            </Link>
+          ) : (
+            <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">{entry.userLabel}</span>
+          )}
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-[#fdf1e6] px-1.5 py-px font-pixelJp text-[10px] font-bold text-[#b0643f]">
+            <Camera className="h-2.5 w-2.5" strokeWidth={2.4} />
+            写真のひとこと
+          </span>
+          <span className="font-pixelJp text-[10px] text-[#9b917e]">
+            {new Date(entry.postedAt).toLocaleDateString('ja-JP')}
+          </span>
+        </div>
+        {/* 本文はテキストノードとして描画する（CommentItem と同じ理由） */}
+        <p className="whitespace-pre-wrap break-words font-pixelJp text-xs leading-relaxed text-[#6f6657]">
+          {entry.text}
         </p>
       </div>
     </div>
