@@ -211,8 +211,10 @@ export interface Database {
         Row: {
           id: string;
           manhole_id: number;
-          title_key: string;
+          kind: 'wrong' | 'suggest';
+          title_key: string | null;
           title_label: string | null;
+          suggested_label: string | null;
           reporter_user_id: string | null;
           reason: string | null;
           created_at: string;
@@ -221,8 +223,10 @@ export interface Database {
         Insert: {
           id?: string;
           manhole_id: number;
-          title_key: string;
+          kind?: 'wrong' | 'suggest';
+          title_key?: string | null;
           title_label?: string | null;
+          suggested_label?: string | null;
           reporter_user_id?: string | null;
           reason?: string | null;
           created_at?: string;

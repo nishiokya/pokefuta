@@ -7,11 +7,11 @@ import type { ManholeTitle } from '@/types/database';
  * @swagger
  * /api/manholes/{manholeId}/title-reports:
  *   post:
- *     summary: 蓋のタグ（称号）の間違いを指摘
+ *     summary: 蓋のタグ（称号）の間違いを指摘、または足りないタグを提案
  *     tags: [social]
  *     description: >
  *       タグは図鑑側で自動生成したもので、ここでは直さない。指摘を貯めて運営が図鑑側で直す。
- *       同じ人が同じタグを再指摘しても 200（件数は増えない）。
+ *       同じ人が同じタグを再指摘・同じ名前を再提案しても 200（件数は増えない）。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -26,11 +26,18 @@ import type { ManholeTitle } from '@/types/database';
  *         application/json:
  *           schema:
  *             type: object
- *             required: [title_key]
  *             properties:
+ *               kind:
+ *                 type: string
+ *                 enum: [wrong, suggest]
+ *                 default: wrong
  *               title_key:
  *                 type: string
- *                 description: manhole.titles[].key
+ *                 description: kind=wrong のとき必須。manhole.titles[].key
+ *               suggested_label:
+ *                 type: string
+ *                 maxLength: 50
+ *                 description: kind=suggest のとき必須。提案するタグの名前
  *               reason:
  *                 type: string
  *                 maxLength: 500
@@ -38,7 +45,7 @@ import type { ManholeTitle } from '@/types/database';
  *       200:
  *         description: 受け付けた（既に指摘済みでも 200）
  *       400:
- *         description: title_key が無い、またはその蓋のタグではない
+ *         description: kind に応じた項目が無い、title_key がその蓋のタグではない、提案名が長すぎる
  *       401:
  *         description: 認証が必要
  *       404:
@@ -61,16 +68,33 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Invalid manhole id' }, { status: 400 });
     }
 
-    let body: { title_key?: unknown; reason?: unknown } | null = null;
+    let body: { kind?: unknown; title_key?: unknown; suggested_label?: unknown; reason?: unknown } | null = null;
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
     }
 
+    const kind = body?.kind === undefined ? 'wrong' : body.kind;
+    if (kind !== 'wrong' && kind !== 'suggest') {
+      return NextResponse.json({ success: false, error: 'kind must be wrong or suggest' }, { status: 400 });
+    }
+
     const titleKey = typeof body?.title_key === 'string' ? body.title_key.trim() : '';
-    if (!titleKey) {
+    if (kind === 'wrong' && !titleKey) {
       return NextResponse.json({ success: false, error: 'title_key is required' }, { status: 400 });
+    }
+
+    const suggestedLabel =
+      typeof body?.suggested_label === 'string' ? body.suggested_label.trim() : '';
+    if (kind === 'suggest') {
+      if (!suggestedLabel) {
+        return NextResponse.json({ success: false, error: 'suggested_label is required' }, { status: 400 });
+      }
+      // DB の CHECK（char_length <= 50）と同じ単位で数える
+      if (Array.from(suggestedLabel).length > 50) {
+        return NextResponse.json({ success: false, error: 'suggested_label is too long' }, { status: 400 });
+      }
     }
 
     // 理由はコードポイント単位で切る（comment_report と同じ理由: サロゲートペアの途中で
@@ -94,8 +118,8 @@ export async function POST(
     const titles = (Array.isArray((manhole as { titles?: unknown }).titles)
       ? (manhole as { titles: ManholeTitle[] }).titles
       : []) as ManholeTitle[];
-    const title = titles.find((t) => t?.key === titleKey);
-    if (!title) {
+    const title = kind === 'wrong' ? titles.find((t) => t?.key === titleKey) : undefined;
+    if (kind === 'wrong' && !title) {
       return NextResponse.json({ success: false, error: 'Unknown title for this manhole' }, { status: 400 });
     }
 
@@ -104,14 +128,17 @@ export async function POST(
       .from('manhole_title_report')
       .insert({
         manhole_id: manholeId,
-        title_key: titleKey,
-        title_label: title.label ?? null,
+        kind,
+        title_key: kind === 'wrong' ? titleKey : null,
+        title_label: title?.label ?? null,
+        suggested_label: kind === 'suggest' ? suggestedLabel : null,
         reporter_user_id: session.user.id,
         reason,
       });
 
     if (insertError) {
-      // 23505 = 同じ人が同じタグを再指摘（部分ユニーク索引）。利用者にはエラーを見せない。
+      // 23505 = 同じ人が同じタグを再指摘／同じ名前を再提案（部分ユニーク索引）。
+      // 利用者にはエラーを見せない。
       if (insertError.code === '23505') {
         return NextResponse.json({ success: true, already_reported: true });
       }

@@ -272,6 +272,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+  // 「すべての写真」でコメントをその場に重ねて開いている写真。拡大表示へ飛ばさずに読ませる
+  const [openGridCommentPhotoId, setOpenGridCommentPhotoId] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -883,6 +885,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           // アイコンは「読む価値のあるひとこと」がある写真にだけ付ける。数字だけ等に
           // 付けると、開いて「15」しか出ずにがっかりさせる。
           const comment = isMeaningfulVisitComment(photo.visit?.comment);
+          const commentOpen = comment && openGridCommentPhotoId === photo.id;
           // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
           // 拡大表示側（:941）と同じくリンクにしない。
           const profileHref =
@@ -930,13 +933,34 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     />
                   </span>
                 )}
-                {comment && (
-                  <span
-                    className="pointer-events-none absolute bottom-1 left-1 inline-flex items-center rounded-full bg-black/60 p-1 text-white"
-                    aria-hidden="true"
+                {/*
+                  コメントのアイコンを押すと、そのマスの上にコメントを重ねて出す。
+                  以前は写真を押すしかなく、ページ上部の拡大表示へスクロールで飛ばされていた。
+                  重ねた面を押すと閉じる。
+                */}
+                {comment && !commentOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenGridCommentPhotoId(photo.id)}
+                    aria-label={`@${userLabel}さんのコメントを読む`}
+                    className="absolute bottom-0 left-0 z-10 p-1"
                   >
-                    <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
-                  </span>
+                    <span className="inline-flex items-center rounded-full bg-black/60 p-1 text-white">
+                      <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
+                    </span>
+                  </button>
+                )}
+                {commentOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenGridCommentPhotoId(null)}
+                    aria-label="コメントを閉じる"
+                    className="absolute inset-0 z-20 overflow-y-auto bg-black/75 p-2 text-left"
+                  >
+                    <span className="block whitespace-pre-line break-words font-pixelJp text-[11px] font-bold leading-snug text-white">
+                      {normalizeVisitComment(photo.visit?.comment)}
+                    </span>
+                  </button>
                 )}
               </div>
               {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
@@ -1033,8 +1057,13 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               図鑑と同じく、称号バッジのあとに統計バッジを続ける。
               抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
           {(titleBadges.length > 0 || statBadges.length > 0) && (
-            <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-1.5">
+            // 指摘・提案の入口はタグの並びの末尾（TitleReport が children の後ろに置く）。
+            // 指摘できるのは称号タグだけ。統計バッジ（同じポケモンN枚 等）は集計値なので対象外
+            <TitleReport
+              manholeId={manhole.id}
+              titles={titleBadges}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
+            >
               {titleBadges.map((title, idx) => (
                 <span
                   key={`${title.key}-${idx}`}
@@ -1051,14 +1080,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   {badge.label}
                 </span>
               ))}
-            </div>
-            {/* 指摘できるのは称号タグだけ。統計バッジ（同じポケモンN枚 等）は集計値なので対象外 */}
-            <TitleReport
-              manholeId={manhole.id}
-              titles={titleBadges}
-              isLoggedIn={authChecked ? currentUserId !== null : null}
-            />
-            </div>
+            </TitleReport>
           )}
 
           {/* ── Gallery ── */}
@@ -1369,6 +1391,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   userLocation={null}
                   zoom={16}
                   minHeight={140}
+                  plainMarker
                 />
               </div>
               {/*
