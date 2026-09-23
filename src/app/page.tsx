@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
+import RecentComments from '@/components/comments/RecentComments';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -373,6 +374,9 @@ export default function HomePage() {
             </div>
           </div>
         )}
+
+        {/* 口コミが少ないうちは最新の投稿に口コミ付きの蓋が来ないので、別枠で拾う */}
+        {currentPage === 1 && <RecentComments />}
 
         {/* Photo Gallery */}
         {!loading && (
