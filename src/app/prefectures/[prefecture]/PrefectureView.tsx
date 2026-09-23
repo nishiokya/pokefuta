@@ -13,6 +13,7 @@ import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { PrefectureManhole, PrefectureOverview } from '@/lib/prefecture-page';
+import { manholeDisplayName, manholeHeadingPlace } from '@/lib/manhole-label';
 
 /**
  * `document.title` はここでは触らない。title / description / JSON-LD は
@@ -56,16 +57,6 @@ type FeedVisit = {
 const FEED_FETCH = 48;
 const FEED_SHOWN = 12;
 
-function manholeLabel(manhole: PrefectureManhole): string {
-  if (manhole.building) {
-    return [manhole.municipality || manhole.city, manhole.building]
-      .filter(Boolean)
-      .join('・');
-  }
-  return (
-    manhole.municipality || manhole.city || manhole.title || 'ポケふた'
-  );
-}
 
 export default function PrefectureView({ overview }: { overview: PrefectureOverview }) {
   const router = useRouter();
@@ -234,7 +225,7 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                   >
                     <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
                     <span className="line-clamp-2 text-xs leading-snug">
-                      {manholeLabel(manhole)}
+                      {manholeDisplayName(manhole)}
                     </span>
                   </Link>
                 ))}
@@ -349,7 +340,7 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                       // 県ページなので県名は省く（12枚すべてに「宮崎県」が付くと読めない）。
                       // 市区町村が無い蓋は県名に落とす。空文字のまま繋ぐと
                       // 「のポケふた」だけの見出しになる。
-                      title={`${manhole?.municipality || manhole?.prefecture || ''}のポケふた`}
+                      title={manhole ? manholeHeadingPlace(manhole) : 'ポケふた'}
                       date={formatDateJa(visit.shot_at)}
                       posterName={visit.display_name || undefined}
                       tags={(manhole?.pokemons || []).slice(0, 2)}

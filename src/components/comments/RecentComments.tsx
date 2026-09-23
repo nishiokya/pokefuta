@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MapPin, MessageCircle } from 'lucide-react';
 import { formatDateJaJst } from '@/lib/date';
 import type { RecentCommentKind } from '@/lib/recent-comments';
+import { manholeDisplayName } from '@/lib/manhole-label';
 
 type RecentCommentItem = {
   kind: RecentCommentKind;
@@ -69,9 +70,7 @@ export default function RecentComments() {
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {items.map((item, index) => {
           const { manhole } = item;
-          const place = manhole.building
-            ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
-            : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
+          const place = manholeDisplayName(manhole);
           return (
             <li
               key={`${item.kind}-${manhole.id}`}

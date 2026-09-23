@@ -34,7 +34,8 @@ import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
   filterPokemons,
   formatDistanceKm,
-  manholePlaceLabel,
+  landmarkLabel,
+  manholeHeadingPlace,
 } from '@/lib/manhole-label';
 import { officialLinks, type StatBadge } from '@/lib/manhole-stats';
 import type { RelatedManhole } from '@/lib/manhole-detail';
@@ -1041,7 +1042,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               括弧の中だけ細くしているのは見た目の話で、テキストは図鑑の h1 と同一。
             */}
             <h1 className="font-pixelJp text-[21px] lg:text-[30px] font-black leading-tight text-[#2c2a26]">
-              {manholePlaceLabel(manhole)}
+              {manholeHeadingPlace(manhole)}
               {headingPokemons.length > 0 && (
                 <span className="font-bold text-[15px] lg:text-[20px] text-[#6f6657]">
                   （{headingPokemons.join('・')}）
@@ -1419,10 +1420,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 </div>
                 {/* 建物・目印は住所のすぐ下。以前は地図カードの外の別カードで、
                     住所と目印を突き合わせるのに視線が往復していた。 */}
-                {manhole.building && (
+                {landmarkLabel(manhole) && (
                   <div className="flex gap-3 py-1">
                     <dt className="shrink-0 font-bold text-[#9b917e]">目印</dt>
-                    <dd className="font-bold leading-snug text-[#2c2a26]">{manhole.building}</dd>
+                    <dd className="font-bold leading-snug text-[#2c2a26]">{landmarkLabel(manhole)}</dd>
                   </div>
                 )}
               </dl>

@@ -17,6 +17,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
+import { manholeHeadingPlace } from '@/lib/manhole-label';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -660,18 +661,11 @@ export default function NearbyPage() {
                         // マイ旅と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
                         // 一覧に数十枚並べると読み込みが終わらない。
                         thumbnailUrl={photo?.thumbnail_url || photo?.url}
-                        // 見出しは詳細ページ・マイ旅と同じ「〈県〉〈市区町村〉のポケふた」。
-                        title={`${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}のポケふた`}
+                        // 見出しは詳細ページの h1 と同じ（施設名があれば「〈県〉〈市区町村〉 〈施設名〉のポケふた」）。
+                        title={manholeHeadingPlace(manhole)}
                         date={`#${manhole.id}`}
-                        // 建物名と訪問日はここ。VisitPhotoCard 側で省略記号付きに切り詰まる。
-                        posterName={
-                          [
-                            manhole.building,
-                            manhole.visit ? `訪問 ${formatDate(manhole.visit.shot_at)}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' ・ ') || undefined
-                        }
+                        // 施設名は見出しに入ったので、ここは訪問日だけ。VisitPhotoCard 側で省略記号付きに切り詰まる。
+                        posterName={manhole.visit ? `訪問 ${formatDate(manhole.visit.shot_at)}` : undefined}
                         tags={(manhole.pokemons || []).slice(0, 2)}
                         cornerLabel={
                           activeTab !== 'all' && manhole.distance !== undefined

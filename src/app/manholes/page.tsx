@@ -7,6 +7,7 @@ import { Manhole } from '@/types/database';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
+import { manholeDisplayName } from '@/lib/manhole-label';
 
 export default function ManholesPage() {
   const [manholes, setManholes] = useState<Manhole[]>([]);
@@ -160,12 +161,9 @@ export default function ManholesPage() {
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h2 className="line-clamp-2 text-base font-extrabold leading-snug">
-                        {manhole.title || `${manhole.prefecture || ''}${manhole.municipality || manhole.city || ''}`}
+                      <h2 className="line-clamp-2 text-base font-extrabold leading-snug" title={manholeDisplayName(manhole)}>
+                        {manholeDisplayName(manhole)}
                       </h2>
-                      {manhole.building && (
-                        <p className="mt-1 text-xs font-bold text-[#6B6B6B]">{manhole.building}</p>
-                      )}
                     </div>
                     <span className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-sm font-extrabold text-[#7B63A8] shadow-sm ring-1 ring-[#7B63A8]/15">
                       #{manhole.id}

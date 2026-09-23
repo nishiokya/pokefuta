@@ -17,6 +17,8 @@ export type ManholeLabelSource = {
   municipality?: string | null;
   pokemons?: string[] | null;
   title?: string | null;
+  building?: string | null;
+  address?: string | null;
 };
 
 /** 都道府県サイトへのリンク等がポケモン名の配列に混ざることがあるので落とす。 */
@@ -47,6 +49,53 @@ export function manholeLocationLabel(manhole: ManholeLabelSource): string {
   return `${manhole.prefecture ?? ''}${muni}`;
 }
 
+const MUNICIPALITY_SUFFIX = /[市区町村]$/;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * 接尾辞まで揃った自治体名（「豊橋」→「豊橋市」）。揃わなければ空文字。
+ * 図鑑の `display_names.municipality_label()` / `_complete_municipality()` と同じく、
+ * 住所 → title（「愛知県/豊橋市」）の後半の順で補う。
+ */
+export function municipalityLabel(manhole: ManholeLabelSource): string {
+  const muni = (manhole.city || manhole.municipality || '').trim();
+  if (muni && MUNICIPALITY_SUFFIX.test(muni)) return muni;
+  if (muni && manhole.address) {
+    const hit = manhole.address.match(new RegExp(`${escapeRegExp(muni)}[市区町村]`));
+    if (hit) return hit[0];
+  }
+  const tail = (manhole.title || '').split('/')[1]?.trim() ?? '';
+  return MUNICIPALITY_SUFFIX.test(tail) ? tail : '';
+}
+
+/**
+ * 表示用の施設名。図鑑の `landmark_label()` と同じく、全角・連続スペースを半角1つにし、
+ * 先頭の自治体名（「指宿市 指宿図書館」）を落とす。
+ */
+export function landmarkLabel(manhole: ManholeLabelSource, cityLabel = municipalityLabel(manhole)): string {
+  let building = (manhole.building || '').replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cityLabel && building.startsWith(cityLabel)) building = building.slice(cityLabel.length).trim();
+  return building;
+}
+
+/**
+ * 一覧・カードに出す蓋の名前。**図鑑の地図の見出し（`place_label || title`）と同じ形**。
+ * 施設名があれば「豊橋市 道の駅とよはし」、無ければ title の「岩手県/宮古市」。
+ * 以前は画面ごとに「豊橋・道の駅とよはし」「岩手県 宮古」と組み立てがばらばらだった。
+ */
+export function manholeDisplayName(manhole: ManholeLabelSource): string {
+  const city = municipalityLabel(manhole);
+  const place = city ? landmarkLabel(manhole, city) : '';
+  if (place) return `${city} ${place}`;
+  const title = (manhole.title || '').trim();
+  if (title) return title;
+  const muni = manhole.city || manhole.municipality || '';
+  return [manhole.prefecture, muni].filter(Boolean).join('/') || 'ポケふた';
+}
+
 /** 「宮城県大河原のポケふた」。見出し・title の共通部分。 */
 export function manholePlaceLabel(manhole: ManholeLabelSource): string {
   const location = manholeLocationLabel(manhole);
@@ -62,8 +111,18 @@ export function manholeLabel(manhole: ManholeLabelSource): string {
   return `${manholePlaceLabel(manhole)}（${pokemonText(manhole.pokemons)}）`;
 }
 
+/** h1 のポケモン名より前。施設名があれば「愛知県豊橋 道の駅とよはしのポケふた」。 */
+export function manholeHeadingPlace(manhole: ManholeLabelSource): string {
+  const landmark = landmarkLabel(manhole, municipalityLabel(manhole) || manhole.city || manhole.municipality || '');
+  if (!landmark) return manholePlaceLabel(manhole);
+  const location = manholeLocationLabel(manhole) || manhole.title || '';
+  return `${location} ${landmark}のポケふた`;
+}
+
 /**
  * 「宮城県大河原のポケふた（チェリム・ラプラス）」。**見出し（h1）と JSON-LD の name**。
+ * 施設名があれば図鑑の h1 と同じく「愛知県豊橋 道の駅とよはしのポケふた（…）」と入れる
+ * （`manholeHeadingPlace()`）。`<title>` と og: は検索向けに `manholePlaceLabel()` のまま。
  *
  * `manholeLabel()` と違い、ポケモンが1件も無ければ括弧ごと落とす。図鑑は h1 と
  * 関連カードで規則を分けており（`h1 += "（…）" if pokemons` に対し
@@ -71,7 +130,7 @@ export function manholeLabel(manhole: ManholeLabelSource): string {
  * 1本に畳むと、ポケモン不明の蓋の見出しが「〜のポケふた（ポケモン）」になる。
  */
 export function manholeHeading(manhole: ManholeLabelSource): string {
-  const place = manholePlaceLabel(manhole);
+  const place = manholeHeadingPlace(manhole);
   const list = filterPokemons(manhole.pokemons);
   return list.length > 0 ? `${place}（${list.join('・')}）` : place;
 }

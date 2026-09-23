@@ -24,6 +24,7 @@ import { SITE_NAME } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { CompletionRollup } from '@/lib/prefecture-completion';
 import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
+import { manholeDisplayName } from '@/lib/manhole-label';
 
 type FeedVisit = {
   id: string;
@@ -396,9 +397,7 @@ export default function HomePage() {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                   {sortedFeed.map((visit, index) => {
                     const photo = visit.photos?.[0];
-                    const locationLabel = visit.manhole?.building
-                      ? [visit.manhole.municipality, visit.manhole.building].filter(Boolean).join('・')
-                      : [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ') || visit.shot_location || '';
+                    const locationLabel = visit.manhole ? manholeDisplayName(visit.manhole) : visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
                     const canNavigate = Boolean(manholeId);
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
@@ -642,9 +641,7 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
               {rareManholes.map((manhole) => {
-                const label = manhole.building
-                  ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
-                  : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
+                const label = manholeDisplayName(manhole);
                 return (
                   <Link
                     key={manhole.id}

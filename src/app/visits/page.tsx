@@ -28,6 +28,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
 import { pageTitle } from '@/lib/constants';
+import { manholeDisplayName } from '@/lib/manhole-label';
 
 interface Visit {
   id: string;
@@ -182,9 +183,7 @@ export default function VisitsPage() {
             data.visits.map((v: any) => ({
               id: v.id,
               thumbnail_url: v.photos?.[0]?.thumbnail_url ?? null,
-              location: v.manhole?.building
-                ? [v.manhole.municipality, v.manhole.building].filter(Boolean).join('・')
-                : [v.manhole?.prefecture, v.manhole?.municipality].filter(Boolean).join(' ') || 'ポケふた',
+              location: v.manhole ? manholeDisplayName(v.manhole) : 'ポケふた',
             }))
           );
         }
@@ -1423,7 +1422,7 @@ function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSumm
 
       <div>
         <p className="truncate font-pixelJp text-[9px] font-bold leading-tight text-[#4F3828]">
-          {getMunicipality(manhole)}{manhole.building && `・${manhole.building}`}
+          {manholeDisplayName(manhole)}
         </p>
         {summary && (
           <p className="font-pixel text-[8px] text-[#B5483C]">{formatVisitDate(summary.latestVisit.visited_at, 'yyyy/M')}</p>
