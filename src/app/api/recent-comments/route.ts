@@ -16,7 +16,12 @@ import {
  */
 export const dynamic = 'force-dynamic';
 
-const CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+/**
+ * 共有キャッシュは60秒で打ち切り、stale-while-revalidate は付けない。
+ * 写真のひとことは訪問を非公開にした時点で見えなくなるべきもので、SWR を付けると
+ * 期限切れ後も最大5分、非公開にした本文を配り続ける。
+ */
+const CACHE_CONTROL = 'public, s-maxage=60';
 
 /**
  * 蓋ごとに1件へ絞る前に読む件数。同じ蓋への連投や、読む価値の無いひとこと
@@ -114,16 +119,25 @@ export async function GET(request: NextRequest) {
         .select('id, title, prefecture, municipality, building')
         .in('id', manholeIds)
       : Promise.resolve({ data: [] as any[], error: null }),
-    // 掲示板コメントには写真が無いので、その蓋のいちばん新しい公開写真を添える
-    needPhoto.length > 0
-      ? supabase
-        .from('visit')
-        .select('manhole_id, created_at, photos:photo!inner(id, created_at)')
-        .eq('is_public', true)
-        .in('manhole_id', needPhoto)
-        .order('created_at', { ascending: false })
-        .limit(needPhoto.length * 10)
-      : Promise.resolve({ data: [] as any[], error: null }),
+    // 掲示板コメントには写真が無いので、その蓋のいちばん新しい公開写真を添える。
+    // 蓋ごとに1件ずつ引く。まとめて limit を掛けると、投稿の多い蓋が枠を
+    // 使い切って他の蓋に写真が付かない。蓋は最大 RECENT_COMMENTS_MAX_LIMIT 個。
+    Promise.all(
+      needPhoto.map(async (manholeId) => {
+        const { data, error } = await supabase
+          .from('visit')
+          .select('photos:photo!inner(id, created_at)')
+          .eq('is_public', true)
+          .eq('manhole_id', manholeId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (error) {
+          console.warn('Failed to load photo for recent comment:', manholeId, error);
+          return [manholeId, null] as const;
+        }
+        return [manholeId, firstPhotoId((data as any[])?.[0]?.photos)] as const;
+      })
+    ),
   ]);
 
   if (manholesResult.error) {
@@ -133,17 +147,11 @@ export async function GET(request: NextRequest) {
       { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
-  if (photosResult.error) console.warn('Failed to load photos for recent comments:', photosResult.error);
 
   const manholeMap = new Map<number, any>(
     ((manholesResult.data as any[]) || []).map((manhole) => [manhole.id, manhole])
   );
-  const fallbackPhoto = new Map<number, string>();
-  for (const row of (photosResult.data as any[]) || []) {
-    if (fallbackPhoto.has(row.manhole_id)) continue;
-    const photoId = firstPhotoId(row.photos);
-    if (photoId) fallbackPhoto.set(row.manhole_id, photoId);
-  }
+  const fallbackPhoto = new Map<number, string | null>(photosResult);
 
   const items = picked.flatMap((item) => {
     const manhole = manholeMap.get(item.manhole_id);
