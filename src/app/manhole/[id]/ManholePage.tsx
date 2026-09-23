@@ -23,6 +23,11 @@ import {
   orderManholePhotosForViewer,
   photoChronologyDate,
 } from '@/lib/manhole-photo-ranking';
+import {
+  isMeaningfulVisitComment,
+  normalizeVisitComment,
+  rankVisitComments,
+} from '@/lib/visit-comment-quality';
 import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
 import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
@@ -260,6 +265,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+  const [showAllVisitComments, setShowAllVisitComments] = useState(false);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -422,6 +428,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     const requestId = ++photoRequestIdRef.current;
     setPhotosLoading(true);
     setPhotoLoadError(false);
+    setShowAllVisitComments(false);
     try {
       const pageSize = 100;
       const loadedPhotos: Photo[] = [];
@@ -867,7 +874,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           const dated = photoChronologyDate(photo);
           const dateLabel = dated ? formatPhotoDateCompact(dated.iso) : '';
           const dateKind = dated?.source === 'upload' ? '投稿' : '撮影';
-          const comment = photo.visit?.comment?.trim();
+          // アイコンは「読む価値のあるひとこと」がある写真にだけ付ける。数字だけ等に
+          // 付けると、開いて「15」しか出ずにがっかりさせる。
+          const comment = isMeaningfulVisitComment(photo.visit?.comment);
           // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
           // 拡大表示側（:941）と同じくリンクにしない。
           const profileHref =
@@ -954,6 +963,98 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
+    </div>
+  ) : null;
+
+  // ── 訪れた人のひとこと ─────────────────────────────────────────────
+  // 投稿時に添えられたコメントを、読む価値のあるものだけ長い順に並べる。
+  // 「すべての写真」ではアイコンしか出ず、拡大しないと読めなかった。
+  // 下の「コメント」欄（蓋への掲示板）とは別物: こちらは写真に付いた一言。
+  const VISIT_COMMENT_PREVIEW = 3;
+  const rankedVisitComments = rankVisitComments(allDisplayPhotos);
+  const shownVisitComments = showAllVisitComments
+    ? rankedVisitComments
+    : rankedVisitComments.slice(0, VISIT_COMMENT_PREVIEW);
+  const visitCommentsSection = rankedVisitComments.length > 0 ? (
+    <div>
+      <h3 className="mb-3 flex items-center gap-1.5 font-pixelJp text-[13.5px] font-bold text-[#2c2a26]">
+        <Sparkles className="h-3.5 w-3.5 text-[#b87d0a]" strokeWidth={2.2} />
+        訪れた人のひとこと
+        <span className="font-pixelJp text-[11px] font-normal text-[#9b917e]">
+          {rankedVisitComments.length}
+        </span>
+      </h3>
+      <ul className="flex flex-col gap-2.5">
+        {shownVisitComments.map(({ photo, index, text }) => {
+          const userLabel = getPhotoUserLabel(photo);
+          const dated = photoChronologyDate(photo);
+          const profileHref =
+            photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
+              ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
+              : null;
+          return (
+            <li
+              key={photo.visit?.id ?? photo.id}
+              className="flex items-start gap-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPhotoIdx(index);
+                  setPhotoExpanded(true);
+                  requestAnimationFrame(() => {
+                    document.getElementById('featured-manhole-photo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }}
+                aria-label={`@${userLabel}さんの写真を表示`}
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-[10px] bg-[#fbf6ea] p-0"
+              >
+                <img
+                  src={`/api/photo/${photo.id}?size=small`}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="whitespace-pre-line break-words font-pixelJp text-[12.5px] leading-relaxed text-[#2c2a26]">
+                  {text}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {profileHref ? (
+                    <Link
+                      href={profileHref}
+                      className="font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
+                    >
+                      @{userLabel}
+                    </Link>
+                  ) : (
+                    <span className="font-pixelJp text-[10.5px] font-bold text-[#8b816f]">@{userLabel}</span>
+                  )}
+                  {dated && (
+                    <span className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]">
+                      {formatPhotoDateCompact(dated.iso)}
+                      {dated.source === 'upload' ? ' 投稿' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {rankedVisitComments.length > VISIT_COMMENT_PREVIEW && (
+        <button
+          type="button"
+          onClick={() => setShowAllVisitComments((v) => !v)}
+          aria-expanded={showAllVisitComments}
+          className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640]"
+        >
+          {showAllVisitComments
+            ? 'たたむ'
+            : `もっと見る（残り${rankedVisitComments.length - VISIT_COMMENT_PREVIEW}件）`}
+        </button>
+      )}
     </div>
   ) : null;
 
@@ -1182,7 +1283,14 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             {/* Featured photo detail — memo + isPublic(own) / comment(community) */}
             {featuredPhoto && (() => {
               const isOwn = featuredPhoto.visit?.user_id === currentUserId;
-              const memo = (isOwn ? featuredPhoto.visit?.note : undefined) || featuredPhoto.visit?.comment;
+              // 自分の記録は何を書いていても自分には見せる。他人のひとことは
+              // ゴミ判定（数字だけ・テスト等）を通ったものだけを代表写真に添える。
+              const communityComment = isMeaningfulVisitComment(featuredPhoto.visit?.comment)
+                ? normalizeVisitComment(featuredPhoto.visit?.comment)
+                : undefined;
+              const memo = isOwn
+                ? featuredPhoto.visit?.note || featuredPhoto.visit?.comment
+                : communityComment;
               const isPublic = featuredPhoto.visit?.is_public;
               if (!memo && !isOwn) return null;
               return (
@@ -1190,7 +1298,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   <Sparkles className="mt-0.5 h-[15px] w-[15px] shrink-0 text-[#b87d0a]" strokeWidth={2.2} />
                   <div className="flex-1 min-w-0">
                     {memo && (
-                      <p className="font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
+                      <p className="whitespace-pre-line break-words font-pixelJp text-[12.5px] font-semibold leading-relaxed text-[#6f6657]">{memo}</p>
                     )}
                     {isOwn && featuredPhoto.visit?.id && (() => {
                       const visitId = featuredPhoto.visit!.id;
@@ -1350,6 +1458,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             関連リンク3種とシェアの**上**に置く。以前は全1261行の最下部にあり、
             スクロールしきった人しか到達できなかった。ここは部屋の主コンテンツ。
           */}
+          {visitCommentsSection}
+
           {manhole && (
             <ManholeCommentThread
               manholeId={manhole.id}
