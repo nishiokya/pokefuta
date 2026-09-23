@@ -49,6 +49,15 @@ type FeedVisit = {
  */
 const FRESHLY_SHOT_DAYS = 3;
 
+/**
+ * ヒーローに並べる「写真が残っている都道府県」チップの上限。
+ *
+ * /api/prefecture-completion は残り県を全件返す。今は数県だが、日次スナップショット
+ * が壊れて photo_count が落ちると最大47県ぶんのチップ（各 min-h-11）がヒーローに
+ * 積まれ、CTAもフィードも画面外へ出る。上限で止めて、超過分は件数だけ添える。
+ */
+const INCOMPLETE_CHIP_LIMIT = 12;
+
 function isFreshlyShot(shotAt: string | null | undefined): boolean {
   if (!shotAt) return false;
   const shot = new Date(shotAt).getTime();
@@ -261,42 +270,6 @@ export default function HomePage() {
             </p>
 
             {/*
-              残りの都道府県は「写真がまだないポケふた」の中に置いていたので、
-              最新の投稿を全部見終わるまで目に入らなかった。すぐ上の
-              「残りN都道府県」の内訳なので、その文の直下に出す。並びは残り
-              枚数の少ない順（先頭が「次に終わる県」）、行き先は /manholes の
-              検索で県名に絞った一覧。
-            */}
-            {completion && completion.incompleteCount > 0 && (
-              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                <p className="text-sm font-bold text-[#4A4A4A]">
-                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-                  都道府県は、設置済みのポケふた全てに写真が集まりました。
-                </p>
-                <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-                  残りは{' '}
-                  <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-                  都道府県です。
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {completion.incomplete.map((entry) => (
-                    <Link
-                      key={entry.prefecture}
-                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                    >
-                      <span>{entry.prefecture}</span>
-                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                        あと {entry.missing} 枚
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/*
               新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
               並んでいて、どちらが主かが読めなかった。登録側だけを一段大きくし、
               スタンプ帳は枠線を外して副次的な見た目に落とす。
@@ -317,6 +290,51 @@ export default function HomePage() {
                   <Stamp className="h-4 w-4" />
                   スタンプ帳を見る
                 </Link>
+              </div>
+            )}
+
+            {/*
+              残りの都道府県は「写真がまだないポケふた」の中に置いていて、最新の
+              投稿を全部見終わるまで目に入らなかったので、ヒーローに引き上げる。
+
+              CTAより上には置けない。このパネルは completion（/api/prefecture-completion）
+              が解決してから現れるので、本文とCTAの間に挟むと、ボタンが描かれた後から
+              カードが割り込んでボタンを押し下げる。その瞬間のタップがチップに当たって
+              /manholes へ飛ぶ。ヒーローの末尾なら、遅れて増えても上の要素は動かない。
+
+              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は /manholes の
+              検索で県名に絞った一覧。
+            */}
+            {completion && completion.incompleteCount > 0 && (
+              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
+                {/*
+                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言っている。
+                  ここで繰り返さず、本文が持っていない「もう終わった県」の側を出す。
+                */}
+                <p className="text-sm font-bold text-[#4A4A4A]">
+                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
+                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
+                  都道府県は、設置済みのポケふた全てに写真が集まりました。
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
+                    <Link
+                      key={entry.prefecture}
+                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
+                    >
+                      <span>{entry.prefecture}</span>
+                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
+                        あと {entry.missing} 枚
+                      </span>
+                    </Link>
+                  ))}
+                  {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
+                    <span className="text-xs font-bold text-[#6B6B6B]">
+                      ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
