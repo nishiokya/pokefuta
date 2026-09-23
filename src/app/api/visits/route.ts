@@ -144,6 +144,13 @@ export async function GET(request: NextRequest) {
     // manhole_id が無い訪問記録が一覧から黙って消える。
     const manholeEmbed = prefecture ? 'manhole:manhole_id!inner' : 'manhole:manhole_id';
 
+    // `with_photos=true` も同じ理由で join 側に寄せる。これも後段の配列 filter
+    // だけだったので、`?with_photos=true&limit=12` が返すのは「最新12件のうち
+    // 写真があったもの」で、12件を下回るのが当たり前だった（トップのフィードが
+    // まさにこの形で、ページごとに枚数が揃わない）。写真が1枚も無い訪問記録を
+    // join で落とせば、limit の意味が「写真つきをN件」になる。
+    const photoEmbed = withPhotos === 'true' ? 'photos:photo!inner' : 'photos:photo';
+
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
@@ -164,7 +171,7 @@ export async function GET(request: NextRequest) {
             building,
             pokemons${manholeTagFields}
           ),
-          photos:photo (
+          ${photoEmbed} (
             id,
             storage_key,
             content_type,
@@ -197,7 +204,7 @@ export async function GET(request: NextRequest) {
             building,
             pokemons${manholeTagFields}
           ),
-          photos:photo (
+          ${photoEmbed} (
             id,
             storage_key,
             content_type,

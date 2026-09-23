@@ -72,6 +72,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: url },
+    /*
+      初回リリースは noindex, follow。
+      sitemap から外すだけでは検索に出ないことは保証できない（クロールは
+      リンクからも来る）。このページの主目的は内部回遊と投稿の導線であって
+      検索流入ではないし、同じ都道府県で図鑑が既に評価を持っている。
+      先に図鑑の評価を薄めるリスクを取る理由がないので、索引は止めて
+      リンクは辿らせる（follow）。
+
+      外すときは、図鑑と食い合わないだけの独自の中身が育ってからにすること。
+      その判断をするまでは sitemap にも入れない。
+    */
+    robots: { index: false, follow: true },
     openGraph: {
       type: 'website',
       title,

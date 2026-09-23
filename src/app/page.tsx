@@ -556,6 +556,10 @@ export default function HomePage() {
                     <Link
                       key={entry.prefecture}
                       href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
+                      // チップは「県名 + あとN枚」までしか置けない幅なので、行き先が
+                      // 何のページかは読み上げ用のラベルで補う。詳細ページの県リンク
+                      // （図鑑の設置情報）と文言で区別が付くようにしてある。
+                      aria-label={`${entry.prefecture}の写真募集状況を見る`}
                       className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
                     >
                       <span>{entry.prefecture}</span>

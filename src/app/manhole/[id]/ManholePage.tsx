@@ -1401,15 +1401,22 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           {/* ── Prefecture dex ──
               ラベルどおり図鑑（data.pokefuta.com）の都道府県ページへ直接送る。
               以前は写真館の `/manholes?q=` に送っていたが、写真が1枚も出ない
-              クライアント描画の一覧で、ラベルの「図鑑」とも一致していなかった。 */}
+              クライアント描画の一覧で、ラベルの「図鑑」とも一致していなかった。
+
+              写真館側にも `/prefectures/[prefecture]` ができたが、ここは図鑑のまま。
+              蓋の詳細を見ている人が県名を押すのは「他にどこに設置されているか」を
+              知りたいときで、それは図鑑の担当。写真の集まり具合を見たい人はトップの
+              残り県チップから県ページへ行く。**リンクの文言でどちらか分かるように
+              揃えてある**（ここは「設置情報を図鑑で見る」、県ページ末尾は「市町村別の
+              設置場所・登場ポケモンを図鑑で見る」）。 */}
           {prefectureDexHref && (
             <a
               href={prefectureDexHref}
               className="flex min-h-[48px] items-center gap-2.5 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs font-bold text-[#6f6657] shadow-sm transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
-              aria-label={`ポケふた図鑑で${manhole.prefecture}を見る`}
+              aria-label={`${manhole.prefecture}の設置情報を図鑑で見る`}
             >
               <Flag className="h-4 w-4 shrink-0" strokeWidth={2.2} />
-              <span>ポケふた図鑑で{manhole.prefecture}を見る</span>
+              <span>{manhole.prefecture}の設置情報を図鑑で見る</span>
               <span className="ml-auto text-base" aria-hidden="true">›</span>
             </a>
           )}

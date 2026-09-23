@@ -222,7 +222,14 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                 {overview.missingManholes.map((manhole) => (
                   <Link
                     key={manhole.id}
-                    href={isLoggedIn ? `/upload?manhole_id=${manhole.id}` : '/login'}
+                    // 未ログインでも「どの蓋を選んだか」を落とさない。素の /login に送ると、
+                    // ログイン後にトップへ出てしまい、この一覧まで戻って同じ蓋を探し直すことに
+                    // なる。詳細ページの投稿ボタンと同じ形（/login?redirect=<投稿画面>）。
+                    href={
+                      isLoggedIn
+                        ? `/upload?manhole_id=${manhole.id}`
+                        : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${manhole.id}`)}`
+                    }
                     className="flex items-center gap-2 rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-3 py-2.5 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40 hover:bg-white"
                   >
                     <Camera className="h-4 w-4 shrink-0 text-[#7B63A8]" />
@@ -366,11 +373,16 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                 <span className="flex items-center gap-2.5">
                   <BookOpen className="h-5 w-5 shrink-0 text-[#7B63A8]" />
                   <span>
+                    {/*
+                      文言は目的別に分ける。同じ「県を見る」でも、詳細ページは
+                      設置情報（図鑑）、トップの残り県チップは写真の募集状況（このページ）、
+                      ここは図鑑へ戻す導線。行き先が割れていても、何が得られるかで読み分けられる。
+                    */}
                     <span className="block text-sm font-extrabold text-[#4A4A4A]">
-                      ポケふた図鑑で{prefecture}を見る
+                      市町村別の設置場所・登場ポケモンを図鑑で見る
                     </span>
                     <span className="mt-0.5 block text-xs font-medium text-[#6B6B6B]">
-                      市町村別の設置枚数、行き方、登場ポケモン
+                      {prefecture}の行き方、トリビア、近くの都道府県
                     </span>
                   </span>
                 </span>
