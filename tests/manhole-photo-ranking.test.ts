@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   orderManholePhotosChronologically,
+  orderManholePhotosNewestFirst,
   orderManholePhotosForViewer,
   photoChronologyDate,
   rankManholePhotos,
@@ -134,4 +135,18 @@ test('the display date comes from the same judgement as the sort', () => {
     source: 'upload',
   });
   assert.equal(photoChronologyDate(shot('undated', 'not-a-date', 'also-not-a-date')), null);
+});
+
+test('newest-first puts the latest shot first and keeps undated photos at the end', () => {
+  const ordered = orderManholePhotosNewestFirst([
+    shot('undated', 'not-a-date', 'also-not-a-date'),
+    shot('aug11', '2026-08-11T00:00:00Z', '2026-08-24T00:00:00Z'),
+    shot('aug30', '2026-08-30T00:00:00Z', '2026-08-30T00:00:00Z'),
+    shot('y2024', '2024-07-13T00:00:00Z', '2026-08-13T00:00:00Z'),
+  ]);
+
+  assert.deepEqual(
+    ordered.map(({ photo, index }) => [photo.id, index]),
+    [['aug30', 2], ['aug11', 1], ['y2024', 3], ['undated', 0]]
+  );
 });

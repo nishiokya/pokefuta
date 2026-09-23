@@ -3,9 +3,10 @@ import test from 'node:test';
 import {
   isMeaningfulVisitComment,
   normalizeVisitComment,
-  rankVisitComments,
+  collectVisitComments,
 } from '../src/lib/visit-comment-quality';
 import { rankManholePhotos } from '../src/lib/manhole-photo-ranking';
+import { appendVisitTipSuggestion } from '../src/lib/visit-tip';
 
 test('本番で見つかったゴミは落とす', () => {
   for (const junk of ['15', '9', '  39 ', 'ニャンコ', '四日市', 'cool', '投稿テスト', 'あああああ', 'wwwwww', '!!!!!!', '😂😂😂😂😂', '', null, undefined]) {
@@ -30,26 +31,21 @@ test('改行は残し、CRLF と連続空白は畳む', () => {
 const photo = (id: string, visitId: string, comment: string | null, createdAt = '2026-08-01T00:00:00.000Z') => ({
   id,
   created_at: createdAt,
-  visit: { id: visitId, comment, shot_at: null, user_id: 'u', is_public: true },
+  visit: { id: visitId, comment, created_at: createdAt, shot_at: null, user_id: 'u', is_public: true },
 });
 
-test('ひとこと一覧は長い順・ゴミ除外・訪問単位で1件', () => {
-  const ranked = rankVisitComments([
-    photo('a', 'v1', '15'),
-    photo('b', 'v2', '駅前にありました'),
-    photo('c', 'v3', '道の駅の入り口にありました。駐車場は無料です'),
-    photo('d', 'v3', '道の駅の入り口にありました。駐車場は無料です'),
-    photo('e', 'v4', null),
+test('ひとこと一覧は書かれた新しい順・ゴミ除外・訪問単位で1件', () => {
+  const ranked = collectVisitComments([
+    photo('a', 'v1', '15', '2026-09-01T00:00:00.000Z'),
+    photo('b', 'v2', '駅前にありました', '2026-08-01T00:00:00.000Z'),
+    photo('c', 'v3', '道の駅の入り口にありました', '2026-08-20T00:00:00.000Z'),
+    photo('d', 'v3', '道の駅の入り口にありました', '2026-08-20T00:00:00.000Z'),
+    photo('e', 'v4', null, '2026-09-10T00:00:00.000Z'),
   ]);
-  assert.deepEqual(ranked.map(({ photo: p, index }) => [p.id, index]), [['c', 2], ['b', 1]]);
-});
-
-test('同じ長さなら新しい訪問が先', () => {
-  const ranked = rankVisitComments([
-    photo('old', 'v1', 'あいうえおか', '2026-01-01T00:00:00.000Z'),
-    photo('new', 'v2', 'かきくけこさ', '2026-06-01T00:00:00.000Z'),
-  ]);
-  assert.deepEqual(ranked.map(({ photo: p }) => p.id), ['new', 'old']);
+  assert.deepEqual(
+    ranked.map(({ photo: p, index, postedAt }) => [p.id, index, postedAt]),
+    [['c', 2, '2026-08-20T00:00:00.000Z'], ['b', 1, '2026-08-01T00:00:00.000Z']]
+  );
 });
 
 test('写真の並びはスコアが同じならひとこと付きが先、ゴミコメントは無しと同じ', () => {
@@ -59,4 +55,11 @@ test('写真の並びはスコアが同じならひとこと付きが先、ゴ�
     photo('commented', 'v3', '駅前にありました', '2026-08-01T00:00:00.000Z'),
   ]);
   assert.deepEqual(ranked.map(({ id }) => id), ['commented', 'newest-no-comment', 'junk']);
+});
+
+test('次に来る人への候補は二重に足さず、文の区切りを補う', () => {
+  assert.equal(appendVisitTipSuggestion('', '駐車場あり'), '駐車場あり');
+  assert.equal(appendVisitTipSuggestion('駐車場あり', '駅から歩ける'), '駐車場あり。駅から歩ける');
+  assert.equal(appendVisitTipSuggestion('公園の中です。', '駐車場あり'), '公園の中です。駐車場あり');
+  assert.equal(appendVisitTipSuggestion('駐車場あり', '駐車場あり'), '駐車場あり');
 });

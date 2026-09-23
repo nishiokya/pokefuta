@@ -3,14 +3,15 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage } from '@/lib/storage';
+import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
 /**
  * @swagger
  * /api/visits/{id}:
  *   patch:
- *     summary: 訪問記録の公開設定を変更
+ *     summary: 訪問記録の公開設定・ひとことを変更
  *     tags: [visits]
- *     description: 自分の訪問記録の is_public を更新します。他人の記録は変更できません。
+ *     description: 自分の訪問記録の is_public / comment を更新します（どちらか一方だけでもよい）。他人の記録は変更できません。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -27,16 +28,20 @@ import { storage } from '@/lib/storage';
  *         application/json:
  *           schema:
  *             type: object
- *             required: [is_public]
  *             properties:
  *               is_public:
  *                 type: boolean
  *                 description: true で公開、false で非公開
+ *               comment:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 500
+ *                 description: 次に来る人へのひとこと。空文字または null で消す
  *     responses:
  *       200:
  *         description: 更新成功
  *       400:
- *         description: is_public が boolean でない
+ *         description: 更新項目が無い、is_public が boolean でない、comment が文字列でないか500文字を超える
  *       401:
  *         description: 認証が必要
  *       403:
@@ -71,13 +76,42 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    const isPublic = (body as { is_public?: unknown } | null)?.is_public;
+    const payload = (body ?? {}) as { is_public?: unknown; comment?: unknown };
+    const hasIsPublic = payload.is_public !== undefined;
+    const hasComment = payload.comment !== undefined;
 
-    if (typeof isPublic !== 'boolean') {
+    if (!hasIsPublic && !hasComment) {
+      return NextResponse.json({
+        success: false,
+        error: 'is_public or comment is required'
+      }, { status: 400 });
+    }
+
+    if (hasIsPublic && typeof payload.is_public !== 'boolean') {
       return NextResponse.json({
         success: false,
         error: 'is_public must be a boolean'
       }, { status: 400 });
+    }
+
+    // 「次に来る人へひとこと」を後から書く経路（投稿完了画面・蓋の詳細）。
+    // 上限は投稿画面の textarea と同じ 500 文字。空文字は「消した」として null に落とす。
+    let comment: string | null | undefined;
+    if (hasComment) {
+      if (payload.comment !== null && typeof payload.comment !== 'string') {
+        return NextResponse.json({
+          success: false,
+          error: 'comment must be a string or null'
+        }, { status: 400 });
+      }
+      const trimmed = typeof payload.comment === 'string' ? payload.comment.trim() : '';
+      if (trimmed.length > VISIT_COMMENT_MAX_LENGTH) {
+        return NextResponse.json({
+          success: false,
+          error: `comment must be at most ${VISIT_COMMENT_MAX_LENGTH} characters`
+        }, { status: 400 });
+      }
+      comment = trimmed || null;
     }
 
     const { data: visit, error: visitError } = await supabase
@@ -104,17 +138,21 @@ export async function PATCH(
     // RLS(users_update_own_visits) に加えて user_id でも絞り、DELETE と同じ多層防御にする。
     const { data: updated, error: updateError } = await supabase
       .from('visit')
-      .update({ is_public: isPublic, updated_at: new Date().toISOString() })
+      .update({
+        ...(hasIsPublic ? { is_public: payload.is_public as boolean } : {}),
+        ...(hasComment ? { comment } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', visitId)
       .eq('user_id', session.user.id)
-      .select('id, is_public')
+      .select('id, is_public, comment')
       .single();
 
     if (updateError || !updated) {
-      console.error('Error updating visit visibility:', updateError);
+      console.error('Error updating visit:', updateError);
       return NextResponse.json({
         success: false,
-        error: 'Failed to update visit visibility',
+        error: 'Failed to update visit',
         details: updateError?.message
       }, { status: 500 });
     }
@@ -122,7 +160,8 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       visit_id: updated.id,
-      is_public: updated.is_public
+      is_public: updated.is_public,
+      comment: updated.comment
     });
   } catch (error: any) {
     console.error('Unexpected error updating visit visibility:', error);

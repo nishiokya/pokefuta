@@ -511,6 +511,29 @@ for (const helper of [
   );
 }
 
+// 4d. 次に来る人へひとこと。saved はキーイベントなので、送信元が消えると
+//     コンバージョンが黙ってゼロになる。
+for (const eventName of readLedger('VISIT_TIP_EVENTS')) {
+  expect(
+    analyticsCode.includes(`trackEvent('${eventName}'`),
+    `${eventName} は VISIT_TIP_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
+  );
+}
+for (const helper of ['visitTipPromptView', 'visitTipSaved']) {
+  expect(
+    callerCode.includes(`${helper}({`),
+    `${helper} がどこからも呼ばれていない（ひとことの計測に穴が空く）`
+  );
+}
+// 投稿画面・投稿完了画面・蓋の詳細の3か所すべてから saved が出ていること
+for (const surface of ['upload_form', 'upload_complete', 'manhole_detail']) {
+  // JSX 属性（surface="upload_complete"）とオブジェクト（surface: 'upload_form'）の両方を拾う
+  expect(
+    callerCode.includes(`'${surface}'`) || callerCode.includes(`"${surface}"`),
+    `ひとことの surface '${surface}' がどこからも送られていない`
+  );
+}
+
 // 5. 投稿導線のクリックが計測されている
 expect(
   callerCode.includes('trackSubmissionEntry({'),

@@ -47,42 +47,48 @@ export const visitCommentScore = (raw: string | null | undefined) =>
 type CommentedPhoto = {
   id: string;
   created_at: string;
-  visit?: { id?: string | null; comment?: string | null; shot_at?: string | null } | null;
+  visit?: { id?: string | null; comment?: string | null; created_at?: string | null } | null;
 };
 
-export type RankedVisitComment<T> = {
+export type VisitCommentEntry<T> = {
   photo: T;
   /** 呼び出し側の配列での添字。拡大表示を元配列の添字で動かすため持ち回る */
   index: number;
   text: string;
+  /** ひとことが書かれた日時（訪問の登録日時）。掲示板コメントと同じ軸で並べるために使う */
+  postedAt: string;
 };
 
 /**
- * 「訪れた人のひとこと」に並べる一覧。読む価値のあるものだけを、長い順に並べる。
+ * 蓋の「コメント」欄に掲示板コメントと混ぜて並べる、写真のひとこと。
+ * 読む価値のあるものだけを、書かれた日時の新しい順に返す。
+ *
+ * 日時は訪問の登録日時（visit.created_at）。撮影日ではない: 掲示板コメントの
+ * created_at と同じ「いつ書かれたか」で並べないと、昔の写真を今日上げた人の
+ * ひとことが一覧の底に沈む。
  *
  * コメントは写真ではなく訪問に付くので、1回の訪問で複数枚上げた人が
  * 同じ文で何度も並ばないよう訪問単位で1件にする（代表は配列で先に来た写真）。
- * 同じ長さなら新しい訪問を先に出す。
  */
-export const rankVisitComments = <T extends CommentedPhoto>(photos: T[]): RankedVisitComment<T>[] => {
+export const collectVisitComments = <T extends CommentedPhoto>(photos: T[]): VisitCommentEntry<T>[] => {
   const seen = new Set<string>();
-  const items: Array<RankedVisitComment<T> & { score: number; time: number }> = [];
+  const items: Array<VisitCommentEntry<T> & { time: number }> = [];
   photos.forEach((photo, index) => {
     const key = photo.visit?.id ?? `photo:${photo.id}`;
     if (seen.has(key)) return;
     seen.add(key);
-    const score = visitCommentScore(photo.visit?.comment);
-    if (score === 0) return;
-    const time = new Date(photo.visit?.shot_at || photo.created_at).getTime();
+    if (!isMeaningfulVisitComment(photo.visit?.comment)) return;
+    const postedAt = photo.visit?.created_at || photo.created_at;
+    const time = new Date(postedAt).getTime();
     items.push({
       photo,
       index,
       text: normalizeVisitComment(photo.visit?.comment),
-      score,
+      postedAt,
       time: Number.isFinite(time) ? time : 0,
     });
   });
   return items
-    .sort((a, b) => b.score - a.score || b.time - a.time || a.index - b.index)
-    .map(({ photo, index, text }) => ({ photo, index, text }));
+    .sort((a, b) => b.time - a.time || a.index - b.index)
+    .map(({ photo, index, text, postedAt }) => ({ photo, index, text, postedAt }));
 };
