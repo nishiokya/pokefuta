@@ -762,6 +762,14 @@ export interface Database {
           design_manholes: number;
         }[];
       };
+      get_public_prefecture_completion: {
+        Args: Record<string, never>;
+        Returns: {
+          prefecture: string;
+          total: number;
+          with_photo: number;
+        }[];
+      };
       get_public_display_names: {
         Args: {
           p_auth_uids: string[];

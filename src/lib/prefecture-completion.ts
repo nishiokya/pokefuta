@@ -14,6 +14,12 @@ export interface CompletionInput {
   photo_count: number;
 }
 
+export interface CompletionAggregateInput {
+  prefecture: string | null;
+  total: number;
+  with_photo: number;
+}
+
 export interface PrefectureCompletion {
   prefecture: string;
   total: number;
@@ -83,6 +89,46 @@ export function buildPrefectureCompletion(
       isComplete: missing === 0,
     });
   }
+
+  const incomplete = prefectures
+    .filter((entry) => !entry.isComplete)
+    .sort(
+      (a, b) =>
+        a.missing - b.missing || a.prefecture.localeCompare(b.prefecture, 'ja')
+    );
+
+  return {
+    listedCount: prefectures.length,
+    completeCount: prefectures.filter((entry) => entry.isComplete).length,
+    incomplete,
+    incompleteCount: incomplete.length,
+    missingTotal: prefectures.reduce((sum, entry) => sum + entry.missing, 0),
+  };
+}
+
+/** 公開写真だけを数えたDB集計から、トップ表示用の形へ変換する。 */
+export function buildPrefectureCompletionFromAggregates(
+  aggregates: CompletionAggregateInput[]
+): CompletionRollup {
+  const prefectures: PrefectureCompletion[] = aggregates.flatMap((entry) => {
+    const prefecture = (entry.prefecture ?? '').trim();
+    const total = Number(entry.total);
+    const withPhoto = Number(entry.with_photo);
+    if (!prefecture || !Number.isFinite(total) || total <= 0 || !Number.isFinite(withPhoto)) {
+      return [];
+    }
+
+    const boundedWithPhoto = Math.min(Math.max(withPhoto, 0), total);
+    const missing = total - boundedWithPhoto;
+    return [{
+      prefecture,
+      total,
+      withPhoto: boundedWithPhoto,
+      missing,
+      coverage: Math.round((boundedWithPhoto / total) * 100),
+      isComplete: missing === 0,
+    }];
+  });
 
   const incomplete = prefectures
     .filter((entry) => !entry.isComplete)

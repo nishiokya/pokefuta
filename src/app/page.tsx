@@ -49,16 +49,6 @@ type FeedVisit = {
  */
 const FRESHLY_SHOT_DAYS = 3;
 
-/**
- * ヒーローに並べる「写真が残っている都道府県」チップの上限。
- *
- * /api/prefecture-completion は残り県を全件返す。今は数県だが、日次スナップショット
- * が壊れて photo_count が落ちると最大47県ぶんのチップ（各 min-h-11）がヒーローの
- * 末尾に積まれ、その下のフィードが画面外へ出る。上限で止めて、超過分は一覧への
- * リンクに畳む。
- */
-const INCOMPLETE_CHIP_LIMIT = 12;
-
 function isFreshlyShot(shotAt: string | null | undefined): boolean {
   if (!shotAt) return false;
   const shot = new Date(shotAt).getTime();
@@ -84,9 +74,6 @@ export default function HomePage() {
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
   // 取得が終わったか（成否を問わない）。終わるまで残りの文を出さないための旗。
   const [completionLoaded, setCompletionLoaded] = useState(false);
-  // site-stats が「まだ来ていない」のか「来たが使えなかった」のかを区別する。
-  // totalPosts の null だけでは読み込み中と失敗が同じ顔になる。
-  const [statsLoaded, setStatsLoaded] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
@@ -147,14 +134,14 @@ export default function HomePage() {
       if (!response.ok) return;
       const data = await response.json();
       if (!data?.success) return;
-      setTotalPosts(typeof data.posts === 'number' ? data.posts : null);
+      // 写真館で見えるのは公開訪問の写真だけ。全写真数 posts を出すと、
+      // 非公開にした写真まで「集まっています」に含まれて表示と食い違う。
+      setTotalPosts(typeof data.public_posts === 'number' ? data.public_posts : null);
       setTotalManholes(typeof data.manholes === 'number' ? data.manholes : null);
       setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
-    } finally {
-      setStatsLoaded(true);
     }
   };
 
@@ -216,10 +203,10 @@ export default function HomePage() {
         フッターが担っているので本文には要らない。ここはフッターとの間隔として
         必要な分だけ残す。
       */}
-      <PCShell className="pb-10 pt-5 lg:pb-12 lg:pt-6">
+      <PCShell className="pb-10 pt-2 sm:pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
-        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+        <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
           <div className="relative max-w-3xl">
             {/*
               日本語は単語区切りが無いので、放っておくと文字単位で折り返して
@@ -232,11 +219,10 @@ export default function HomePage() {
               親の max-w-3xl（672px）には収まるのに自分の上限だけで折り返っていた。
               行長は親の max-w-3xl で決める。
             */}
-            <h1 className="text-3xl font-extrabold leading-tight tracking-normal sm:text-5xl">
-              <span className="inline-block">全国のポケふたを</span>
-              <span className="inline-block">写真で埋めよう</span>
+            <h1 className="whitespace-nowrap text-[clamp(1.05rem,5.15vw,1.875rem)] font-extrabold leading-tight tracking-[-0.03em] sm:text-5xl sm:tracking-normal">
+              全国のポケふたを写真で埋めよう
             </h1>
-            <p className="mt-4 text-base font-medium leading-relaxed sm:text-lg">
+            <p className="mt-2 text-sm font-medium leading-relaxed sm:mt-4 sm:text-lg">
               {/*
                 蓋を数える単位は「枚」で揃える（CLAUDE.md の用語規約。以前ここだけ
                 「件」になっていた）。本文なので概念名の「デザインマンホール」を使い、
@@ -281,10 +267,10 @@ export default function HomePage() {
               スタンプ帳は枠線を外して副次的な見た目に落とす。
             */}
             {!isLoggedIn && (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:gap-3">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#7B63A8] px-6 py-3.5 text-base font-extrabold text-white shadow-[0_4px_0_#5f55b8] transition hover:bg-[#6A5299] active:translate-y-0.5 active:shadow-[0_2px_0_#5f55b8]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#7B63A8] px-4 py-2.5 text-sm font-extrabold text-white shadow-[0_4px_0_#5f55b8] transition hover:bg-[#6A5299] active:translate-y-0.5 active:shadow-[0_2px_0_#5f55b8] sm:px-6 sm:py-3.5 sm:text-base"
                 >
                   <Camera className="h-5 w-5" />
                   無料で旅の記録をはじめる
@@ -299,80 +285,12 @@ export default function HomePage() {
               </div>
             )}
 
-            {/*
-              残りの都道府県は「写真がまだないポケふた」の中に置いていて、最新の
-              投稿を全部見終わるまで目に入らなかったので、ヒーローに引き上げる。
-
-              CTAより上には置けない。このパネルは completion（/api/prefecture-completion）
-              が解決してから現れるので、本文とCTAの間に挟むと、ボタンが描かれた後から
-              カードが割り込んでボタンを押し下げる。その瞬間のタップがチップに当たって
-              /manholes へ飛ぶ。ヒーローの末尾なら、遅れて増えても上の要素は動かない。
-
-              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は /manholes の
-              検索で県名に絞った一覧。
-            */}
-            {completion && completion.incompleteCount > 0 && (
-              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                {/*
-                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言うので、
-                  ここでは繰り返さず、本文が持っていない「もう終わった県」の側を出す。
-                */}
-                <p className="text-sm font-bold text-[#4A4A4A]">
-                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-                  都道府県は、設置済みのポケふた全てに写真が集まりました。
-                </p>
-                {/*
-                  ただし本文の枚数の文は totalPosts（/api/site-stats）に依存していて、
-                  こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
-                  「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
-                  出なくなる。そのときだけパネルが引き受ける。
-
-                  statsLoaded を待つ。totalPosts の null は「読み込み中」と「失敗」の
-                  両方なので、待たないと取得が遅いだけの回でこの行が出てから消え、
-                  下のチップが動く。
-                */}
-                {statsLoaded && !(totalPosts != null && totalPosts > 0) && (
-                  <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-                    残りは{' '}
-                    <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-                    都道府県です。
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
-                    <Link
-                      key={entry.prefecture}
-                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                    >
-                      <span>{entry.prefecture}</span>
-                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                        あと {entry.missing} 枚
-                      </span>
-                    </Link>
-                  ))}
-                  {/*
-                    ただの文字にすると、打ち切った県は探しようがなくなる。
-                    県名で絞れる一覧（/manholes の検索）へ逃がす。
-                  */}
-                  {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
-                    <Link
-                      href="/manholes"
-                      className="inline-flex min-h-11 items-center text-xs font-bold text-[#7B63A8] underline underline-offset-4"
-                    >
-                      ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
         {/* Loading State */}
         {loading && (
-          <div className="mt-6 flex items-center justify-center py-12">
+          <div className="mt-4 flex items-center justify-center py-8 sm:mt-6 sm:py-12">
             <div className="text-center">
               <div className="font-bold text-[#7B63A8]">
                 読み込み中<span className="rpg-loading"></span>
@@ -380,58 +298,6 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
-        <section className="mt-6 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
-          <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
-              <ImageIcon className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
-              {/*
-                枚数は /api/site-stats の design_manholes（status='published' のみ）で、
-                以前ヒーロー本文に出ていたものをこのカードへ戻した。下の説明文ではなく
-                見出しに付ける。説明文は今ちょうど1行に収まっており、頭に枚数を足すと
-                行があふれて「す。」だけが次行に落ちるため。取得できない日は見出しだけ出す。
-              */}
-              <h2 className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-lg font-extrabold">
-                デザインふたも集まっています
-                {designManholes != null && designManholes > 0 && (
-                  <span className="whitespace-nowrap text-sm font-bold text-[#7B63A8]">
-                    これまでに {designManholes} 枚
-                  </span>
-                )}
-              </h2>
-              <p className="mt-2 text-sm font-medium leading-relaxed text-[#5F574F]">
-                キャラクター・ご当地デザインなど、みんなが見つけた全国のマンホールを楽しめます。
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/design-manholes"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
-            >
-              みんなの投稿を見る
-            </Link>
-            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
-              <span
-                aria-disabled="true"
-                className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-lg border border-[#7B63A8]/20 bg-white/50 px-4 text-sm font-bold text-[#5E4788]/55"
-              >
-                投稿は一時停止中
-              </span>
-            ) : (
-              <Link
-                href="/design-manholes/new"
-                onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'home_design_manhole_card' })}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#7B63A8]/35 bg-white/80 px-4 text-sm font-bold text-[#5E4788] transition hover:bg-white"
-              >
-                見つけたマンホールを投稿
-              </Link>
-            )}
-          </div>
-        </section>
 
         {/* Photo Gallery */}
         {!loading && (
@@ -601,6 +467,55 @@ export default function HomePage() {
               </section>
             )}
           </>
+        )}
+
+        {/* 補助情報より写真を先に見せる。特にスマホのファーストビューを塞がない。 */}
+        {!loading && (
+        <section className="mt-8 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
+              <ImageIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-extrabold text-[#7B63A8]">ポケふただけじゃない</p>
+              <h2 className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-lg font-extrabold">
+                デザインふたも集まっています
+                {designManholes != null && designManholes > 0 && (
+                  <span className="whitespace-nowrap text-sm font-bold text-[#7B63A8]">
+                    これまでに {designManholes} 枚
+                  </span>
+                )}
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[#5F574F]">
+                キャラクター・ご当地デザインなど、みんなが見つけた全国のマンホールを楽しめます。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/design-manholes"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#7B63A8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"
+            >
+              みんなの投稿を見る
+            </Link>
+            {DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-lg border border-[#7B63A8]/20 bg-white/50 px-4 text-sm font-bold text-[#5E4788]/55"
+              >
+                投稿は一時停止中
+              </span>
+            ) : (
+              <Link
+                href="/design-manholes/new"
+                onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'home_design_manhole_card' })}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#7B63A8]/35 bg-white/80 px-4 text-sm font-bold text-[#5E4788] transition hover:bg-white"
+              >
+                見つけたマンホールを投稿
+              </Link>
+            )}
+          </div>
+        </section>
         )}
 
         {/* 写真がまだないポケふた（募集枠なので、最新の投稿を見終わった一番下に置く） */}
