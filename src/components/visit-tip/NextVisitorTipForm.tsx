@@ -3,44 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import { pokefutaEvents, type VisitTipSurface } from '@/lib/analytics/gtag';
-import {
-  VISIT_COMMENT_MAX_LENGTH,
-  VISIT_TIP_SUGGESTIONS,
-  appendVisitTipSuggestion,
-} from '@/lib/visit-tip';
-
-interface SuggestionChipsProps {
-  value: string;
-  onPick: (next: string) => void;
-  disabled?: boolean;
-}
-
-/** タップで入れる候補。投稿画面・投稿完了画面・蓋の詳細で共有する */
-export function VisitTipSuggestionChips({ value, onPick, disabled }: SuggestionChipsProps) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {VISIT_TIP_SUGGESTIONS.map((suggestion) => {
-        const picked = value.includes(suggestion);
-        return (
-          <button
-            key={suggestion}
-            type="button"
-            disabled={disabled || picked}
-            onClick={() => onPick(appendVisitTipSuggestion(value, suggestion))}
-            className={`rounded-full border px-2.5 py-1 font-pixelJp text-[11px] font-bold transition-colors disabled:cursor-default ${
-              picked
-                ? 'border-[#c7e6d3] bg-[#e2f2e9] text-[#1f9d63]'
-                : 'border-[#e9dfc7] bg-white text-[#6f6657] hover:border-[#bf5640] hover:text-[#bf5640]'
-            }`}
-          >
-            {picked ? '✓ ' : '+ '}
-            {suggestion}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import SuggestionChips from '@/components/comments/SuggestionChips';
+import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
 interface Props {
   visitId: string;
@@ -53,7 +17,8 @@ interface Props {
 }
 
 /**
- * 「次に来る人へひとこと」を後から書くフォーム。投稿完了画面と蓋の詳細で使う。
+ * 「次に来る人へひとこと」を後から書くフォーム。投稿完了画面で使う。
+ * （蓋の詳細では入力欄を掲示板の1つにまとめたので使わない）
  * 書き先は掲示板ではなく**訪問のひとこと（visit.comment）**。写真と一緒に並び、
  * 代表写真の吹き出しにも載るので、書いた人から見て反映先が分かりやすい。
  */
@@ -133,7 +98,7 @@ export default function NextVisitorTipForm({
         className="mt-2.5 w-full resize-y rounded-[12px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-xs leading-relaxed text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-1 focus:ring-[#bf5640]"
       />
       <div className="mt-2">
-        <VisitTipSuggestionChips
+        <SuggestionChips
           value={draft}
           disabled={saving}
           onPick={(next) => {

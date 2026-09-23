@@ -2,6 +2,7 @@
 --
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 -- マイグレーション: supabase/migrations/20260811150000_manhole_comment_guardrails.sql
+--               supabase/migrations/20260923150000_manhole_title_report.sql（[11]）
 --
 -- なぜ SQL で書くか: Supabase は anon/authenticated キーで PostgREST を直接叩ける設計なので、
 -- **アプリの API 層はセキュリティ境界ではない**。境界は GRANT・RLS・制約・トリガだけ。
@@ -366,7 +367,63 @@ BEGIN
 
   RESET ROLE;
 
+  -- =====================================================================
+  -- 11. タグの間違い指摘（manhole_title_report、20260923150000）
+  --     comment_report と同じ形: 自分の名前でしか書けない・同じタグは1人1件・
+  --     authenticated / anon からは読めない・RETURNING は落ちる。
+  -- =====================================================================
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', commenter, 'role', 'authenticated')::text, true);
+
+  INSERT INTO public.manhole_title_report (manhole_id, title_key, title_label, reporter_user_id, reason)
+  VALUES (target_manhole, 'verify_key', '検証タグ', commenter, '検証');
+
+  BEGIN
+    INSERT INTO public.manhole_title_report (manhole_id, title_key, reporter_user_id)
+    VALUES (target_manhole, 'verify_key_2', commenter) RETURNING id INTO report_id;
+    RAISE EXCEPTION '[11] タグ指摘の INSERT ... RETURNING が通ってしまった（指摘が読める）';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- 期待どおり。アプリは .select() を付けないこと
+  END;
+
+  BEGIN
+    INSERT INTO public.manhole_title_report (manhole_id, title_key, reporter_user_id)
+    VALUES (target_manhole, 'verify_key', other_id);
+    RAISE EXCEPTION '[11] 他人の名前でタグを指摘できてしまった';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.manhole_title_report (manhole_id, title_key, reporter_user_id)
+    VALUES (target_manhole, 'verify_key', commenter);
+    RAISE EXCEPTION '[11] 同じタグの指摘が2件入ってしまった';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    SELECT count(*) INTO n FROM public.manhole_title_report;
+    RAISE EXCEPTION '[11] authenticated がタグ指摘を読めている（% 行）', n;
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  SET LOCAL ROLE anon;
+  BEGIN
+    INSERT INTO public.manhole_title_report (manhole_id, title_key)
+    VALUES (target_manhole, 'anon_key');
+    RAISE EXCEPTION '[11] anon がタグを指摘できてしまった';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', '', true);
+
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）
+  DELETE FROM public.manhole_title_report WHERE reporter_user_id = commenter;
   DELETE FROM public.comment_report WHERE reporter_user_id = commenter;
   DELETE FROM public.visit_comment WHERE visit_id = public_visit;
   DELETE FROM public.visit WHERE id = public_visit;
