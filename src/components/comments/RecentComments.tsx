@@ -20,6 +20,12 @@ type RecentCommentItem = {
   thumbnail_url: string | null;
 };
 
+/**
+ * スマホで出す件数。1カラムの縦積みなので6件だと「最新の投稿」が1画面ぶん下がる。
+ * 取得は PC と同じ6件のまま、4件目以降を md 未満で隠す。
+ */
+const MOBILE_VISIBLE = 3;
+
 const KIND_LABEL: Record<RecentCommentKind, string> = {
   comment: '口コミ',
   photo_note: '写真のひとこと',
@@ -60,14 +66,17 @@ export default function RecentComments() {
         <MessageCircle className="h-5 w-5 text-[#7B63A8]" />
         最近の口コミ
       </h2>
-      <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => {
+      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {items.map((item, index) => {
           const { manhole } = item;
           const place = manhole.building
             ? [manhole.municipality, manhole.building].filter(Boolean).join('・')
             : [manhole.prefecture, manhole.municipality].filter(Boolean).join(' ') || manhole.title || 'ポケふた';
           return (
-            <li key={`${item.kind}-${manhole.id}`}>
+            <li
+              key={`${item.kind}-${manhole.id}`}
+              className={index >= MOBILE_VISIBLE ? 'hidden md:block' : undefined}
+            >
               <Link
                 href={`/manhole/${manhole.id}`}
                 className="flex h-full gap-3 rounded-[8px] border border-[#7B63A8]/15 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
