@@ -15,7 +15,7 @@
     "test:pokemon-go": "tsx --test tests/pokemon-go-*.test.ts",
     "test:date": "tsx --test tests/date.test.ts",
     "test:manhole-gallery": "tsx --test tests/manhole-photo-ranking.test.ts tests/visit-comment-quality.test.ts",
-    "test:latest-comment": "tsx --test tests/latest-manhole-comment.test.ts",
+    "test:latest-comment": "tsx --test tests/latest-manhole-comment.test.ts tests/recent-comments.test.ts",
     "test:manhole-label": "tsx --test tests/manhole-label.test.ts",
     "test:json-ld": "tsx --test tests/json-ld.test.ts",
     "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
