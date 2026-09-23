@@ -93,14 +93,17 @@ export default function TitleReport({ manholeId, titles, isLoggedIn, children }:
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {children}
+        {/* 入口は旗アイコンだけ。文字を付けると幅が増え、最後のバッジの後ろで
+            折り返して1行を丸ごと使っていた。名前は aria-label と title で渡す。 */}
         {!open && (
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 font-pixelJp text-[11px] text-[#9b917e] hover:text-[#bf5640]"
+            aria-label={titles.length > 0 ? 'タグが違う・足りないタグを提案する' : 'タグを提案する'}
+            title={titles.length > 0 ? 'タグが違う？・足りないタグを提案' : 'タグを提案'}
+            className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#e9dfc7] bg-[#fffdf7] text-[#9b917e] hover:border-[#bf5640] hover:text-[#bf5640]"
           >
             <Flag className="h-3 w-3" strokeWidth={2.2} />
-            {titles.length > 0 ? 'タグが違う？' : 'タグを提案'}
           </button>
         )}
       </div>

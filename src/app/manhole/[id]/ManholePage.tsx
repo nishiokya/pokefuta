@@ -620,9 +620,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
-  const photoContributorCount = new Set(
-    allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
-  ).size;
   // 「すべての写真」は撮影日の新しい順。見に来た人が知りたいのは今の姿なので、
   // 最近の1枚を左上に置く（以前は古い順で、最新の写真が一番下に埋もれていた）。
   // ヒーロー側の代表写真（allDisplayPhotos[0]）はひとこと付きを優先するので並びは触らない。
@@ -1032,10 +1029,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
           {/* ── Title block ── */}
           <div>
-            <div className="mb-1 flex items-center gap-1.5 font-pixelJp text-[12px] lg:text-[13px] font-semibold text-[#9b917e]">
-              <MapPin className="h-3.5 w-3.5 text-[#9b917e]" strokeWidth={2.2} />
-              {manhole.prefecture} / {municipality}
-            </div>
+            {/*
+              h1 の上にあった「{都道府県} / {市区町村}」の行は消した。h1 が
+              「{都道府県}{市区町村}のポケふた」なので同じ情報で1行使っていた。
+            */}
             {/*
               ページの主見出し。図鑑と同じ「{都道府県}{市区町村}のポケふた（{ポケモン}）」。
               以前は h2 で、しかもページ全体に h1 が1つも無かった。ポケモン名は
@@ -1123,7 +1120,26 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="relative flex flex-col gap-3">
+              {/*
+                枚数と「写真を追加」は写真の左上に重ねる。以前は写真の下に
+                「N人が撮影・全N枚 ／ ＋写真を追加」の1行を取っていた。
+                拡大表示中は左上に「一覧に戻る」があるので出さない。
+              */}
+              {!photoExpanded && (
+                <div className="pointer-events-none absolute left-2.5 top-2.5 z-[2] flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
+                    <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
+                    className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full bg-[#bf5640]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-[#a8483a]"
+                  >
+                    <Plus className="h-3 w-3" strokeWidth={2.6} />追加
+                  </button>
+                </div>
+              )}
               {photoExpanded && featuredPhoto ? (
                 <>
                   <div
@@ -1257,11 +1273,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        {isRepresentative && (
-                          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
-                            <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
-                          </span>
-                        )}
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (
@@ -1289,20 +1300,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   })}
                 </div>
               )}
-
-              <div className="flex items-center justify-between gap-3 px-1">
-                <div className="flex min-w-0 items-center gap-1.5 font-pixelJp text-[11px] font-semibold text-[#8b816f]">
-                  {photoContributorCount > 0 && <span>{photoContributorCount}人が撮影・</span>}
-                  <span>全{allDisplayPhotos.length}枚</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640]"
-                >
-                  <Plus className="h-3 w-3" strokeWidth={2.4} />写真を追加
-                </button>
-              </div>
             </div>
           )}
 
