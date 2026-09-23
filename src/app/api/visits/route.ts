@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
+import { summarizeManholeComments } from '@/lib/latest-manhole-comment';
 
 /**
  * @swagger
@@ -270,7 +271,7 @@ export async function GET(request: NextRequest) {
       manholeIds.length > 0
         ? supabase
           .from('manhole_comment')
-          .select('manhole_id')
+          .select('manhole_id, content, created_at')
           .in('manhole_id', manholeIds)
           .is('parent_comment_id', null)
         : Promise.resolve({ data: [] as any[] }),
@@ -298,7 +299,10 @@ export async function GET(request: NextRequest) {
     // 各訪問記録のいいね数・コメント数・状態を集計
     const likesMap = new Map<string, { count: number; isLiked: boolean }>();
     const commentsMap = new Map<string, number>();
-    const manholeCommentsMap = new Map<number, number>();
+    const {
+      counts: manholeCommentsMap,
+      latest: latestManholeCommentMap,
+    } = summarizeManholeComments(manholeCommentCounts || []);
     const bookmarksSet = new Set<string>();
 
     visitIds.forEach(id => {
@@ -318,13 +322,6 @@ export async function GET(request: NextRequest) {
     (commentCounts || []).forEach(comment => {
       const current = commentsMap.get(comment.visit_id) || 0;
       commentsMap.set(comment.visit_id, current + 1);
-    });
-
-    (manholeCommentCounts || []).forEach(comment => {
-      const manholeId = comment.manhole_id;
-      if (typeof manholeId !== 'number') return;
-      const current = manholeCommentsMap.get(manholeId) || 0;
-      manholeCommentsMap.set(manholeId, current + 1);
     });
 
     (bookmarks || []).forEach(bookmark => {
@@ -373,6 +370,9 @@ export async function GET(request: NextRequest) {
         is_liked: likeInfo.isLiked,
         comments_count: commentCount,
         manhole_comments_count: manholeCommentCount,
+        latest_manhole_comment: typeof visit.manhole_id === 'number'
+          ? latestManholeCommentMap.get(visit.manhole_id) ?? null
+          : null,
         is_bookmarked: isBookmarked
       };
     });
