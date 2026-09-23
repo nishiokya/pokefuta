@@ -35,6 +35,7 @@ const CHECKS = [
   '蓋コメントを auth uid 抜きで読める（get_manhole_comments／表示名・公開ID・is_own）',
   'auth uid は DB からも読めない（直叩きと select * が 42501／RPC・投稿・自己削除は生きている／'
   + 'manhole_comment_stats が巻き添えで死んでいない）',
+  'タグの間違い指摘は自分の名前でしか作れない／同じタグは1人1件／誰からも読めない／anon は書けない',
 ];
 
 try {
