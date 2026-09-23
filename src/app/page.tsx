@@ -288,79 +288,6 @@ export default function HomePage() {
                 </Link>
               </div>
             )}
-
-            {/*
-              残りの都道府県は「写真がまだないポケふた」の中に置いていて、最新の
-              投稿を全部見終わるまで目に入らなかったので、ヒーローに引き上げる。
-
-              CTAより上には置けない。このパネルは completion（/api/prefecture-completion）
-              が解決してから現れるので、本文とCTAの間に挟むと、ボタンが描かれた後から
-              カードが割り込んでボタンを押し下げる。その瞬間のタップがチップに当たって
-              /manholes へ飛ぶ。ヒーローの末尾なら、遅れて増えても上の要素は動かない。
-
-              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は残りの蓋と
-              最新の投稿を同時に確認できる都道府県ページ。
-            */}
-            {completion && completion.incompleteCount > 0 && (
-              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                {/*
-                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言うので、
-                  ここでは繰り返さず、本文が持っていない「もう終わった県」の側を出す。
-                */}
-                <p className="text-sm font-bold text-[#4A4A4A]">
-                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-                  都道府県は、設置済みのポケふた全てに写真が集まりました。
-                </p>
-                {/*
-                  ただし本文の枚数の文は totalPosts（/api/site-stats）に依存していて、
-                  こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
-                  「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
-                  出なくなる。そのときだけパネルが引き受ける。
-
-                  statsLoaded を待つ。totalPosts の null は「読み込み中」と「失敗」の
-                  両方なので、待たないと取得が遅いだけの回でこの行が出てから消え、
-                  下のチップが動く。
-                */}
-                {statsLoaded && !(totalPosts != null && totalPosts > 0) && (
-                  <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-                    残りは{' '}
-                    <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-                    都道府県です。
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
-                    <Link
-                      key={entry.prefecture}
-                      href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
-                      // チップは「県名 + あとN枚」までしか置けない幅なので、行き先が
-                      // 何のページかは読み上げ用のラベルで補う。詳細ページの県リンク
-                      // （図鑑の設置情報）と文言で区別が付くようにしてある。
-                      aria-label={`${entry.prefecture}の写真募集状況を見る`}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                    >
-                      <span>{entry.prefecture}</span>
-                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                        あと {entry.missing} 枚
-                      </span>
-                    </Link>
-                  ))}
-                  {/*
-                    ただの文字にすると、打ち切った県は探しようがなくなる。
-                    県名で絞れる一覧（/manholes の検索）へ逃がす。
-                  */}
-                  {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
-                    <Link
-                      href="/manholes"
-                      className="inline-flex min-h-11 items-center text-xs font-bold text-[#7B63A8] underline underline-offset-4"
-                    >
-                      ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -548,6 +475,77 @@ export default function HomePage() {
                     次へ
                     <ChevronRight className="w-4 h-4" />
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/*
+              残りの都道府県パネル。#256 でヒーロー末尾に引き上げたのを、2026-09-23 に
+              ページ送りの下へ移した（フィードを見終えた位置）。
+
+              ここならパネルが遅れて現れても上の要素は動かない（#256 がヒーロー末尾を
+              選んだのと同じ理由が、フィードの下でも成り立つ）。
+
+              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は残りの蓋と
+              最新の投稿を同時に確認できる都道府県ページ。
+            */}
+            {completion && completion.incompleteCount > 0 && (
+              <div className="mt-7 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4 shadow-sm">
+                {/*
+                  残り県数はヒーローの本文が「残りN都道府県の M 枚だけ」と言うので、
+                  ここでは繰り返さず、本文が持っていない「もう終わった県」の側を出す。
+                */}
+                <p className="text-sm font-bold text-[#4A4A4A]">
+                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
+                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
+                  都道府県は、設置済みのポケふた全てに写真が集まりました。
+                </p>
+                {/*
+                  ただし本文の枚数の文は totalPosts（/api/site-stats）に依存していて、
+                  こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
+                  「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
+                  出なくなる。そのときだけパネルが引き受ける。
+
+                  statsLoaded を待つ。totalPosts の null は「読み込み中」と「失敗」の
+                  両方なので、待たないと取得が遅いだけの回でこの行が出てから消え、
+                  下のチップが動く。
+                */}
+                {statsLoaded && !(totalPosts != null && totalPosts > 0) && (
+                  <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
+                    残りは{' '}
+                    <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
+                    都道府県です。
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
+                    <Link
+                      key={entry.prefecture}
+                      href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
+                      // チップは「県名 + あとN枚」までしか置けない幅なので、行き先が
+                      // 何のページかは読み上げ用のラベルで補う。詳細ページの県リンク
+                      // （図鑑の設置情報）と文言で区別が付くようにしてある。
+                      aria-label={`${entry.prefecture}の写真募集状況を見る`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
+                    >
+                      <span>{entry.prefecture}</span>
+                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
+                        あと {entry.missing} 枚
+                      </span>
+                    </Link>
+                  ))}
+                  {/*
+                    ただの文字にすると、打ち切った県は探しようがなくなる。
+                    県名で絞れる一覧（/manholes の検索）へ逃がす。
+                  */}
+                  {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
+                    <Link
+                      href="/manholes"
+                      className="inline-flex min-h-11 items-center text-xs font-bold text-[#7B63A8] underline underline-offset-4"
+                    >
+                      ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
