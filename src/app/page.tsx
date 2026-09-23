@@ -84,6 +84,9 @@ export default function HomePage() {
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
   // 取得が終わったか（成否を問わない）。終わるまで残りの文を出さないための旗。
   const [completionLoaded, setCompletionLoaded] = useState(false);
+  // site-stats が「まだ来ていない」のか「来たが使えなかった」のかを区別する。
+  // totalPosts の null だけでは読み込み中と失敗が同じ顔になる。
+  const [statsLoaded, setStatsLoaded] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
@@ -150,6 +153,8 @@ export default function HomePage() {
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
+    } finally {
+      setStatsLoaded(true);
     }
   };
 
@@ -322,8 +327,12 @@ export default function HomePage() {
                   こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
                   「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
                   出なくなる。そのときだけパネルが引き受ける。
+
+                  statsLoaded を待つ。totalPosts の null は「読み込み中」と「失敗」の
+                  両方なので、待たないと取得が遅いだけの回でこの行が出てから消え、
+                  下のチップが動く。
                 */}
-                {!(totalPosts != null && totalPosts > 0) && (
+                {statsLoaded && !(totalPosts != null && totalPosts > 0) && (
                   <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
                     残りは{' '}
                     <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
