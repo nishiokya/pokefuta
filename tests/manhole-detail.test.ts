@@ -19,7 +19,8 @@ const target = {
 };
 
 const near = (id: number, city: string, pokemons: string[], lat: number, lng: number) => ({
-  id, prefecture: '宮城県', city, municipality: city, pokemons, latitude: lat, longitude: lng, titles: [],
+  // name はスナップショットの正本の名前（施設名の無い一意な蓋は title と同じ「県/市町」）
+  id, prefecture: '宮城県', city, municipality: city, name: `宮城県/${city}町`, pokemons, latitude: lat, longitude: lng, titles: [],
 });
 
 const others = [
@@ -33,7 +34,7 @@ const others = [
 test('近傍は距離順・ラベル込みで返る', () => {
   const d = buildManholeDetail(target, [target, ...others]);
   assert.deepEqual(d.nearby.map((n) => n.id), [129, 130, 131]);
-  assert.equal(d.nearby[0].label, '宮城県柴田のポケふた（フラベベ・ラプラス）');
+  assert.equal(d.nearby[0].label, '宮城県/柴田町のポケふた（フラベベ・ラプラス）');
   // 距離は昇順
   const ds = d.nearby.map((n) => n.distanceKm!);
   assert.deepEqual([...ds].sort((a, b) => a - b), ds);

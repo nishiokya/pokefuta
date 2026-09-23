@@ -21,21 +21,24 @@ const manhole128 = {
   municipality: '大河原',
   pokemons: ['チェリム', 'ラプラス'],
   title: '宮城県/大河原町',
+  name: '宮城県/大河原町',
 };
 
-test('見出しラベルは図鑑の h1 と同一', () => {
+test('見出しと関連カードは図鑑と同じく正本の名前、<title> 用は地域表現', () => {
+  // 図鑑（tracker #524 以降）の h1 と関連カードは compose_display_name() ＋「のポケふた」
+  assert.equal(manholeHeading(manhole128), '宮城県/大河原町のポケふた（チェリム・ラプラス）');
+  assert.equal(manholeLabel(manhole128), '宮城県/大河原町のポケふた（チェリム・ラプラス）');
+  // <title> / og: は検索向けの「県市のポケふた」のまま
   assert.equal(manholeLocationLabel(manhole128), '宮城県大河原');
   assert.equal(manholePlaceLabel(manhole128), '宮城県大河原のポケふた');
-  assert.equal(manholeHeading(manhole128), '宮城県大河原のポケふた（チェリム・ラプラス）');
-  assert.equal(manholeLabel(manhole128), '宮城県大河原のポケふた（チェリム・ラプラス）');
 });
 
 test('ポケモンが無いとき、見出しは括弧ごと落とす / カードは「ポケモン」を出す', () => {
   // 図鑑は h1 と関連カードで規則が違う。1本に畳むと見出しが
   // 「〜のポケふた（ポケモン）」になってしまうので分けている。
-  const noPokemon = { prefecture: '宮城県', city: '大河原', pokemons: [] };
-  assert.equal(manholeHeading(noPokemon), '宮城県大河原のポケふた');
-  assert.equal(manholeLabel(noPokemon), '宮城県大河原のポケふた（ポケモン）');
+  const noPokemon = { prefecture: '宮城県', city: '大河原', name: '宮城県/大河原町', pokemons: [] };
+  assert.equal(manholeHeading(noPokemon), '宮城県/大河原町のポケふた');
+  assert.equal(manholeLabel(noPokemon), '宮城県/大河原町のポケふた（ポケモン）');
 });
 
 test('ポケモン名は省略しない — 省略すると共通ポケモンが消える', () => {
@@ -45,10 +48,11 @@ test('ポケモン名は省略しない — 省略すると共通ポケモンが
     prefecture: '宮城県',
     city: '仙台',
     municipality: '仙台',
+    name: '宮城県/仙台市',
     pokemons: ['ウミディグダ', 'チョンチー', 'ホエルコ', 'ラプラス'],
   };
   const label = manholeLabel(sendai);
-  assert.equal(label, '宮城県仙台のポケふた（ウミディグダ・チョンチー・ホエルコ・ラプラス）');
+  assert.equal(label, '宮城県/仙台市のポケふた（ウミディグダ・チョンチー・ホエルコ・ラプラス）');
   assert.ok(label.includes('ラプラス'));
 });
 
@@ -108,14 +112,25 @@ test('name が無いときは title → 県/市 → ポケふた に落とす（
   assert.equal(manholeDisplayName({}), 'ポケふた');
 });
 
-test('施設名は全角スペースと先頭の自治体名を整える', () => {
+test('目印欄の施設名は全角スペースと、区切りのある先頭の自治体名だけ整える', () => {
   assert.equal(landmarkLabel({ building: '指宿警察署　指宿中央交番', city: '指宿' }), '指宿警察署 指宿中央交番');
   assert.equal(landmarkLabel({ building: '指宿市 指宿図書館', city: '指宿' }), '指宿図書館');
+  // 自治体名まで含めて施設名のものは残す（図鑑の landmark_label と同じ）
+  assert.equal(landmarkLabel({ building: '岡谷市役所前（蚕糸公園）', city: '岡谷' }), '岡谷市役所前（蚕糸公園）');
 });
 
-test('詳細の見出しは施設名入り、<title> 用は今の形のまま', () => {
-  assert.equal(manholeHeadingPlace(manhole273), '愛知県豊橋 道の駅とよはしのポケふた');
-  assert.equal(manholeHeading(manhole273), '愛知県豊橋 道の駅とよはしのポケふた（スターミー・デンヂムシ）');
+test('詳細の見出しは正本の名前＋「のポケふた」。<title> 用は検索向けの形のまま', () => {
+  assert.equal(manholeHeadingPlace(manhole273), '豊橋市 道の駅とよはしのポケふた');
+  assert.equal(manholeHeading(manhole273), '豊橋市 道の駅とよはしのポケふた（スターミー・デンヂムシ）');
   assert.equal(manholePlaceLabel(manhole273), '愛知県豊橋のポケふた');
-  assert.equal(manholeHeadingPlace({ ...manhole273, building: '' }), '愛知県豊橋のポケふた');
+  // 施設名の無い一意な蓋は title がそのまま名前（図鑑の h1 と同じ）
+  assert.equal(
+    manholeHeadingPlace({ title: '岩手県/洋野町', name: '岩手県/洋野町' }),
+    '岩手県/洋野町のポケふた'
+  );
+  // 同じ施設名が2枚ある蓋は図鑑が住所で区別した名前をそのまま使う（tracker #524）
+  assert.equal(
+    manholeHeadingPlace({ building: '花園中央公園', name: '東大阪市 花園中央公園（松原南1）' }),
+    '東大阪市 花園中央公園（松原南1）のポケふた'
+  );
 });
