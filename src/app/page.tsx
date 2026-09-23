@@ -489,8 +489,11 @@ export default function HomePage() {
 
                     if (!canNavigate) {
                       return (
+                        // 素の div の aria-label は読み上げられない（generic 要素は名前を持てない）。
+                        // 口コミ件数はバッジの数字だけなので、group にしてラベルを効かせる。
                         <div
                           key={visit.id}
+                          role="group"
                           className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15"
                           aria-label={commonAriaLabel}
                         >
