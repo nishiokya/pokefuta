@@ -308,8 +308,8 @@ export default function HomePage() {
               カードが割り込んでボタンを押し下げる。その瞬間のタップがチップに当たって
               /manholes へ飛ぶ。ヒーローの末尾なら、遅れて増えても上の要素は動かない。
 
-              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は /manholes の
-              検索で県名に絞った一覧。
+              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は残りの蓋と
+              最新の投稿を同時に確認できる都道府県ページ。
             */}
             {completion && completion.incompleteCount > 0 && (
               <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
@@ -343,7 +343,11 @@ export default function HomePage() {
                   {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
                     <Link
                       key={entry.prefecture}
-                      href={`/manholes?q=${encodeURIComponent(entry.prefecture)}`}
+                      href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
+                      // チップは「県名 + あとN枚」までしか置けない幅なので、行き先が
+                      // 何のページかは読み上げ用のラベルで補う。詳細ページの県リンク
+                      // （図鑑の設置情報）と文言で区別が付くようにしてある。
+                      aria-label={`${entry.prefecture}の写真募集状況を見る`}
                       className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
                     >
                       <span>{entry.prefecture}</span>

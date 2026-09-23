@@ -131,6 +131,26 @@ export async function GET(request: NextRequest) {
     // Default keeps existing behavior; home feed can override with order_by=created_at
     const orderBy: 'shot_at' | 'created_at' = orderByRaw === 'created_at' ? 'created_at' : 'shot_at';
 
+    // 都道府県の絞り込みは **range() より前** に効かせる。
+    //
+    // 以前はここに中身の無い `if (prefecture) {}` があり、実際の絞り込みは
+    // ページングで切り出した後の配列に対して行われていた。つまり
+    // `?prefecture=宮崎県&limit=12` は「全国の最新12件のうち宮崎県のもの」しか
+    // 返さず、県内に投稿が何十件あっても 0 件になるのが普通だった。
+    // （`/api/manholes` の `no_photos` が踏んだのと同じ形。）
+    //
+    // 埋め込みを `!inner` にすると PostgREST が join して絞ってくれる。指定が
+    // 無いときは今までどおり外部結合のままにする。`!inner` を常時付けると、
+    // manhole_id が無い訪問記録が一覧から黙って消える。
+    const manholeEmbed = prefecture ? 'manhole:manhole_id!inner' : 'manhole:manhole_id';
+
+    // `with_photos=true` も同じ理由で join 側に寄せる。これも後段の配列 filter
+    // だけだったので、`?with_photos=true&limit=12` が返すのは「最新12件のうち
+    // 写真があったもの」で、12件を下回るのが当たり前だった（トップのフィードが
+    // まさにこの形で、ページごとに枚数が揃わない）。写真が1枚も無い訪問記録を
+    // join で落とせば、limit の意味が「写真つきをN件」になる。
+    const photoEmbed = withPhotos === 'true' ? 'photos:photo!inner' : 'photos:photo';
+
     // Get user (optional - for authenticated users)
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
@@ -143,7 +163,7 @@ export async function GET(request: NextRequest) {
         .from('visit')
         .select(`
           *,
-          manhole:manhole_id (
+          ${manholeEmbed} (
             id,
             title,
             prefecture,
@@ -151,7 +171,7 @@ export async function GET(request: NextRequest) {
             building,
             pokemons${manholeTagFields}
           ),
-          photos:photo (
+          ${photoEmbed} (
             id,
             storage_key,
             content_type,
@@ -161,8 +181,6 @@ export async function GET(request: NextRequest) {
             created_at
           )
         `)
-        .order(orderBy, { ascending: false })
-        .range(offset, offset + limit - 1)
         .eq('user_id', viewerUserId);
     } else {
       // ✅ 未ログイン時: 公開(is_public=true)の訪問記録を返す（noteは返さない）
@@ -178,7 +196,7 @@ export async function GET(request: NextRequest) {
           is_public,
           created_at,
           updated_at,
-          manhole:manhole_id (
+          ${manholeEmbed} (
             id,
             title,
             prefecture,
@@ -186,7 +204,7 @@ export async function GET(request: NextRequest) {
             building,
             pokemons${manholeTagFields}
           ),
-          photos:photo (
+          ${photoEmbed} (
             id,
             storage_key,
             content_type,
@@ -196,22 +214,18 @@ export async function GET(request: NextRequest) {
             created_at
           )
         `)
-        .order(orderBy, { ascending: false })
-        .range(offset, offset + limit - 1)
         .eq('is_public', true);
     }
 
+    // フィルタは order/range より先。supabase-js は order() を呼んだ時点で
+    // TransformBuilder になり、そこから先は eq() を生やせない。
     if (prefecture) {
-      // Note: This requires a join, handled by the query above
-      // We'll filter on the client side or use a view
+      query = query.eq('manhole.prefecture', prefecture);
     }
 
-    if (withPhotos === 'true') {
-      // Only visits with photos - we'll filter this on the client side
-      // or use a SQL function
-    }
-
-    const { data: visits, error } = await query;
+    const { data: visits, error } = await query
+      .order(orderBy, { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Error fetching visits:', error);
@@ -383,6 +397,9 @@ export async function GET(request: NextRequest) {
     // Apply client-side filters if needed
     let filteredVisits = enrichedVisits;
 
+    // 絞り込み自体はクエリ側（!inner + eq）で済んでいる。ここは保険。
+    // 埋め込みの形が変わって join が効かなくなったときに、県外の投稿が
+    // 都道府県ページへ黙って混ざるより、0件になって気付ける方がよい。
     if (prefecture) {
       filteredVisits = filteredVisits.filter(
         (visit: any) => visit.manhole?.prefecture === prefecture
