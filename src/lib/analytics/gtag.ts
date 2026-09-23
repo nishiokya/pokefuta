@@ -371,8 +371,10 @@ export interface TitleReportParams extends GAEventParams {
   /** 発生箇所。GA4 予約語の source は使わない。 */
   surface: string;
   manhole_id: number;
-  /** 指摘されたタグ（manhole.titles[].key）。どのタグの生成規則が外れやすいかを見る */
-  title_key: string;
+  /** wrong = 既存タグの間違い指摘 / suggest = 足りないタグの提案 */
+  kind: 'wrong' | 'suggest';
+  /** 指摘されたタグ（manhole.titles[].key）。どの生成規則が外れやすいかを見る。提案では無い */
+  title_key?: string;
 }
 
 export interface ApiErrorEventParams extends GAEventParams {

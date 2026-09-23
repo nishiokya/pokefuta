@@ -272,6 +272,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
+  // 「すべての写真」でコメントをその場に重ねて開いている写真。拡大表示へ飛ばさずに読ませる
+  const [openGridCommentPhotoId, setOpenGridCommentPhotoId] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -618,9 +620,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
-  const photoContributorCount = new Set(
-    allDisplayPhotos.map((photo) => photo.visit?.user_id).filter(Boolean)
-  ).size;
   // 「すべての写真」は撮影日の新しい順。見に来た人が知りたいのは今の姿なので、
   // 最近の1枚を左上に置く（以前は古い順で、最新の写真が一番下に埋もれていた）。
   // ヒーロー側の代表写真（allDisplayPhotos[0]）はひとこと付きを優先するので並びは触らない。
@@ -883,6 +882,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           // アイコンは「読む価値のあるひとこと」がある写真にだけ付ける。数字だけ等に
           // 付けると、開いて「15」しか出ずにがっかりさせる。
           const comment = isMeaningfulVisitComment(photo.visit?.comment);
+          const commentOpen = comment && openGridCommentPhotoId === photo.id;
           // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
           // 拡大表示側（:941）と同じくリンクにしない。
           const profileHref =
@@ -930,13 +930,34 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     />
                   </span>
                 )}
-                {comment && (
-                  <span
-                    className="pointer-events-none absolute bottom-1 left-1 inline-flex items-center rounded-full bg-black/60 p-1 text-white"
-                    aria-hidden="true"
+                {/*
+                  コメントのアイコンを押すと、そのマスの上にコメントを重ねて出す。
+                  以前は写真を押すしかなく、ページ上部の拡大表示へスクロールで飛ばされていた。
+                  重ねた面を押すと閉じる。
+                */}
+                {comment && !commentOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenGridCommentPhotoId(photo.id)}
+                    aria-label={`@${userLabel}さんのコメントを読む`}
+                    className="absolute bottom-0 left-0 z-10 p-1"
                   >
-                    <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
-                  </span>
+                    <span className="inline-flex items-center rounded-full bg-black/60 p-1 text-white">
+                      <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
+                    </span>
+                  </button>
+                )}
+                {commentOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenGridCommentPhotoId(null)}
+                    aria-label="コメントを閉じる"
+                    className="absolute inset-0 z-20 overflow-y-auto bg-black/75 p-2 text-left"
+                  >
+                    <span className="block whitespace-pre-line break-words font-pixelJp text-[11px] font-bold leading-snug text-white">
+                      {normalizeVisitComment(photo.visit?.comment)}
+                    </span>
+                  </button>
                 )}
               </div>
               {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
@@ -1008,10 +1029,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         <div className="flex flex-col gap-5 max-w-2xl lg:max-w-none">
           {/* ── Title block ── */}
           <div>
-            <div className="mb-1 flex items-center gap-1.5 font-pixelJp text-[12px] lg:text-[13px] font-semibold text-[#9b917e]">
-              <MapPin className="h-3.5 w-3.5 text-[#9b917e]" strokeWidth={2.2} />
-              {manhole.prefecture} / {municipality}
-            </div>
+            {/*
+              h1 の上にあった「{都道府県} / {市区町村}」の行は消した。h1 が
+              「{都道府県}{市区町村}のポケふた」なので同じ情報で1行使っていた。
+            */}
             {/*
               ページの主見出し。図鑑と同じ「{都道府県}{市区町村}のポケふた（{ポケモン}）」。
               以前は h2 で、しかもページ全体に h1 が1つも無かった。ポケモン名は
@@ -1033,8 +1054,13 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               図鑑と同じく、称号バッジのあとに統計バッジを続ける。
               抑制規則（称号と内容が重なるものは出さない）はサーバ側の `buildStatBadges()`。 */}
           {(titleBadges.length > 0 || statBadges.length > 0) && (
-            <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-1.5">
+            // 指摘・提案の入口はタグの並びの末尾（TitleReport が children の後ろに置く）。
+            // 指摘できるのは称号タグだけ。統計バッジ（同じポケモンN枚 等）は集計値なので対象外
+            <TitleReport
+              manholeId={manhole.id}
+              titles={titleBadges}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
+            >
               {titleBadges.map((title, idx) => (
                 <span
                   key={`${title.key}-${idx}`}
@@ -1051,14 +1077,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   {badge.label}
                 </span>
               ))}
-            </div>
-            {/* 指摘できるのは称号タグだけ。統計バッジ（同じポケモンN枚 等）は集計値なので対象外 */}
-            <TitleReport
-              manholeId={manhole.id}
-              titles={titleBadges}
-              isLoggedIn={authChecked ? currentUserId !== null : null}
-            />
-            </div>
+            </TitleReport>
           )}
 
           {/* ── Gallery ── */}
@@ -1101,7 +1120,26 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="relative flex flex-col gap-3">
+              {/*
+                枚数と「写真を追加」は写真の左上に重ねる。以前は写真の下に
+                「N人が撮影・全N枚 ／ ＋写真を追加」の1行を取っていた。
+                拡大表示中は左上に「一覧に戻る」があるので出さない。
+              */}
+              {!photoExpanded && (
+                <div className="pointer-events-none absolute left-2.5 top-2.5 z-[2] flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
+                    <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
+                    className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full bg-[#bf5640]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-[#a8483a]"
+                  >
+                    <Plus className="h-3 w-3" strokeWidth={2.6} />追加
+                  </button>
+                </div>
+              )}
               {photoExpanded && featuredPhoto ? (
                 <>
                   <div
@@ -1235,11 +1273,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        {isRepresentative && (
-                          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
-                            <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
-                          </span>
-                        )}
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (
@@ -1267,20 +1300,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   })}
                 </div>
               )}
-
-              <div className="flex items-center justify-between gap-3 px-1">
-                <div className="flex min-w-0 items-center gap-1.5 font-pixelJp text-[11px] font-semibold text-[#8b816f]">
-                  {photoContributorCount > 0 && <span>{photoContributorCount}人が撮影・</span>}
-                  <span>全{allDisplayPhotos.length}枚</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-pixelJp text-[11px] font-bold text-[#8b816f] transition-colors hover:bg-[#ece2cd] hover:text-[#bf5640]"
-                >
-                  <Plus className="h-3 w-3" strokeWidth={2.4} />写真を追加
-                </button>
-              </div>
             </div>
           )}
 
@@ -1369,6 +1388,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   userLocation={null}
                   zoom={16}
                   minHeight={140}
+                  plainMarker
                 />
               </div>
               {/*

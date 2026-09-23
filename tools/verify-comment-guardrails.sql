@@ -410,6 +410,20 @@ BEGIN
     NULL;
   END;
 
+  -- 足りないタグの提案は title_key = '@suggest:<提案名>' で同じ表に入る（列は増やさない）。
+  -- 名前が違えば何件でも入り、同じ名前の連打は一意索引で1件になること。
+  INSERT INTO public.manhole_title_report (manhole_id, title_key, title_label, reporter_user_id)
+  VALUES (target_manhole, '@suggest:温泉のポケふた', '温泉のポケふた', commenter),
+         (target_manhole, '@suggest:足湯のポケふた', '足湯のポケふた', commenter);
+
+  BEGIN
+    INSERT INTO public.manhole_title_report (manhole_id, title_key, title_label, reporter_user_id)
+    VALUES (target_manhole, '@suggest:温泉のポケふた', '温泉のポケふた', commenter);
+    RAISE EXCEPTION '[11] 同じ名前の提案が2件入ってしまった';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
   SET LOCAL ROLE anon;
   BEGIN
     INSERT INTO public.manhole_title_report (manhole_id, title_key)

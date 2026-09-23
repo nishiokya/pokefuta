@@ -57,6 +57,12 @@ interface MapComponentProps {
   zoom?: number;
   minHeight?: number | string;
   markerStatus?: MarkerStatus;
+  /**
+   * 状態を持たない普通のピンにする。蓋の詳細の地図のように「ここにある」を示すだけの
+   * 地図で使う。状態の軸（訪問済みか）を渡していないのに既定の塗り分けを使うと、
+   * どの蓋も「?（未訪問）」で描かれ、意味のない疑問符が出る。
+   */
+  plainMarker?: boolean;
 }
 
 export default function MapComponent({
@@ -67,6 +73,7 @@ export default function MapComponent({
   zoom,
   minHeight = 400,
   markerStatus = DEFAULT_MARKER_STATUS,
+  plainMarker = false,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -170,8 +177,22 @@ export default function MapComponent({
           const status = markerStatusRef.current;
           const isVisited = status.of(manhole);
 
+          // 状態を持たないピン（蓋の詳細）。しずく型で、先端が設置場所を指す
+          const plainIcon = L.divIcon({
+            className: 'manhole-marker marker-plain',
+            html: `
+              <svg width="30" height="40" viewBox="0 0 30 40" aria-hidden="true">
+                <path d="M15 1C7.3 1 1 7.2 1 14.9 1 25.4 15 39 15 39s14-13.6 14-24.1C29 7.2 22.7 1 15 1z"
+                      fill="#bf5640" stroke="white" stroke-width="2"/>
+                <circle cx="15" cy="15" r="5.5" fill="white"/>
+              </svg>
+            `,
+            iconSize: [30, 40],
+            iconAnchor: [15, 39],
+          });
+
           // Create custom icon based on visit status
-          const markerIcon = L.divIcon({
+          const statusIcon = L.divIcon({
             className: `manhole-marker ${isVisited ? 'marker-visited' : 'marker-unvisited'}`,
             html: `
               <div style="
@@ -197,7 +218,7 @@ export default function MapComponent({
           });
 
           const marker = L.marker([manhole.latitude, manhole.longitude], {
-            icon: markerIcon
+            icon: plainMarker ? plainIcon : statusIcon
           });
 
         // Add popup
@@ -229,9 +250,9 @@ export default function MapComponent({
               ` : ''}
               ${pokemonInfo}
               <div class="flex items-center justify-between pt-3 border-t">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isVisited ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                ${plainMarker ? '<span></span>' : `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isVisited ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
                   ${isVisited ? status.on : status.off}
-                </span>
+                </span>`}
                 <button
                   onclick="window.location.href='/manhole/${manhole.id}'"
                   class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
@@ -260,7 +281,7 @@ export default function MapComponent({
             ${manhole.pokemons && manhole.pokemons.length > 0
               ? `<div class="mt-1 text-blue-600">${manhole.pokemons.slice(0, 2).join(', ')}${manhole.pokemons.length > 2 ? '...' : ''}</div>`
               : ''}
-            <div class="mt-1 ${isVisited ? 'text-green-600' : 'text-gray-500'}">${isVisited ? '✓ 訪問済み' : '未訪問'}</div>
+            ${plainMarker ? '' : `<div class="mt-1 ${isVisited ? 'text-green-600' : 'text-gray-500'}">${isVisited ? '✓ 訪問済み' : '未訪問'}</div>`}
             <div class="text-gray-400 mt-1 text-[10px]">クリックで詳細表示</div>
           </div>
         `;
@@ -283,7 +304,7 @@ export default function MapComponent({
         }
       }
     });
-  }, [manholes]);
+  }, [manholes, plainMarker]);
 
   return (
     <div
