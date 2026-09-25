@@ -25,6 +25,7 @@ import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submis
 import type { CompletionRollup } from '@/lib/prefecture-completion';
 import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
+import { feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 
 type FeedVisit = {
   id: string;
@@ -33,6 +34,7 @@ type FeedVisit = {
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
+  public_user_id?: string | null;
   photos: Array<{
     id: string;
     thumbnail_url?: string;
@@ -45,15 +47,6 @@ type FeedVisit = {
 };
 
 /**
- * 「新着投稿」バッジの対象。
- *
- * 投稿日ではなく撮影日で判定する。写真は旅から帰ってからまとめて上げられるので、
- * 投稿日で見ると中央値29日・平均177日前に撮られたものが「新着」を名乗ってしまう。
- * バッジが付くのはグリッド内の該当分だけで、フィードの並びと件数には影響しない。
- */
-const FRESHLY_SHOT_DAYS = 3;
-
-/**
  * ヒーローに並べる「写真が残っている都道府県」チップの上限。
  *
  * /api/prefecture-completion は残り県を全件返す。今は数県だが、日次スナップショット
@@ -63,16 +56,14 @@ const FRESHLY_SHOT_DAYS = 3;
  */
 const INCOMPLETE_CHIP_LIMIT = 12;
 
-function isFreshlyShot(shotAt: string | null | undefined): boolean {
-  if (!shotAt) return false;
-  const shot = new Date(shotAt).getTime();
-  if (Number.isNaN(shot)) return false;
-  // 端末時計のズレで直前の撮影が弾かれないよう未来側も見るが、同じ幅で打ち切る。
-  // 片側を開けたままにすると、カメラの日付設定を誤った1枚に「新着投稿」が
-  // 未来永劫つき続ける。
-  const distance = Math.abs(Date.now() - shot);
-  return distance < FRESHLY_SHOT_DAYS * 24 * 60 * 60 * 1000;
-}
+// 写真の上に直接載るので、どの写真の上でも読めるよう明るい不透明の地にする
+const CHIP_CLASS = {
+  mythical: 'bg-gradient-to-r from-[#F9A8D4] to-[#C4B5FD] text-[#2E2346]',
+  legendary: 'bg-gradient-to-r from-[#FDE68A] to-[#FBBF24] text-[#2E2346]',
+  'same-day': 'bg-[#A7F3D0] text-[#064E3B]',
+  fresh: 'bg-white text-[#7B63A8]',
+  memory: 'bg-[#E7DCC8] text-[#5B4636]',
+} as const;
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
@@ -192,6 +183,7 @@ export default function HomePage() {
   const sortedFeed = [...feed].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+  const sameDayCounts = sameDayVisitorCounts(sortedFeed);
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -396,6 +388,7 @@ export default function HomePage() {
               ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
                   {sortedFeed.map((visit, index) => {
+                    const chips = feedCardTags(visit, sameDayCounts.get(visit.id));
                     const photo = visit.photos?.[0];
                     const locationLabel = visit.manhole ? manholeDisplayName(visit.manhole) : visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
@@ -405,11 +398,10 @@ export default function HomePage() {
                     const latestComment = commentCount > 0 ? visit.latest_manhole_comment ?? null : null;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
-                    const isFresh = isFreshlyShot(visit.shot_at);
                     // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
                     // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
-                      isFresh ? '新着投稿' : null,
+                      ...chips.map((chip) => chip.label),
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
@@ -432,10 +424,15 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {isFresh && (
-                          <span className="absolute left-2 top-2 rounded-[6px] bg-[#7B63A8] px-2 py-1 text-xs font-extrabold text-white shadow-sm">
-                            新着投稿
-                          </span>
+                        {/* タグは口コミ件数と同じく写真の上に置く。右上の口コミバッジと重ならないよう右を空ける */}
+                        {chips.length > 0 && (
+                          <div className="absolute left-2 right-14 top-2 flex flex-wrap gap-1">
+                            {chips.map((chip) => (
+                              <span key={chip.tag} className={`rounded-full px-2 py-1 text-xs font-extrabold leading-none shadow-sm ${CHIP_CLASS[chip.tag]}`}>
+                                {chip.label}
+                              </span>
+                            ))}
+                          </div>
                         )}
                         {/* 口コミの有無は写真の上で一目でわかるようにする（下の帯に置くと文字に埋もれる） */}
                         {commentCount > 0 && (
