@@ -10,11 +10,20 @@ import {
 
 const photo = (
   id: string,
-  options: { score?: number | null; createdAt?: string; userId?: string; isPublic?: boolean } = {}
+  options: {
+    score?: number | null;
+    qualityScore?: number | null;
+    eligible?: boolean | null;
+    createdAt?: string;
+    userId?: string;
+    isPublic?: boolean;
+  } = {}
 ) => ({
   id,
   created_at: options.createdAt ?? '2026-08-01T00:00:00.000Z',
   score: options.score,
+  quality_score: options.qualityScore,
+  quality_eligible: options.eligible,
   visit: {
     user_id: options.userId ?? 'community',
     is_public: options.isPublic ?? true,
@@ -29,6 +38,36 @@ test('scored photos rank ahead of unscored photos, then by score', () => {
   ]);
 
   assert.deepEqual(ranked.map(({ id }) => id), ['higher', 'lower', 'unscored']);
+});
+
+test('photo.quality_score from the DB ranks photos', () => {
+  const ranked = rankManholePhotos([
+    photo('unscored', { createdAt: '2026-09-26T00:00:00.000Z' }),
+    photo('low', { qualityScore: 0.61, eligible: true }),
+    photo('high', { qualityScore: 0.9, eligible: true }),
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['high', 'low', 'unscored']);
+});
+
+test('photos judged ineligible go after unscored ones, even with a high score', () => {
+  const ranked = rankManholePhotos([
+    photo('clipped', { qualityScore: 0.93, eligible: false }),
+    photo('unscored', { createdAt: '2026-09-26T00:00:00.000Z' }),
+    photo('ok', { qualityScore: 0.55, eligible: true }),
+    photo('blurry', { qualityScore: 0.4, eligible: false }),
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['ok', 'unscored', 'clipped', 'blurry']);
+});
+
+test('a manhole whose photos are all ineligible still gets a representative', () => {
+  const result = orderManholePhotosForViewer([
+    photo('worse', { qualityScore: 0.3, eligible: false }),
+    photo('better', { qualityScore: 0.5, eligible: false }),
+  ], null);
+
+  assert.equal(result.representativePhoto?.id, 'better');
 });
 
 test('equal or missing scores fall back to newest photo first', () => {

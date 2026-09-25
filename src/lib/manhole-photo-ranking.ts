@@ -6,6 +6,8 @@ export type RankableManholePhoto = {
   score?: number | null;
   quality_score?: number | null;
   ranking_score?: number | null;
+  /** false = 採点で代表写真の候補から外れた（ブレ・白飛び・色かぶり・蓋が写っていない） */
+  quality_eligible?: boolean | null;
   visit?: {
     user_id?: string | null;
     is_public?: boolean;
@@ -21,8 +23,27 @@ export const getManholePhotoScore = (photo: RankableManholePhoto) => {
   ) ?? null;
 };
 
+/**
+ * 代表写真の選び方の段。小さいほど先。
+ *
+ *   0 … 採点済みで候補（スコアの高い順に並ぶ）
+ *   1 … 未採点（採点後に投稿された写真。ひとこと付き → 新しい順）
+ *   2 … 採点で候補外と判定された写真
+ *
+ * 候補外を未採点より後ろに置くのは、「ブレている」と分かっている写真を
+ * 「まだ見ていない」写真より前に出さないため。スコアは photo.quality_score
+ * （k11 manhole-score で採点、マイグレーションで投入）。
+ */
+const rankTier = (photo: RankableManholePhoto) => {
+  if (photo.quality_eligible === false) return 2;
+  return getManholePhotoScore(photo) === null ? 1 : 0;
+};
+
 export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
   [...items].sort((a, b) => {
+    const tier = rankTier(a) - rankTier(b);
+    if (tier !== 0) return tier;
+
     const aScore = getManholePhotoScore(a);
     const bScore = getManholePhotoScore(b);
 
