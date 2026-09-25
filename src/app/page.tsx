@@ -57,12 +57,12 @@ type FeedVisit = {
  */
 const INCOMPLETE_CHIP_LIMIT = 12;
 
-// 写真下の暗い帯の上に載るので、どれも明るい地にする
+// 写真の上に直接載るので、どの写真の上でも読めるよう明るい不透明の地にする
 const CHIP_CLASS = {
   mythical: 'bg-gradient-to-r from-[#F9A8D4] to-[#C4B5FD] text-[#2E2346]',
   legendary: 'bg-gradient-to-r from-[#FDE68A] to-[#FBBF24] text-[#2E2346]',
   'same-day': 'bg-[#A7F3D0] text-[#064E3B]',
-  fresh: 'bg-white/95 text-[#7B63A8]',
+  fresh: 'bg-white text-[#7B63A8]',
   memory: 'bg-[#E7DCC8] text-[#5B4636]',
 } as const;
 
@@ -425,6 +425,16 @@ export default function HomePage() {
                           </div>
                         )}
 
+                        {/* タグは口コミ件数と同じく写真の上に置く。右上の口コミバッジと重ならないよう右を空ける */}
+                        {chips.length > 0 && (
+                          <div className="absolute left-2 right-14 top-2 flex flex-wrap gap-1">
+                            {chips.map((chip) => (
+                              <span key={chip.tag} className={`rounded-full px-2 py-1 text-xs font-extrabold leading-none shadow-sm ${CHIP_CLASS[chip.tag]}`}>
+                                {chip.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {/* 口コミの有無は写真の上で一目でわかるようにする（下の帯に置くと文字に埋もれる） */}
                         {commentCount > 0 && (
                           <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-xs font-extrabold text-[#7B63A8] shadow-sm">
@@ -433,15 +443,6 @@ export default function HomePage() {
                           </span>
                         )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
-                          {chips.length > 0 && (
-                            <div className="mb-1.5 flex flex-wrap gap-1">
-                              {chips.map((chip) => (
-                                <span key={chip.tag} className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold leading-tight sm:text-xs ${CHIP_CLASS[chip.tag]}`}>
-                                  {chip.label}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
                           </div>
