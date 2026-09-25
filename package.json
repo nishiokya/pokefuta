@@ -17,6 +17,7 @@
     "test:manhole-gallery": "tsx --test tests/manhole-photo-ranking.test.ts tests/visit-comment-quality.test.ts",
     "test:latest-comment": "tsx --test tests/latest-manhole-comment.test.ts tests/recent-comments.test.ts",
     "test:manhole-label": "tsx --test tests/manhole-label.test.ts",
+    "test:feed-card-tags": "tsx --test tests/feed-card-tags.test.ts",
     "test:json-ld": "tsx --test tests/json-ld.test.ts",
     "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
     "test:prefecture-completion": "tsx --test tests/prefecture-completion.test.ts",
