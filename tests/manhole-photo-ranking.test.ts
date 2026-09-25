@@ -17,6 +17,7 @@ const photo = (
     createdAt?: string;
     userId?: string;
     isPublic?: boolean;
+    comment?: string | null;
   } = {}
 ) => ({
   id,
@@ -27,6 +28,7 @@ const photo = (
   visit: {
     user_id: options.userId ?? 'community',
     is_public: options.isPublic ?? true,
+    comment: options.comment ?? null,
   },
 });
 
@@ -68,6 +70,29 @@ test('a manhole whose photos are all ineligible still gets a representative', ()
   ], null);
 
   assert.equal(result.representativePhoto?.id, 'better');
+});
+
+test('a photo with a comment is representative even when others score higher', () => {
+  const ranked = rankManholePhotos([
+    photo('best-no-comment', { qualityScore: 0.92, eligible: true }),
+    photo('commented-low', { qualityScore: 0.6, eligible: true, comment: '駅前の交差点にありました' }),
+    photo('commented-high', { qualityScore: 0.8, eligible: true, comment: '公園の入口の横です' }),
+    photo('second-no-comment', { qualityScore: 0.7, eligible: true }),
+  ]);
+
+  assert.deepEqual(
+    ranked.map(({ id }) => id),
+    ['commented-high', 'commented-low', 'best-no-comment', 'second-no-comment']
+  );
+});
+
+test('junk comments do not jump the queue', () => {
+  const ranked = rankManholePhotos([
+    photo('junk', { qualityScore: 0.5, eligible: true, comment: '15' }),
+    photo('best', { qualityScore: 0.9, eligible: true }),
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['best', 'junk']);
 });
 
 test('equal or missing scores fall back to newest photo first', () => {
