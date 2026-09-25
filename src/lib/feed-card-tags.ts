@@ -34,7 +34,6 @@ export type FeedCardTagInput = {
   id: string;
   manhole_id: number | null;
   shot_at: string;
-  user_id?: string | null;
   public_user_id?: string | null;
   manhole?: { pokemons?: string[] | null } | null;
 };
@@ -78,7 +77,9 @@ export function sameDayVisitorCounts(visits: FeedCardTagInput[]): Map<string, nu
   const keyOf = new Map<string, string>();
   for (const v of visits) {
     const day = jstDate(v.shot_at);
-    const who = v.public_user_id ?? v.user_id;
+    // 公開IDが無い投稿は数えない。内部の user_id（auth UID）に頼ると、公開APIがそれを返し
+    // 続けることが前提になってしまう。公開IDが取れないときはチップが出ないだけで済ませる
+    const who = v.public_user_id;
     if (v.manhole_id == null || !day || !who) continue;
     const key = `${v.manhole_id}:${day}`;
     keyOf.set(v.id, key);

@@ -34,7 +34,6 @@ type FeedVisit = {
   shot_at: string;
   created_at: string;
   shot_location?: string | null;
-  user_id?: string | null;
   public_user_id?: string | null;
   photos: Array<{
     id: string;

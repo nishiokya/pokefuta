@@ -40,7 +40,7 @@ test('伝説・幻は蓋のポケモンで判定し、幻を優先する', () =>
 
 test('同じ蓋・同じ日（JST）に別の人が撮ったら人数を返す。同じ人の2枚は1人', () => {
   const v = (id: string, who: string, manhole_id: number, shot_at: string) => ({
-    id, manhole_id, public_user_id: who, shot_at, created_at: shot_at,
+    id, manhole_id, public_user_id: who, shot_at,
   });
   const counts = sameDayVisitorCounts([
     v('1', 'maru', 161, '2026-09-24T01:00:00Z'),
@@ -53,6 +53,14 @@ test('同じ蓋・同じ日（JST）に別の人が撮ったら人数を返す�
   assert.equal(counts.get('2'), 2);
   assert.equal(counts.has('3'), false);
   assert.equal(counts.has('4'), false);
+});
+
+test('公開IDの無い投稿は同じ日の人数に数えない（内部の user_id には頼らない）', () => {
+  const counts = sameDayVisitorCounts([
+    { id: '1', manhole_id: 161, public_user_id: 'maru', shot_at: '2026-09-24T01:00:00Z' },
+    { id: '2', manhole_id: 161, public_user_id: null, user_id: 'auth-uid', shot_at: '2026-09-24T02:00:00Z' } as never,
+  ]);
+  assert.equal(counts.size, 0);
 });
 
 test('チップは最大2つ、珍しい順', () => {
