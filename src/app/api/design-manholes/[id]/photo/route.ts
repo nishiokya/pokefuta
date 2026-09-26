@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveDesignSmallKey } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +31,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // published の行しか返さない公開写真で、応答は共有キャッシュする。クッキーを読まない（anon.ts 参照）
+    const supabase = createAnonClient();
 
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size');

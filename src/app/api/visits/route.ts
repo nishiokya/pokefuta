@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
+import { createRouteHandlerClient, hasSupabaseAuthCookie } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
@@ -489,8 +489,9 @@ export async function GET(request: NextRequest) {
       headers: {
         // 匿名レスポンスは全員同一(is_liked/is_bookmarked 常に false)なので
         // CDN で共有キャッシュさせ、Lambda 起動ごと削減する。
-        // ログイン時はユーザー固有のためキャッシュ禁止。
-        'Cache-Control': viewerUserId
+        // 認証クッキー付きのリクエストは、ログイン判定の結果にかかわらずキャッシュ禁止。
+        // セッション更新の Set-Cookie が共有キャッシュに乗ると別人に配られる。
+        'Cache-Control': viewerUserId || hasSupabaseAuthCookie()
           ? 'private, no-store'
           : 'public, s-maxage=60, stale-while-revalidate=300',
       },

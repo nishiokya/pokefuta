@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import sharp from 'sharp';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import {
@@ -337,7 +338,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // 公開カラムだけの一覧で、応答は共有キャッシュする。クッキーを読まない（lib/supabase/anon.ts 参照）
+    const supabase = createAnonClient();
 
     const { searchParams } = new URL(request.url);
     const limitParam = parseInt(searchParams.get('limit') ?? '', 10);
