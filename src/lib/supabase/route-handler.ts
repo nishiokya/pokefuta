@@ -43,3 +43,19 @@ export function createRouteHandlerClient(
     }
   ) as unknown as SupabaseClient<Database>;
 }
+
+/**
+ * リクエストに Supabase の認証クッキーが載っているか。
+ *
+ * 載っているリクエストは createRouteHandlerClient がセッション更新の Set-Cookie を
+ * 書きうるので、その応答に `Cache-Control: public` を付けてはいけない
+ * （CDN が Set-Cookie ごと共有キャッシュし、別人にセッションが渡る）。
+ * getSession() の結果（viewerUserId）では判定しない。更新に失敗したときは
+ * viewer が null のまま「クッキーを消す」Set-Cookie が書かれ、それが共有されると
+ * 同じURLを開いた人が全員ログアウトされる。
+ */
+export function hasSupabaseAuthCookie(): boolean {
+  return cookies()
+    .getAll()
+    .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'));
+}

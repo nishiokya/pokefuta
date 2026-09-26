@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { cookies } from 'next/headers';
+import { createAnonClient } from '@/lib/supabase/anon';
 import type { Database, ManholeTitle } from '@/types/database';
 
 type RarePreviewManhole = {
@@ -29,7 +28,8 @@ const getTopTitlePriority = (titles?: ManholeTitle[] | null) =>
 
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // 共有キャッシュする応答なのでクッキーを読まない（anon.ts 参照）
+    const supabase = createAnonClient();
 
     const { data, error } = await supabase
       .from('manhole')

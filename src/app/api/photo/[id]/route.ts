@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey } from '@/lib/storage';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 
@@ -72,15 +74,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
     const photoId = params.id;
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size'); // 'small', 'medium', 'large', or null for original
-    const { data: { session } } = await supabase.auth.getSession();
-    const viewerUserId = session?.user?.id ?? null;
 
-    // Fetch photo metadata from database
-    const { data: photo, error } = await supabase
+    const selectPhoto = (client: SupabaseClient<Database>) => client
       .from('photo')
       .select(`
         id,
@@ -92,7 +90,25 @@ export async function GET(
         )
       `)
       .eq('id', photoId)
-      .single();
+      .maybeSingle();
+
+    // 公開写真はクッキーを読まない anon クライアントで引く。この応答は CDN に
+    // 共有キャッシュさせるので、セッション更新の Set-Cookie を載せてはいけない
+    // （載ると次に同じ写真を開いた別人にセッションが配られる。lib/supabase/anon.ts 参照）。
+    // anon で見えない（＝非公開の）ときだけ、クッキーでログインを見て本人か確かめる。
+    let { data: photo, error } = await selectPhoto(createAnonClient());
+    let viewerUserId: string | null = null;
+    // クッキーを読んだ応答（Set-Cookie が載りうる）は共有キャッシュさせない
+    let readCookies = false;
+    if (!error && !photo) {
+      readCookies = true;
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { session } } = await supabase.auth.getSession();
+      viewerUserId = session?.user?.id ?? null;
+      if (viewerUserId) {
+        ({ data: photo, error } = await selectPhoto(supabase));
+      }
+    }
 
     if (error || !photo) {
       return NextResponse.json({
@@ -134,7 +150,7 @@ export async function GET(
     // 十分短くして、キャッシュされた Location が期限切れURLを指さないようにする
     // （stale-while-revalidate は寿命を超えて配り続けるため公開写真でも使わない）。
     // Private photos must not enter shared caches.
-    const cacheControl = visit?.is_public === true
+    const cacheControl = visit?.is_public === true && !readCookies
       ? 'public, max-age=300'
       : 'private, max-age=300';
 
