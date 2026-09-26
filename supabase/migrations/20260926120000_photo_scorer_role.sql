@@ -44,16 +44,19 @@ GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 -- 採点の対象: 指定の版で採点されていない写真（未採点・旧版）
 -- 非公開の写真も含める（公開に切り替えた瞬間から正しく並ぶように）。
 -- storage_key は R2 から原本を取るために返す。exif や visit の情報は返さない。
+-- quality_score_version / quality_scored_at は書き戻すときの楽観ロックの鍵
+-- （apply_photo_scores の expected_version / expected_scored_at）。
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION scoring.unscored_photos(p_version text, p_limit integer DEFAULT 1000)
-RETURNS TABLE (id uuid, storage_key text, manhole_id integer, created_at timestamptz)
+RETURNS TABLE (id uuid, storage_key text, manhole_id integer, created_at timestamptz,
+               quality_score_version text, quality_scored_at timestamptz)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT p.id, p.storage_key, p.manhole_id, p.created_at
+  SELECT p.id, p.storage_key, p.manhole_id, p.created_at, p.quality_score_version, p.quality_scored_at
   FROM public.photo AS p
   WHERE p.quality_score_version IS DISTINCT FROM p_version
   ORDER BY p.created_at DESC
@@ -63,9 +66,19 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 採点結果の書き込み
 --
--- p_rows: [{"id": "<uuid>", "score": 0.83, "eligible": true}, ...]
+-- p_rows: [{"id": "<uuid>", "score": 0.83, "eligible": true,
+--           "expected_version": <unscored_photos が返した quality_score_version | null>,
+--           "expected_scored_at": <unscored_photos が返した quality_scored_at | null>}, ...]
 -- 1回の呼び出しは1トランザクション。1行でも不正なら全部書かない。
--- 戻り値は実際に更新した行数（削除済みの写真は数えられない）。
+-- 戻り値は実際に更新した行数。削除済みの写真と、下の楽観ロックで弾いた写真は数えない。
+--
+-- 楽観ロック: 読んだ時点から（版, 採点時刻）の組が変わっている行は書かない。
+-- 版の切り替え時に採点ジョブが2本重なると、古い版のバッチが後から終わって
+-- 新しい版の結果を上書きしうる（PR #274 の Codex レビュー）。採点時刻での比較は
+-- 「古いバッチほど後に書く」ので効かない。読んだ値との一致で判定する。
+-- 時刻だけを鍵にしないのは、呼び出し側が渡す時刻が偶然一致すると見分けられないため
+-- （1トランザクション内の now() で実際に起きた）。版が違えば時刻が同じでも弾ける。
+-- 弾かれた写真は、まだ自分の版で未採点なら次の回に拾われる。
 -- photo_protect_quality_score トリガは anon / authenticated だけを止めるので、
 -- 所有者（postgres）として動くこの関数は通る。
 -- ---------------------------------------------------------------------------
@@ -106,6 +119,12 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'apply_photo_scores: id / score(0〜1) / eligible が欠けた行がある';
   END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_rows) AS e
+    WHERE NOT (e ? 'expected_version' AND e ? 'expected_scored_at')
+  ) THEN
+    RAISE EXCEPTION 'apply_photo_scores: expected_version / expected_scored_at が無い行がある（未採点なら null を明示する）';
+  END IF;
   IF (
     SELECT count(*) <> count(DISTINCT r.id)
     FROM jsonb_to_recordset(p_rows) AS r(id uuid, score real, eligible boolean)
@@ -118,8 +137,11 @@ BEGIN
       quality_eligible = r.eligible,
       quality_score_version = p_version,
       quality_scored_at = p_scored_at
-  FROM jsonb_to_recordset(p_rows) AS r(id uuid, score real, eligible boolean)
-  WHERE p.id = r.id;
+  FROM jsonb_to_recordset(p_rows) AS r(id uuid, score real, eligible boolean,
+                                      expected_version text, expected_scored_at timestamptz)
+  WHERE p.id = r.id
+    AND p.quality_score_version IS NOT DISTINCT FROM r.expected_version
+    AND p.quality_scored_at IS NOT DISTINCT FROM r.expected_scored_at;
   GET DIAGNOSTICS n_updated = ROW_COUNT;
 
   RETURN n_updated;
