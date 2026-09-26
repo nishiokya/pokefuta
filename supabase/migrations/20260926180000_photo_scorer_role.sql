@@ -319,12 +319,15 @@ $$;
 --   member_of          … photo_scorer が他ロールのメンバー（権限を引き継ぐ）
 --   can_become         … 他ロールが photo_scorer に SET ROLE / 継承できる
 --   reachable_relation … スキーマの USAGE があり、表か列の権限もある（＝届く表）
---   reachable_sequence … スキーマの USAGE があり、シーケンスの USAGE / SELECT / UPDATE がある
---                        （UPDATE があれば setval() で共有の採番を壊せる）
+--   reachable_sequence … シーケンスの USAGE / SELECT / UPDATE がある（UPDATE があれば setval() で
+--                        共有の採番を壊せる）。表と違いスキーマの USAGE は条件にしない。
+--                        シーケンス関数は regclass（OID）で呼べるので、スキーマに入れなくても届く
 --   schema_create      … CREATE できるスキーマがある（関数や表を置いて何かを仕込める）
 --   secdef_function    … 呼べる SECURITY DEFINER 関数のうち、下の許可リストに無いもの
 --   scoring_object     … scoring にこのマイグレーション以外のものがある（関数は署名で照合。
 --                        同名で引数の違う関数も違反）
+--   function_attribute … scoring の4関数の所有者（postgres）・SECURITY DEFINER の有無・
+--                        search_path の固定が想定と違う（本番で誰かが ALTER FUNCTION したら止まる）
 --   extension          … pg_net が有効（net の表が PUBLIC に開き、DB から HTTP を出せる）
 --
 -- 許可リストの public の3関数は、2026-09-26 時点で本番でもローカルでも PUBLIC が呼べる
@@ -379,7 +382,6 @@ AS $$
   JOIN pg_catalog.pg_namespace AS ns ON ns.oid = c.relnamespace
   WHERE c.relkind = 'S'
     AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-    AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
     -- has_sequence_privilege はシーケンス以外に渡すと例外になり、WHERE の評価順は
     -- 保証されないので CASE で先に relkind を見る
     AND CASE WHEN c.relkind = 'S'
@@ -425,6 +427,18 @@ AS $$
     'active_version()', 'unscored_photos(text, integer)',
     'apply_photo_scores(text, timestamp with time zone, jsonb)', 'audit_photo_scorer()'
   )
+
+  UNION ALL
+  SELECT 'function_attribute', format('%s owner=%s secdef=%s config=%s',
+           p.proname, pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef,
+           coalesce(pg_catalog.array_to_string(p.proconfig, ','), 'NULL'))
+  FROM pg_catalog.pg_proc AS p
+  WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
+    AND p.proname IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
+    -- NULL になりうる proconfig（RESET search_path 後）も違反として拾うよう、NULL 安全に比べる
+    AND (pg_catalog.pg_get_userbyid(p.proowner) IS DISTINCT FROM 'postgres'
+         OR p.proconfig IS DISTINCT FROM ARRAY['search_path=""']::text[]
+         OR p.prosecdef IS DISTINCT FROM (p.proname IN ('unscored_photos', 'apply_photo_scores')))
 
   UNION ALL
   SELECT 'extension', 'pg_net ' || e.extversion

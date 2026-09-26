@@ -112,6 +112,15 @@ BEGIN
     RAISE EXCEPTION '[2f] シーケンスの権限を自己点検が検出しない';
   END IF;
   REVOKE UPDATE ON SEQUENCE public.manhole_id_seq FROM photo_scorer;
+  --     USAGE の無いスキーマのシーケンスでも検出する（setval(oid::regclass, ...) で届くため）
+  CREATE SCHEMA _verify_no_usage;
+  CREATE SEQUENCE _verify_no_usage.s;
+  GRANT UPDATE ON SEQUENCE _verify_no_usage.s TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'reachable_sequence' AND a.detail = '_verify_no_usage.s') THEN
+    RAISE EXCEPTION '[2f] USAGE の無いスキーマのシーケンス権限を自己点検が検出しない';
+  END IF;
+  DROP SCHEMA _verify_no_usage CASCADE;
 
   -- 2g. スキーマの CREATE を付けると schema_create
   GRANT CREATE ON SCHEMA public TO photo_scorer;
@@ -131,6 +140,24 @@ BEGIN
   END IF;
   DROP FUNCTION scoring.unscored_photos(text);
 
+  -- 2i. 4関数の属性が退行すると function_attribute（search_path の固定を外す＝proconfig が NULL、
+  --     SECURITY DEFINER を外す、の2通り）
+  ALTER FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) RESET search_path;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'function_attribute' AND a.detail LIKE 'apply_photo_scores %config=NULL') THEN
+    RAISE EXCEPTION '[2i] search_path の固定が外れたことを自己点検が検出しない';
+  END IF;
+  ALTER FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) SET search_path = '';
+  ALTER FUNCTION scoring.unscored_photos(text, integer) SECURITY INVOKER;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'function_attribute' AND a.detail LIKE 'unscored_photos %secdef=f %') THEN
+    RAISE EXCEPTION '[2i] SECURITY DEFINER が外れたことを自己点検が検出しない';
+  END IF;
+  ALTER FUNCTION scoring.unscored_photos(text, integer) SECURITY DEFINER;
+  IF EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a WHERE a.kind = 'function_attribute') THEN
+    RAISE EXCEPTION '[2i] 属性を戻しても function_attribute が残る';
+  END IF;
+
   -- ---------------------------------------------------------------------
   -- 3. scoring スキーマ: 所有者と、API のロールからの遮断
   -- ---------------------------------------------------------------------
@@ -144,19 +171,7 @@ BEGIN
      OR has_function_privilege('anon', f_unscored, 'EXECUTE') OR has_function_privilege('authenticated', f_unscored, 'EXECUTE') THEN
     RAISE EXCEPTION '[3] anon / authenticated が scoring の関数の EXECUTE を持っている';
   END IF;
-  -- 4つの関数の所有者と属性（所有者・SECURITY DEFINER・search_path の固定が退行しないこと）
-  SELECT string_agg(p.proname || ' owner=' || pg_get_userbyid(p.proowner) || ' secdef=' || p.prosecdef
-                    || ' config=' || coalesce(array_to_string(p.proconfig, ','), '-'), '; ') INTO bad
-  FROM pg_proc AS p
-  WHERE p.pronamespace = 'scoring'::regnamespace
-    AND NOT (
-      pg_get_userbyid(p.proowner) = 'postgres'
-      AND p.proconfig = ARRAY['search_path=""']
-      AND p.prosecdef = (p.proname IN ('unscored_photos', 'apply_photo_scores'))
-    );
-  IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '[3] scoring の関数の所有者・属性が想定と違う: %', bad;
-  END IF;
+  -- 4つの関数の所有者・属性は audit_photo_scorer() の function_attribute が見る（[1] で0件、[2i] で検出）
 
   -- ---------------------------------------------------------------------
   -- ここから photo_scorer に切り替えて挙動を見る
