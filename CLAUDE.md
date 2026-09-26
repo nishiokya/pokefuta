@@ -26,8 +26,23 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 - `.env.local` を `set -a; . ./.env.local` のように丸ごと読み込まない。必要な値だけ取り出す
 - **Supabase と R2 は別々に向き先を持つ。** 一方がローカルでも他方がそうとは限らないので、
   書き込みを伴う動作確認の前に両方を確認する
-- 本番への書き込み経路はマイグレーションの適用と**アプリ本来の経路**に限る。
+- 本番への書き込み経路はマイグレーションの適用と**アプリ本来の経路**、**用途を限った専用ロール**に限る。
   curl + service role の直叩きはしない。Supabase MCP は read-only なので調査に使ってよい
+- 専用ロールは「テーブル権限を渡さず、SECURITY DEFINER 関数の EXECUTE だけ」の形にする。
+  関数は PostgREST に出ないスキーマに置き、入力の検査は関数の中でやる。
+  今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、`verify:photo-scorer` で検査、
+  `20260926180000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
+  リポジトリにも `.env.local` にも置かない
+- **SECURITY DEFINER 関数は `REVOKE EXECUTE ... FROM PUBLIC` して使うロールに名指しで GRANT し、
+  `SET search_path` は `public, pg_temp` のように pg_temp を最後に置く（または `` にして全部修飾する）。**
+  `SET search_path = public` だけだと pg_temp が暗黙に先頭になり、直接ログインできるロールが一時ビューで
+  関数を乗っ取って所有者の権限でコードを動かせる。anon / authenticated は PostgREST 経由なので一時オブジェクトを
+  作れないが、専用ロール（photo_scorer）は作れる（2026-09-27、PR #274 の Codex レビュー）
+- **ログインできる専用ロールは、PostgreSQL が PUBLIC に開いているものを全部持つ。**
+  なので `scoring.audit_photo_scorer()` が権限を点検し、k11 のジョブは書き込みの前に毎回呼んで
+  違反があれば止まる。次のことをすると本番の自動採点が止まる（＝止まったらここを疑う）:
+  public に SECURITY DEFINER 関数を足して `REVOKE ... FROM PUBLIC` を書き忘れる、
+  `scoring` に関数を足す、pg_net を有効にする（`net` の表が PUBLIC に開き、DB から HTTP を出せる。ローカルの Supabase には入っている）
 - **検証のために本番への書き込み手段を新設しない。** トリガや制約の確認は、機能を有効にして
   アプリの実操作で通す方が、余計な権限を作らずに同じことを確かめられる
 
@@ -60,6 +75,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
 | `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:photo-visibility` | photo の列権限と RLS を実際にロールを切り替えて確認（exif が anon から見えないこと、非公開写真が隠れること、INSERT の RETURNING が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
+| `npm run verify:photo-scorer` | 自動採点ロール photo_scorer の権限の自己点検（`scoring.audit_photo_scorer()`）が違反を返さないこと・わざと作った違反を検出すること、楽観ロック・入力検査。ローカルの pg_net は警告 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:app-user-visibility` | app_user の列権限と RLS を実際にロールを切り替えて確認（anon が1列も読めないこと、他人の行が見えないこと、プロフィール系 RPC が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
 | `npm run verify:comment-guardrails` | 蓋コメントの制約・通報の RLS・公開ID/表示名の条件一致を実際に書き込んで確認 | `supabase start` でローカルスタックが起動 |
 

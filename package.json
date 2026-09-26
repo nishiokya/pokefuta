@@ -28,6 +28,7 @@
     "db:drift": "node tools/check-migration-drift.js",
     "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",
     "verify:photo-visibility": "node tools/verify-photo-visibility.js",
+    "verify:photo-scorer": "node tools/verify-photo-scorer.js",
     "verify:app-user-visibility": "node tools/verify-app-user-visibility.js",
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
