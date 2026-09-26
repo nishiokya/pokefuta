@@ -7,6 +7,12 @@ import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey } from '@/lib/storage';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 
+export const dynamic = 'force-dynamic';
+// 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
+// supabase-js の GET を Data Cache に載せうるため、公開→非公開に切り替えた写真が
+// 「公開」のまま配信され続ける。fetch キャッシュを無効化する
+export const fetchCache = 'force-no-store';
+
 /**
  * @swagger
  * /api/photo/{id}:
