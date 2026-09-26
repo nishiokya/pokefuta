@@ -28,7 +28,15 @@ const LEGENDARY = new Set([
   'ウーラオス', 'オーガポン',
 ]);
 
-export type FeedCardTag = 'fresh' | 'memory' | 'mythical' | 'legendary' | 'same-day';
+export type FeedCardTag =
+  | 'fresh'
+  | 'memory'
+  | 'mythical'
+  | 'legendary'
+  | 'same-day'
+  | 'pikachu'
+  | 'regional'
+  | 'night';
 
 export type FeedCardTagInput = {
   id: string;
@@ -38,6 +46,15 @@ export type FeedCardTagInput = {
   manhole?: { pokemons?: string[] | null } | null;
 };
 
+const PIKACHU = new Set(['ピカチュウ', 'ライチュウ', 'アローラライチュウ', 'ピチュー']);
+
+// 名前の頭に付く地方名。蓋の pokemons はフォーム名を「アローラナッシー」の形で持つ
+const REGIONAL_PREFIXES = ['アローラ', 'ガラル', 'ヒスイ', 'パルデア'] as const;
+
+/** 夜ふた: JST の 20:00〜4:59 に撮った写真（直近192件で17%） */
+const NIGHT_START_HOUR = 20;
+const NIGHT_END_HOUR = 5;
+
 const ageMs = (value: string | null | undefined, now: number): number | null => {
   if (!value) return null;
   const t = new Date(value).getTime();
@@ -45,10 +62,28 @@ const ageMs = (value: string | null | undefined, now: number): number | null => 
 };
 
 const JST_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' });
+const JST_HOUR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' });
 const jstDate = (value: string): string | null => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : JST_DATE.format(d);
 };
+
+export function isNightShot(shotAt: string | null | undefined): boolean {
+  if (!shotAt) return false;
+  const d = new Date(shotAt);
+  if (Number.isNaN(d.getTime())) return false;
+  const hour = Number(JST_HOUR.format(d));
+  return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR;
+}
+
+/** 蓋に描かれたリージョンフォームの地方名（最初の1つ） */
+export function regionalFormOf(pokemons: string[] | null | undefined): string | null {
+  for (const p of pokemons ?? []) {
+    const region = REGIONAL_PREFIXES.find((prefix) => p.startsWith(prefix) && p.length > prefix.length);
+    if (region) return region;
+  }
+  return null;
+}
 
 export function isFreshShot(shotAt: string | null | undefined, now = Date.now()): boolean {
   const age = ageMs(shotAt, now);
@@ -112,8 +147,73 @@ export function feedCardTags(
   if (sameDayCount && sameDayCount >= 2) {
     chips.push({ tag: 'same-day', label: `同じ日に${sameDayCount}人` });
   }
+  if (visit.manhole?.pokemons?.some((p) => PIKACHU.has(p))) {
+    chips.push({ tag: 'pikachu', label: 'ピカチュウ' });
+  }
+  const region = regionalFormOf(visit.manhole?.pokemons);
+  if (region) chips.push({ tag: 'regional', label: `${region}のすがた` });
+  if (isNightShot(visit.shot_at)) chips.push({ tag: 'night', label: '夜ふた' });
   if (isFreshShot(visit.shot_at, now)) chips.push({ tag: 'fresh', label: '撮れたて' });
   else if (isMemoryShot(visit.shot_at, now)) chips.push({ tag: 'memory', label: '思い出の1枚' });
 
   return chips.slice(0, MAX_CHIPS);
+}
+
+/** 同じ人の投稿をトップの1ページに何枚まで並べるか。超えた分は「ほか◯枚」の1枚に畳む */
+export const MAX_CARDS_PER_POSTER = 6;
+
+export type FeedCollapsed = {
+  kind: 'collapsed';
+  public_user_id: string;
+  display_name: string | null;
+  hidden: string[];
+  /** 畳んだ分も含め、その人がこのページで1日に撮った蓋の最多枚数 */
+  busiestDay: number;
+};
+
+/**
+ * まとめ投稿で最新の投稿が1人に埋まらないよう、同じ人の7枚目以降を畳む。
+ * 畳んだカードは7枚目があった位置に1枚だけ出す。公開IDの無い投稿は畳まない
+ * （誰の投稿か言えないのでリンク先も作れない）。
+ */
+export function collapseByPoster<T extends FeedCardTagInput & { display_name?: string | null }>(
+  visits: T[],
+  maxPerPoster = MAX_CARDS_PER_POSTER
+): Array<{ kind: 'visit'; visit: T } | FeedCollapsed> {
+  const shown = new Map<string, number>();
+  const collapsed = new Map<string, FeedCollapsed>();
+  const dayCounts = new Map<string, Map<string, Set<number>>>();
+  const out: Array<{ kind: 'visit'; visit: T } | FeedCollapsed> = [];
+
+  for (const v of visits) {
+    const who = v.public_user_id;
+    if (!who) {
+      out.push({ kind: 'visit', visit: v });
+      continue;
+    }
+    const day = jstDate(v.shot_at);
+    if (day && v.manhole_id != null) {
+      if (!dayCounts.has(who)) dayCounts.set(who, new Map());
+      const byDay = dayCounts.get(who)!;
+      if (!byDay.has(day)) byDay.set(day, new Set());
+      byDay.get(day)!.add(v.manhole_id);
+    }
+    const n = shown.get(who) ?? 0;
+    if (n < maxPerPoster) {
+      shown.set(who, n + 1);
+      out.push({ kind: 'visit', visit: v });
+      continue;
+    }
+    let group = collapsed.get(who);
+    if (!group) {
+      group = { kind: 'collapsed', public_user_id: who, display_name: v.display_name ?? null, hidden: [], busiestDay: 0 };
+      collapsed.set(who, group);
+      out.push(group);
+    }
+    group.hidden.push(v.id);
+  }
+  for (const [who, group] of collapsed) {
+    group.busiestDay = Math.max(0, ...[...(dayCounts.get(who)?.values() ?? [])].map((s) => s.size));
+  }
+  return out;
 }

@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  collapseByPoster,
   feedCardTags,
+  isNightShot,
+  regionalFormOf,
   isFreshShot,
   isMemoryShot,
   rarityOf,
@@ -70,4 +73,47 @@ test('チップは最大2つ、珍しい順', () => {
     NOW
   );
   assert.deepEqual(tags.map((c) => c.label), ['伝説', '同じ日に3人']);
+});
+
+test('夜ふたは JST の 20:00〜4:59', () => {
+  assert.equal(isNightShot('2026-09-24T11:00:00Z'), true); // JST 20:00
+  assert.equal(isNightShot('2026-09-24T19:59:00Z'), true); // JST 4:59
+  assert.equal(isNightShot('2026-09-24T20:00:00Z'), false); // JST 5:00
+  assert.equal(isNightShot('2026-09-24T10:59:00Z'), false); // JST 19:59
+});
+
+test('リージョンフォームは名前の頭の地方名で拾う', () => {
+  assert.equal(regionalFormOf(['アローラナッシー', 'ナッシー']), 'アローラ');
+  assert.equal(regionalFormOf(['ヒスイガーディ']), 'ヒスイ');
+  assert.equal(regionalFormOf(['ガーディ']), null);
+});
+
+test('ピカチュウ・すがた・夜ふたも優先順どおり最大2つ', () => {
+  const chips = feedCardTags(
+    { id: 'p', manhole_id: 1, shot_at: '2025-01-01T13:00:00Z', manhole: { pokemons: ['アローラライチュウ'] } },
+    undefined,
+    NOW
+  );
+  assert.deepEqual(chips.map((c) => c.label), ['ピカチュウ', 'アローラのすがた']);
+});
+
+test('同じ人の7枚目以降を7枚目の位置で1枚に畳み、1日の最多枚数を数える', () => {
+  const v = (id: string, who: string | null, manhole_id: number, shot_at = '2026-08-19T03:00:00Z') => ({
+    id, manhole_id, public_user_id: who, shot_at, display_name: who,
+  });
+  const visits = [
+    ...Array.from({ length: 9 }, (_, i) => v(`y${i}`, 'yamato', 100 + i)),
+    v('h1', 'hopi', 1),
+    v('anon1', null, 2),
+    v('y9', 'yamato', 200, '2023-08-20T03:00:00Z'),
+  ];
+  const out = collapseByPoster(visits);
+  assert.deepEqual(
+    out.map((item) => (item.kind === 'visit' ? item.visit.id : `collapsed:${item.hidden.length}`)),
+    ['y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'collapsed:4', 'h1', 'anon1']
+  );
+  const group = out[6];
+  assert.ok(group.kind === 'collapsed');
+  assert.equal(group.busiestDay, 9);
+  assert.equal(group.public_user_id, 'yamato');
 });
