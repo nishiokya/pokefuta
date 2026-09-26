@@ -147,7 +147,7 @@ BEGIN
                  WHERE a.kind = 'function_attribute' AND a.detail LIKE 'apply_photo_scores %config=NULL') THEN
     RAISE EXCEPTION '[2i] search_path の固定が外れたことを自己点検が検出しない';
   END IF;
-  ALTER FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) SET search_path = '';
+  ALTER FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) SET search_path = pg_catalog, pg_temp;
   ALTER FUNCTION scoring.unscored_photos(text, integer) SECURITY INVOKER;
   IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
                  WHERE a.kind = 'function_attribute' AND a.detail LIKE 'unscored_photos %secdef=f %') THEN
@@ -220,6 +220,29 @@ BEGIN
   END IF;
   SET LOCAL ROLE photo_scorer;
 
+  -- 5a. pg_temp の型の乗っ取りが効かない
+  --     photo_scorer は直接ログインして pg_temp に同名のドメインを作れる。search_path に
+  --     pg_catalog を先に明示していないと、SECURITY DEFINER の関数の中の未修飾の型名が
+  --     このドメインに解決され、CHECK が postgres の権限で評価される。ここでは CHECK (false)
+  --     にして、乗っ取られていれば関数が落ちる形で確かめる。
+  --     関数の実行計画はセッション内でキャッシュされるので、scoring の関数を初めて呼ぶ前に仕込む。
+  --     （この DO ブロック自身の後続の式も未修飾の型名を使うので、確かめたらすぐ消す）
+  CREATE DOMAIN pg_temp.text AS pg_catalog.text CHECK (false);
+  CREATE DOMAIN pg_temp.uuid AS pg_catalog.uuid CHECK (false);
+  CREATE DOMAIN pg_temp.real AS pg_catalog.float4 CHECK (false);
+  CREATE DOMAIN pg_temp.boolean AS pg_catalog.bool CHECK (false);
+  CREATE DOMAIN pg_temp.timestamptz AS pg_catalog.timestamptz CHECK (false);
+  CREATE DOMAIN pg_temp.interval AS pg_catalog.interval CHECK (false);
+  BEGIN
+    PERFORM 1 FROM scoring.unscored_photos(v1) LIMIT 1;
+    PERFORM scoring.apply_photo_scores(v1, now(), pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
+      'id', '00000000-0000-0000-0000-0000000fd0ff', 'score', 0.5, 'eligible', true,
+      'expected_version', null, 'expected_scored_at', null)));
+  EXCEPTION WHEN check_violation THEN
+    RAISE EXCEPTION '[5a] pg_temp の同名ドメインに型を乗っ取られた: %', SQLERRM;
+  END;
+  DROP DOMAIN pg_temp.text, pg_temp.uuid, pg_temp.real, pg_temp.boolean, pg_temp.timestamptz, pg_temp.interval;
+
   -- 5. photo_scorer 自身が自己点検を呼べる（本番のジョブはこのロールで呼ぶ）。
   --    テーブルは直接読めず、直接書けない
   PERFORM 1 FROM scoring.audit_photo_scorer();
@@ -230,6 +253,10 @@ BEGIN
   BEGIN
     PERFORM public.get_site_stats();
     RAISE EXCEPTION '[5] photo_scorer が public.get_site_stats() を呼べた';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM public.is_own_manhole_comment('00000000-0000-0000-0000-000000000000'::uuid);
+    RAISE EXCEPTION '[5] photo_scorer が public.is_own_manhole_comment() を呼べた';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
     PERFORM 1 FROM public.photo LIMIT 1;
@@ -264,8 +291,8 @@ BEGIN
   --    * 新しい版は、読んだ値を渡せば書け、同じ値を読んでいた別のバッチは後から
   --      上書きできない（1トランザクション内で now() が同じ＝時刻が一致しても）
   RESET ROLE;
-  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %L AS %L',
-                 '', format('SELECT %L::text', v2));
+  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %s AS %L',
+                 'pg_catalog, pg_temp', format('SELECT %L::text', v2));
   SET LOCAL ROLE photo_scorer;
 
   BEGIN
@@ -290,8 +317,8 @@ BEGIN
 
   -- 有効な版を元に戻す（[9] は v1 で入力検査を見る）
   RESET ROLE;
-  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %L AS %L',
-                 '', format('SELECT %L::text', v1));
+  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %s AS %L',
+                 'pg_catalog, pg_temp', format('SELECT %L::text', v1));
   SET LOCAL ROLE photo_scorer;
 
   -- 9. 不正な入力は1件も書かずに拒否する（関数の RAISE は raise_exception で返る）

@@ -163,6 +163,19 @@ REVOKE ALL ON SCHEMA scoring FROM PUBLIC;
 GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 
 -- ---------------------------------------------------------------------------
+-- scoring の関数の search_path は pg_catalog, pg_temp にする
+--
+-- search_path = '' でも pg_temp は無効にならない。明示しなければ、表と**型**の名前は
+-- pg_temp が pg_catalog より先に探される。photo_scorer は直接ログインして pg_temp に
+-- 同名のドメイン（pg_temp.text 等、CHECK に任意の式）を作れるので、SECURITY DEFINER の
+-- 関数の中の未修飾の型名（text / uuid / real / boolean / timestamptz / interval）が
+-- それに解決されると、CHECK が所有者（postgres）の権限で評価される。
+-- pg_catalog を先に、pg_temp を最後に明示すれば、組み込みの型が必ず先に当たる
+-- （https://www.postgresql.org/docs/17/sql-createfunction.html の推奨。PR #274 の Codex レビュー）。
+-- verify:photo-scorer の [5a] で、同名ドメインを仕込んでも関数が影響を受けないことを見ている。
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
 -- 有効な採点の版（1つだけ）
 --
 -- unscored_photos / apply_photo_scores は、この版以外で呼ばれたら例外にする。
@@ -172,7 +185,8 @@ GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 -- （PR #274 の Codex レビュー P1）。有効な版を1つに絞れば、古い版のジョブは
 -- 読むことも書くこともできずに止まる。
 --
--- 版を切り替えるときは、この関数を CREATE OR REPLACE するマイグレーションを足す。
+-- 版を切り替えるときは、この関数を CREATE OR REPLACE するマイグレーションを足す
+-- （STABLE と SET search_path = pg_catalog, pg_temp を省かないこと。function_attribute が見ている）。
 -- STABLE にしてある（IMMUTABLE だと呼び出し側のキャッシュ済みの計画に定数として
 -- 焼き付き、切り替え後も古い版が返りうる）。
 -- ---------------------------------------------------------------------------
@@ -181,7 +195,7 @@ CREATE OR REPLACE FUNCTION scoring.active_version()
 RETURNS text
 LANGUAGE sql
 STABLE
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT 'quality_score/0.2.0'::text
 $$;
@@ -201,7 +215,7 @@ RETURNS TABLE (id uuid, storage_key text, manhole_id integer, created_at timesta
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   IF p_version IS NULL OR length(p_version) > 64
@@ -253,7 +267,7 @@ CREATE OR REPLACE FUNCTION scoring.apply_photo_scores(
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   n_rows integer;
@@ -361,7 +375,7 @@ $$;
 --   scoring_object     … scoring にこのマイグレーション以外のものがある（関数は署名で照合。
 --                        同名で引数の違う関数も違反）
 --   function_attribute … scoring の4関数の所有者（postgres）・SECURITY DEFINER の有無・
---                        search_path の固定が想定と違う（本番で誰かが ALTER FUNCTION したら止まる）
+--                        search_path（pg_catalog, pg_temp）が想定と違う（本番で誰かが ALTER FUNCTION したら止まる）
 --   extension          … pg_net が有効（net の表が PUBLIC に開き、DB から HTTP を出せる）
 --
 -- 呼べる SECURITY DEFINER 関数の許可リストは scoring の2つだけ。public に SECURITY DEFINER
@@ -378,7 +392,7 @@ RETURNS TABLE (kind text, detail text)
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT 'role_attribute', format(
       'super=%s createrole=%s createdb=%s bypassrls=%s replication=%s login=%s inherit=%s connlimit=%s',
@@ -473,7 +487,7 @@ AS $$
     AND p.proname IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
     -- NULL になりうる proconfig（RESET search_path 後）も違反として拾うよう、NULL 安全に比べる
     AND (pg_catalog.pg_get_userbyid(p.proowner) IS DISTINCT FROM 'postgres'
-         OR p.proconfig IS DISTINCT FROM ARRAY['search_path=""']::text[]
+         OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, pg_temp']::text[]
          OR p.prosecdef IS DISTINCT FROM (p.proname IN ('unscored_photos', 'apply_photo_scores')))
 
   UNION ALL

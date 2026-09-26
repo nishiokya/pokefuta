@@ -25,6 +25,7 @@ const CHECKS = [
   '権限の自己点検 scoring.audit_photo_scorer() が違反を返さない（ローカルの pg_net は警告）',
   '自己点検が効く: 表・シーケンス（USAGE の無いスキーマでも）・スキーマ CREATE の権限、public の REVOKE 忘れ、scoring への追加と同名オーバーロード、メンバーシップ、ロールの属性、4関数の属性（search_path の固定・SECURITY DEFINER）、MAINTAIN、データベースの CREATE をそれぞれ検出',
   'scoring の所有者（postgres）、anon / authenticated からの遮断、public の SECURITY DEFINER 関数3つを PUBLIC から外し search_path に pg_temp を最後に置いたこと',
+  'pg_temp に同名のドメイン（text / uuid / real / boolean / timestamptz / interval）を仕込んでも scoring の関数が乗っ取られない',
   'photo_scorer 自身が自己点検を呼べ、photo / visit を直接読み書きできず、public の SECURITY DEFINER 関数を呼べない',
   '未採点の一覧に出て、書くと消える',
   '楽観ロック: 未採点の時点で読んだ別のバッチは上書きしない',
