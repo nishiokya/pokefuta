@@ -3,17 +3,22 @@
 --
 -- 新着写真を k11（manhole-score）で採点し、photo.quality_* に書き戻す。
 -- 仕様: vault inbox/dev/pokefuta/spec/2026-09-26 pokefuta 新着写真の自動採点フロー.md
+-- 検査: npm run verify:photo-scorer（tools/verify-photo-scorer.sql）
 --
--- **できることを2つの関数の呼び出しに絞る。**
---   * scoring.unscored_photos(版)            … 指定の版で採点されていない写真の一覧
---   * scoring.apply_photo_scores(版, 時刻, 行) … quality_* の4列だけを書く
--- テーブル・ビュー・他のスキーマへの権限は1つも渡さない。パスワードが漏れても
--- できるのは写真スコアの書き換えだけ。
+-- 何ができて、何ができないか（パスワードが漏れたときの被害の上限）:
+--   * テーブル・ビュー・列への権限は1つも無い。photo も visit も直接は読み書きできない
+--   * 書けるのは scoring.apply_photo_scores 経由の photo.quality_* 4列だけ
+--   * 読めるのは scoring.unscored_photos が返す id / storage_key / manhole_id / created_at /
+--     採点の版と時刻だけ（非公開の写真を含む。exif や visit は返さない）
+--   * PostgreSQL の既定で PUBLIC に開いているもの（public スキーマの USAGE、PUBLIC に
+--     EXECUTE がある関数、pg_catalog）はログインロールなら誰でも持つ。photo_scorer が
+--     anon より多く実行できる SECURITY DEFINER 関数は上の2つだけ、を検査で担保する
+--   * statement_timeout・接続数の上限は事故よけであって境界ではない（本人が変えられる）
 --
 -- テーブルに列単位で GRANT しない理由: photo の RLS ポリシーは全部 TO public で、
 -- 中で visit と auth.uid() を参照している。専用ロールで photo を直接読み書きさせると
--- それらが評価され、visit への権限まで要る。関数（SECURITY DEFINER、所有者 postgres）に
--- 閉じ込めれば、ロール側は関数の引数と戻り値しか扱えない。
+-- それらが評価され、visit への権限まで要る。関数（SECURITY DEFINER、所有者はこの
+-- マイグレーションを流すロール＝postgres）に閉じ込めれば、ロール側は引数と戻り値しか扱えない。
 --
 -- スキーマを public にしないのは、public の関数は PostgREST の /rpc に出るため。
 -- scoring は API の公開スキーマ（config.toml の api.schemas）に含めない。
@@ -24,19 +29,66 @@
 -- パスワード未設定のあいだは誰もログインできない。
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- ロール
+--
+-- 既にある場合は黙って使わず、属性とメンバーシップを検査する。強い権限を持った
+-- 同名ロールを温存したまま関数の権限を足すと、「スコアしか書けない」が崩れる。
+-- 既存を許すのは、ローカルの supabase db reset でロール（クラスタ単位）が残るため。
+-- ---------------------------------------------------------------------------
+
 DO $$
+DECLARE
+  r pg_roles%ROWTYPE;
 BEGIN
-  CREATE ROLE photo_scorer LOGIN NOINHERIT NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 2;
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
+  SELECT * INTO r FROM pg_roles WHERE rolname = 'photo_scorer';
+  IF NOT FOUND THEN
+    CREATE ROLE photo_scorer
+      LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION
+      CONNECTION LIMIT 2;
+  ELSIF r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
+        OR NOT r.rolcanlogin OR r.rolinherit THEN
+    RAISE EXCEPTION 'photo_scorer が既にあり、属性が想定と違う（super=%, createrole=%, createdb=%, bypassrls=%, replication=%, login=%, inherit=%）',
+      r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolbypassrls, r.rolreplication, r.rolcanlogin, r.rolinherit;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member = 'photo_scorer'::regrole) THEN
+    RAISE EXCEPTION 'photo_scorer が他のロールのメンバーになっている。権限を引き継ぐので外すこと';
+  END IF;
 END $$;
 
+ALTER ROLE photo_scorer CONNECTION LIMIT 2;
 ALTER ROLE photo_scorer SET statement_timeout = '120s';
 
 COMMENT ON ROLE photo_scorer IS
-  'k11 manhole-score の自動採点ジョブ専用。scoring.unscored_photos / scoring.apply_photo_scores の EXECUTE のみ';
+  'k11 manhole-score の自動採点ジョブ専用。テーブル権限なし。scoring.unscored_photos / scoring.apply_photo_scores の EXECUTE のみ';
 
-CREATE SCHEMA IF NOT EXISTS scoring;
+-- ---------------------------------------------------------------------------
+-- スキーマ
+--
+-- 既にある場合は所有者を検査する。別の用途・別の所有者の scoring を黙って採用しない。
+--
+-- **scoring に関数を足すときは、必ず REVOKE ALL ... FROM PUBLIC を書くこと。**
+-- PostgreSQL は新しい関数に PUBLIC の EXECUTE を付け、photo_scorer は scoring の USAGE を
+-- 持つので、書き忘れると photo_scorer から呼べる。ALTER DEFAULT PRIVILEGES ... IN SCHEMA
+-- での REVOKE は全体の既定を打ち消せない（スキーマ単位の既定は足す方向にしか効かない）ので
+-- 使えず、全体の既定を変えると public など他のスキーマに響く。
+-- SECURITY DEFINER の関数を書き忘れた場合は verify:photo-scorer の [3] が検出する。
+-- SECURITY INVOKER の関数は呼んだ側の権限で動くので、テーブル権限の無い photo_scorer からは何もできない。
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+  owner_name text;
+BEGIN
+  SELECT nspowner::regrole::text INTO owner_name FROM pg_namespace WHERE nspname = 'scoring';
+  IF NOT FOUND THEN
+    CREATE SCHEMA scoring;
+  ELSIF owner_name <> current_user THEN
+    RAISE EXCEPTION 'scoring スキーマが既にあり、所有者が % （想定は %）', owner_name, current_user;
+  END IF;
+END $$;
+
 REVOKE ALL ON SCHEMA scoring FROM PUBLIC;
 GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 
@@ -46,21 +98,30 @@ GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 -- storage_key は R2 から原本を取るために返す。exif や visit の情報は返さない。
 -- quality_score_version / quality_scored_at は書き戻すときの楽観ロックの鍵
 -- （apply_photo_scores の expected_version / expected_scored_at）。
+-- 並びは新しい順。created_at が NULL の行は最後、同時刻は id で決める（毎回同じ順）。
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION scoring.unscored_photos(p_version text, p_limit integer DEFAULT 1000)
 RETURNS TABLE (id uuid, storage_key text, manhole_id integer, created_at timestamptz,
                quality_score_version text, quality_scored_at timestamptz)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+BEGIN
+  IF p_version IS NULL OR length(p_version) > 64
+     OR p_version !~ '^[a-z_]+/[0-9]+\.[0-9]+\.[0-9]+$' THEN
+    RAISE EXCEPTION 'unscored_photos: 版の形が不正: %', left(p_version, 80);
+  END IF;
+
+  RETURN QUERY
   SELECT p.id, p.storage_key, p.manhole_id, p.created_at, p.quality_score_version, p.quality_scored_at
   FROM public.photo AS p
   WHERE p.quality_score_version IS DISTINCT FROM p_version
-  ORDER BY p.created_at DESC
+  ORDER BY p.created_at DESC NULLS LAST, p.id DESC
   LIMIT least(greatest(coalesce(p_limit, 1000), 1), 5000);
+END;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -69,6 +130,9 @@ $$;
 -- p_rows: [{"id": "<uuid>", "score": 0.83, "eligible": true,
 --           "expected_version": <unscored_photos が返した quality_score_version | null>,
 --           "expected_scored_at": <unscored_photos が返した quality_scored_at | null>}, ...]
+--
+-- 入力は JSON の型から厳密に検査する。jsonb_to_recordset は "0.5" や "true" のような
+-- 文字列も黙って変換するので、変換の前に各キーの jsonb_typeof を見る。知らないキーも拒否。
 -- 1回の呼び出しは1トランザクション。1行でも不正なら全部書かない。
 -- 戻り値は実際に更新した行数。削除済みの写真と、下の楽観ロックで弾いた写真は数えない。
 --
@@ -79,8 +143,9 @@ $$;
 -- 時刻だけを鍵にしないのは、呼び出し側が渡す時刻が偶然一致すると見分けられないため
 -- （1トランザクション内の now() で実際に起きた）。版が違えば時刻が同じでも弾ける。
 -- 弾かれた写真は、まだ自分の版で未採点なら次の回に拾われる。
+--
 -- photo_protect_quality_score トリガは anon / authenticated だけを止めるので、
--- 所有者（postgres）として動くこの関数は通る。
+-- 所有者として動くこの関数は通る。
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION scoring.apply_photo_scores(
@@ -97,14 +162,20 @@ DECLARE
   n_rows integer;
   n_updated integer;
 BEGIN
-  IF p_version IS NULL OR p_version !~ '^[a-z_]+/[0-9]+\.[0-9]+\.[0-9]+$' THEN
-    RAISE EXCEPTION 'apply_photo_scores: 版の形が不正: %', p_version;
+  IF p_version IS NULL OR length(p_version) > 64
+     OR p_version !~ '^[a-z_]+/[0-9]+\.[0-9]+\.[0-9]+$' THEN
+    RAISE EXCEPTION 'apply_photo_scores: 版の形が不正: %', left(p_version, 80);
   END IF;
-  IF p_scored_at IS NULL OR p_scored_at > now() + interval '1 hour' THEN
-    RAISE EXCEPTION 'apply_photo_scores: 採点時刻が不正: %', p_scored_at;
+  IF p_scored_at IS NULL OR NOT isfinite(p_scored_at)
+     OR p_scored_at > now() + interval '1 hour' OR p_scored_at < now() - interval '1 day' THEN
+    RAISE EXCEPTION 'apply_photo_scores: 採点時刻が不正（未来・1日より前・無限）: %', p_scored_at;
   END IF;
   IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'apply_photo_scores: p_rows は配列';
+  END IF;
+  -- 5000 行 × 1行 200 バイト前後で 1MB。桁違いに大きいものは中身を見る前に断る
+  IF octet_length(p_rows::text) > 2000000 THEN
+    RAISE EXCEPTION 'apply_photo_scores: p_rows が大きすぎる（% バイト）', octet_length(p_rows::text);
   END IF;
 
   n_rows := jsonb_array_length(p_rows);
@@ -112,18 +183,34 @@ BEGIN
     RAISE EXCEPTION 'apply_photo_scores: 1回 5000 行まで（% 行）', n_rows;
   END IF;
 
-  -- 型の変換に失敗した行（id が uuid でない、score が数でない等）はここで例外になる
-  IF EXISTS (
-    SELECT 1 FROM jsonb_to_recordset(p_rows) AS r(id uuid, score real, eligible boolean)
-    WHERE r.id IS NULL OR r.score IS NULL OR r.eligible IS NULL OR r.score < 0 OR r.score > 1
-  ) THEN
-    RAISE EXCEPTION 'apply_photo_scores: id / score(0〜1) / eligible が欠けた行がある';
-  END IF;
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_rows) AS e
-    WHERE NOT (e ? 'expected_version' AND e ? 'expected_scored_at')
+    WHERE CASE
+      WHEN jsonb_typeof(e) <> 'object' THEN true
+      ELSE jsonb_typeof(e -> 'id') IS DISTINCT FROM 'string'
+        OR length(e ->> 'id') > 36
+        OR jsonb_typeof(e -> 'score') IS DISTINCT FROM 'number'
+        OR jsonb_typeof(e -> 'eligible') IS DISTINCT FROM 'boolean'
+        OR NOT (e ? 'expected_version' AND e ? 'expected_scored_at')
+        OR jsonb_typeof(e -> 'expected_version') NOT IN ('string', 'null')
+        OR length(e ->> 'expected_version') > 64
+        OR jsonb_typeof(e -> 'expected_scored_at') NOT IN ('string', 'null')
+        OR length(e ->> 'expected_scored_at') > 40
+        OR EXISTS (
+          SELECT 1 FROM jsonb_object_keys(e) AS k
+          WHERE k NOT IN ('id', 'score', 'eligible', 'expected_version', 'expected_scored_at')
+        )
+    END
   ) THEN
-    RAISE EXCEPTION 'apply_photo_scores: expected_version / expected_scored_at が無い行がある（未採点なら null を明示する）';
+    RAISE EXCEPTION 'apply_photo_scores: 行の形が不正（id=文字列, score=数, eligible=真偽, expected_version / expected_scored_at=文字列か null。ほかのキーは不可）';
+  END IF;
+
+  -- 型の変換に失敗した行（id が uuid でない、時刻が読めない等）はここで例外になる
+  IF EXISTS (
+    SELECT 1 FROM jsonb_to_recordset(p_rows) AS r(id uuid, score real, eligible boolean)
+    WHERE r.score < 0 OR r.score > 1 OR r.score = 'NaN'::real
+  ) THEN
+    RAISE EXCEPTION 'apply_photo_scores: score は 0〜1';
   END IF;
   IF (
     SELECT count(*) <> count(DISTINCT r.id)
@@ -148,7 +235,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION scoring.unscored_photos(text, integer) FROM PUBLIC;
-REVOKE ALL ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) FROM PUBLIC;
+-- scoring には Supabase の既定の権限（public / storage 等にはある anon への EXECUTE）が
+-- 掛かっていないが、将来の設定変更に備えて名指しでも外す。
+REVOKE ALL ON FUNCTION scoring.unscored_photos(text, integer) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION scoring.unscored_photos(text, integer) TO photo_scorer;
 GRANT EXECUTE ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) TO photo_scorer;

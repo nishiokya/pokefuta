@@ -30,9 +30,13 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
   curl + service role の直叩きはしない。Supabase MCP は read-only なので調査に使ってよい
 - 専用ロールは「テーブル権限を渡さず、SECURITY DEFINER 関数の EXECUTE だけ」の形にする。
   関数は PostgREST に出ないスキーマに置き、入力の検査は関数の中でやる。
-  今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、
+  今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、`verify:photo-scorer` で検査、
   `20260926120000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
   リポジトリにも `.env.local` にも置かない
+- **ログインできる専用ロールは、PostgreSQL が PUBLIC に開いているものを全部持つ。**
+  本番で pg_net を有効にすると `net` の表が PUBLIC に開き、専用ロールが DB から HTTP を出せるようになる
+  （ローカルの Supabase には入っている）。有効にする前に `net` の PUBLIC 権限を剥がすこと。
+  `scoring` に関数を足すときは `REVOKE ALL ... FROM PUBLIC` を必ず書く（既定で PUBLIC に EXECUTE が付く）
 - **検証のために本番への書き込み手段を新設しない。** トリガや制約の確認は、機能を有効にして
   アプリの実操作で通す方が、余計な権限を作らずに同じことを確かめられる
 
@@ -65,6 +69,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | `npm run db:drift` | マイグレーションのローカル / 本番のズレ | 本番へのリンク。`.github/workflows/db-drift.yml` が PR・main・毎日も回す |
 | `npm run verify:design-manhole-trigger` | 近接レビュー強制のトリガと RLS を実際に INSERT して確認 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:photo-visibility` | photo の列権限と RLS を実際にロールを切り替えて確認（exif が anon から見えないこと、非公開写真が隠れること、INSERT の RETURNING が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
+| `npm run verify:photo-scorer` | 自動採点ロール photo_scorer の権限の棚卸し（テーブル権限なし、anon より多く呼べる SECURITY DEFINER 関数は scoring の2つだけ、scoring に足した関数が PUBLIC に開かない）と、楽観ロック・入力検査 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:app-user-visibility` | app_user の列権限と RLS を実際にロールを切り替えて確認（anon が1列も読めないこと、他人の行が見えないこと、プロフィール系 RPC が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
 | `npm run verify:comment-guardrails` | 蓋コメントの制約・通報の RLS・公開ID/表示名の条件一致を実際に書き込んで確認 | `supabase start` でローカルスタックが起動 |
 
