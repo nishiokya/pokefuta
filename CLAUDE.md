@@ -31,7 +31,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 - 専用ロールは「テーブル権限を渡さず、SECURITY DEFINER 関数の EXECUTE だけ」の形にする。
   関数は PostgREST に出ないスキーマに置き、入力の検査は関数の中でやる。
   今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、`verify:photo-scorer` で検査、
-  `20260926120000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
+  `20260926180000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
   リポジトリにも `.env.local` にも置かない
 - **ログインできる専用ロールは、PostgreSQL が PUBLIC に開いているものを全部持つ。**
   なので `scoring.audit_photo_scorer()` が権限を点検し、k11 のジョブは書き込みの前に毎回呼んで
