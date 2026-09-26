@@ -94,6 +94,36 @@ COMMENT ON ROLE photo_scorer IS
   'k11 manhole-score の自動採点ジョブ専用。テーブル権限なし。scoring.unscored_photos / scoring.apply_photo_scores の EXECUTE のみ';
 
 -- ---------------------------------------------------------------------------
+-- public の SECURITY DEFINER 関数3つを PUBLIC から外す
+--
+-- get_my_app_user_id() / get_site_stats() / is_own_manhole_comment(uuid) は PostgreSQL の既定で
+-- PUBLIC に EXECUTE が付いたまま、SET search_path = public（pg_temp が暗黙に先頭）だった。
+-- 直接ログインできるロールは pg_temp に同名の一時ビューを置き、その中から自分の関数を
+-- 呼ばせることで、これらの関数の所有者（postgres）の権限でコードを動かせる
+-- （https://www.postgresql.org/docs/17/sql-createfunction.html の SECURITY DEFINER の注意）。
+-- anon / authenticated は PostgREST 経由で一時オブジェクトを作れないので、これまでは
+-- 露出していなかった。photo_scorer は直接ログインするので、ここで塞ぐ。
+--
+--   * PUBLIC から REVOKE し、使っている anon / authenticated / service_role に名指しで GRANT
+--     （本番では既に名指しの GRANT があるので、アプリの動作は変わらない）
+--   * search_path を public, pg_temp にする（pg_temp を最後に回す。定石）
+--
+-- 他の public の SECURITY DEFINER 関数（12個、2026-09-26 時点）は PUBLIC に開いておらず
+-- photo_scorer から呼べない。search_path の書き方は別途揃える。
+-- ---------------------------------------------------------------------------
+
+ALTER FUNCTION public.get_my_app_user_id() SET search_path = public, pg_temp;
+ALTER FUNCTION public.get_site_stats() SET search_path = public, pg_temp;
+ALTER FUNCTION public.is_own_manhole_comment(uuid) SET search_path = public, pg_temp;
+
+REVOKE EXECUTE ON FUNCTION public.get_my_app_user_id() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_site_stats() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.is_own_manhole_comment(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_my_app_user_id() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_site_stats() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_own_manhole_comment(uuid) TO anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
 -- スキーマ
 --
 -- 既にある場合は所有者を検査する。別の用途・別の所有者の scoring を黙って採用しない。
@@ -323,6 +353,10 @@ $$;
 --                        共有の採番を壊せる）。表と違いスキーマの USAGE は条件にしない。
 --                        シーケンス関数は regclass（OID）で呼べるので、スキーマに入れなくても届く
 --   schema_create      … CREATE できるスキーマがある（関数や表を置いて何かを仕込める）
+--   database_create    … データベースに CREATE できる（新しいスキーマを作れる）
+--   （reachable_relation は PostgreSQL 17 の MAINTAIN も見る。VACUUM FULL / LOCK TABLE 等ができる）
+--   データベースの TEMPORARY は PUBLIC に既定で付いていて外せない（外すと影響が広い）。
+--   一時オブジェクトで悪用できる SECURITY DEFINER 関数を photo_scorer に呼ばせないことで塞ぐ
 --   secdef_function    … 呼べる SECURITY DEFINER 関数のうち、下の許可リストに無いもの
 --   scoring_object     … scoring にこのマイグレーション以外のものがある（関数は署名で照合。
 --                        同名で引数の違う関数も違反）
@@ -330,10 +364,11 @@ $$;
 --                        search_path の固定が想定と違う（本番で誰かが ALTER FUNCTION したら止まる）
 --   extension          … pg_net が有効（net の表が PUBLIC に開き、DB から HTTP を出せる）
 --
--- 許可リストの public の3関数は、2026-09-26 時点で本番でもローカルでも PUBLIC が呼べる
--- SECURITY DEFINER 関数のすべて（どれも anon が /rpc で既に呼べる）。public に
--- SECURITY DEFINER 関数を足して REVOKE を書き忘れると、ここに引っかかってジョブが止まる。
--- その関数を photo_scorer に呼ばせてよいなら許可リストに足し、だめなら REVOKE を書く。
+-- 呼べる SECURITY DEFINER 関数の許可リストは scoring の2つだけ。public に SECURITY DEFINER
+-- 関数を足して REVOKE ... FROM PUBLIC を書き忘れると、ここに引っかかってジョブが止まる。
+-- （以前は public の3関数を「anon も呼べるから」と許していたが、直接ログインできるロールは
+--  pg_temp に一時ビューを置いて search_path=public の SECURITY DEFINER 関数を乗っ取れるので
+--  許さない。この PR の下の節で3関数を PUBLIC から外している。PR #274 の Codex レビュー）
 --
 -- SECURITY INVOKER にしてある（呼んだ側の権限で pg_catalog を読むだけ。権限を上げない）。
 -- ---------------------------------------------------------------------------
@@ -373,7 +408,7 @@ AS $$
     AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
     AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
     AND (pg_catalog.has_table_privilege('photo_scorer', c.oid,
-           'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+           'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN')
          OR pg_catalog.has_any_column_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
 
   UNION ALL
@@ -387,6 +422,10 @@ AS $$
     AND CASE WHEN c.relkind = 'S'
              THEN pg_catalog.has_sequence_privilege('photo_scorer', c.oid, 'USAGE, SELECT, UPDATE')
              ELSE false END
+
+  UNION ALL
+  SELECT 'database_create', pg_catalog.current_database()
+  WHERE pg_catalog.has_database_privilege('photo_scorer', pg_catalog.current_database(), 'CREATE')
 
   UNION ALL
   SELECT 'schema_create', ns.nspname
@@ -406,10 +445,7 @@ AS $$
   ) AS f
   WHERE f.sig NOT IN (
     'scoring.unscored_photos(text, integer)',
-    'scoring.apply_photo_scores(text, timestamp with time zone, jsonb)',
-    'public.get_my_app_user_id()',
-    'public.get_site_stats()',
-    'public.is_own_manhole_comment(uuid)'
+    'scoring.apply_photo_scores(text, timestamp with time zone, jsonb)'
   )
 
   UNION ALL

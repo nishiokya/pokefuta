@@ -33,10 +33,15 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
   今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、`verify:photo-scorer` で検査、
   `20260926180000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
   リポジトリにも `.env.local` にも置かない
+- **SECURITY DEFINER 関数は `REVOKE EXECUTE ... FROM PUBLIC` して使うロールに名指しで GRANT し、
+  `SET search_path` は `public, pg_temp` のように pg_temp を最後に置く（または `` にして全部修飾する）。**
+  `SET search_path = public` だけだと pg_temp が暗黙に先頭になり、直接ログインできるロールが一時ビューで
+  関数を乗っ取って所有者の権限でコードを動かせる。anon / authenticated は PostgREST 経由なので一時オブジェクトを
+  作れないが、専用ロール（photo_scorer）は作れる（2026-09-27、PR #274 の Codex レビュー）
 - **ログインできる専用ロールは、PostgreSQL が PUBLIC に開いているものを全部持つ。**
   なので `scoring.audit_photo_scorer()` が権限を点検し、k11 のジョブは書き込みの前に毎回呼んで
   違反があれば止まる。次のことをすると本番の自動採点が止まる（＝止まったらここを疑う）:
-  public に SECURITY DEFINER 関数を足して `REVOKE ... FROM PUBLIC` を書き忘れる（呼ばせてよいなら許可リストに足す）、
+  public に SECURITY DEFINER 関数を足して `REVOKE ... FROM PUBLIC` を書き忘れる、
   `scoring` に関数を足す、pg_net を有効にする（`net` の表が PUBLIC に開き、DB から HTTP を出せる。ローカルの Supabase には入っている）
 - **検証のために本番への書き込み手段を新設しない。** トリガや制約の確認は、機能を有効にして
   アプリの実操作で通す方が、余計な権限を作らずに同じことを確かめられる

@@ -158,6 +158,21 @@ BEGIN
     RAISE EXCEPTION '[2i] 属性を戻しても function_attribute が残る';
   END IF;
 
+  -- 2j. PostgreSQL 17 の MAINTAIN（VACUUM FULL / LOCK TABLE 等）を付けると reachable_relation
+  GRANT MAINTAIN ON public.manhole TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'reachable_relation' AND a.detail = 'public.manhole') THEN
+    RAISE EXCEPTION '[2j] MAINTAIN を自己点検が検出しない';
+  END IF;
+  REVOKE MAINTAIN ON public.manhole FROM photo_scorer;
+
+  -- 2k. データベースの CREATE を付けると database_create
+  EXECUTE format('GRANT CREATE ON DATABASE %I TO photo_scorer', current_database());
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a WHERE a.kind = 'database_create') THEN
+    RAISE EXCEPTION '[2k] データベースの CREATE を自己点検が検出しない';
+  END IF;
+  EXECUTE format('REVOKE CREATE ON DATABASE %I FROM photo_scorer', current_database());
+
   -- ---------------------------------------------------------------------
   -- 3. scoring スキーマ: 所有者と、API のロールからの遮断
   -- ---------------------------------------------------------------------
@@ -172,6 +187,20 @@ BEGIN
     RAISE EXCEPTION '[3] anon / authenticated が scoring の関数の EXECUTE を持っている';
   END IF;
   -- 4つの関数の所有者・属性は audit_photo_scorer() の function_attribute が見る（[1] で0件、[2i] で検出）
+
+  -- public の SECURITY DEFINER 関数3つ: photo_scorer（PUBLIC）からは呼べず、API のロールは呼べる。
+  -- search_path は pg_temp を最後に置く（直接ログインできるロールの pg_temp 乗っ取り対策）
+  SELECT string_agg(f::text, ', ') INTO bad
+  FROM unnest(ARRAY['public.get_my_app_user_id()', 'public.get_site_stats()',
+                    'public.is_own_manhole_comment(uuid)']::regprocedure[]) AS f
+  WHERE has_function_privilege('photo_scorer', f, 'EXECUTE')
+     OR NOT has_function_privilege('anon', f, 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', f, 'EXECUTE')
+     OR NOT has_function_privilege('service_role', f, 'EXECUTE')
+     OR (SELECT proconfig FROM pg_proc WHERE oid = f) IS DISTINCT FROM ARRAY['search_path=public, pg_temp']::text[];
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION '[3] public の SECURITY DEFINER 関数の権限・search_path が想定と違う: %', bad;
+  END IF;
 
   -- ---------------------------------------------------------------------
   -- ここから photo_scorer に切り替えて挙動を見る
@@ -194,6 +223,14 @@ BEGIN
   -- 5. photo_scorer 自身が自己点検を呼べる（本番のジョブはこのロールで呼ぶ）。
   --    テーブルは直接読めず、直接書けない
   PERFORM 1 FROM scoring.audit_photo_scorer();
+  BEGIN
+    PERFORM public.get_my_app_user_id();
+    RAISE EXCEPTION '[5] photo_scorer が public.get_my_app_user_id() を呼べた（pg_temp 乗っ取りの入口）';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM public.get_site_stats();
+    RAISE EXCEPTION '[5] photo_scorer が public.get_site_stats() を呼べた';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
     PERFORM 1 FROM public.photo LIMIT 1;
     RAISE EXCEPTION '[5] photo_scorer が photo を直接読めた';

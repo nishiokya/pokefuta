@@ -23,9 +23,9 @@ const SQL_FILE = path.join(__dirname, 'verify-photo-scorer.sql');
 // SQL 側は期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 const CHECKS = [
   '権限の自己点検 scoring.audit_photo_scorer() が違反を返さない（ローカルの pg_net は警告）',
-  '自己点検が効く: 表・シーケンス（USAGE の無いスキーマでも）・スキーマ CREATE の権限、public の REVOKE 忘れ、scoring への追加と同名オーバーロード、メンバーシップ、ロールの属性、4関数の属性（search_path の固定・SECURITY DEFINER）をそれぞれ検出',
-  'scoring の所有者（postgres）、anon / authenticated からの遮断',
-  'photo_scorer 自身が自己点検を呼べ、photo / visit を直接読み書きできない',
+  '自己点検が効く: 表・シーケンス（USAGE の無いスキーマでも）・スキーマ CREATE の権限、public の REVOKE 忘れ、scoring への追加と同名オーバーロード、メンバーシップ、ロールの属性、4関数の属性（search_path の固定・SECURITY DEFINER）、MAINTAIN、データベースの CREATE をそれぞれ検出',
+  'scoring の所有者（postgres）、anon / authenticated からの遮断、public の SECURITY DEFINER 関数3つを PUBLIC から外し search_path に pg_temp を最後に置いたこと',
+  'photo_scorer 自身が自己点検を呼べ、photo / visit を直接読み書きできず、public の SECURITY DEFINER 関数を呼べない',
   '未採点の一覧に出て、書くと消える',
   '楽観ロック: 未採点の時点で読んだ別のバッチは上書きしない',
   '有効な版の切り替え: 古い版のジョブは読めず書けない。新しい版は読んだ値で書け、同じ値を読んでいた別のバッチは時刻が一致しても上書きしない',
