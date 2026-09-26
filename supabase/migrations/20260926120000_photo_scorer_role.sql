@@ -11,8 +11,11 @@
 --   * 読めるのは scoring.unscored_photos が返す id / storage_key / manhole_id / created_at /
 --     採点の版と時刻だけ（非公開の写真を含む。exif や visit は返さない）
 --   * PostgreSQL の既定で PUBLIC に開いているもの（public スキーマの USAGE、PUBLIC に
---     EXECUTE がある関数、pg_catalog）はログインロールなら誰でも持つ。photo_scorer が
---     anon より多く実行できる SECURITY DEFINER 関数は上の2つだけ、を検査で担保する
+--     EXECUTE がある関数、pg_catalog）はログインロールなら誰でも持つ。そこで
+--     scoring.audit_photo_scorer() が「届く表が無い」「呼べる SECURITY DEFINER 関数が
+--     許可リストどおり」などを点検し、**k11 のジョブは書き込みの前に毎回これを呼んで、
+--     違反が1件でもあれば書かずに止まる**（本番で誰かが権限を足しても、pg_net を
+--     有効にしても、次の実行で止まる）。ローカルでは verify:photo-scorer が同じ関数を使う
 --   * statement_timeout・接続数の上限は事故よけであって境界ではない（本人が変えられる）
 --
 -- テーブルに列単位で GRANT しない理由: photo の RLS ポリシーは全部 TO public で、
@@ -32,17 +35,25 @@
 -- ---------------------------------------------------------------------------
 -- ロール
 --
--- 既にある場合は黙って使わず、属性とメンバーシップを検査する。強い権限を持った
--- 同名ロールを温存したまま関数の権限を足すと、「スコアしか書けない」が崩れる。
--- 既存を許すのは、ローカルの supabase db reset でロール（クラスタ単位）が残るため。
+-- 既にある場合は黙って使わない。強い権限を持った同名ロールを温存したまま関数の権限を
+-- 足すと、「スコアしか書けない」が崩れる。既存を許すのは、ローカルの supabase db reset で
+-- ロール（クラスタ単位）が残るため。そのときは:
+--   * 属性・所属（photo_scorer が他ロールのメンバー）・メンバー（他ロールが photo_scorer に
+--     SET ROLE できる）・所有物を検査し、想定と違えば失敗させる
+--   * パスワードを消し、ロール単位の設定をリセットする（既知のパスワードを持つ同名ロールに
+--     権限を足さない。本番では初回適用なのでこの分岐に入らない）
+-- メンバーで許すのは、ロールを作ったユーザー自身の ADMIN のみの付与（PostgreSQL 16 以降、
+-- CREATE ROLE で自動的に付く。SET も INHERIT も無いので photo_scorer にはなれない）。
 -- ---------------------------------------------------------------------------
 
 DO $$
 DECLARE
   r pg_roles%ROWTYPE;
+  existed boolean;
 BEGIN
   SELECT * INTO r FROM pg_roles WHERE rolname = 'photo_scorer';
-  IF NOT FOUND THEN
+  existed := FOUND;
+  IF NOT existed THEN
     CREATE ROLE photo_scorer
       LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION
       CONNECTION LIMIT 2;
@@ -54,6 +65,24 @@ BEGIN
 
   IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member = 'photo_scorer'::regrole) THEN
     RAISE EXCEPTION 'photo_scorer が他のロールのメンバーになっている。権限を引き継ぐので外すこと';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_auth_members
+    WHERE roleid = 'photo_scorer'::regrole
+      AND (member <> (SELECT oid FROM pg_roles WHERE rolname = current_user) OR set_option OR inherit_option)
+  ) THEN
+    RAISE EXCEPTION 'photo_scorer に SET ROLE / 継承できるロールがある（pg_auth_members.roleid = photo_scorer）';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_shdepend
+    WHERE refclassid = 'pg_authid'::regclass AND refobjid = 'photo_scorer'::regrole AND deptype = 'o'
+  ) THEN
+    RAISE EXCEPTION 'photo_scorer が所有しているオブジェクトがある';
+  END IF;
+
+  IF existed THEN
+    ALTER ROLE photo_scorer PASSWORD NULL;
+    ALTER ROLE photo_scorer RESET ALL;
   END IF;
 END $$;
 
@@ -86,6 +115,11 @@ BEGIN
     CREATE SCHEMA scoring;
   ELSIF owner_name <> current_user THEN
     RAISE EXCEPTION 'scoring スキーマが既にあり、所有者が % （想定は %）', owner_name, current_user;
+  ELSIF EXISTS (SELECT 1 FROM pg_class WHERE relnamespace = 'scoring'::regnamespace)
+     OR EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'scoring'::regnamespace
+                AND proname NOT IN ('unscored_photos', 'apply_photo_scores', 'audit_photo_scorer'))
+     OR EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'scoring'::regnamespace) THEN
+    RAISE EXCEPTION 'scoring スキーマが既にあり、このマイグレーションの関数以外のものが入っている';
   END IF;
 END $$;
 
@@ -235,9 +269,110 @@ BEGIN
 END;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- 権限の自己点検
+--
+-- photo_scorer は本番に直接ログインするので、PostgreSQL が PUBLIC に開いているもの
+-- （public スキーマ、PUBLIC に EXECUTE がある関数、有効にした拡張の表）を全部持つ。
+-- マイグレーション時点の検査だけでは、あとから誰かが権限を足したり拡張を有効にしたり
+-- したときに気づけない。そこで違反を返す関数を置き、k11 のジョブが**書き込みの前に毎回**
+-- 呼んで、1件でも返ってきたら書かずに止まる。ローカルの verify:photo-scorer も同じ関数を使う。
+--
+-- 返す違反（1行 = 1件、kind と detail）:
+--   role_attribute     … superuser / createrole / createdb / bypassrls / replication / inherit / 接続数
+--   member_of          … photo_scorer が他ロールのメンバー（権限を引き継ぐ）
+--   can_become         … 他ロールが photo_scorer に SET ROLE / 継承できる
+--   reachable_relation … スキーマの USAGE があり、表か列の権限もある（＝届く表）
+--   secdef_function    … 呼べる SECURITY DEFINER 関数のうち、下の許可リストに無いもの
+--   scoring_object     … scoring にこのマイグレーション以外のものがある
+--   extension          … pg_net が有効（net の表が PUBLIC に開き、DB から HTTP を出せる）
+--
+-- 許可リストの public の3関数は、2026-09-26 時点で本番でもローカルでも PUBLIC が呼べる
+-- SECURITY DEFINER 関数のすべて（どれも anon が /rpc で既に呼べる）。public に
+-- SECURITY DEFINER 関数を足して REVOKE を書き忘れると、ここに引っかかってジョブが止まる。
+-- その関数を photo_scorer に呼ばせてよいなら許可リストに足し、だめなら REVOKE を書く。
+--
+-- SECURITY INVOKER にしてある（呼んだ側の権限で pg_catalog を読むだけ。権限を上げない）。
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION scoring.audit_photo_scorer()
+RETURNS TABLE (kind text, detail text)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT 'role_attribute', format(
+      'super=%s createrole=%s createdb=%s bypassrls=%s replication=%s login=%s inherit=%s connlimit=%s',
+      r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolbypassrls, r.rolreplication,
+      r.rolcanlogin, r.rolinherit, r.rolconnlimit)
+  FROM pg_catalog.pg_roles AS r
+  WHERE r.rolname = 'photo_scorer'
+    AND (r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
+         OR NOT r.rolcanlogin OR r.rolinherit OR r.rolconnlimit <> 2)
+
+  UNION ALL
+  SELECT 'member_of', m.roleid::pg_catalog.regrole::text
+  FROM pg_catalog.pg_auth_members AS m
+  WHERE m.member = 'photo_scorer'::pg_catalog.regrole
+
+  UNION ALL
+  SELECT 'can_become', m.member::pg_catalog.regrole::text
+  FROM pg_catalog.pg_auth_members AS m
+  WHERE m.roleid = 'photo_scorer'::pg_catalog.regrole
+    AND (m.set_option OR m.inherit_option)
+
+  UNION ALL
+  SELECT 'reachable_relation', ns.nspname || '.' || c.relname
+  FROM pg_catalog.pg_class AS c
+  JOIN pg_catalog.pg_namespace AS ns ON ns.oid = c.relnamespace
+  WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
+    AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+    AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
+    AND (pg_catalog.has_table_privilege('photo_scorer', c.oid,
+           'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+         OR pg_catalog.has_any_column_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
+
+  UNION ALL
+  SELECT 'secdef_function', f.sig
+  FROM (
+    SELECT ns.nspname || '.' || p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS sig
+    FROM pg_catalog.pg_proc AS p
+    JOIN pg_catalog.pg_namespace AS ns ON ns.oid = p.pronamespace
+    WHERE p.prosecdef
+      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
+      AND pg_catalog.has_function_privilege('photo_scorer', p.oid, 'EXECUTE')
+  ) AS f
+  WHERE f.sig NOT IN (
+    'scoring.unscored_photos(text, integer)',
+    'scoring.apply_photo_scores(text, timestamp with time zone, jsonb)',
+    'public.get_my_app_user_id()',
+    'public.get_site_stats()',
+    'public.is_own_manhole_comment(uuid)'
+  )
+
+  UNION ALL
+  SELECT 'scoring_object', 'relation ' || c.relname
+  FROM pg_catalog.pg_class AS c
+  WHERE c.relnamespace = 'scoring'::pg_catalog.regnamespace
+  UNION ALL
+  SELECT 'scoring_object', 'function ' || p.proname
+  FROM pg_catalog.pg_proc AS p
+  WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
+    AND p.proname NOT IN ('unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
+
+  UNION ALL
+  SELECT 'extension', 'pg_net ' || e.extversion
+  FROM pg_catalog.pg_extension AS e
+  WHERE e.extname = 'pg_net'
+$$;
+
 -- scoring には Supabase の既定の権限（public / storage 等にはある anon への EXECUTE）が
 -- 掛かっていないが、将来の設定変更に備えて名指しでも外す。
 REVOKE ALL ON FUNCTION scoring.unscored_photos(text, integer) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION scoring.audit_photo_scorer() FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION scoring.unscored_photos(text, integer) TO photo_scorer;
 GRANT EXECUTE ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) TO photo_scorer;
+GRANT EXECUTE ON FUNCTION scoring.audit_photo_scorer() TO photo_scorer;

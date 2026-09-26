@@ -5,7 +5,7 @@
 -- マイグレーション: supabase/migrations/20260926120000_photo_scorer_role.sql
 --
 -- このロールの要は「関数を呼べる」ことより「それ以外は何もできない」こと。
--- 前半（[1]〜[4]）は権限の棚卸し、後半（[5]〜）は関数の挙動と入力検査。
+-- 前半（[1]〜[3]）は権限の自己点検とその網が効くこと、後半（[5]〜）は関数の挙動と入力検査。
 -- 検証のために postgres へ一時的に photo_scorer の SET を付与する（SET ROLE のため）。
 -- 単一の DO 文なので、途中で落ちればメンバーシップも検証行も巻き戻る。
 
@@ -31,85 +31,91 @@ BEGIN
   END IF;
 
   -- ---------------------------------------------------------------------
-  -- 1. ロールの属性とメンバーシップ
+  -- 1. 権限の自己点検 scoring.audit_photo_scorer() が違反を返さない
+  --    本番で k11 のジョブが書き込みの前に毎回呼ぶのと同じ関数。
+  --    ローカルの Supabase には pg_net が入っていて、net の表が PUBLIC に開いている。
+  --    これはローカル環境の性質なので、net.* と extension pg_net だけは失敗にせず
+  --    警告として出す（本番で同じものが出たらジョブが止まる）。
   -- ---------------------------------------------------------------------
-  IF r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
-     OR NOT r.rolcanlogin OR r.rolinherit OR r.rolconnlimit <> 2 THEN
-    RAISE EXCEPTION '[1] photo_scorer の属性が想定と違う（super=%, createrole=%, createdb=%, bypassrls=%, replication=%, login=%, inherit=%, connlimit=%）',
-      r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolbypassrls, r.rolreplication, r.rolcanlogin, r.rolinherit, r.rolconnlimit;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member = 'photo_scorer'::regrole) THEN
-    RAISE EXCEPTION '[1] photo_scorer が他のロールのメンバーになっている';
-  END IF;
-
-  -- ---------------------------------------------------------------------
-  -- 2. 届くテーブル・ビュー・列が1つも無い（全スキーマ）
-  --    「届く」＝スキーマの USAGE があり、かつ表か列の権限がある。extensions の
-  --    postgis / pg_stat_statements は PUBLIC に SELECT があるが、スキーマに入れないので届かない。
-  --
-  --    net（pg_net）だけは外す。ローカルの Supabase には入っていて、net の表が PUBLIC に
-  --    全権限で開いている（＝ログインできるロールは DB から HTTP を出せる）。
-  --    2026-09-26 時点で本番には pg_net が無い。本番で有効にするなら先に net の PUBLIC 権限を
-  --    剥がすこと（CLAUDE.md）。本番適用後の確認でも pg_net が無いことを見る。
-  -- ---------------------------------------------------------------------
-  SELECT string_agg(c.oid::regclass::text, ', ') INTO bad
-  FROM pg_class AS c
-  JOIN pg_namespace AS ns ON ns.oid = c.relnamespace
-  WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
-    AND ns.nspname NOT IN ('pg_catalog', 'information_schema', 'net')
-    AND has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
-    AND (has_table_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
-         OR has_any_column_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'));
+  SELECT string_agg(a.kind || ': ' || a.detail, ', ') INTO bad
+  FROM scoring.audit_photo_scorer() AS a
+  WHERE NOT (a.kind = 'reachable_relation' AND a.detail LIKE 'net.%')
+    AND NOT (a.kind = 'extension' AND a.detail LIKE 'pg_net %');
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '[2] photo_scorer が届くテーブル・ビューがある: %', bad;
+    RAISE EXCEPTION '[1] 権限の自己点検が違反を返した: %', bad;
   END IF;
-
-  -- ---------------------------------------------------------------------
-  -- 3. anon より多く実行できる SECURITY DEFINER 関数は scoring の2つだけ
-  --    PUBLIC に EXECUTE がある関数はログインロールなら誰でも呼べる（PostgreSQL の既定）。
-  --    それ自体は anon と同じなので許し、「anon には無いのに photo_scorer にはある」を見る。
-  -- ---------------------------------------------------------------------
-  SELECT string_agg(p.oid::regprocedure::text, ', ') INTO bad
-  FROM pg_proc AS p
-  JOIN pg_namespace AS ns ON ns.oid = p.pronamespace
-  WHERE p.prosecdef
-    AND ns.nspname NOT IN ('pg_catalog', 'information_schema', 'net')   -- net は [2] の注記を参照
-    AND has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
-    AND has_function_privilege('photo_scorer', p.oid, 'EXECUTE')
-    AND NOT (has_schema_privilege('anon', ns.oid, 'USAGE') AND has_function_privilege('anon', p.oid, 'EXECUTE'))
-    AND p.oid NOT IN (f_unscored, f_apply);
+  SELECT string_agg(a.detail, ', ') INTO bad FROM scoring.audit_photo_scorer() AS a;
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '[3] photo_scorer だけが呼べる SECURITY DEFINER 関数が増えている: %', bad;
+    RAISE WARNING '[1] ローカルの pg_net により photo_scorer から届くもの（本番ならジョブが止まる）: %', bad;
   END IF;
 
   -- ---------------------------------------------------------------------
-  -- 4. scoring スキーマ: 所有者、API のロールからの遮断、将来の関数が PUBLIC に開かないこと
+  -- 2. 自己点検が効くこと（わざと違反を作って、それぞれ検出されるか）
+  --    どれも単一の DO 文の中なので、落ちても成功しても最後に元へ戻す。
+  -- ---------------------------------------------------------------------
+  -- 2a. 表の権限を付けると reachable_relation
+  GRANT SELECT ON public.manhole TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'reachable_relation' AND a.detail = 'public.manhole') THEN
+    RAISE EXCEPTION '[2a] 表の権限を付けても自己点検が検出しない';
+  END IF;
+  REVOKE SELECT ON public.manhole FROM photo_scorer;
+
+  -- 2b. public に SECURITY DEFINER 関数を足して REVOKE を忘れると secdef_function
+  --     （anon からも呼べる関数でも検出する。anon との差分では見ない）
+  CREATE FUNCTION public._verify_scorer_forgot_revoke() RETURNS integer
+    LANGUAGE sql SECURITY DEFINER SET search_path = '' AS 'SELECT 1';
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'secdef_function' AND a.detail = 'public._verify_scorer_forgot_revoke()') THEN
+    RAISE EXCEPTION '[2b] public の REVOKE 忘れを自己点検が検出しない';
+  END IF;
+  DROP FUNCTION public._verify_scorer_forgot_revoke();
+
+  -- 2c. scoring に関数を足すと scoring_object（REVOKE を忘れた SECURITY DEFINER なら secdef_function も）
+  CREATE FUNCTION scoring._verify_forgot_revoke() RETURNS integer
+    LANGUAGE sql SECURITY DEFINER SET search_path = '' AS 'SELECT 1';
+  IF (SELECT count(*) FROM scoring.audit_photo_scorer() AS a
+      WHERE (a.kind = 'scoring_object' AND a.detail = 'function _verify_forgot_revoke')
+         OR (a.kind = 'secdef_function' AND a.detail = 'scoring._verify_forgot_revoke()')) <> 2 THEN
+    RAISE EXCEPTION '[2c] scoring に足した関数を自己点検が検出しない';
+  END IF;
+  DROP FUNCTION scoring._verify_forgot_revoke();
+
+  -- 2d. 他ロールが photo_scorer になれると can_become、photo_scorer が他ロールに入ると member_of
+  --     （循環するので2方向は別々に作る）
+  GRANT photo_scorer TO authenticated WITH SET TRUE;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'can_become' AND a.detail = 'authenticated') THEN
+    RAISE EXCEPTION '[2d] photo_scorer になれるロールを自己点検が検出しない';
+  END IF;
+  REVOKE photo_scorer FROM authenticated;
+  GRANT authenticated TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'member_of' AND a.detail = 'authenticated') THEN
+    RAISE EXCEPTION '[2d] photo_scorer が他ロールに入ったことを自己点検が検出しない';
+  END IF;
+  REVOKE authenticated FROM photo_scorer;
+
+  -- 2e. 属性を強めると role_attribute
+  ALTER ROLE photo_scorer BYPASSRLS;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a WHERE a.kind = 'role_attribute') THEN
+    RAISE EXCEPTION '[2e] BYPASSRLS を自己点検が検出しない';
+  END IF;
+  ALTER ROLE photo_scorer NOBYPASSRLS;
+
+  -- ---------------------------------------------------------------------
+  -- 3. scoring スキーマ: 所有者と、API のロールからの遮断
   -- ---------------------------------------------------------------------
   IF (SELECT nspowner::regrole::text FROM pg_namespace WHERE nspname = 'scoring') <> 'postgres' THEN
-    RAISE EXCEPTION '[4] scoring の所有者が postgres でない';
+    RAISE EXCEPTION '[3] scoring の所有者が postgres でない';
   END IF;
   IF has_schema_privilege('anon', 'scoring', 'USAGE') OR has_schema_privilege('authenticated', 'scoring', 'USAGE') THEN
-    RAISE EXCEPTION '[4] anon / authenticated が scoring の USAGE を持っている';
+    RAISE EXCEPTION '[3] anon / authenticated が scoring の USAGE を持っている';
   END IF;
   IF has_function_privilege('anon', f_apply, 'EXECUTE') OR has_function_privilege('authenticated', f_apply, 'EXECUTE')
      OR has_function_privilege('anon', f_unscored, 'EXECUTE') OR has_function_privilege('authenticated', f_unscored, 'EXECUTE') THEN
-    RAISE EXCEPTION '[4] anon / authenticated が scoring の関数の EXECUTE を持っている';
+    RAISE EXCEPTION '[3] anon / authenticated が scoring の関数の EXECUTE を持っている';
   END IF;
-  -- [3] の網が効いていること: REVOKE を書き忘れた SECURITY DEFINER 関数を scoring に足すと、
-  -- 同じ条件で検出される（scoring に関数を足すときの書き忘れを想定。マイグレーションの注記を参照）
-  CREATE FUNCTION scoring._verify_forgot_revoke() RETURNS integer
-    LANGUAGE sql SECURITY DEFINER SET search_path = '' AS 'SELECT 1';
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_proc AS p JOIN pg_namespace AS ns ON ns.oid = p.pronamespace
-    WHERE p.oid = 'scoring._verify_forgot_revoke()'::regprocedure
-      AND p.prosecdef
-      AND has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
-      AND has_function_privilege('photo_scorer', p.oid, 'EXECUTE')
-      AND NOT (has_schema_privilege('anon', ns.oid, 'USAGE') AND has_function_privilege('anon', p.oid, 'EXECUTE'))
-  ) THEN
-    RAISE EXCEPTION '[4] REVOKE を忘れた SECURITY DEFINER 関数を [3] が検出できない';
-  END IF;
-  DROP FUNCTION scoring._verify_forgot_revoke();
 
   -- ---------------------------------------------------------------------
   -- ここから photo_scorer に切り替えて挙動を見る
@@ -128,7 +134,9 @@ BEGIN
   END IF;
   SET LOCAL ROLE photo_scorer;
 
-  -- 5. テーブルは直接読めず、直接書けない
+  -- 5. photo_scorer 自身が自己点検を呼べる（本番のジョブはこのロールで呼ぶ）。
+  --    テーブルは直接読めず、直接書けない
+  PERFORM 1 FROM scoring.audit_photo_scorer();
   BEGIN
     PERFORM 1 FROM public.photo LIMIT 1;
     RAISE EXCEPTION '[5] photo_scorer が photo を直接読めた';
@@ -228,6 +236,11 @@ BEGIN
                                           'expected_version', null, 'expected_scored_at', null))
       FROM generate_series(1, 5001)));
     RAISE EXCEPTION '[9] 5001 行が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', repeat('v', 2100000), 'expected_scored_at', null)));
+    RAISE EXCEPTION '[9] 2MB を超える p_rows が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
     PERFORM scoring.apply_photo_scores('quality_score/0.2.0', '-infinity'::timestamptz, '[]'::jsonb);
