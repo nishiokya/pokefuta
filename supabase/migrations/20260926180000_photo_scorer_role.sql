@@ -118,7 +118,9 @@ BEGIN
     RAISE EXCEPTION 'scoring スキーマが既にあり、所有者が % （想定は postgres）', owner_name;
   ELSIF EXISTS (SELECT 1 FROM pg_class WHERE relnamespace = 'scoring'::regnamespace)
      OR EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'scoring'::regnamespace
-                AND proname NOT IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer'))
+                AND proname || '(' || oidvectortypes(proargtypes) || ')' NOT IN (
+                  'active_version()', 'unscored_photos(text, integer)',
+                  'apply_photo_scores(text, timestamp with time zone, jsonb)', 'audit_photo_scorer()'))
      OR EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'scoring'::regnamespace) THEN
     RAISE EXCEPTION 'scoring スキーマが既にあり、このマイグレーションの関数以外のものが入っている';
   END IF;
@@ -317,8 +319,12 @@ $$;
 --   member_of          … photo_scorer が他ロールのメンバー（権限を引き継ぐ）
 --   can_become         … 他ロールが photo_scorer に SET ROLE / 継承できる
 --   reachable_relation … スキーマの USAGE があり、表か列の権限もある（＝届く表）
+--   reachable_sequence … スキーマの USAGE があり、シーケンスの USAGE / SELECT / UPDATE がある
+--                        （UPDATE があれば setval() で共有の採番を壊せる）
+--   schema_create      … CREATE できるスキーマがある（関数や表を置いて何かを仕込める）
 --   secdef_function    … 呼べる SECURITY DEFINER 関数のうち、下の許可リストに無いもの
---   scoring_object     … scoring にこのマイグレーション以外のものがある
+--   scoring_object     … scoring にこのマイグレーション以外のものがある（関数は署名で照合。
+--                        同名で引数の違う関数も違反）
 --   extension          … pg_net が有効（net の表が PUBLIC に開き、DB から HTTP を出せる）
 --
 -- 許可リストの public の3関数は、2026-09-26 時点で本番でもローカルでも PUBLIC が呼べる
@@ -368,6 +374,24 @@ AS $$
          OR pg_catalog.has_any_column_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
 
   UNION ALL
+  SELECT 'reachable_sequence', ns.nspname || '.' || c.relname
+  FROM pg_catalog.pg_class AS c
+  JOIN pg_catalog.pg_namespace AS ns ON ns.oid = c.relnamespace
+  WHERE c.relkind = 'S'
+    AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+    AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
+    -- has_sequence_privilege はシーケンス以外に渡すと例外になり、WHERE の評価順は
+    -- 保証されないので CASE で先に relkind を見る
+    AND CASE WHEN c.relkind = 'S'
+             THEN pg_catalog.has_sequence_privilege('photo_scorer', c.oid, 'USAGE, SELECT, UPDATE')
+             ELSE false END
+
+  UNION ALL
+  SELECT 'schema_create', ns.nspname
+  FROM pg_catalog.pg_namespace AS ns
+  WHERE pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'CREATE')
+
+  UNION ALL
   SELECT 'secdef_function', f.sig
   FROM (
     SELECT ns.nspname || '.' || p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS sig
@@ -391,10 +415,16 @@ AS $$
   FROM pg_catalog.pg_class AS c
   WHERE c.relnamespace = 'scoring'::pg_catalog.regnamespace
   UNION ALL
-  SELECT 'scoring_object', 'function ' || p.proname
-  FROM pg_catalog.pg_proc AS p
-  WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
-    AND p.proname NOT IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
+  SELECT 'scoring_object', 'function ' || f.sig
+  FROM (
+    SELECT p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS sig
+    FROM pg_catalog.pg_proc AS p
+    WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
+  ) AS f
+  WHERE f.sig NOT IN (
+    'active_version()', 'unscored_photos(text, integer)',
+    'apply_photo_scores(text, timestamp with time zone, jsonb)', 'audit_photo_scorer()'
+  )
 
   UNION ALL
   SELECT 'extension', 'pg_net ' || e.extversion

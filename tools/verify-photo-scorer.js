@@ -23,8 +23,8 @@ const SQL_FILE = path.join(__dirname, 'verify-photo-scorer.sql');
 // SQL 側は期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 const CHECKS = [
   '権限の自己点検 scoring.audit_photo_scorer() が違反を返さない（ローカルの pg_net は警告）',
-  '自己点検が効く: 表の権限・public の REVOKE 忘れ・scoring への追加・メンバーシップ・属性をそれぞれ検出',
-  'scoring の所有者と、anon / authenticated からの遮断',
+  '自己点検が効く: 表・シーケンス・スキーマ CREATE の権限、public の REVOKE 忘れ、scoring への追加と同名オーバーロード、メンバーシップ、属性をそれぞれ検出',
+  'scoring と4関数の所有者（postgres）・属性、anon / authenticated からの遮断',
   'photo_scorer 自身が自己点検を呼べ、photo / visit を直接読み書きできない',
   '未採点の一覧に出て、書くと消える',
   '楽観ロック: 未採点の時点で読んだ別のバッチは上書きしない',

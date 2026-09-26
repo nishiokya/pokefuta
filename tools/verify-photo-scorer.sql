@@ -41,7 +41,7 @@ BEGIN
   -- ---------------------------------------------------------------------
   SELECT string_agg(a.kind || ': ' || a.detail, ', ') INTO bad
   FROM scoring.audit_photo_scorer() AS a
-  WHERE NOT (a.kind = 'reachable_relation' AND a.detail LIKE 'net.%')
+  WHERE NOT (a.kind IN ('reachable_relation', 'reachable_sequence') AND a.detail LIKE 'net.%')
     AND NOT (a.kind = 'extension' AND a.detail LIKE 'pg_net %');
   IF bad IS NOT NULL THEN
     RAISE EXCEPTION '[1] 権限の自己点検が違反を返した: %', bad;
@@ -77,7 +77,7 @@ BEGIN
   CREATE FUNCTION scoring._verify_forgot_revoke() RETURNS integer
     LANGUAGE sql SECURITY DEFINER SET search_path = '' AS 'SELECT 1';
   IF (SELECT count(*) FROM scoring.audit_photo_scorer() AS a
-      WHERE (a.kind = 'scoring_object' AND a.detail = 'function _verify_forgot_revoke')
+      WHERE (a.kind = 'scoring_object' AND a.detail = 'function _verify_forgot_revoke()')
          OR (a.kind = 'secdef_function' AND a.detail = 'scoring._verify_forgot_revoke()')) <> 2 THEN
     RAISE EXCEPTION '[2c] scoring に足した関数を自己点検が検出しない';
   END IF;
@@ -105,6 +105,32 @@ BEGIN
   END IF;
   ALTER ROLE photo_scorer NOBYPASSRLS;
 
+  -- 2f. シーケンスの権限を付けると reachable_sequence（UPDATE があれば setval() で採番を壊せる）
+  GRANT UPDATE ON SEQUENCE public.manhole_id_seq TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'reachable_sequence' AND a.detail = 'public.manhole_id_seq') THEN
+    RAISE EXCEPTION '[2f] シーケンスの権限を自己点検が検出しない';
+  END IF;
+  REVOKE UPDATE ON SEQUENCE public.manhole_id_seq FROM photo_scorer;
+
+  -- 2g. スキーマの CREATE を付けると schema_create
+  GRANT CREATE ON SCHEMA public TO photo_scorer;
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'schema_create' AND a.detail = 'public') THEN
+    RAISE EXCEPTION '[2g] スキーマの CREATE を自己点検が検出しない';
+  END IF;
+  REVOKE CREATE ON SCHEMA public FROM photo_scorer;
+
+  -- 2h. scoring に同名で引数の違う関数（SECURITY INVOKER）を足すと scoring_object
+  --     （名前だけで照合していると素通りする）
+  CREATE FUNCTION scoring.unscored_photos(p text) RETURNS integer
+    LANGUAGE sql SET search_path = '' AS 'SELECT 1';
+  IF NOT EXISTS (SELECT 1 FROM scoring.audit_photo_scorer() AS a
+                 WHERE a.kind = 'scoring_object' AND a.detail = 'function unscored_photos(text)') THEN
+    RAISE EXCEPTION '[2h] scoring の同名オーバーロードを自己点検が検出しない';
+  END IF;
+  DROP FUNCTION scoring.unscored_photos(text);
+
   -- ---------------------------------------------------------------------
   -- 3. scoring スキーマ: 所有者と、API のロールからの遮断
   -- ---------------------------------------------------------------------
@@ -117,6 +143,19 @@ BEGIN
   IF has_function_privilege('anon', f_apply, 'EXECUTE') OR has_function_privilege('authenticated', f_apply, 'EXECUTE')
      OR has_function_privilege('anon', f_unscored, 'EXECUTE') OR has_function_privilege('authenticated', f_unscored, 'EXECUTE') THEN
     RAISE EXCEPTION '[3] anon / authenticated が scoring の関数の EXECUTE を持っている';
+  END IF;
+  -- 4つの関数の所有者と属性（所有者・SECURITY DEFINER・search_path の固定が退行しないこと）
+  SELECT string_agg(p.proname || ' owner=' || pg_get_userbyid(p.proowner) || ' secdef=' || p.prosecdef
+                    || ' config=' || coalesce(array_to_string(p.proconfig, ','), '-'), '; ') INTO bad
+  FROM pg_proc AS p
+  WHERE p.pronamespace = 'scoring'::regnamespace
+    AND NOT (
+      pg_get_userbyid(p.proowner) = 'postgres'
+      AND p.proconfig = ARRAY['search_path=""']
+      AND p.prosecdef = (p.proname IN ('unscored_photos', 'apply_photo_scores'))
+    );
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION '[3] scoring の関数の所有者・属性が想定と違う: %', bad;
   END IF;
 
   -- ---------------------------------------------------------------------
