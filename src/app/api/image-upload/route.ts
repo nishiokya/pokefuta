@@ -582,7 +582,8 @@ export async function GET(request: NextRequest) {
       // Build query based on filters
       // 返す列を明示する。`select=*` は photo の全列に展開され、anon/authenticated へ
       // GRANT していない exif まで要求するため 42501 で落ちる（一覧が全 caller で失敗する）。
-      // 下の列挙は photo の全列から exif を除いたもの＝この GET の従来の応答と同じ。
+      // 下の列挙は photo の全列から exif と採点の管理列（quality_score_version / quality_scored_at。
+      // anon に GRANT していない）を除いたもの。
       let query = supabase
         .from('photo')
         .select(`
@@ -600,6 +601,8 @@ export async function GET(request: NextRequest) {
           thumbnail_800,
           thumbnail_1600,
           created_at,
+          quality_score,
+          quality_eligible,
           visit:visit_id!inner (
             id,
             user_id,

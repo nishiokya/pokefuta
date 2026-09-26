@@ -289,6 +289,10 @@ export interface Database {
           thumbnail_320: string | null;
           thumbnail_800: string | null;
           thumbnail_1600: string | null;
+          quality_score: number | null;
+          quality_eligible: boolean | null;
+          quality_score_version: string | null;
+          quality_scored_at: string | null;
           binary_data: ArrayBuffer | null;
           thumbnail_small: ArrayBuffer | null;
           thumbnail_medium: ArrayBuffer | null;

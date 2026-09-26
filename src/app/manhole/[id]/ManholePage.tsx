@@ -60,11 +60,12 @@ interface Photo {
   storage_key: string;
   content_type: string;
   created_at: string;
-  // The scoring project can expose any of these during its rollout.
-  // Keep ranking client-side compatible while unscored photos fall back to recency.
+  // 代表写真の並び（src/lib/manhole-photo-ranking.ts）に使う。/api/image-upload が返す。
+  // 採点後に投稿された写真は NULL で、ひとこと付き → 新しい順に落ちる。
   score?: number | null;
   quality_score?: number | null;
   ranking_score?: number | null;
+  quality_eligible?: boolean | null;
   visit?: {
     id: string;
     user_id: string;
