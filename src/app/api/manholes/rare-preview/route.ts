@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { createAnonClient } from '@/lib/supabase/anon';
 import type { Database, ManholeTitle } from '@/types/database';
 
+// クッキーを読まない（#275）と静的ルート扱いになり、ビルド時の結果で固まりうる
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 type RarePreviewManhole = {
   id: number;
   prefecture: string | null;
