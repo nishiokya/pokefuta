@@ -186,7 +186,8 @@ GRANT USAGE ON SCHEMA scoring TO photo_scorer;
 -- 読むことも書くこともできずに止まる。
 --
 -- 版を切り替えるときは、この関数を CREATE OR REPLACE するマイグレーションを足す
--- （STABLE と SET search_path = pg_catalog, pg_temp を省かないこと。function_attribute が見ている）。
+-- （STABLE と SET search_path = pg_catalog, pg_temp を省かないこと。search_path は
+--  function_attribute が見ている。STABLE は点検していないので、書き換えるときに目で確かめる）。
 -- STABLE にしてある（IMMUTABLE だと呼び出し側のキャッシュ済みの計画に定数として
 -- 焼き付き、切り替え後も古い版が返りうる）。
 -- ---------------------------------------------------------------------------

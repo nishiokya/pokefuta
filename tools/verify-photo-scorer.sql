@@ -225,7 +225,8 @@ BEGIN
   --     pg_catalog を先に明示していないと、SECURITY DEFINER の関数の中の未修飾の型名が
   --     このドメインに解決され、CHECK が postgres の権限で評価される。ここでは CHECK (false)
   --     にして、乗っ取られていれば関数が落ちる形で確かめる。
-  --     関数の実行計画はセッション内でキャッシュされるので、scoring の関数を初めて呼ぶ前に仕込む。
+  --     関数の実行計画はセッション内でキャッシュされるので、unscored_photos / apply_photo_scores を
+  --     初めて呼ぶ前に仕込む（active_version は上で v1 を取るときに postgres として1回呼んでいる）。
   --     （この DO ブロック自身の後続の式も未修飾の型名を使うので、確かめたらすぐ消す）
   CREATE DOMAIN pg_temp.text AS pg_catalog.text CHECK (false);
   CREATE DOMAIN pg_temp.uuid AS pg_catalog.uuid CHECK (false);
