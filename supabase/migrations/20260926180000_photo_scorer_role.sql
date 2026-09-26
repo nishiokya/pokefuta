@@ -7,7 +7,8 @@
 --
 -- 何ができて、何ができないか（パスワードが漏れたときの被害の上限）:
 --   * テーブル・ビュー・列への権限は1つも無い。photo も visit も直接は読み書きできない
---   * 書けるのは scoring.apply_photo_scores 経由の photo.quality_* 4列だけ
+--   * 書けるのは scoring.apply_photo_scores 経由の photo.quality_* 4列だけで、
+--     版は scoring.active_version() が返す1つに限る（古い版のジョブは止まる）
 --   * 読めるのは scoring.unscored_photos が返す id / storage_key / manhole_id / created_at /
 --     採点の版と時刻だけ（非公開の写真を含む。exif や visit は返さない）
 --   * PostgreSQL の既定で PUBLIC に開いているもの（public スキーマの USAGE、PUBLIC に
@@ -113,18 +114,45 @@ BEGIN
   SELECT nspowner::regrole::text INTO owner_name FROM pg_namespace WHERE nspname = 'scoring';
   IF NOT FOUND THEN
     CREATE SCHEMA scoring;
-  ELSIF owner_name <> current_user THEN
-    RAISE EXCEPTION 'scoring スキーマが既にあり、所有者が % （想定は %）', owner_name, current_user;
+  ELSIF owner_name <> 'postgres' THEN
+    RAISE EXCEPTION 'scoring スキーマが既にあり、所有者が % （想定は postgres）', owner_name;
   ELSIF EXISTS (SELECT 1 FROM pg_class WHERE relnamespace = 'scoring'::regnamespace)
      OR EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'scoring'::regnamespace
-                AND proname NOT IN ('unscored_photos', 'apply_photo_scores', 'audit_photo_scorer'))
+                AND proname NOT IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer'))
      OR EXISTS (SELECT 1 FROM pg_type WHERE typnamespace = 'scoring'::regnamespace) THEN
     RAISE EXCEPTION 'scoring スキーマが既にあり、このマイグレーションの関数以外のものが入っている';
   END IF;
 END $$;
 
+-- 所有者は postgres に固定する（SECURITY DEFINER 関数の権限の基準になる。既存の
+-- 20260923090000_site_counts_public_photo_coverage.sql と同じく明示する）
+ALTER SCHEMA scoring OWNER TO postgres;
 REVOKE ALL ON SCHEMA scoring FROM PUBLIC;
 GRANT USAGE ON SCHEMA scoring TO photo_scorer;
+
+-- ---------------------------------------------------------------------------
+-- 有効な採点の版（1つだけ）
+--
+-- unscored_photos / apply_photo_scores は、この版以外で呼ばれたら例外にする。
+-- 楽観ロックは「読んだ後の変更」しか防げない。版の切り替え時に古い版のジョブが
+-- 残っていると、新しい版で採点済みの行を「自分の版では未採点」として読み、正当な
+-- 期待値付きで古い版に戻せてしまい、新旧のジョブが交互に書き戻し合う
+-- （PR #274 の Codex レビュー P1）。有効な版を1つに絞れば、古い版のジョブは
+-- 読むことも書くこともできずに止まる。
+--
+-- 版を切り替えるときは、この関数を CREATE OR REPLACE するマイグレーションを足す。
+-- STABLE にしてある（IMMUTABLE だと呼び出し側のキャッシュ済みの計画に定数として
+-- 焼き付き、切り替え後も古い版が返りうる）。
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION scoring.active_version()
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT 'quality_score/0.2.0'::text
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 採点の対象: 指定の版で採点されていない写真（未採点・旧版）
@@ -147,6 +175,9 @@ BEGIN
   IF p_version IS NULL OR length(p_version) > 64
      OR p_version !~ '^[a-z_]+/[0-9]+\.[0-9]+\.[0-9]+$' THEN
     RAISE EXCEPTION 'unscored_photos: 版の形が不正: %', left(p_version, 80);
+  END IF;
+  IF p_version IS DISTINCT FROM scoring.active_version() THEN
+    RAISE EXCEPTION 'unscored_photos: % は有効な版ではない（有効な版は %）', p_version, scoring.active_version();
   END IF;
 
   RETURN QUERY
@@ -199,6 +230,9 @@ BEGIN
   IF p_version IS NULL OR length(p_version) > 64
      OR p_version !~ '^[a-z_]+/[0-9]+\.[0-9]+\.[0-9]+$' THEN
     RAISE EXCEPTION 'apply_photo_scores: 版の形が不正: %', left(p_version, 80);
+  END IF;
+  IF p_version IS DISTINCT FROM scoring.active_version() THEN
+    RAISE EXCEPTION 'apply_photo_scores: % は有効な版ではない（有効な版は %）', p_version, scoring.active_version();
   END IF;
   IF p_scored_at IS NULL OR NOT isfinite(p_scored_at)
      OR p_scored_at > now() + interval '1 hour' OR p_scored_at < now() - interval '1 day' THEN
@@ -360,7 +394,7 @@ AS $$
   SELECT 'scoring_object', 'function ' || p.proname
   FROM pg_catalog.pg_proc AS p
   WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
-    AND p.proname NOT IN ('unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
+    AND p.proname NOT IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer')
 
   UNION ALL
   SELECT 'extension', 'pg_net ' || e.extversion
@@ -370,6 +404,13 @@ $$;
 
 -- scoring には Supabase の既定の権限（public / storage 等にはある anon への EXECUTE）が
 -- 掛かっていないが、将来の設定変更に備えて名指しでも外す。
+ALTER FUNCTION scoring.active_version() OWNER TO postgres;
+ALTER FUNCTION scoring.unscored_photos(text, integer) OWNER TO postgres;
+ALTER FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) OWNER TO postgres;
+ALTER FUNCTION scoring.audit_photo_scorer() OWNER TO postgres;
+
+-- active_version は SECURITY DEFINER の2関数の中から所有者として呼ぶだけなので、誰にも GRANT しない
+REVOKE ALL ON FUNCTION scoring.active_version() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION scoring.unscored_photos(text, integer) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION scoring.apply_photo_scores(text, timestamptz, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION scoring.audit_photo_scorer() FROM PUBLIC, anon, authenticated, service_role;

@@ -22,6 +22,8 @@ DECLARE
   qs real;
   ok boolean;
   ver text;
+  v1 text;
+  v2 text := 'quality_score/999.0.0';
   f_unscored regprocedure := 'scoring.unscored_photos(text,integer)'::regprocedure;
   f_apply regprocedure := 'scoring.apply_photo_scores(text,timestamptz,jsonb)'::regprocedure;
 BEGIN
@@ -128,6 +130,7 @@ BEGIN
 
   -- ロールを作ったユーザー（PostgreSQL 16 以降）は ADMIN 付きのメンバーだが SET は持たない。
   -- MEMBER ではなく SET で判定し、足りなければ SET 付きで一時的に付与する。
+  v1 := scoring.active_version();
   was_member := pg_has_role(current_user, 'photo_scorer', 'SET');
   IF NOT was_member THEN
     EXECUTE format('GRANT photo_scorer TO %I WITH SET TRUE, INHERIT FALSE', current_user);
@@ -150,42 +153,65 @@ BEGIN
     RAISE EXCEPTION '[5] photo_scorer が photo を直接更新できた';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 
-  -- 6. 未採点の一覧に出て、書くと消え、版を上げると再び出る
-  SELECT count(*) INTO n FROM scoring.unscored_photos('quality_score/0.2.0') AS u WHERE u.id = pid;
+  -- 6. 未採点の一覧に出て、書くと消える（有効な版 v1 = 検査開始時の active_version）
+  SELECT count(*) INTO n FROM scoring.unscored_photos(v1) AS u WHERE u.id = pid;
   IF n <> 1 THEN RAISE EXCEPTION '[6] 未採点の写真が一覧に出ない'; END IF;
-  SELECT scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(jsonb_build_object(
+  SELECT scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
     'id', pid, 'score', 0.81, 'eligible', true, 'expected_version', null, 'expected_scored_at', null))) INTO n;
   IF n <> 1 THEN RAISE EXCEPTION '[6] 更新行数が % 行', n; END IF;
-  SELECT count(*) INTO n FROM scoring.unscored_photos('quality_score/0.2.0') AS u WHERE u.id = pid;
+  SELECT count(*) INTO n FROM scoring.unscored_photos(v1) AS u WHERE u.id = pid;
   IF n <> 0 THEN RAISE EXCEPTION '[6] 採点後も一覧に残る'; END IF;
-  SELECT count(*) INTO n FROM scoring.unscored_photos('quality_score/0.3.0') AS u WHERE u.id = pid;
-  IF n <> 1 THEN RAISE EXCEPTION '[6] 版を上げても対象にならない'; END IF;
 
-  -- 7. 楽観ロック: 未採点の時点で読んだ古いバッチは、採点済みの行を上書きしない
-  SELECT scoring.apply_photo_scores('quality_score/0.1.0', now(), jsonb_build_array(jsonb_build_object(
+  -- 7. 楽観ロック: 未採点の時点で読んだ別のバッチ（同じ版）は、採点済みの行を上書きしない
+  SELECT scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
     'id', pid, 'score', 0.1, 'eligible', false, 'expected_version', null, 'expected_scored_at', null))) INTO n;
   IF n <> 0 THEN RAISE EXCEPTION '[7] 古いバッチが % 行上書きした', n; END IF;
 
-  -- 8. 楽観ロック: 読んだ値を渡せば新しい版で書け、同じ値を読んでいた別のバッチは
-  --    後から上書きできない（1トランザクション内で now() が同じ＝時刻が一致しても）
+  -- 8. 有効な版を v2 に切り替える（版を上げるマイグレーションと同じ操作）
+  --    * 古い版 v1 のジョブは、読むことも書くこともできない（新旧のジョブが交互に
+  --      書き戻し合わない。PR #274 の Codex レビュー P1）
+  --    * 新しい版は、読んだ値を渡せば書け、同じ値を読んでいた別のバッチは後から
+  --      上書きできない（1トランザクション内で now() が同じ＝時刻が一致しても）
+  RESET ROLE;
+  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %L AS %L',
+                 '', format('SELECT %L::text', v2));
+  SET LOCAL ROLE photo_scorer;
+
+  BEGIN
+    PERFORM 1 FROM scoring.unscored_photos(v1);
+    RAISE EXCEPTION '[8] 古い版で未採点の一覧を引けた';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[8]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.1, 'eligible', false, 'expected_version', v1, 'expected_scored_at', now())));
+    RAISE EXCEPTION '[8] 古い版で書けた';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[8]%' THEN RAISE; END IF; END;
+
   SELECT u.quality_score_version, u.quality_scored_at INTO ev, ts
-  FROM scoring.unscored_photos('quality_score/0.3.0') AS u WHERE u.id = pid;
-  SELECT scoring.apply_photo_scores('quality_score/0.3.0', now(), jsonb_build_array(jsonb_build_object(
+  FROM scoring.unscored_photos(v2) AS u WHERE u.id = pid;
+  IF ev IS DISTINCT FROM v1 THEN RAISE EXCEPTION '[8] 版を上げても対象にならない（%）', ev; END IF;
+  SELECT scoring.apply_photo_scores(v2, now(), jsonb_build_array(jsonb_build_object(
     'id', pid, 'score', 0.77, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts))) INTO n;
   IF n <> 1 THEN RAISE EXCEPTION '[8] 版の更新が % 行', n; END IF;
-  SELECT scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(jsonb_build_object(
-    'id', pid, 'score', 0.81, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts))) INTO n;
+  SELECT scoring.apply_photo_scores(v2, now(), jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts))) INTO n;
   IF n <> 0 THEN RAISE EXCEPTION '[8] 同じ値を読んでいた別のバッチが % 行上書きした', n; END IF;
+
+  -- 有効な版を元に戻す（[9] は v1 で入力検査を見る）
+  RESET ROLE;
+  EXECUTE format('CREATE OR REPLACE FUNCTION scoring.active_version() RETURNS text LANGUAGE sql STABLE SET search_path = %L AS %L',
+                 '', format('SELECT %L::text', v1));
+  SET LOCAL ROLE photo_scorer;
 
   -- 9. 不正な入力は1件も書かずに拒否する（関数の RAISE は raise_exception で返る）
   --    [9] で始まる例外は検査側の失敗なので投げ直す
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(jsonb_build_object(
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
       'id', pid, 'score', 1.5, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts)));
     RAISE EXCEPTION '[9] 範囲外のスコアが通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(
       jsonb_build_object('id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null),
       jsonb_build_object('id', pid, 'score', 0.6, 'eligible', true, 'expected_version', null, 'expected_scored_at', null)));
     RAISE EXCEPTION '[9] 重複 id が通った';
@@ -203,55 +229,55 @@ BEGIN
     RAISE EXCEPTION '[9] unscored_photos が不正な版を受けた';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(),
+    PERFORM scoring.apply_photo_scores(v1, now(),
       '[{"id":"00000000-0000-0000-0000-0000000fd001","score":"0.5","eligible":true,"expected_version":null,"expected_scored_at":null}]'::jsonb);
     RAISE EXCEPTION '[9] 文字列の score が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(),
+    PERFORM scoring.apply_photo_scores(v1, now(),
       '[{"id":"00000000-0000-0000-0000-0000000fd001","score":0.5,"eligible":"true","expected_version":null,"expected_scored_at":null}]'::jsonb);
     RAISE EXCEPTION '[9] 文字列の eligible が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(),
+    PERFORM scoring.apply_photo_scores(v1, now(),
       '[{"id":"00000000-0000-0000-0000-0000000fd001","score":0.5,"eligible":true,"expected_version":null,"expected_scored_at":null,"quality_score_version":"x"}]'::jsonb);
     RAISE EXCEPTION '[9] 知らないキーが通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(),
+    PERFORM scoring.apply_photo_scores(v1, now(),
       '[{"id":"00000000-0000-0000-0000-0000000fd001","score":0.5,"eligible":true}]'::jsonb);
     RAISE EXCEPTION '[9] expected_* の無い行が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), '[1, 2]'::jsonb);
+    PERFORM scoring.apply_photo_scores(v1, now(), '[1, 2]'::jsonb);
     RAISE EXCEPTION '[9] オブジェクトでない行が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), '{"id":1}'::jsonb);
+    PERFORM scoring.apply_photo_scores(v1, now(), '{"id":1}'::jsonb);
     RAISE EXCEPTION '[9] 配列でない p_rows が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), (
+    PERFORM scoring.apply_photo_scores(v1, now(), (
       SELECT jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'score', 0.5, 'eligible', true,
                                           'expected_version', null, 'expected_scored_at', null))
       FROM generate_series(1, 5001)));
     RAISE EXCEPTION '[9] 5001 行が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), jsonb_build_array(jsonb_build_object(
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
       'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', repeat('v', 2100000), 'expected_scored_at', null)));
     RAISE EXCEPTION '[9] 2MB を超える p_rows が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', '-infinity'::timestamptz, '[]'::jsonb);
+    PERFORM scoring.apply_photo_scores(v1, '-infinity'::timestamptz, '[]'::jsonb);
     RAISE EXCEPTION '[9] 無限の採点時刻が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now() + interval '1 day', '[]'::jsonb);
+    PERFORM scoring.apply_photo_scores(v1, now() + interval '1 day', '[]'::jsonb);
     RAISE EXCEPTION '[9] 未来の採点時刻が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[9]%' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(),
+    PERFORM scoring.apply_photo_scores(v1, now(),
       '[{"id":"not-a-uuid","score":0.5,"eligible":true,"expected_version":null,"expected_scored_at":null}]'::jsonb);
     RAISE EXCEPTION '[9] 不正な uuid が通った';
   EXCEPTION WHEN invalid_text_representation THEN NULL; END;
@@ -260,20 +286,20 @@ BEGIN
 
   -- 10. ここまでの書き込み・拒否の結果、値は [8] の1回ぶんだけ
   SELECT quality_score, quality_eligible, quality_score_version INTO qs, ok, ver FROM public.photo WHERE id = pid;
-  IF qs IS DISTINCT FROM 0.77::real OR ok IS DISTINCT FROM true OR ver IS DISTINCT FROM 'quality_score/0.3.0' THEN
+  IF qs IS DISTINCT FROM 0.77::real OR ok IS DISTINCT FROM true OR ver IS DISTINCT FROM v2 THEN
     RAISE EXCEPTION '[10] 値が期待と違う（%, %, %）', qs, ok, ver;
   END IF;
 
   -- 11. anon / authenticated は scoring の関数を呼べない
   SET LOCAL ROLE anon;
   BEGIN
-    PERFORM 1 FROM scoring.unscored_photos('quality_score/0.2.0');
+    PERFORM 1 FROM scoring.unscored_photos(v1);
     RAISE EXCEPTION '[11] anon が scoring.unscored_photos を呼べた';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
   SET LOCAL ROLE authenticated;
   BEGIN
-    PERFORM scoring.apply_photo_scores('quality_score/0.2.0', now(), '[]'::jsonb);
+    PERFORM scoring.apply_photo_scores(v1, now(), '[]'::jsonb);
     RAISE EXCEPTION '[11] authenticated が scoring.apply_photo_scores を呼べた';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
