@@ -25,7 +25,7 @@ import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submis
 import type { CompletionRollup } from '@/lib/prefecture-completion';
 import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
-import { feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
+import { collapseByPoster, feedCardTags, sameDayVisitorCounts, type FeedCardTag } from '@/lib/feed-card-tags';
 
 type FeedVisit = {
   id: string;
@@ -57,13 +57,16 @@ type FeedVisit = {
 const INCOMPLETE_CHIP_LIMIT = 12;
 
 // 写真の上に直接載るので、どの写真の上でも読めるよう明るい不透明の地にする
-const CHIP_CLASS = {
+const CHIP_CLASS: Record<FeedCardTag, string> = {
   mythical: 'bg-gradient-to-r from-[#F9A8D4] to-[#C4B5FD] text-[#2E2346]',
   legendary: 'bg-gradient-to-r from-[#FDE68A] to-[#FBBF24] text-[#2E2346]',
   'same-day': 'bg-[#A7F3D0] text-[#064E3B]',
   fresh: 'bg-white text-[#7B63A8]',
   memory: 'bg-[#E7DCC8] text-[#5B4636]',
-} as const;
+  pikachu: 'bg-[#FDE047] text-[#422006]',
+  regional: 'bg-[#BAE6FD] text-[#0C4A6E]',
+  night: 'bg-[#1E1B4B] text-[#E0E7FF] ring-1 ring-white/60',
+};
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
@@ -184,6 +187,7 @@ export default function HomePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   const sameDayCounts = sameDayVisitorCounts(sortedFeed);
+  const feedById = new Map(sortedFeed.map((visit) => [visit.id, visit]));
   const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
@@ -387,7 +391,46 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
-                  {sortedFeed.map((visit, index) => {
+                  {collapseByPoster(sortedFeed).map((item, index) => {
+                    if (item.kind === 'collapsed') {
+                      const hiddenPhotos = item.hidden
+                        .map((id) => feedById.get(id)?.photos?.[0]?.thumbnail_url)
+                        .filter((url): url is string => Boolean(url))
+                        .slice(0, 4);
+                      const who = item.display_name ? `${item.display_name}さん` : 'この人';
+                      const summary = `${who}の投稿 ほか${item.hidden.length}枚`;
+                      return (
+                        <Link
+                          key={`collapsed-${item.public_user_id}`}
+                          href={`/users/${encodeURIComponent(item.public_user_id)}/visits`}
+                          className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#2E2346] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
+                          aria-label={[summary, item.busiestDay >= 3 ? `1日で${item.busiestDay}枚ハシゴ` : null, '投稿をすべて見る'].filter(Boolean).join('、')}
+                        >
+                          {/* 畳んだ写真を2x2で敷き、暗く落として文字を載せる */}
+                          <div className="grid h-full w-full grid-cols-2 grid-rows-2 opacity-45">
+                            {hiddenPhotos.map((url) => (
+                              <img key={url} src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                            ))}
+                          </div>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center text-white">
+                            {item.busiestDay >= 3 && (
+                              <span className="rounded-full bg-[#FFB347] px-2.5 py-1 text-xs font-extrabold leading-none text-[#2E2346] shadow-sm">
+                                1日で{item.busiestDay}枚ハシゴ
+                              </span>
+                            )}
+                            <div className="text-base font-extrabold sm:text-lg">
+                              ほか{item.hidden.length}枚
+                            </div>
+                            <div className="line-clamp-1 text-xs font-semibold text-white/85 sm:text-sm">{who}の投稿</div>
+                            <div className="mt-1 inline-flex items-center gap-0.5 text-xs font-extrabold text-[#FFB347]">
+                              すべて見る
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    }
+                    const visit = item.visit;
                     const chips = feedCardTags(visit, sameDayCounts.get(visit.id));
                     const photo = visit.photos?.[0];
                     const locationLabel = visit.manhole ? manholeDisplayName(visit.manhole) : visit.shot_location || '';
