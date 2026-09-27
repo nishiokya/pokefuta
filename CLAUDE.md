@@ -31,7 +31,7 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 - 専用ロールは「テーブル権限を渡さず、SECURITY DEFINER 関数の EXECUTE だけ」の形にする。
   関数は PostgREST に出ないスキーマに置き、入力の検査は関数の中でやる。
   今あるのは `photo_scorer`（k11 の自動採点。`scoring.unscored_photos` / `scoring.apply_photo_scores` のみ、`verify:photo-scorer` で検査、
-  `20260926180000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
+  `20260927100000_photo_scorer_role.sql`）。パスワードは SQL Editor で設定し、
   リポジトリにも `.env.local` にも置かない
 - **SECURITY DEFINER 関数は `REVOKE EXECUTE ... FROM PUBLIC` して使うロールに名指しで GRANT し、
   `SET search_path` は `public, pg_temp` のように pg_temp を最後に置く（または `` にして全部修飾する）。**
