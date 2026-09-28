@@ -8,7 +8,7 @@ import {
   MapPin, ArrowLeft, Navigation,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronUp, Eye, EyeOff, Heart, ExternalLink, BookOpen,
-  MessageCircle,
+  MessageCircle, Pencil, Check, X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { SnapshotManhole } from '@/lib/manhole-snapshot';
@@ -42,6 +42,7 @@ import type { RelatedManhole } from '@/lib/manhole-detail';
 import type { ManholeDetailPayload } from '@/lib/manhole-detail-payload';
 import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import type { ManholeTitle } from '@/types/database';
+import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -276,6 +277,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
   // 「すべての写真」でコメントをその場に重ねて開いている写真。拡大表示へ飛ばさずに読ませる
   const [openGridCommentPhotoId, setOpenGridCommentPhotoId] = useState<string | null>(null);
+  const [editingCommentVisitId, setEditingCommentVisitId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [commentSaveError, setCommentSaveError] = useState<string | null>(null);
 
   const { trackManholeDetailOpen, trackRouteOpen, trackVisitDelete, trackVisitVisibilityChange } = useAnalytics();
 
@@ -493,6 +498,57 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     setSelectedPhotoId(photoId);
     setSelectedVisitId(visitId || null);
     setDeleteModalOpen(true);
+  };
+
+  const startCommentEdit = (photo: Photo) => {
+    if (!photo.visit?.id || photo.visit.user_id !== currentUserId) return;
+    setEditingCommentVisitId(photo.visit.id);
+    setCommentDraft(photo.visit.comment ?? '');
+    setCommentSaveError(null);
+  };
+
+  const cancelCommentEdit = () => {
+    if (commentSaving) return;
+    setEditingCommentVisitId(null);
+    setCommentDraft('');
+    setCommentSaveError(null);
+  };
+
+  const savePhotoComment = async (visitId: string) => {
+    const comment = commentDraft.trim();
+    if (comment.length > VISIT_COMMENT_MAX_LENGTH || commentSaving) return;
+    setCommentSaving(true);
+    setCommentSaveError(null);
+    try {
+      const response = await fetch(`/api/visits/${visitId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        setCommentSaveError(
+          response.status === 401
+            ? 'ログインが切れました。もう一度ログインしてください'
+            : 'ひとことを保存できませんでした'
+        );
+        return;
+      }
+      const savedComment = typeof data.comment === 'string' ? data.comment : '';
+      setPhotos((prev) =>
+        prev.map((photo) =>
+          photo.visit?.id === visitId
+            ? { ...photo, visit: { ...photo.visit, comment: savedComment } }
+            : photo
+        )
+      );
+      setEditingCommentVisitId(null);
+      setCommentDraft('');
+    } catch {
+      setCommentSaveError('保存中にエラーが発生しました');
+    } finally {
+      setCommentSaving(false);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -1160,7 +1216,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     )}
                     <button
                       type="button"
-                      onClick={() => setPhotoExpanded(false)}
+                      onClick={() => {
+                        cancelCommentEdit();
+                        setPhotoExpanded(false);
+                      }}
                       aria-label="写真一覧に戻る"
                       className="absolute left-3 top-3 z-10 inline-flex min-h-8 items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white backdrop-blur-sm"
                     >
@@ -1177,6 +1236,78 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           </span>
                         </span>
                       </span>
+                    )}
+                    {featuredPhoto.visit?.user_id === currentUserId && featuredPhoto.visit?.id && (
+                      editingCommentVisitId === featuredPhoto.visit.id ? (
+                        <div
+                          className="absolute inset-x-3 bottom-12 z-[3] rounded-[14px] bg-white/95 p-3 shadow-lg backdrop-blur-sm"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <label
+                              htmlFor={`photo-comment-${featuredPhoto.visit.id}`}
+                              className="font-pixelJp text-xs font-bold text-[#2c2a26]"
+                            >
+                              写真のひとこと
+                            </label>
+                            <button
+                              type="button"
+                              onClick={cancelCommentEdit}
+                              disabled={commentSaving}
+                              aria-label="編集をやめる"
+                              className="rounded-full p-1 text-[#6f6657] hover:bg-[#f1e8d4] disabled:opacity-50"
+                            >
+                              <X className="h-4 w-4" strokeWidth={2.4} />
+                            </button>
+                          </div>
+                          <textarea
+                            id={`photo-comment-${featuredPhoto.visit.id}`}
+                            value={commentDraft}
+                            onChange={(event) => setCommentDraft(event.target.value)}
+                            rows={3}
+                            autoFocus
+                            placeholder="見つけた場所・駐車場・行き方など"
+                            disabled={commentSaving}
+                            className="mt-2 w-full resize-none rounded-[10px] border border-[#d7c8a7] bg-white px-3 py-2 font-pixelJp text-xs leading-relaxed text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-2 focus:ring-[#bf5640]/30 disabled:opacity-60"
+                          />
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className={`font-pixelJp text-[10px] ${commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH ? 'text-[#bf5640]' : 'text-[#9b917e]'}`}>
+                              {commentDraft.trim().length}/{VISIT_COMMENT_MAX_LENGTH}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void savePhotoComment(featuredPhoto.visit!.id)}
+                              disabled={commentSaving || commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH}
+                              className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#bf5640] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white disabled:opacity-50"
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                              {commentSaving ? '保存中…' : commentDraft.trim() ? '保存' : 'ひとことを削除'}
+                            </button>
+                          </div>
+                          {commentSaveError && (
+                            <p className="mt-2 font-pixelJp text-[11px] font-bold text-[#bf5640]">
+                              {commentSaveError}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="absolute inset-x-3 bottom-12 z-[2] flex">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              startCommentEdit(featuredPhoto);
+                            }}
+                            className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[12px] rounded-bl-[4px] bg-white/95 px-2.5 py-1.5 text-left shadow-sm transition-colors hover:bg-white"
+                          >
+                            <Pencil className="h-3 w-3 shrink-0 text-[#bf5640]" strokeWidth={2.4} />
+                            <span className="line-clamp-2 min-w-0 font-pixelJp text-xs font-bold leading-snug text-[#2c2a26]">
+                              {featuredPhoto.visit.comment?.trim() || 'ひとことを追加'}
+                            </span>
+                            <span className="shrink-0 font-pixelJp text-[10px] font-bold text-[#bf5640]">編集</span>
+                          </button>
+                        </div>
+                      )
                     )}
                     <div className="absolute inset-x-0 bottom-0 z-[1] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-10 text-white">
                       {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
