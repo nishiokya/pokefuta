@@ -16,6 +16,7 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -58,6 +59,7 @@ const MapComponent = dynamic(
 
 interface Photo {
   id: string;
+  is_landscape?: boolean;
   storage_key: string;
   content_type: string;
   created_at: string;
@@ -669,7 +671,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   // ── Derived photo state ────────────────────────────────────────────
   const isLoggedIn = currentUserId !== null;
-  const { myPhotos, orderedPhotos: allDisplayPhotos } = orderManholePhotosForViewer(
+  const { myPhotos, orderedPhotos: allDisplayPhotos, representativePhoto } = orderManholePhotosForViewer(
     photos,
     currentUserId
   );
@@ -917,7 +919,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   );
 
   // Every photo on this manhole, always visible — no "+N" gate, nobody's shot stays hidden.
-  const allPhotosGrid = allDisplayPhotos.length > 1 ? (
+  const allPhotosGrid = allDisplayPhotos.length > 1 || (!representativePhoto && allDisplayPhotos.length > 0) ? (
     <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
@@ -967,6 +969,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   aria-label={
                     `@${userLabel}さんの写真を表示` +
                     (dateLabel ? `（${dateLabel}${dateKind}）` : '') +
+                    (photo.is_landscape ? '、周辺の風景' : '') +
                     (comment ? '、コメントあり' : '')
                   }
                   className="block h-full w-full p-0"
@@ -1021,6 +1024,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
                   投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
               <div className="flex flex-col gap-0.5 px-1.5 py-1">
+                <LandscapePhotoBadge isLandscape={photo.is_landscape} />
                 {profileHref ? (
                   <Link
                     href={profileHref}
@@ -1156,7 +1160,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 もう一度読み込む
               </button>
             </div>
-          ) : photoState === 'none' ? (
+          ) : !representativePhoto && !photoExpanded ? (
             <div
               className="relative overflow-hidden rounded-[16px] lg:rounded-[18px] border-2 border-dashed border-[#cdbf9f] h-[210px] lg:h-[360px] flex items-center justify-center"
               style={{ background: 'repeating-linear-gradient(135deg,#f3ecdc 0 12px,#ece2cd 12px 24px)' }}
@@ -1164,10 +1168,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               <div className="text-center">
                 <div className="font-['Outfit'] text-[44px] lg:text-[72px] font-black leading-none text-[#cdbb92]">0</div>
                 <div className="mt-2 font-pixelJp text-sm font-bold text-[#6f6657]">
-                  この場所の写真はまだ0枚
+                  蓋の写真を募集中
                 </div>
                 <div className="mt-1 font-pixelJp text-xs font-bold text-[#bf5640]">
-                  あなたが最初の記録者に
+                  {allDisplayPhotos.length > 0 ? '周辺の風景は下の写真一覧で見られます' : 'あなたが最初の記録者に'}
                 </div>
               </div>
               <div className="absolute left-3 top-3">
@@ -1209,6 +1213,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
                       className="h-full w-full object-contain"
                     />
+                    <div className="absolute bottom-3 left-3">
+                      <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
+                    </div>
                     {featuredPhoto.visit?.user_id === currentUserId && (
                       <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
                         あなたの投稿
@@ -1406,6 +1413,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
+                        <div className="absolute bottom-9 left-2">
+                          <LandscapePhotoBadge isLandscape={photo.is_landscape} />
+                        </div>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (

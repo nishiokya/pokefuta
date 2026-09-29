@@ -8,6 +8,8 @@ export type RankableManholePhoto = {
   ranking_score?: number | null;
   /** false = 採点で代表写真の候補から外れた（ブレ・白飛び・色かぶり・蓋が写っていない） */
   quality_eligible?: boolean | null;
+  /** 投稿者が選んだ周辺風景。品質採点とは別に代表候補から除く。 */
+  is_landscape?: boolean;
   visit?: {
     user_id?: string | null;
     is_public?: boolean;
@@ -49,6 +51,7 @@ const rankTier = (photo: RankableManholePhoto) => {
  */
 export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
   [...items].sort((a, b) => {
+    if (Boolean(a.is_landscape) !== Boolean(b.is_landscape)) return a.is_landscape ? 1 : -1;
     const aCommented = isMeaningfulVisitComment(a.visit?.comment);
     const bCommented = isMeaningfulVisitComment(b.visit?.comment);
     if (aCommented !== bCommented) return aCommented ? -1 : 1;
@@ -149,10 +152,11 @@ export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(
       (photo) => photo.visit?.is_public === true || photo.visit?.user_id === currentUserId
     )
   );
-  const representativePhoto = myPhotos[0] ?? visiblePhotos[0] ?? null;
+  const representativePhoto = myPhotos.find(photo => !photo.is_landscape)
+    ?? visiblePhotos.find(photo => !photo.is_landscape) ?? null;
   const orderedPhotos = representativePhoto
     ? [representativePhoto, ...visiblePhotos.filter((photo) => photo.id !== representativePhoto.id)]
-    : [];
+    : visiblePhotos;
 
   return { myPhotos, orderedPhotos, representativePhoto };
 };

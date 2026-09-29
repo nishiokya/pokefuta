@@ -186,6 +186,7 @@ export async function GET(request: NextRequest) {
           ),
           ${photoEmbed} (
             id,
+            is_landscape,
             storage_key,
             content_type,
             file_size,
@@ -219,6 +220,7 @@ export async function GET(request: NextRequest) {
           ),
           ${photoEmbed} (
             id,
+            is_landscape,
             storage_key,
             content_type,
             file_size,
@@ -394,6 +396,7 @@ export async function GET(request: NextRequest) {
         updated_at: visit.updated_at,
         photos: photos.map((photo: any) => ({
           id: photo.id,
+          is_landscape: photo.is_landscape,
           storage_key: photo.storage_key,
           content_type: photo.content_type,
           file_size: photo.file_size,

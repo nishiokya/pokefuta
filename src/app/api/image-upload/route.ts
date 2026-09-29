@@ -59,6 +59,11 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *                 enum: ['true', 'false']
  *                 default: 'true'
  *                 description: 公開設定（true=他のユーザーもcommentを閲覧可能、false=自分だけが閲覧可能、デフォルト：公開）
+ *               is_landscape:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 default: 'false'
+ *                 description: 周辺の風景写真。代表画像・蓋の写真充足率には含めない。GPS・距離条件は通常の写真と同じ。
  *               latitude:
  *                 type: number
  *                 format: float
@@ -172,6 +177,11 @@ export async function POST(request: NextRequest) {
     const longitude = formData.get('longitude');
     const exifStr = formData.get('exif');
     const existingVisitId = formData.get('visit_id');  // 既存visitへの写真追加（一括投稿用）
+    const landscapeValue = formData.get('is_landscape');
+    if (landscapeValue !== null && landscapeValue !== 'true' && landscapeValue !== 'false') {
+      return NextResponse.json({ success: false, error: 'is_landscape must be true or false' }, { status: 400 });
+    }
+    const isLandscape = landscapeValue === 'true';
 
     let photoExif: Record<string, any> | undefined;
     if (exifStr) {
@@ -421,6 +431,7 @@ export async function POST(request: NextRequest) {
         visit_id: visitId,
         manhole_id: manholeIdInt, // ✅ 必須: photoは必ずマンホールに紐づく
         storage_key: storageKey,
+        is_landscape: isLandscape,
       };
 
       // Add optional fields if they exist in schema
@@ -463,6 +474,7 @@ export async function POST(request: NextRequest) {
       visit_id: visitId,
       image: {
         id: imageId,
+        is_landscape: isLandscape,
         filename: file.name,
         content_type: file.type,
         file_size: fileSize,
@@ -603,6 +615,7 @@ export async function GET(request: NextRequest) {
           created_at,
           quality_score,
           quality_eligible,
+          is_landscape,
           visit:visit_id!inner (
             id,
             user_id,

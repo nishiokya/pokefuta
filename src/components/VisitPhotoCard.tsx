@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
+import LandscapePhotoBadge from './LandscapePhotoBadge';
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 const NUM = '"Outfit", "M PLUS Rounded 1c", system-ui, sans-serif';
@@ -16,6 +17,7 @@ const TINTS = [
 export interface VisitPhotoCardProps {
   manholeId: number;
   thumbnailUrl?: string | null;
+  isLandscape?: boolean;
   title: string;
   date: string;
   posterName?: string | null;
@@ -35,6 +37,7 @@ export interface VisitPhotoCardProps {
 export default function VisitPhotoCard({
   manholeId,
   thumbnailUrl,
+  isLandscape,
   title,
   date,
   posterName,
@@ -140,6 +143,9 @@ export default function VisitPhotoCard({
               {cornerLabel}
             </span>
           )}
+          <div style={{ position: 'absolute', left: 8, top: 8 }}>
+            <LandscapePhotoBadge isLandscape={isLandscape} />
+          </div>
           <div style={{ position: 'absolute', left: 12, bottom: 10, right: 12, color: '#fff' }}>
             <div
               style={{

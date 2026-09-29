@@ -12,6 +12,7 @@ import {
   Stamp,
 } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import ShareButtons from '@/components/ShareButtons';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
@@ -417,6 +418,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
         )}
       </div>
       <div className="p-2.5">
+        <LandscapePhotoBadge isLandscape={visit.isLandscape} />
         <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">
           {title}
         </p>

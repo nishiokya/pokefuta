@@ -27,7 +27,7 @@ type JourneyVisit = {
   shot_at: string;
   display_name?: string | null;
   is_public?: boolean;
-  photos: Array<{ id: string; thumbnail_url?: string }>;
+  photos: Array<{ id: string; thumbnail_url?: string; is_landscape?: boolean }>;
 };
 
 const getMunicipality = (manhole?: JourneyVisit['manhole']) =>
@@ -412,6 +412,7 @@ export default function MyTripPage() {
                           key={`${manholeId}-${visit.shot_at}`}
                           manholeId={manholeId}
                           thumbnailUrl={visit.photos?.[0]?.thumbnail_url}
+                          isLandscape={visit.photos?.[0]?.is_landscape}
                           title={title}
                           date={dateStr}
                           posterName={visit.display_name}

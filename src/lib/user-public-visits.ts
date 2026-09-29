@@ -22,6 +22,7 @@ export type PublicVisit = {
   createdAt: string | null;
   manhole: PublicVisitManhole | null;
   photoIds: string[];
+  isLandscape: boolean;
 };
 
 export type PublicUserVisits = {
@@ -51,6 +52,7 @@ type VisitPublicRow = {
   manhole_municipality: string | null;
   manhole_pokemons: string[] | null;
   latest_photo_id: string | null;
+  latest_photo_is_landscape: boolean | null;
 };
 
 const VISIT_LIMIT = 500;
@@ -108,7 +110,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
       .select(
         'id, manhole_id, shot_at, comment, created_at,' +
         ' manhole_title, manhole_prefecture, manhole_municipality, manhole_pokemons,' +
-        ' latest_photo_id'
+        ' latest_photo_id, latest_photo_is_landscape'
       )
       .eq('public_user_id', trimmedUserId)
       .order('shot_at', { ascending: false })
@@ -160,6 +162,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
           pokemons: Array.isArray(visit.manhole_pokemons) ? visit.manhole_pokemons : [],
         },
     photoIds: visit.latest_photo_id ? [visit.latest_photo_id] : [],
+    isLandscape: visit.latest_photo_is_landscape === true,
   }));
 
   const totalVisits = totalCount ?? publicVisits.length;

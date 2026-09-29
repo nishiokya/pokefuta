@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -32,6 +33,7 @@ type FeedVisit = {
   photos: Array<{
     id: string;
     thumbnail_url?: string;
+    is_landscape?: boolean;
   }>;
   likes_count: number;
   comments_count: number;
@@ -313,7 +315,7 @@ export default function PopularPage() {
                     const to = canNavigate ? `/manhole/${manholeId}` : '';
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
 
-                    const commonAriaLabel = `${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${commentCount}`;
+                    const commonAriaLabel = `${photo?.is_landscape ? '周辺の風景、' : ''}${locationLabel}、撮影 ${formatDateJa(visit.shot_at)}、コメント ${commentCount}`;
                     const cardContent = (
                       <>
                         {photo?.thumbnail_url ? (
@@ -335,6 +337,7 @@ export default function PopularPage() {
                           </span>
                         )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
+                          <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
                           </div>
