@@ -1,6 +1,22 @@
--- ローカル Supabase 専用。マイグレーション適用後に psql / supabase db query --local で実行。
+-- ローカル Supabase 専用。マイグレーション適用後に npm run verify:photo-landscape で実行。
 -- 全操作をロールバックする。既存データは変更せず、専用fixtureのみ挿入する。
 BEGIN;
+DO $$
+DECLARE
+  f regprocedure;
+BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'public.get_site_counts()'::regprocedure,
+    'public.get_public_prefecture_completion()'::regprocedure
+  ] LOOP
+    IF has_function_privilege('public', f, 'EXECUTE')
+       OR (SELECT proconfig FROM pg_proc WHERE oid = f)
+          IS DISTINCT FROM ARRAY['search_path=public, pg_temp']::text[] THEN
+      RAISE EXCEPTION 'SECURITY DEFINER function ACL/search_path mismatch: %', f;
+    END IF;
+  END LOOP;
+END $$;
+
 DO $$
 DECLARE
   owner_id uuid := gen_random_uuid();
@@ -18,6 +34,8 @@ BEGIN
     email_confirmed_at, created_at, updated_at)
   VALUES(owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated',
     'authenticated', owner_id::text || '@example.test', 'x', now(), now(), now());
+  INSERT INTO public.app_user(auth_uid, display_name)
+  VALUES(owner_id, '風景検証ユーザー');
   INSERT INTO public.manhole(id, title, prefecture) VALUES
     (-929001, '風景テスト', '__landscape_test__'),
     (-929002, '非公開テスト', '__landscape_test__');

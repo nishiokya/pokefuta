@@ -28,7 +28,7 @@ RETURNS TABLE (
   manholes bigint, posts bigint, public_posts bigint,
   manholes_with_photos bigint, users bigint, design_manholes bigint
 )
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO public, pg_temp
 AS $$
   SELECT
     (SELECT count(*) FROM public.manhole)::bigint,
@@ -49,7 +49,7 @@ COMMENT ON FUNCTION public.get_site_counts() IS
 
 CREATE OR REPLACE FUNCTION public.get_public_prefecture_completion()
 RETURNS TABLE (prefecture text, total bigint, with_photo bigint)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO public, pg_temp
 AS $$
   SELECT m.prefecture, count(*)::bigint,
     count(*) FILTER (WHERE EXISTS (
