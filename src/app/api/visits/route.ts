@@ -186,6 +186,7 @@ export async function GET(request: NextRequest) {
           ),
           ${photoEmbed} (
             id,
+            is_landscape,
             storage_key,
             content_type,
             file_size,
@@ -219,6 +220,7 @@ export async function GET(request: NextRequest) {
           ),
           ${photoEmbed} (
             id,
+            is_landscape,
             storage_key,
             content_type,
             file_size,
@@ -369,7 +371,18 @@ export async function GET(request: NextRequest) {
 
     // Post-process data
     const processedVisits = (visits || []).map(visit => {
-      const photos = Array.isArray(visit.photos) ? visit.photos : [];
+      // カードの先頭は場所の代表として使われるため、蓋写真を風景より優先する。
+      // 風景しかない投稿は残し、呼び出し側で分類ラベルを表示する。
+      const photos = Array.isArray(visit.photos)
+        ? [...visit.photos].sort((a: any, b: any) => {
+            if (Boolean(a.is_landscape) !== Boolean(b.is_landscape)) {
+              return a.is_landscape ? 1 : -1;
+            }
+            const createdDiff = Date.parse(b.created_at || '') - Date.parse(a.created_at || '');
+            if (Number.isFinite(createdDiff) && createdDiff !== 0) return createdDiff;
+            return String(b.id).localeCompare(String(a.id));
+          })
+        : [];
       const likeInfo = likesMap.get(visit.id) || { count: 0, isLiked: false };
       const commentCount = commentsMap.get(visit.id) || 0;
       const manholeCommentCount = typeof visit.manhole_id === 'number'
@@ -394,6 +407,7 @@ export async function GET(request: NextRequest) {
         updated_at: visit.updated_at,
         photos: photos.map((photo: any) => ({
           id: photo.id,
+          is_landscape: photo.is_landscape,
           storage_key: photo.storage_key,
           content_type: photo.content_type,
           file_size: photo.file_size,

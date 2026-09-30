@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import RecentComments from '@/components/comments/RecentComments';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
@@ -38,6 +39,7 @@ type FeedVisit = {
   photos: Array<{
     id: string;
     thumbnail_url?: string;
+    is_landscape?: boolean;
   }>;
   likes_count: number;
   comments_count: number;
@@ -444,6 +446,7 @@ export default function HomePage() {
                     // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
                     // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
+                      photo?.is_landscape ? '周辺の風景' : null,
                       ...chips.map((chip) => chip.label),
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
@@ -468,8 +471,9 @@ export default function HomePage() {
                         )}
 
                         {/* タグは口コミ件数と同じく写真の上に置く。右上の口コミバッジと重ならないよう右を空ける */}
-                        {chips.length > 0 && (
+                        {(chips.length > 0 || photo?.is_landscape) && (
                           <div className="absolute left-2 right-14 top-2 flex flex-wrap gap-1">
+                            <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
                             {chips.map((chip) => (
                               <span key={chip.tag} className={`rounded-full px-2 py-1 text-xs font-extrabold leading-none shadow-sm ${CHIP_CLASS[chip.tag]}`}>
                                 {chip.label}

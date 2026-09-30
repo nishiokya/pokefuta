@@ -43,7 +43,7 @@ type FeedVisit = {
     pokemons?: string[] | null;
   } | null;
   shot_at: string;
-  photos: Array<{ id: string; thumbnail_url?: string; url?: string }>;
+  photos: Array<{ id: string; thumbnail_url?: string; url?: string; is_landscape?: boolean }>;
   display_name?: string | null;
 };
 
@@ -337,6 +337,7 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                       key={visit.id}
                       manholeId={visit.manhole_id ?? manhole?.id ?? 0}
                       thumbnailUrl={photo?.thumbnail_url || photo?.url}
+                      isLandscape={photo?.is_landscape}
                       // 見出しは詳細ページの h1 と同じ正本の名前（図鑑のスナップショットの name）。
                       // 施設名の無い蓋は「宮崎県/延岡市」と県名から始まるが、県ページでも
                       // 名前はどの画面でも同じにする方針なので、ここで県名を削らない。

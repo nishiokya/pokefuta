@@ -73,6 +73,7 @@ type VisitProgressRow = {
   created_at: string | null;
   manhole_prefecture: string | null;
   latest_photo_id: string | null;
+  latest_photo_is_landscape: boolean | null;
   latest_photo_created_at: string | null;
 };
 
@@ -351,7 +352,7 @@ async function loadPublicUserPrefectureProgressImpl(
     .from('public_user_visit_card')
     .select(
       'manhole_id, shot_at, created_at, manhole_prefecture,' +
-      ' latest_photo_id, latest_photo_created_at'
+      ' latest_photo_id, latest_photo_created_at, latest_photo_is_landscape'
     )
     .eq('public_user_id', trimmedUserId)
     .not('manhole_id', 'is', null);
@@ -397,7 +398,7 @@ async function loadPublicUserPrefectureProgressImpl(
     // ビューが visit ごとに最新1枚を返すので、ここでは訪問間で新しい方を採る。
     // 比較は max(訪問日時, 写真日時)。同じマンホールを複数回訪れた人で、
     // 古い訪問に後から足した写真が代表になることがあるため、写真の時刻も見る。
-    if (visit.latest_photo_id) {
+    if (visit.latest_photo_id && !visit.latest_photo_is_landscape) {
       const sortTime = Math.max(
         getVisitSortTime(visit),
         new Date(visit.latest_photo_created_at || 0).getTime()

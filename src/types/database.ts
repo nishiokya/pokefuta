@@ -291,6 +291,7 @@ export interface Database {
           thumbnail_1600: string | null;
           quality_score: number | null;
           quality_eligible: boolean | null;
+          is_landscape: boolean;
           quality_score_version: string | null;
           quality_scored_at: string | null;
           binary_data: ArrayBuffer | null;
@@ -301,6 +302,7 @@ export interface Database {
           id?: string;
           visit_id?: string | null;
           manhole_id: number; // 必須 - マンホールなしの写真は登録不可
+          is_landscape?: boolean;
           storage_provider?: string;
           storage_key?: string;
           original_name?: string | null;
@@ -320,6 +322,7 @@ export interface Database {
         Update: {
           visit_id?: string | null;
           manhole_id?: number; // 更新時はオプショナル
+          is_landscape?: boolean;
           storage_provider?: string;
           storage_key?: string;
           original_name?: string | null;
@@ -697,6 +700,7 @@ export interface Database {
           manhole_municipality: string | null;
           manhole_pokemons: string[] | null;
           latest_photo_id: string | null;
+          latest_photo_is_landscape: boolean | null;
           // 同じマンホールの代表写真を max(訪問日時, 写真日時) で選ぶために返す
           latest_photo_created_at: string | null;
         };

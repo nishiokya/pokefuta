@@ -30,6 +30,7 @@ interface ManholeWithDistance extends Manhole {
       url?: string;
       /** /api/photo/<id>?size=small。一覧のサムネはこちらを使う */
       thumbnail_url?: string;
+      is_landscape?: boolean;
     }>;
   };
 }
@@ -661,6 +662,7 @@ export default function NearbyPage() {
                         // マイ旅と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
                         // 一覧に数十枚並べると読み込みが終わらない。
                         thumbnailUrl={photo?.thumbnail_url || photo?.url}
+                        isLandscape={photo?.is_landscape}
                         // 見出しは詳細ページの h1 と同じ（施設名があれば「〈県〉〈市区町村〉 〈施設名〉のポケふた」）。
                         title={manholeHeadingPlace(manhole)}
                         date={`#${manhole.id}`}

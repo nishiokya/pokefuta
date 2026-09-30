@@ -73,6 +73,7 @@ export async function loadPhotoForOgp(
       .select('id, storage_key, visit:visit_id (is_public), manhole_id')
       .eq('id', photoId)
       .eq('manhole_id', manholeId)
+      .eq('is_landscape', false)
       .single();
 
     if (error || !data) continue;
@@ -113,6 +114,7 @@ export async function loadFirstPublicPhotoForManhole(
       .from('photo')
       .select('id, storage_key, visit:visit_id (is_public)')
       .eq('manhole_id', manholeId)
+      .eq('is_landscape', false)
       .order('created_at', { ascending: false })
       .limit(20);
 

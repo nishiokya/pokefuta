@@ -90,6 +90,7 @@ interface UploadedPhoto {
   matchedManhole?: Manhole;
   uploading: boolean;
   uploaded: boolean;
+  isLandscape: boolean;
   uploadedImageId?: string;
   error?: string;
   photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
@@ -504,6 +505,7 @@ function UploadPageInner() {
       matchedManhole,
       uploading: false,
       uploaded: false,
+      isLandscape: false,
       error: distanceError,
       photoStatus
     }]);
@@ -680,6 +682,7 @@ function UploadPageInner() {
       // Prepare form data for upload
       const formData = new FormData();
       formData.append('file', compressedFile);
+      formData.append('is_landscape', String(photo.isLandscape));
 
       // Add manhole ID if matched
       if (photo.matchedManhole) {
@@ -1036,9 +1039,34 @@ function UploadPageInner() {
               </>
             )}
           </div>
-          <p className="mt-2 text-xs text-[#2A2A2A]/60">
-            できるだけ「真上から・マンホール全体（ふたの縁まで）が入る」写真だと、とても助かります。
-          </p>
+          {selectedPhoto && (
+            <div className="mt-3 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
+              <label className="flex items-center gap-2 text-sm font-bold">
+                <input
+                  type="checkbox"
+                  checked={selectedPhoto.isLandscape}
+                  disabled={selectedPhoto.uploading || selectedPhoto.uploaded}
+                  aria-describedby="landscape-help"
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setPhotos(prev => prev.map(photo => photo.id === selectedPhoto.id
+                      ? { ...photo, isLandscape: checked } : photo));
+                  }}
+                  className="h-4 w-4 accent-[#7B63A8]"
+                />
+                周辺の風景
+              </label>
+              <p id="landscape-help" className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
+                ポケふたのある場所や、その周辺の景色はこちら。蓋が写っていなくても投稿できます。
+                GPS位置情報付き・蓋から50m以内の写真が対象です。
+              </p>
+            </div>
+          )}
+          {!selectedPhoto?.isLandscape && (
+            <p className="mt-2 text-xs text-[#2A2A2A]/60">
+              できるだけ「真上から・マンホール全体（ふたの縁まで）が入る」写真だと、とても助かります。
+            </p>
+          )}
 
           {/* 写真ステータス（/design-manholes/new と同じ表示パターン） */}
           {loading && (
@@ -1086,7 +1114,7 @@ function UploadPageInner() {
 
         {/* 撮影のコツ */}
         <details className="mt-4 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
-          <summary className="cursor-pointer text-sm font-bold">撮影のコツ（OK / NG例）</summary>
+          <summary className="cursor-pointer text-sm font-bold">蓋の写真を撮るコツ（OK / NG例）</summary>
 
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="rounded-lg border border-[#4C9A57]/30 bg-[#4C9A57]/5 p-2">

@@ -5,6 +5,7 @@ import { Camera, MapPin, Sparkles } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import PhotoDeleteButton from '@/components/PhotoDeleteButton';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { photoShareText } from '@/lib/share';
@@ -36,10 +37,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const pokemonText = photo.manhole.pokemons.length > 0
     ? `｜${photo.manhole.pokemons.join('・')}`
     : '';
-  const title = `${locationLabel}のポケふた写真${pokemonText} | ${SITE_NAME}`;
+  const title = `${locationLabel}の${photo.is_landscape ? '周辺の風景' : 'ポケふた写真'}${pokemonText} | ${SITE_NAME}`;
   const description = photo.visit.comment
     ? photo.visit.comment
-    : `${locationLabel}で見つけたポケふた写真です。`;
+    : `${locationLabel}の${photo.is_landscape ? 'ポケふた周辺の風景' : 'ポケふた写真'}です。`;
   const pageUrl = `${SITE_URL}/p/${photo.id}`;
   const imageUrl = `${pageUrl}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
@@ -89,10 +90,11 @@ export default async function SharedPhotoPage({ params }: PageProps) {
           <div className="relative bg-[#E9DEC9]">
             <img
               src={`/api/photo/${photo.id}?size=small`}
-              alt={`${locationLabel}のポケふた写真`}
+              alt={`${locationLabel}の${photo.is_landscape ? '周辺の風景' : 'ポケふた写真'}`}
               className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-white sm:p-6">
+              <LandscapePhotoBadge isLandscape={photo.is_landscape} />
               <div className="mb-2 flex items-center gap-2 text-sm font-bold">
                 <MapPin className="h-4 w-4" />
                 {photo.manhole.prefecture} / {photo.manhole.municipality || '場所未設定'}

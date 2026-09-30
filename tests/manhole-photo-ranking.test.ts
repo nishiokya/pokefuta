@@ -14,6 +14,7 @@ const photo = (
     score?: number | null;
     qualityScore?: number | null;
     eligible?: boolean | null;
+    isLandscape?: boolean;
     createdAt?: string;
     userId?: string;
     isPublic?: boolean;
@@ -25,6 +26,7 @@ const photo = (
   score: options.score,
   quality_score: options.qualityScore,
   quality_eligible: options.eligible,
+  is_landscape: options.isLandscape,
   visit: {
     user_id: options.userId ?? 'community',
     is_public: options.isPublic ?? true,
@@ -70,6 +72,32 @@ test('a manhole whose photos are all ineligible still gets a representative', ()
   ], null);
 
   assert.equal(result.representativePhoto?.id, 'better');
+});
+
+test('a landscape never outranks a lid, even with a comment and higher score', () => {
+  const photos = [
+    photo('scenery', { isLandscape: true, qualityScore: 1, comment: '公園の入口です', userId: 'me' }),
+    photo('lid', { qualityScore: 0.1 }),
+  ];
+  for (const viewer of [null, 'me']) {
+    const result = orderManholePhotosForViewer(photos, viewer);
+    assert.equal(result.representativePhoto?.id, 'lid');
+    assert.deepEqual(result.orderedPhotos.map(p => p.id), ['lid', 'scenery']);
+  }
+});
+
+test('landscape-only galleries stay visible without a representative or private-photo leak', () => {
+  const photos = [
+    photo('public-scenery', { isLandscape: true }),
+    photo('private-scenery', { isLandscape: true, userId: 'me', isPublic: false }),
+  ];
+  const anonymous = orderManholePhotosForViewer(photos, null);
+  assert.equal(anonymous.representativePhoto, null);
+  assert.deepEqual(anonymous.orderedPhotos.map(p => p.id), ['public-scenery']);
+  const owner = orderManholePhotosForViewer(photos, 'me');
+  assert.equal(owner.representativePhoto, null);
+  assert.equal(owner.orderedPhotos.length, 2);
+  assert.equal(owner.myPhotos.length, 1);
 });
 
 test('a photo with a comment is representative even when others score higher', () => {

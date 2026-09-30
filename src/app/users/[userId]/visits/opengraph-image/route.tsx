@@ -52,6 +52,9 @@ async function loadNotoSansCjk(): Promise<ArrayBuffer | null> {
 // 1枚でも失敗したら写真なしレイアウトに落とすのではなく、取れた分だけ使う。
 async function loadRecentPhotoDataUris(visits: PublicVisit[]): Promise<string[]> {
   const photoIds = visits
+    // このOGPは投稿単体ではなくスタンプ帳の代表画像。風景を蓋の代表に見せない。
+    // 風景投稿そのものはプロフィール本文と写真単体共有でラベル付き表示を続ける。
+    .filter((visit) => !visit.isLandscape)
     .map((visit) => visit.photoIds[0])
     .filter((id): id is string => Boolean(id))
     .slice(0, PHOTO_COUNT);
