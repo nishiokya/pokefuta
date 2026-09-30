@@ -677,6 +677,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   );
   const photoState: 'none' | 'mine' | 'community' =
     photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
+  const hasMyLidPhoto = myPhotos.some(photo => !photo.is_landscape);
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
@@ -802,7 +803,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             />
           </span>
           <span className="font-pixelJp text-[13.5px] font-bold">
-            {photoState === 'mine' && isLoggedIn ? 'この場所はコンプリート' : '撮ると写真図鑑も埋まる'}
+            {hasMyLidPhoto && isLoggedIn
+              ? 'この場所の蓋写真を登録済み'
+              : photoState === 'mine' && isLoggedIn
+              ? '訪問記録済み・蓋の写真は募集中'
+              : '撮ると写真図鑑も埋まる'}
           </span>
         </div>
 
@@ -1213,7 +1218,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
                       className="h-full w-full object-contain"
                     />
-                    <div className="absolute bottom-3 left-3">
+                    <div className="absolute bottom-12 left-3 z-[2]">
                       <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
                     </div>
                     {featuredPhoto.visit?.user_id === currentUserId && (
@@ -1400,7 +1405,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           setSelectedPhotoIdx(index);
                           setPhotoExpanded(true);
                         }}
-                        aria-label={`@${getPhotoUserLabel(photo)}さんの写真を全体表示`}
+                        aria-label={`@${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
                         className={`group relative overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
                           isRepresentative
                             ? 'col-span-2 row-span-2 rounded-l-[16px] lg:rounded-l-[18px]'
@@ -1413,7 +1418,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        <div className="absolute bottom-9 left-2">
+                        <div className="absolute bottom-9 left-2 z-[2]">
                           <LandscapePhotoBadge isLandscape={photo.is_landscape} />
                         </div>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
