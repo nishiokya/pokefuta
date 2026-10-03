@@ -9,13 +9,15 @@
 --   model        判定の版（例 'scene_attrs/1'）
 -- 例: {"model": "scene_attrs/1", "scene": "wide_context", "plush": true, "plush_score": 0.93, "night": false}
 --
--- 表示は写真館が「AI」の印を付けて出す。投稿者の申告（is_landscape）を上書きしない。
+-- 表示は写真館が「AI」の印を付けて出す（蓋詳細・トップ・人気・訪問一覧・写真の個別ページ）。
+-- 投稿者の申告（is_landscape）を上書きしない。
 -- 投稿者が外す操作（上書き用の列）はまだ作らない。外れが目立ったら足す。
 --
 -- 書き込み経路は scoring.apply_photo_scores だけ。関数の署名は変えない
 -- （scoring.audit_photo_scorer は署名で照合しているので、変えると本番の採点ジョブが止まる）。
 -- 有効な版を quality_score/0.3.0 に上げる。全写真が未採点扱いになり、翌朝のジョブで
 -- 既存の写真にも ai_tags が入る（初回の流し込み用のマイグレーションは要らない）。
+-- **アプリより先に適用する。** アプリは ai_tags を select するので、列が無いと写真の一覧が 500 になる。
 -- 版を上げる前の k11 のジョブ（0.2.0）は読めず書けずに止まるので、適用後に k11 側を 0.3.0 に切り替える。
 -- 仕様: vault inbox/dev/pokefuta/spec/2026-10-03 pokefuta 周辺写真の自動タグ案.md
 -- 検査: npm run verify:photo-scorer
@@ -30,6 +32,26 @@ COMMENT ON COLUMN public.photo.ai_tags IS
 
 -- 読み取り: 写真館がタグを出すので公開する（判定の中身だけで、個人に結びつく情報は入れない）
 GRANT SELECT (ai_tags) ON public.photo TO anon, authenticated;
+
+-- 利用者ごとの訪問一覧（/users/[id]/visits）は public_user_visit_card を読む。先頭写真の ai_tags を足す。
+-- 列は末尾に足す（CREATE OR REPLACE VIEW は既存の列の並びを変えられない）。それ以外は 20260929100000 と同じ
+CREATE OR REPLACE VIEW public.public_user_visit_card
+WITH (security_invoker = false, security_barrier = true) AS
+SELECT b.*, latest.id AS latest_photo_id,
+  latest.created_at AS latest_photo_created_at,
+  latest.is_landscape AS latest_photo_is_landscape,
+  latest.ai_tags AS latest_photo_ai_tags
+FROM public.public_user_visit_base b
+LEFT JOIN LATERAL (
+  SELECT p.id, p.created_at, p.is_landscape, p.ai_tags FROM public.photo p
+  WHERE p.visit_id = b.id
+  ORDER BY p.is_landscape ASC, p.created_at DESC NULLS LAST, p.id DESC
+  LIMIT 1
+) latest ON true;
+REVOKE ALL ON public.public_user_visit_card FROM PUBLIC;
+GRANT SELECT ON public.public_user_visit_card TO anon, authenticated, service_role;
+COMMENT ON VIEW public.public_user_visit_card IS
+  '公開訪問カード。蓋の写真を優先して最新1枚を返し、風景だけの場合は種別を明示する。先頭写真の AI タグも返す。';
 
 -- ---------------------------------------------------------------------------
 -- 利用者が書き換えられないようにする（quality_* と同じ扱い。理由は 20260925120000）

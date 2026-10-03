@@ -1,6 +1,7 @@
 # 写真の AI タグ（ぬいぐるみ・夜・風景）
 
-写真に「AI」の印付きでタグを出す。判定は k11 の manhole-score が毎朝の自動採点で行い、
+写真に「AI」の印付きでタグを出す（蓋詳細の一覧と拡大表示・トップ・人気・訪問一覧・利用者ごとの訪問一覧・写真の個別ページ）。
+判定は k11 の manhole-score が毎朝の自動採点で行い、
 `photo.ai_tags` に書く。アプリは判定しない。
 
 | タグ | 判定 | 出す条件 |
@@ -24,6 +25,7 @@
 
 1. マイグレーションを本番に適用する。有効な版が `quality_score/0.3.0` になり、k11 の 0.2.0 のジョブは止まる（止まるのが正しい）
 2. k11 の manhole-score を 0.3.0（`ai_tags` を書く版）に切り替える。翌朝 05:15 の実行で既存の全写真に `ai_tags` が入る
-3. 写真館（この PR のアプリ側）を出す。`ai_tags` が NULL の写真にはタグが出ないだけなので、1 と 2 の前に出ても壊れない
+3. 写真館（アプリ側）を出す。**必ず 1 の後。** アプリは `photo.ai_tags` と `public_user_visit_card.latest_photo_ai_tags` を
+   select するので、列が無いうちに出すと写真の一覧・訪問一覧が 500 になる。2 の前に出るのは構わない（`ai_tags` が NULL ならタグが出ないだけ）
 
 確認: `npm run verify:photo-scorer`（ローカル）、本番は適用後に `select count(*) from photo where ai_tags is not null`。

@@ -1228,8 +1228,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
                       className="h-full w-full object-contain"
                     />
-                    <div className="absolute bottom-12 left-3 z-[2]">
+                    <div className="absolute bottom-12 left-3 z-[2] flex flex-wrap gap-1">
                       <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
+                      <AiPhotoTags photo={featuredPhoto} />
                     </div>
                     {featuredPhoto.visit?.user_id === currentUserId && (
                       <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">

@@ -9,6 +9,7 @@ export type SharedPhoto = {
   content_type: string;
   created_at: string;
   is_landscape: boolean;
+  ai_tags: unknown;
   signed_url?: string;
   visit: {
     id: string;
@@ -69,6 +70,7 @@ export async function loadPublicSharedPhoto(
         content_type,
         created_at,
         is_landscape,
+        ai_tags,
         visit:visit_id (
           id,
           user_id,
@@ -103,6 +105,7 @@ export async function loadPublicSharedPhoto(
       content_type: row.content_type,
       created_at: row.created_at,
       is_landscape: row.is_landscape === true,
+      ai_tags: row.ai_tags ?? null,
       visit: {
         id: visit.id,
         user_id: visit.user_id,

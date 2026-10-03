@@ -6,8 +6,11 @@ import { AI_TAG_HELP, photoAiTags } from '@/lib/photo-ai-tags';
  */
 export default function AiPhotoTags({
   photo,
+  compact = false,
 }: {
   photo: { ai_tags?: unknown; is_landscape?: boolean | null };
+  /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰める */
+  compact?: boolean;
 }) {
   const tags = photoAiTags(photo);
   if (tags.length === 0) return null;
@@ -16,10 +19,12 @@ export default function AiPhotoTags({
       {tags.map((tag) => (
         <span
           key={tag.key}
-          className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-900 ring-1 ring-indigo-200"
+          className={`inline-flex items-center gap-1 rounded-full bg-indigo-50 font-bold text-indigo-900 ring-1 ring-indigo-200 ${
+            compact ? 'px-1.5 py-0 text-[9px]' : 'px-2 py-0.5 text-xs'
+          }`}
           aria-label={`${tag.label}（AIによる判定）`}
         >
-          <span className="text-[9px] font-extrabold tracking-wide text-indigo-500">AI</span>
+          <span className={`${compact ? 'text-[7px]' : 'text-[9px]'} font-extrabold tracking-wide text-indigo-500`}>AI</span>
           {tag.label}
         </span>
       ))}
