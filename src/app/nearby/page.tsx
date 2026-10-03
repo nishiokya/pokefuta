@@ -13,6 +13,7 @@ import {
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
+import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
@@ -116,15 +117,14 @@ export default function NearbyPage() {
   const loadAllManholes = async () => {
     try {
       setAllLoading(true);
-      const manholesResponse = await fetch('/api/manholes');
-      if (!manholesResponse.ok) {
+      const manholesData = await fetchAllManholes();
+      if (!manholesData) {
         console.error('Failed to load all manholes');
         setAllLoading(false);
         return;
       }
 
-      const manholesData = await manholesResponse.json();
-      const manholes = manholesData.manholes || [];
+      const manholes = manholesData.manholes;
 
       // Fetch all visits with a high limit to ensure we get all visits
       const visitsResponse = await fetch('/api/visits?limit=10000');

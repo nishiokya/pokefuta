@@ -23,6 +23,7 @@
     "test:prefecture-completion": "tsx --test tests/prefecture-completion.test.ts",
     "test:dex-url": "tsx --test tests/dex-url.test.ts",
     "test:manhole-detail": "tsx --test tests/manhole-detail.test.ts",
+    "test:manhole-list": "tsx --test tests/manhole-list-client.test.ts",
     "test:japanese-phrases": "tsx --test tests/japanese-phrases.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",

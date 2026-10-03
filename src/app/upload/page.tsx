@@ -8,6 +8,7 @@ import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X } from 'lucide-reac
 import exifr from 'exifr';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
+import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -266,27 +267,24 @@ function UploadPageInner() {
 
   const loadManholes = async () => {
     try {
-      // limit は付けない。/api/manholes は未指定なら全件返す。
-      // ここで数を指定すると、蓋がその数を超えたとき古い id の蓋が候補から
+      // 全件を読む（静的スナップショット → 取れなければ /api/manholes）。
+      // 件数を絞ると、蓋がその数を超えたとき古い id の蓋が候補から
       // 黙って消え、そこへ行った人に「50m以内にマンホールが見つかりません」
       // としか出なくなる。念のため切り捨てを検知するのが下の report。
-      const response = await fetch('/api/manholes');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.manholes) {
-          const list = data.manholes as Manhole[];
-          setManholes(list);
-          reportManholeListProblem(list.length, data.total);
-          if (hintManholeId) {
-            const found = list.find(m => m.id === hintManholeId);
-            if (found) setHintManhole(found);
-          }
-          return;
+      const data = await fetchAllManholes();
+      if (data) {
+        const list = data.manholes as unknown as Manhole[];
+        setManholes(list);
+        reportManholeListProblem(list.length, data.total);
+        if (hintManholeId) {
+          const found = list.find(m => m.id === hintManholeId);
+          if (found) setHintManhole(found);
         }
+        return;
       }
       // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
       // 画面上は静かなので、ここで数えないと存在に気づけない。
-      console.error('Failed to load manholes: unexpected response', response.status);
+      console.error('Failed to load manholes: static snapshot and /api/manholes both failed');
       reportManholesUnavailable();
     } catch (error) {
       console.error('Failed to load manholes:', error);

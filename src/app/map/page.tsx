@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { MapPin, Camera, Navigation, History, Home, ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { useHeaderTitle } from '@/components/SiteChrome';
+import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
 
@@ -226,20 +227,16 @@ export default function MapPage() {
 
   const loadRecentManholes = async () => {
     try {
-      const response = await fetch('/api/manholes');
-      if (response.ok) {
-        const data = await response.json();
-        console.log('MapPage: API response:', data);
-        if (data.success && data.manholes) {
-          console.log(`MapPage: Received ${data.manholes.length} manholes from API`);
-          // Filter out null/undefined manholes and manholes without coordinates
-          const validManholes = data.manholes.filter((m: Manhole) =>
-            m && m.latitude !== null && m.latitude !== undefined
-          );
-          console.log(`MapPage: Filtered to ${validManholes.length} valid manholes with coordinates`);
-          console.log('MapPage: Sample manhole:', validManholes[0]);
-          setAllManholes(validManholes);
-        }
+      const data = await fetchAllManholes();
+      if (data) {
+        console.log(`MapPage: Received ${data.manholes.length} manholes from ${data.source}`);
+        // Filter out null/undefined manholes and manholes without coordinates
+        const validManholes = (data.manholes as unknown as Manhole[]).filter((m: Manhole) =>
+          m && m.latitude !== null && m.latitude !== undefined
+        );
+        console.log(`MapPage: Filtered to ${validManholes.length} valid manholes with coordinates`);
+        console.log('MapPage: Sample manhole:', validManholes[0]);
+        setAllManholes(validManholes);
       }
     } catch (error) {
       console.error('Failed to load recent manholes:', error);

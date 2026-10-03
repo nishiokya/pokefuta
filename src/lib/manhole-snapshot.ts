@@ -103,7 +103,8 @@ export function fetchManholeSnapshot(): Promise<ManholeSnapshot | null> {
  * 蓋1枚をスナップショットから引く。
  *
  * 詳細ページのメタ情報・JSON-LD はここを読む。クライアント側も同じスナップショットを
- * `/api/manholes` 経由で読んでいるので、**サーバとクライアントで蓋の情報が食い違わない**。
+ * 直接（`fetchAllManholes()`、取れなければ `/api/manholes` 経由で）読んでいるので、
+ * **サーバとクライアントで蓋の情報が食い違わない**。
  * Supabase の `manhole` テーブルは緯度経度を PostGIS の `location` でしか持たず
  * `city` 列も無いため、JSON-LD の geo を出せるのはこちらだけでもある。
  */

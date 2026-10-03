@@ -25,6 +25,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
+import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { visitsShareText } from '@/lib/share';
@@ -162,12 +163,11 @@ export default function VisitsPage() {
 
   const loadManholesOnly = async () => {
     try {
-      const [manholesRes, visitsRes] = await Promise.all([
-        fetch('/api/manholes'),
+      const [data, visitsRes] = await Promise.all([
+        fetchAllManholes(),
         fetch('/api/visits?with_photos=true&limit=6&order_by=created_at', { credentials: 'omit' }),
       ]);
-      if (manholesRes.ok) {
-        const data = await manholesRes.json();
+      if (data) {
         const apiManholes: Manhole[] = Array.isArray(data.manholes)
           ? data.manholes.map((manhole: any) => ({
               ...manhole,
@@ -200,9 +200,9 @@ export default function VisitsPage() {
 
   const loadPassport = async () => {
     try {
-      const [visitsResponse, manholesResponse] = await Promise.all([
+      const [visitsResponse, data] = await Promise.all([
         fetch('/api/visits?limit=1000'),
-        fetch('/api/manholes'),
+        fetchAllManholes(),
       ]);
 
       if (visitsResponse.ok) {
@@ -247,8 +247,7 @@ export default function VisitsPage() {
         }
       }
 
-      if (manholesResponse.ok) {
-        const data = await manholesResponse.json();
+      if (data) {
         const apiManholes: Manhole[] = Array.isArray(data.manholes)
           ? data.manholes.map((manhole: any) => ({
               ...manhole,

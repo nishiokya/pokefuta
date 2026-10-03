@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Camera, MapPin, Search } from 'lucide-react';
 import { Manhole } from '@/types/database';
+import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
@@ -40,11 +41,9 @@ export default function ManholesPage() {
 
   const loadManholes = async () => {
     try {
-      const response = await fetch('/api/manholes');
-      if (!response.ok) return;
-      const data = await response.json();
-      const list = Array.isArray(data?.manholes) ? data.manholes : Array.isArray(data) ? data : [];
-      setManholes(list);
+      const data = await fetchAllManholes();
+      if (!data) return;
+      setManholes(data.manholes as unknown as Manhole[]);
     } catch (error) {
       console.error('Failed to load manholes:', error);
     } finally {

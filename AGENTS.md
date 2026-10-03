@@ -16,6 +16,7 @@
 - 標準イベント `search` は**本物のテキスト検索**にだけ使う。絞り込みや半径の変更は
   `p_` 付きの専用イベントにする（半径スライダーを `search{search_term:'radius:30km'}` で
   送っていたため、GA4の検索レポートが丸ごと汚染されていた）。
+- 画面から蓋の全件を読むときは `fetchAllManholes()`（`src/lib/manhole-list-client.ts`）を使う。`data.pokefuta.com` の静的スナップショットを直接読み、取れなければ `/api/manholes` に戻る。`fetch('/api/manholes')` で全件を取り直さない（全件約720KBを毎回 Amplify の SSR で組み立てることになり、2026年8〜9月の Amplify 料金の大半がこれだった）。
 - エラーイベントは `p_api_error` / `p_auth_error` / `p_app_error` を使う。旧キーイベント名 `error_event` / `auth_error` は送信しない。
 
 ## 投稿ファネル
