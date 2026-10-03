@@ -6,6 +6,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import PhotoDeleteButton from '@/components/PhotoDeleteButton';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { photoShareText } from '@/lib/share';
@@ -94,7 +95,10 @@ export default async function SharedPhotoPage({ params }: PageProps) {
               className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-white sm:p-6">
-              <LandscapePhotoBadge isLandscape={photo.is_landscape} />
+              <div className="mb-1 flex flex-wrap items-center gap-1">
+                <LandscapePhotoBadge isLandscape={photo.is_landscape} />
+                <AiPhotoTags photo={photo} />
+              </div>
               <div className="mb-2 flex items-center gap-2 text-sm font-bold">
                 <MapPin className="h-4 w-4" />
                 {photo.manhole.prefecture} / {photo.manhole.municipality || '場所未設定'}

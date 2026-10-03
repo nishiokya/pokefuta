@@ -3,6 +3,7 @@
 --
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 -- マイグレーション: supabase/migrations/20260927100000_photo_scorer_role.sql
+--               supabase/migrations/20261004100000_photo_ai_tags.sql（ai_tags。[12]）
 --
 -- このロールの要は「関数を呼べる」ことより「それ以外は何もできない」こと。
 -- 前半（[1]〜[3]）は権限の自己点検とその網が効くこと、後半（[5]〜）は関数の挙動と入力検査。
@@ -22,6 +23,7 @@ DECLARE
   qs real;
   ok boolean;
   ver text;
+  tags jsonb;
   v1 text;
   v2 text := 'quality_score/999.0.0';
   f_unscored regprocedure := 'scoring.unscored_photos(text,integer)'::regprocedure;
@@ -408,6 +410,78 @@ BEGIN
   IF qs IS DISTINCT FROM 0.77::real OR ok IS DISTINCT FROM true OR ver IS DISTINCT FROM v2 THEN
     RAISE EXCEPTION '[10] 値が期待と違う（%, %, %）', qs, ok, ver;
   END IF;
+
+  -- 12. ai_tags（20261004100000）: 書けて、無い行では変わらず、不正な形は拒否する
+  --     この時点の写真は版 v2・[8] の時刻で採点済み。有効な版は v1 に戻してある
+  SELECT quality_score_version, quality_scored_at INTO ev, ts FROM public.photo WHERE id = pid;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.77, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts,
+    'ai_tags', jsonb_build_object('model', 'scene_attrs/1', 'scene', 'wide_context',
+                                  'plush', true, 'plush_score', 0.93, 'night', false)))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[12] ai_tags 付きの更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags, quality_score_version, quality_scored_at INTO tags, ev, ts FROM public.photo WHERE id = pid;
+  IF tags IS DISTINCT FROM '{"model":"scene_attrs/1","scene":"wide_context","plush":true,"plush_score":0.93,"night":false}'::jsonb THEN
+    RAISE EXCEPTION '[12] ai_tags が期待と違う: %', tags;
+  END IF;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now() + interval '1 second', jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.77, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[12] ai_tags 無しの更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags INTO tags FROM public.photo WHERE id = pid;
+  IF tags IS NULL THEN RAISE EXCEPTION '[12] ai_tags の無い行で ai_tags が消えた'; END IF;
+  SET LOCAL ROLE photo_scorer;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'owner', 'x'))));
+    RAISE EXCEPTION '[12] ai_tags の知らないキーが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('scene', 'wide_context'))));
+    RAISE EXCEPTION '[12] model の無い ai_tags が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'scene', 'selfie'))));
+    RAISE EXCEPTION '[12] 知らない scene が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'plush', 'true'))));
+    RAISE EXCEPTION '[12] 文字列の plush が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'plush_score', 1.5))));
+    RAISE EXCEPTION '[12] 範囲外の plush_score が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'plush_score', 'abc'))));
+    RAISE EXCEPTION '[12] 文字列の plush_score が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', '[]'::jsonb)));
+    RAISE EXCEPTION '[12] 配列の ai_tags が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', repeat('m', 600)))));
+    RAISE EXCEPTION '[12] 500バイトを超える ai_tags が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  RESET ROLE;
 
   -- 11. anon / authenticated は scoring の関数を呼べない
   SET LOCAL ROLE anon;

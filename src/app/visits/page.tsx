@@ -22,6 +22,7 @@ import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
@@ -41,6 +42,7 @@ interface Visit {
     url: string;
     thumbnail_url: string;
     is_landscape?: boolean;
+    ai_tags?: unknown;
   }[];
   notes?: string;
   comment?: string;
@@ -128,7 +130,7 @@ export default function VisitsPage() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [sampleVisits, setSampleVisits] = useState<Array<{ id: string; thumbnail_url: string | null; location: string; is_landscape?: boolean }>>([]);
+  const [sampleVisits, setSampleVisits] = useState<Array<{ id: string; thumbnail_url: string | null; location: string; is_landscape?: boolean; ai_tags?: unknown }>>([]);
   const { trackView, trackPassportOpen } = useAnalytics();
 
   useEffect(() => {
@@ -186,6 +188,7 @@ export default function VisitsPage() {
               id: v.id,
               thumbnail_url: v.photos?.[0]?.thumbnail_url ?? null,
               is_landscape: v.photos?.[0]?.is_landscape,
+              ai_tags: v.photos?.[0]?.ai_tags,
               location: v.manhole ? manholeDisplayName(v.manhole) : 'ポケふた',
             }))
           );
@@ -234,6 +237,7 @@ export default function VisitsPage() {
                 url: photo.url,
                 thumbnail_url: photo.thumbnail_url,
                 is_landscape: photo.is_landscape,
+                ai_tags: photo.ai_tags,
               })) || [],
               notes: visit.note,
               comment: visit.comment,
@@ -806,7 +810,10 @@ export default function VisitsPage() {
                       </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5">
-                      <LandscapePhotoBadge isLandscape={sv.is_landscape} />
+                      <div className="flex flex-wrap gap-0.5">
+                        <LandscapePhotoBadge isLandscape={sv.is_landscape} />
+                        <AiPhotoTags photo={sv} compact />
+                      </div>
                       <p className="line-clamp-1 text-[9px] font-bold text-white">{sv.location}</p>
                     </div>
                   </div>

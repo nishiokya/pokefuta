@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
 import ShareButtons from '@/components/ShareButtons';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
@@ -418,7 +419,10 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
         )}
       </div>
       <div className="p-2.5">
-        <LandscapePhotoBadge isLandscape={visit.isLandscape} />
+        <div className="flex flex-wrap gap-1">
+          <LandscapePhotoBadge isLandscape={visit.isLandscape} />
+          <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} />
+        </div>
         <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">
           {title}
         </p>
