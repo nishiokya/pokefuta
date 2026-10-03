@@ -3,6 +3,7 @@
 - Codex / Claude Code で作業を始める前に `docs/development-workflow.md` を読む。
 - 各マシンでは clean な基準 clone の `main` を最新に保ち、実作業は原則として最新の `origin/main` から作ったタスク専用 worktree で行う。dirty な基準 clone を自動で stash・reset・上書きしない。
 - Mac・K11間で共有すべき知識はローカル memory だけに置かず、`AGENTS.md`、`docs/`、またはリポジトリ内の `.agents/skills/` に記録する。
+- アプリに届かないファイル（`docs/`、`*.md`、`.agents/`、`.github/`、`tests/`、`supabase/`、`tools/check-*`・`tools/verify-*`）だけを変える PR は、タイトルの末尾に `[skip-cd]` を付ける。squash マージでタイトルがコミットメッセージになり、Amplify が本番ビルドを飛ばす（2026-07〜10 のマージ116件のうち66件がこれで、毎回ビルド代を払っていた）。それ以外のファイルが1つでも入るなら付けない。`tools/` のほかのスクリプトはビルドで動くので対象外。迷ったら付けない（ビルドが1回増えるだけで済む）。
 - Treat `app_user` profile data as public only through narrowly scoped `SECURITY DEFINER` functions. Do not grant anonymous table access.
 - Keep `src/types/database.ts` in sync when a database migration adds or changes profile fields.
 - A user may edit only the profile associated with `auth.uid()`; enforce this in the database as well as in the UI.
