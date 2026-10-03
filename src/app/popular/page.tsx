@@ -17,6 +17,7 @@ import {
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -124,11 +125,9 @@ export default function PopularPage() {
 
   const loadRareManholes = async () => {
     try {
-      const response = await fetch('/api/manholes?no_photos=true&limit=12');
-      if (!response.ok) return;
-      const data = await response.json();
-      if (Array.isArray(data.manholes)) {
-        setRareManholes(data.manholes);
+      const data = await fetchAllManholes();
+      if (data) {
+        setRareManholes(pickManholesWithoutPhotos(data.manholes, 12));
       }
     } catch {
       // ignore
