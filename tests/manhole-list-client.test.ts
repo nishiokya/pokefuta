@@ -82,6 +82,20 @@ test('静的スナップショットが応答しなければタイムアウト�
   assert.ok(Date.now() - started < 5000);
 });
 
+for (const [label, total] of [
+  ['欠落', undefined],
+  ['文字列', '482'],
+  ['null', null],
+] as const) {
+  test(`total が${label}なら補完せずそのまま渡す（投稿画面の契約違反検知を生かす）`, async () => {
+    const body: Record<string, unknown> = { success: true, manholes: [manhole(1)] };
+    if (total !== undefined) body.total = total;
+    const { fetchImpl } = recorder({ [STATIC_MANHOLES_URL]: async () => ok(body) });
+    const data = await fetchAllManholes(fetchImpl);
+    assert.equal(data?.total, total);
+  });
+}
+
 test('両方とも取れなければ null', async () => {
   const { fetchImpl } = recorder({
     [STATIC_MANHOLES_URL]: async () => new Response('down', { status: 503 }),

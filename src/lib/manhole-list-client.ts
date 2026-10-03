@@ -29,8 +29,14 @@ const STATIC_TIMEOUT_MS = 3000;
 export interface ManholeListPayload {
   success: true;
   manholes: SnapshotManhole[];
-  total: number;
-  with_photos: number;
+  /**
+   * 応答の値をそのまま渡す（検証・補完しない）。
+   * `/upload` の `reportManholeListProblem` が欠落・型不正を
+   * `manhole_list_total_invalid` として通知するので、ここで件数に置き換えると
+   * 一覧の生成が壊れて蓋が抜けたときに監視をすり抜ける。
+   */
+  total: unknown;
+  with_photos: unknown;
   /** どちらから読めたか。障害時に切り替わったことを追えるようにする。 */
   source: 'static' | 'api';
 }
@@ -47,8 +53,8 @@ function toPayload(data: unknown, source: ManholeListPayload['source']): Manhole
     success: true,
     // `/api/manholes` と同じ id 降順に揃える。生成側の並びに依存しない
     manholes: [...manholes].sort((a, b) => b.id - a.id),
-    total: typeof body.total === 'number' ? body.total : manholes.length,
-    with_photos: typeof body.with_photos === 'number' ? body.with_photos : 0,
+    total: body.total,
+    with_photos: body.with_photos,
     source,
   };
 }
