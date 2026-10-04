@@ -416,7 +416,9 @@ BEGIN
   SELECT string_agg(column_name, ',' ORDER BY column_name) INTO txt
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'public_user_visit_card';
-  IF txt <> 'comment,created_at,id,latest_photo_created_at,latest_photo_id,latest_photo_is_landscape,manhole_id,'
+  -- latest_photo_ai_tags（20261004100000）は AI の判定（scene / plush / plush_score / night / model）だけで、
+  -- 個人に結びつく情報を含まないので公開してよいと判断した
+  IF txt <> 'comment,created_at,id,latest_photo_ai_tags,latest_photo_created_at,latest_photo_id,latest_photo_is_landscape,manhole_id,'
             'manhole_municipality,manhole_pokemons,manhole_prefecture,manhole_title,'
             'public_user_id,shot_at' THEN
     RAISE EXCEPTION '[19] public_user_visit_card の列集合が変わった: %', txt;
