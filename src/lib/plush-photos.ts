@@ -5,7 +5,7 @@ import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 
 /**
  * ぬいぐるみと一緒に撮った公開写真（photo.ai_tags.plush = true）。/photos/plush の一覧に使う。
- * 新しい順に最大 limit 枚を取り、ぬいぐるみらしさ（plush_score）の高い順に並べて返す。
+ * ぬいぐるみらしさ（plush_score）の高い順に最大 limit 枚を返す。
  *
  * 判定は k11 の manhole-score（20261004100000_photo_ai_tags.sql）。anon キーで読むので、
  * 返るのは RLS が許す公開訪問の写真だけ。
@@ -59,6 +59,9 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
     `)
     .eq('visit.is_public', true)
     .eq('ai_tags->>plush', 'true')
+    // 上限で切る前に DB でスコア順に並べる（新しい順で切ってから並べると、古くてぬいぐるみらしい写真が漏れる）。
+    // jsonb の数値どうしは数値として比べられる。同点は新しい順
+    .order('ai_tags->plush_score', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -108,7 +111,5 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
         posterPublicId: publicIds.get(visit.user_id) ?? null,
       } satisfies PlushPhoto;
     })
-    .filter((p): p is PlushPhoto => p !== null)
-    // ぬいぐるみらしさの高い順。同点は新しい順（取得は新しい順なので安定ソートで保たれる）
-    .sort((a, b) => b.plushScore - a.plushScore);
+    .filter((p): p is PlushPhoto => p !== null);
 }

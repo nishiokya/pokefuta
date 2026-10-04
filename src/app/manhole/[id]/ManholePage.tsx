@@ -1586,6 +1586,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           </div>
 
           {allPhotosGrid}
+          {/* 写真が代表の1枚だけの蓋は allPhotosGrid が無いので、タグの注釈をここで出す（拡大表示にはタグが出る） */}
+          {!allPhotosGrid && (
+            <AiTagNote show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
+          )}
 
           {/* ── Pokemon ── */}
           {manhole.pokemons && manhole.pokemons.length > 0 && (
