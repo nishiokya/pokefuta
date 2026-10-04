@@ -939,7 +939,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       </div>
       {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
         <p className="mb-2 text-[10.5px] leading-snug text-[#8b816f]">
-          <span className="mr-1 font-extrabold text-indigo-500">AI</span>の付いたタグは、{AI_TAG_HELP}
+          {AI_TAG_HELP}
         </p>
       )}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、

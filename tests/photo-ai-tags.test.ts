@@ -27,6 +27,11 @@ test('周辺（wide_context）と看板（signage_info）はタグにしない',
   assert.deepEqual(labels({ ai_tags: { scene: 'signage_info' } }), []);
 });
 
+test('夜だけは AI の印を付けない（撮影時刻と場所から決まる）', () => {
+  const tags = photoAiTags({ ai_tags: { plush: true, night: true, scene: 'landscape' } });
+  assert.deepEqual(tags.map((t) => [t.label, t.ai]), [['ぬいぐるみ', true], ['夜', false], ['風景', true]]);
+});
+
 test('投稿者が「周辺の風景」を選んだ写真には AI の風景を重ねない', () => {
   assert.deepEqual(labels({ ai_tags: { scene: 'landscape' }, is_landscape: true }), []);
   assert.deepEqual(labels({ ai_tags: { scene: 'landscape', night: true }, is_landscape: true }), ['夜']);
