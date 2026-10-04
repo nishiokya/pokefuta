@@ -17,6 +17,8 @@ import {
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
+import { photoAiTags } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -41,6 +43,7 @@ type FeedVisit = {
     id: string;
     thumbnail_url?: string;
     is_landscape?: boolean;
+    ai_tags?: unknown;
   }>;
   likes_count: number;
   comments_count: number;
@@ -470,9 +473,10 @@ export default function HomePage() {
                         )}
 
                         {/* タグは口コミ件数と同じく写真の上に置く。右上の口コミバッジと重ならないよう右を空ける */}
-                        {(chips.length > 0 || photo?.is_landscape) && (
+                        {(chips.length > 0 || photo?.is_landscape || (photo && photoAiTags(photo).length > 0)) && (
                           <div className="absolute left-2 right-14 top-2 flex flex-wrap gap-1">
                             <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
+                            {photo && <AiPhotoTags photo={photo} />}
                             {chips.map((chip) => (
                               <span key={chip.tag} className={`rounded-full px-2 py-1 text-xs font-extrabold leading-none shadow-sm ${CHIP_CLASS[chip.tag]}`}>
                                 {chip.label}

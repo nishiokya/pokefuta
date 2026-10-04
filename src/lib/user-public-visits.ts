@@ -23,6 +23,8 @@ export type PublicVisit = {
   manhole: PublicVisitManhole | null;
   photoIds: string[];
   isLandscape: boolean;
+  /** 先頭写真の AI タグ（photo.ai_tags）。表示は src/lib/photo-ai-tags.ts */
+  aiTags: unknown;
 };
 
 export type PublicUserVisits = {
@@ -53,6 +55,7 @@ type VisitPublicRow = {
   manhole_pokemons: string[] | null;
   latest_photo_id: string | null;
   latest_photo_is_landscape: boolean | null;
+  latest_photo_ai_tags: unknown;
 };
 
 const VISIT_LIMIT = 500;
@@ -110,7 +113,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
       .select(
         'id, manhole_id, shot_at, comment, created_at,' +
         ' manhole_title, manhole_prefecture, manhole_municipality, manhole_pokemons,' +
-        ' latest_photo_id, latest_photo_is_landscape'
+        ' latest_photo_id, latest_photo_is_landscape, latest_photo_ai_tags'
       )
       .eq('public_user_id', trimmedUserId)
       .order('shot_at', { ascending: false })
@@ -163,6 +166,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
         },
     photoIds: visit.latest_photo_id ? [visit.latest_photo_id] : [],
     isLandscape: visit.latest_photo_is_landscape === true,
+    aiTags: visit.latest_photo_ai_tags ?? null,
   }));
 
   const totalVisits = totalCount ?? publicVisits.length;

@@ -17,6 +17,7 @@ import {
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
@@ -35,6 +36,7 @@ type FeedVisit = {
     id: string;
     thumbnail_url?: string;
     is_landscape?: boolean;
+    ai_tags?: unknown;
   }>;
   likes_count: number;
   comments_count: number;
@@ -336,7 +338,10 @@ export default function PopularPage() {
                           </span>
                         )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-14 text-white sm:p-4 sm:pt-20">
-                          <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
+                          <div className="flex flex-wrap items-center gap-1">
+                            <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
+                            {photo && <AiPhotoTags photo={photo} />}
+                          </div>
                           <div className="line-clamp-1 text-sm font-extrabold sm:text-base">
                             {locationLabel || 'ポケふた'}
                           </div>

@@ -17,6 +17,8 @@ import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiPhotoTags from '@/components/AiPhotoTags';
+import { AI_TAG_HELP, photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -60,6 +62,8 @@ const MapComponent = dynamic(
 interface Photo {
   id: string;
   is_landscape?: boolean;
+  // AI の判定タグ（k11 が毎朝書く）。/api/image-upload が返す。表示は src/lib/photo-ai-tags.ts
+  ai_tags?: PhotoAiTags | null;
   storage_key: string;
   content_type: string;
   created_at: string;
@@ -933,6 +937,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
+      {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
+        <p className="mb-2 text-[10.5px] leading-snug text-[#8b816f]">
+          <span className="mr-1 font-extrabold text-indigo-500">AI</span>の付いたタグは、{AI_TAG_HELP}
+        </p>
+      )}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
           元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
@@ -1030,6 +1039,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
               <div className="flex flex-col gap-0.5 px-1.5 py-1">
                 <LandscapePhotoBadge isLandscape={photo.is_landscape} />
+                <AiPhotoTags photo={photo} />
                 {profileHref ? (
                   <Link
                     href={profileHref}
@@ -1218,8 +1228,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
                       className="h-full w-full object-contain"
                     />
-                    <div className="absolute bottom-12 left-3 z-[2]">
+                    <div className="absolute bottom-12 left-3 z-[2] flex flex-wrap gap-1">
                       <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
+                      <AiPhotoTags photo={featuredPhoto} />
                     </div>
                     {featuredPhoto.visit?.user_id === currentUserId && (
                       <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
