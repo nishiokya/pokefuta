@@ -19,7 +19,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
@@ -326,6 +326,7 @@ export default function PopularPage() {
                             src={photo.thumbnail_url}
                             alt=""
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                             loading="lazy"
                           />
                         ) : (

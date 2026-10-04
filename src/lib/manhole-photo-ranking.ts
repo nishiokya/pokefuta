@@ -8,6 +8,8 @@ export type RankableManholePhoto = {
   ranking_score?: number | null;
   /** false = 採点で代表写真の候補から外れた（ブレ・白飛び・色かぶり・蓋が写っていない） */
   quality_eligible?: boolean | null;
+  /** k11 の AI タグ（photo.ai_tags）。scene と lid_fits を代表写真の選び方に使う */
+  ai_tags?: unknown;
   /** 投稿者が選んだ周辺風景。品質採点とは別に代表候補から除く。 */
   is_landscape?: boolean;
   visit?: {
@@ -42,12 +44,27 @@ const rankTier = (photo: RankableManholePhoto) => {
 };
 
 /**
+ * 蓋が真ん中に写っていて、一覧の正方形に蓋が収まる写真か（ai_tags.scene = centered_clean かつ lid_fits）。
+ * 中心の写真には蓋が画面より大きいアップも多く、正方形にすると縁が欠けるので、収まるものだけを先にする。
+ * 判定は k11（20261004120000）。タグの無い写真は false（今までの並びと同じ扱い）。
+ */
+export const isCenteredLidPhoto = (photo: RankableManholePhoto) => {
+  const tags = photo.ai_tags;
+  if (typeof tags !== 'object' || tags === null || Array.isArray(tags)) return false;
+  const t = tags as { scene?: unknown; lid_fits?: unknown };
+  return t.scene === 'centered_clean' && t.lid_fits === true;
+};
+
+/**
  * 蓋の写真の並び。先頭が代表写真。
  *
  * 1. ひとこと付きの写真を最優先する。代表写真にはひとことの吹き出しが重なるので、
  *    蓋を開いた人が最初に読める情報が増える。ゴミ判定されたコメント（数字だけ等）は
  *    「付いていない」と同じ扱い。候補外の写真でもひとこと付きなら先に出る
  * 2. その中（ひとこと付き同士・無し同士）はスコア順。段 → スコア → 新しい順
+ * 3. ただし採点済みの候補（段 0）の中では、蓋が真ん中で正方形に収まる写真（isCenteredLidPhoto）を
+ *    スコアより先にする。2026-10-04 の試算でスコアの差は中央値 0.03 と小さく、一覧の正方形で蓋が欠ける
+ *    代表写真が減る（manhole-ai Tools/photo-check/rep_crops.py）
  */
 export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
   [...items].sort((a, b) => {
@@ -58,6 +75,11 @@ export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
 
     const tier = rankTier(a) - rankTier(b);
     if (tier !== 0) return tier;
+
+    if (rankTier(a) === 0) {
+      const aCentered = isCenteredLidPhoto(a);
+      if (aCentered !== isCenteredLidPhoto(b)) return aCentered ? -1 : 1;
+    }
 
     const aScore = getManholePhotoScore(a);
     const bScore = getManholePhotoScore(b);

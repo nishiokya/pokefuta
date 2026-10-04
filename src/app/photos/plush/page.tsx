@@ -4,7 +4,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { photoAiTags } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
 import { MapPin, UserRound } from 'lucide-react';
 import AiPhotoTags from '@/components/AiPhotoTags';
@@ -84,6 +84,7 @@ export default async function PlushPhotosPage() {
                       width={400}
                       height={400}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      style={{ objectPosition: photoObjectPosition(photo.aiTags) }}
                       loading={index < 6 ? 'eager' : 'lazy'}
                     />
                     <div className="absolute left-2 right-2 top-2 flex flex-wrap gap-1">

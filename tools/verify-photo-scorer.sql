@@ -4,6 +4,7 @@
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 -- マイグレーション: supabase/migrations/20260927100000_photo_scorer_role.sql
 --               supabase/migrations/20261004100000_photo_ai_tags.sql（ai_tags。[12]）
+--               supabase/migrations/20261004120000_photo_ai_tags_crop.sql（crop / lid_fits。[13]）
 --
 -- このロールの要は「関数を呼べる」ことより「それ以外は何もできない」こと。
 -- 前半（[1]〜[3]）は権限の自己点検とその網が効くこと、後半（[5]〜）は関数の挙動と入力検査。
@@ -481,6 +482,64 @@ BEGIN
       'ai_tags', jsonb_build_object('model', repeat('m', 600)))));
     RAISE EXCEPTION '[12] 500バイトを超える ai_tags が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[12]%' THEN RAISE; END IF; END;
+  RESET ROLE;
+
+  -- 13. crop / lid_fits（20261004120000）: 書けて、不正な形は拒否する
+  SELECT quality_score_version, quality_scored_at INTO ev, ts FROM public.photo WHERE id = pid;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now() + interval '2 seconds', jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.77, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts,
+    'ai_tags', jsonb_build_object('model', 'scene_attrs/1', 'scene', 'centered_clean',
+                                  'crop', jsonb_build_array(0.1235, 0, 0.8735, 1), 'lid_fits', true)))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[13] crop 付きの更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags INTO tags FROM public.photo WHERE id = pid;
+  IF tags -> 'crop' IS DISTINCT FROM '[0.1235, 0, 0.8735, 1]'::jsonb OR tags -> 'lid_fits' IS DISTINCT FROM 'true'::jsonb THEN
+    RAISE EXCEPTION '[13] crop / lid_fits が期待と違う: %', tags;
+  END IF;
+  SET LOCAL ROLE photo_scorer;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', jsonb_build_array(0.1, 0, 0.9)))));
+    RAISE EXCEPTION '[13] 4つでない cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', jsonb_build_array(0.1, 0, 1.2, 1)))));
+    RAISE EXCEPTION '[13] 範囲外の cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', jsonb_build_array(0.5, 0, 0.5, 1)))));
+    RAISE EXCEPTION '[13] 幅0の cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', jsonb_build_array(0.1, 0.9, 0.9, 0.1)))));
+    RAISE EXCEPTION '[13] 上下が逆の cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', jsonb_build_array('0.1', 0, 0.9, 1)))));
+    RAISE EXCEPTION '[13] 文字列の入った cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'crop', '{"x":0}'::jsonb))));
+    RAISE EXCEPTION '[13] オブジェクトの cropが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'lid_fits', 'yes'))));
+    RAISE EXCEPTION '[13] 文字列の lid_fits が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
   RESET ROLE;
 
   -- 11. anon / authenticated は scoring の関数を呼べない

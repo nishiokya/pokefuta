@@ -15,7 +15,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import ShareButtons from '@/components/ShareButtons';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
@@ -417,6 +417,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
             src={photoUrl}
             alt=""
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            style={{ objectPosition: photoObjectPosition(visit.aiTags) }}
             loading="lazy"
           />
         ) : (

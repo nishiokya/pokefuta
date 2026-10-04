@@ -19,6 +19,7 @@ const photo = (
     userId?: string;
     isPublic?: boolean;
     comment?: string | null;
+    aiTags?: unknown;
   } = {}
 ) => ({
   id,
@@ -27,6 +28,7 @@ const photo = (
   quality_score: options.qualityScore,
   quality_eligible: options.eligible,
   is_landscape: options.isLandscape,
+  ai_tags: options.aiTags,
   visit: {
     user_id: options.userId ?? 'community',
     is_public: options.isPublic ?? true,
@@ -241,4 +243,33 @@ test('newest-first puts the latest shot first and keeps undated photos at the en
     ordered.map(({ photo, index }) => [photo.id, index]),
     [['aug30', 2], ['aug11', 1], ['y2024', 3], ['undated', 0]]
   );
+});
+
+const CENTERED_FITS = { model: 'scene_attrs/1', scene: 'centered_clean', crop: [0.12, 0, 0.87, 1], lid_fits: true };
+
+test('among scored candidates, a centered photo whose lid fits the square comes before a higher score', () => {
+  const ranked = rankManholePhotos([
+    photo('wide-high', { qualityScore: 0.84, aiTags: { model: 'scene_attrs/1', scene: 'wide_context' } }),
+    photo('centered-fits', { qualityScore: 0.82, aiTags: CENTERED_FITS }),
+  ]);
+  assert.deepEqual(ranked.map((item) => item.id), ['centered-fits', 'wide-high']);
+});
+
+test('a centered close-up whose lid does not fit the square keeps the score order', () => {
+  const ranked = rankManholePhotos([
+    photo('wide-high', { qualityScore: 0.84, aiTags: { model: 'scene_attrs/1', scene: 'wide_context' } }),
+    photo('closeup', { qualityScore: 0.82, aiTags: { ...CENTERED_FITS, lid_fits: false } }),
+    photo('untagged', { qualityScore: 0.83 }),
+  ]);
+  assert.deepEqual(ranked.map((item) => item.id), ['wide-high', 'untagged', 'closeup']);
+});
+
+test('the centered preference does not jump over comments, unscored or ineligible tiers', () => {
+  const ranked = rankManholePhotos([
+    photo('centered-ineligible', { qualityScore: 0.9, eligible: false, aiTags: CENTERED_FITS }),
+    photo('unscored', { createdAt: '2026-08-15T00:00:00.000Z' }),
+    photo('commented', { qualityScore: 0.5, comment: '道の駅の入り口にありました' }),
+    photo('centered', { qualityScore: 0.6, aiTags: CENTERED_FITS }),
+  ]);
+  assert.deepEqual(ranked.map((item) => item.id), ['commented', 'centered', 'unscored', 'centered-ineligible']);
 });
