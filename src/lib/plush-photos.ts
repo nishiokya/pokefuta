@@ -22,6 +22,9 @@ export type PlushPhoto = {
   shotAt: string | null;
   manholeId: number;
   manholeName: string;
+  /** フィードのタグ（幻・夜ふた・撮れたて…）を作るための入力。トップと同じ feedCardTags に渡す */
+  visitId: string;
+  pokemons: string[];
   posterName: string;
   /** 公開訪問を持つ投稿者の公開ID。無ければリンクしない */
   posterPublicId: string | null;
@@ -29,7 +32,11 @@ export type PlushPhoto = {
 
 export const PLUSH_PAGE_LIMIT = 300;
 
-export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPhoto[]> {
+/** order: 'score' = ぬいぐるみらしい順（特集ページ）、'recent' = 新しい順（トップの特集カード。新着が出るように） */
+export async function loadPlushPhotos(
+  limit = PLUSH_PAGE_LIMIT,
+  order: 'score' | 'recent' = 'score',
+): Promise<PlushPhoto[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return [];
@@ -37,7 +44,7 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('photo')
     .select(`
       id,
@@ -45,6 +52,7 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
       ai_tags,
       is_landscape,
       visit:visit_id!inner (
+        id,
         user_id,
         shot_at,
         is_public
@@ -54,14 +62,18 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
         title,
         prefecture,
         municipality,
-        building
+        building,
+        pokemons
       )
     `)
     .eq('visit.is_public', true)
-    .eq('ai_tags->>plush', 'true')
+    .eq('ai_tags->>plush', 'true');
+  if (order === 'score') {
     // 上限で切る前に DB でスコア順に並べる（新しい順で切ってから並べると、古くてぬいぐるみらしい写真が漏れる）。
     // jsonb の数値どうしは数値として比べられる。同点は新しい順
-    .order('ai_tags->plush_score', { ascending: false, nullsFirst: false })
+    query = query.order('ai_tags->plush_score', { ascending: false, nullsFirst: false });
+  }
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -107,6 +119,8 @@ export async function loadPlushPhotos(limit = PLUSH_PAGE_LIMIT): Promise<PlushPh
         shotAt: visit.shot_at ?? null,
         manholeId: manhole.id,
         manholeName: manholeDisplayName(manhole),
+        visitId: visit.id,
+        pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
         posterName: names.get(visit.user_id)?.trim() || '名無しのトレーナー',
         posterPublicId: publicIds.get(visit.user_id) ?? null,
       } satisfies PlushPhoto;

@@ -30,7 +30,8 @@ import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submis
 import type { CompletionRollup } from '@/lib/prefecture-completion';
 import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
-import { collapseByPoster, feedCardTags, sameDayVisitorCounts, type FeedCardTag } from '@/lib/feed-card-tags';
+import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
+import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 
 type FeedVisit = {
   id: string;
@@ -54,16 +55,8 @@ type FeedVisit = {
 };
 
 // 写真の上に直接載るので、どの写真の上でも読めるよう明るい不透明の地にする
-const CHIP_CLASS: Record<FeedCardTag, string> = {
-  mythical: 'bg-gradient-to-r from-[#F9A8D4] to-[#C4B5FD] text-[#2E2346]',
-  legendary: 'bg-gradient-to-r from-[#FDE68A] to-[#FBBF24] text-[#2E2346]',
-  'same-day': 'bg-[#A7F3D0] text-[#064E3B]',
-  fresh: 'bg-white text-[#7B63A8]',
-  memory: 'bg-[#E7DCC8] text-[#5B4636]',
-  pikachu: 'bg-[#FDE047] text-[#422006]',
-  regional: 'bg-[#BAE6FD] text-[#0C4A6E]',
-  night: 'bg-[#1E1B4B] text-[#E0E7FF] ring-1 ring-white/60',
-};
+// タグの色は特集ページと共有する（src/lib/feed-chip-class.ts）
+const CHIP_CLASS = FEED_CHIP_CLASS;
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
