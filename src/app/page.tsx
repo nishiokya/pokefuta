@@ -52,16 +52,6 @@ type FeedVisit = {
   display_name?: string | null;
 };
 
-/**
- * ヒーローに並べる「写真が残っている都道府県」チップの上限。
- *
- * /api/prefecture-completion は残り県を全件返す。今は数県だが、日次スナップショット
- * が壊れて photo_count が落ちると最大47県ぶんのチップ（各 min-h-11）がヒーローの
- * 末尾に積まれ、その下のフィードが画面外へ出る。上限で止めて、超過分は一覧への
- * リンクに畳む。
- */
-const INCOMPLETE_CHIP_LIMIT = 12;
-
 // 写真の上に直接載るので、どの写真の上でも読めるよう明るい不透明の地にする
 const CHIP_CLASS: Record<FeedCardTag, string> = {
   mythical: 'bg-gradient-to-r from-[#F9A8D4] to-[#C4B5FD] text-[#2E2346]',
@@ -86,9 +76,8 @@ export default function HomePage() {
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
   // 取得が終わったか（成否を問わない）。終わるまで残りの文を出さないための旗。
   const [completionLoaded, setCompletionLoaded] = useState(false);
-  // site-stats が「まだ来ていない」のか「来たが使えなかった」のかを区別する。
-  // totalPosts の null だけでは読み込み中と失敗が同じ顔になる。
-  const [statsLoaded, setStatsLoaded] = useState(false);
+  // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
+  const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
@@ -115,6 +104,7 @@ export default function HomePage() {
     loadSiteStats();
     loadRareManholes();
     loadCompletion();
+    loadPlushFeature();
   }, []);
 
   useEffect(() => {
@@ -155,8 +145,18 @@ export default function HomePage() {
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
-    } finally {
-      setStatsLoaded(true);
+    }
+  };
+
+  const loadPlushFeature = async () => {
+    try {
+      const response = await fetch('/api/features/plush');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos)) return;
+      setPlushFeature({ count: data.count, photos: data.photos });
+    } catch {
+      // ignore
     }
   };
 
@@ -291,75 +291,44 @@ export default function HomePage() {
             )}
 
             {/*
-              残りの都道府県は「写真がまだないポケふた」の中に置いていて、最新の
-              投稿を全部見終わるまで目に入らなかったので、ヒーローに引き上げる。
+              特集（ベータ）。以前ここには「ポケふたがある N 都道府県のうち M 都道府県は、設置済みの
+              ポケふた全てに写真が集まりました」と残り県のチップを置いていたが、特集の入口に替えた
+              （2026-10-04）。残りの県数はすぐ上の本文がまだ言っている。
 
-              CTAより上には置けない。このパネルは completion（/api/prefecture-completion）
-              が解決してから現れるので、本文とCTAの間に挟むと、ボタンが描かれた後から
-              カードが割り込んでボタンを押し下げる。その瞬間のタップがチップに当たって
-              /manholes へ飛ぶ。ヒーローの末尾なら、遅れて増えても上の要素は動かない。
-
-              並びは残り枚数の少ない順（先頭が「次に終わる県」）、行き先は残りの蓋と
-              最新の投稿を同時に確認できる都道府県ページ。
+              ヒーローの末尾に置くのは以前のパネルと同じ理由。/api/features/plush の応答を待って
+              現れるので、CTA より上に置くと遅れて割り込んでボタンを押し下げる。
             */}
-            {completion && completion.incompleteCount > 0 && (
+            {plushFeature && plushFeature.count > 0 && (
               <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                {/*
-                  残り県数はすぐ上の本文が「残りN都道府県の M 枚だけ」と言うので、
-                  ここでは繰り返さず、本文が持っていない「もう終わった県」の側を出す。
-                */}
-                <p className="text-sm font-bold text-[#4A4A4A]">
-                  ポケふたがある {completion.listedCount} 都道府県のうち{' '}
-                  <b className="text-[#7B63A8]">{completion.completeCount}</b>{' '}
-                  都道府県は、設置済みのポケふた全てに写真が集まりました。
-                </p>
-                {/*
-                  ただし本文の枚数の文は totalPosts（/api/site-stats）に依存していて、
-                  こちらは /api/prefecture-completion。site-stats だけ落ちると本文が
-                  「全国のポケふたを旅して…」に落ち、残り県数がページのどこにも
-                  出なくなる。そのときだけパネルが引き受ける。
-
-                  statsLoaded を待つ。totalPosts の null は「読み込み中」と「失敗」の
-                  両方なので、待たないと取得が遅いだけの回でこの行が出てから消え、
-                  下のチップが動く。
-                */}
-                {statsLoaded && !(totalPosts != null && totalPosts > 0) && (
-                  <p className="mt-1 text-sm font-bold text-[#4A4A4A]">
-                    残りは{' '}
-                    <b className="text-[#B5483C]">{completion.incompleteCount}</b>{' '}
-                    都道府県です。
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {completion.incomplete.slice(0, INCOMPLETE_CHIP_LIMIT).map((entry) => (
-                    <Link
-                      key={entry.prefecture}
-                      href={`/prefectures/${encodeURIComponent(entry.prefecture)}`}
-                      // チップは「県名 + あとN枚」までしか置けない幅なので、行き先が
-                      // 何のページかは読み上げ用のラベルで補う。詳細ページの県リンク
-                      // （図鑑の設置情報）と文言で区別が付くようにしてある。
-                      aria-label={`${entry.prefecture}の写真募集状況を見る`}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#7B63A8]/20 bg-white px-3 text-sm font-bold text-[#4A4A4A] shadow-sm transition hover:border-[#7B63A8]/40"
-                    >
-                      <span>{entry.prefecture}</span>
-                      <span className="whitespace-nowrap text-xs font-extrabold text-[#B5483C]">
-                        あと {entry.missing} 枚
-                      </span>
-                    </Link>
-                  ))}
-                  {/*
-                    ただの文字にすると、打ち切った県は探しようがなくなる。
-                    県名で絞れる一覧（/manholes の検索）へ逃がす。
-                  */}
-                  {completion.incomplete.length > INCOMPLETE_CHIP_LIMIT && (
-                    <Link
-                      href="/manholes"
-                      className="inline-flex min-h-11 items-center text-xs font-bold text-[#7B63A8] underline underline-offset-4"
-                    >
-                      ほか {completion.incomplete.length - INCOMPLETE_CHIP_LIMIT} 都道府県
-                    </Link>
-                  )}
-                </div>
+                <p className="mb-2 text-xs font-extrabold tracking-wide text-[#7B63A8]">特集</p>
+                <Link
+                  href="/photos/plush"
+                  className="group flex items-center gap-3 rounded-lg bg-white p-2 shadow-sm transition hover:shadow"
+                >
+                  <div className="flex shrink-0 -space-x-3">
+                    {plushFeature.photos.map((photo) => (
+                      <img
+                        key={photo.id}
+                        src={`/api/photo/${photo.id}?size=small`}
+                        alt=""
+                        width={56}
+                        height={56}
+                        loading="lazy"
+                        className="h-14 w-14 rounded-full border-2 border-white object-cover shadow-sm"
+                      />
+                    ))}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-sm font-extrabold text-[#4A4A4A]">
+                      ぬいぐるみと旅するポケふた
+                      <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
+                    </p>
+                    <p className="text-xs text-[#6A4D36]">
+                      ぬいぐるみと一緒に撮られた写真 {plushFeature.count}枚
+                      <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                    </p>
+                  </div>
+                </Link>
               </div>
             )}
           </div>
