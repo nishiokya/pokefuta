@@ -937,11 +937,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
-        <p className="mb-2 text-[10.5px] leading-snug text-[#8b816f]">
-          {AI_TAG_HELP}
-        </p>
-      )}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
           元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
@@ -1067,6 +1062,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
+      {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
+        <p className="mt-2 text-[10.5px] leading-snug text-[#8b816f]">※ {AI_TAG_HELP}</p>
+      )}
     </div>
   ) : null;
 

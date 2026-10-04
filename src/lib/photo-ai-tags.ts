@@ -26,8 +26,8 @@ export type AiTagKey = 'plush' | 'night' | 'landscape';
 /** ai: AI が写真から判定したか（「AI」の印を付ける）。夜は撮影時刻と場所から決まるので false */
 export type AiTag = { key: AiTagKey; label: string; ai: boolean };
 
-export const AI_TAG_HELP =
-  '「AI」の付いたタグ（ぬいぐるみ・風景）は写真から AI が判定しています。「夜」は撮影時刻と場所から自動で付けています。間違っていることがあります。';
+// チップには「AI」の印を付けない（かっこ悪いという利用者の声）。代わりにタグの下にこの注釈を出す
+export const AI_TAG_HELP = 'タグは AI で自動判定しています。間違っていたらごめんなさい。';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
