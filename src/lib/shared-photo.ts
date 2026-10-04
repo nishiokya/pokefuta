@@ -23,6 +23,8 @@ export type SharedPhoto = {
     title: string;
     prefecture: string;
     municipality: string | null;
+    building: string | null;
+    address: string | null;
     pokemons: string[];
     titles: ManholeTitle[];
     hashtags: string[];
@@ -83,6 +85,8 @@ export async function loadPublicSharedPhoto(
           title,
           prefecture,
           municipality,
+          building,
+          address,
           pokemons,
           titles,
           hashtags
@@ -118,6 +122,8 @@ export async function loadPublicSharedPhoto(
         title: manhole.title,
         prefecture: manhole.prefecture,
         municipality: manhole.municipality,
+        building: manhole.building ?? null,
+        address: manhole.address ?? null,
         pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
         titles: getSortedTitles(manhole.titles),
         hashtags: Array.isArray(manhole.hashtags) ? manhole.hashtags : [],
