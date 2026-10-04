@@ -35,6 +35,7 @@ const CHECKS = [
   'anon / authenticated は scoring の関数を呼べない',
   'ai_tags: 書けて、ai_tags の無い行では変わらず、不正な形（知らないキー・model 無し・知らない scene・型・範囲・配列・500バイト超）は拒否',
   'crop / lid_fits: 書けて、不正な crop（4つでない・範囲外・幅0・上下逆・文字列・オブジェクト）と文字列の lid_fits は拒否',
+  'lid: 書けて、不正な lid（4つでない・範囲外・左右逆・文字列）は拒否',
 ];
 
 try {

@@ -5,6 +5,7 @@
 -- マイグレーション: supabase/migrations/20260927100000_photo_scorer_role.sql
 --               supabase/migrations/20261004100000_photo_ai_tags.sql（ai_tags。[12]）
 --               supabase/migrations/20261004120000_photo_ai_tags_crop.sql（crop / lid_fits。[13]）
+--               supabase/migrations/20261005100000_photo_ai_tags_lid.sql（lid。[14]）
 --
 -- このロールの要は「関数を呼べる」ことより「それ以外は何もできない」こと。
 -- 前半（[1]〜[3]）は権限の自己点検とその網が効くこと、後半（[5]〜）は関数の挙動と入力検査。
@@ -540,6 +541,46 @@ BEGIN
       'ai_tags', jsonb_build_object('model', 'm', 'lid_fits', 'yes'))));
     RAISE EXCEPTION '[13] 文字列の lid_fits が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[13]%' THEN RAISE; END IF; END;
+  RESET ROLE;
+
+  -- 14. lid（20261005100000）: 書けて、不正な形は拒否する
+  SELECT quality_score_version, quality_scored_at INTO ev, ts FROM public.photo WHERE id = pid;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now() + interval '3 seconds', jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.77, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts,
+    'ai_tags', jsonb_build_object('model', 'scene_attrs/1', 'crop', jsonb_build_array(0.1235, 0, 0.8735, 1),
+                                  'lid_fits', true, 'lid', jsonb_build_array(0.18, 0.21, 0.82, 0.79))))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[14] lid 付きの更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags INTO tags FROM public.photo WHERE id = pid;
+  IF tags -> 'lid' IS DISTINCT FROM '[0.18, 0.21, 0.82, 0.79]'::jsonb THEN
+    RAISE EXCEPTION '[14] lid が期待と違う: %', tags;
+  END IF;
+  SET LOCAL ROLE photo_scorer;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'lid', jsonb_build_array(0.1, 0, 0.9)))));
+    RAISE EXCEPTION '[14] 4つでない lidが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[14]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'lid', jsonb_build_array(0.1, 0, 1.2, 1)))));
+    RAISE EXCEPTION '[14] 範囲外の lidが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[14]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'lid', jsonb_build_array(0.9, 0.1, 0.1, 0.9)))));
+    RAISE EXCEPTION '[14] 左右が逆の lidが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[14]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'lid', '"box"'::jsonb))));
+    RAISE EXCEPTION '[14] 文字列の lidが通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[14]%' THEN RAISE; END IF; END;
   RESET ROLE;
 
   -- 11. anon / authenticated は scoring の関数を呼べない

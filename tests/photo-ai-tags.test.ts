@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, photoAiTags, photoObjectPosition } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, photoAiTags, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -59,4 +59,33 @@ test('photoObjectPosition ignores missing or malformed crops', () => {
   assert.equal(photoObjectPosition({ crop: [0.5, 0, 0.5, 1] }), undefined);
   assert.equal(photoObjectPosition({ crop: ['0', 0, 0.75, 1] }), undefined);
   assert.equal(photoObjectPosition({ crop: [0, 0, 1.5, 1] }), undefined);
+});
+
+test('photoLidZoom fills the stamp with the lid', () => {
+  // 正方形の写真（crop が全体）、蓋が真ん中で幅・高さ 0.5 → 枠の一辺は 0.52、写真は 1/0.52 ≒ 192.3% に拡大
+  const z = photoLidZoom({ crop: [0, 0, 1, 1], lid: [0.25, 0.25, 0.75, 0.75] });
+  assert.deepEqual(z, { position: 'absolute', width: '192.3%', height: '192.3%', left: '-46.2%', top: '-46.2%', maxWidth: 'none' });
+});
+
+test('photoLidZoom keeps the aspect ratio of a portrait photo and centres the lid', () => {
+  // 縦長 3:4（幅 1・高さ 4/3）。crop は短辺の正方形 = 高さ 0.75
+  const z = photoLidZoom({ crop: [0, 0.1, 1, 0.85], lid: [0.1, 0.3, 0.9, 0.9] })!;
+  // 蓋の枠: 幅 0.8、高さ 0.6 × 4/3 = 0.8 → 一辺 0.832
+  assert.equal(z.width, '120.2%');
+  assert.equal(z.height, '160.3%');
+  assert.equal(z.left, '-10.1%');
+  // 蓋の中心 y = 0.6 × 4/3 = 0.8 → 0.5 − 0.8 / 0.832
+  assert.equal(z.top, '-46.2%');
+});
+
+test('photoLidZoom does not zoom tiny lids beyond LID_ZOOM_MAX', () => {
+  const z = photoLidZoom({ crop: [0, 0, 1, 1], lid: [0.45, 0.45, 0.5, 0.5] })!;
+  assert.equal(z.width, `${Math.round((LID_ZOOM_MAX) * 1000) / 10}%`);
+});
+
+test('photoLidZoom needs both lid and crop', () => {
+  assert.equal(photoLidZoom({ crop: [0, 0, 1, 1] }), undefined);
+  assert.equal(photoLidZoom({ lid: [0.2, 0.2, 0.8, 0.8] }), undefined);
+  assert.equal(photoLidZoom({ crop: [0, 0, 1, 1], lid: [0.8, 0.2, 0.2, 0.8] }), undefined);
+  assert.equal(photoLidZoom(null), undefined);
 });
