@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Calendar, Camera, ChevronRight, Heart, Image as ImageIcon, MapPin, MessageCircle, Sparkles, UserRound } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb';
 import ShareButtons from '@/components/ShareButtons';
 import PhotoDeleteButton from '@/components/PhotoDeleteButton';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
