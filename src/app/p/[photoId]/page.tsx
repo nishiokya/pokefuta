@@ -110,11 +110,15 @@ export default async function SharedPhotoPage({ params }: PageProps) {
           行き先は2つ: 投稿者のページ（投稿者の欄）と蓋の詳細（いちばん下）。
         */}
         <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
-          <div className="flex justify-center bg-[#1c1a17]">
+          {/*
+            枠の比率を先に決めて場所を取っておく（読み込みが遅いと高さ0から押し広げて見出し以下がずれる。CLS）。
+            写真は枠の中に切らずに収め、余りは暗い背景。DB の width/height は回転前の値のことがあるので使わない
+          */}
+          <div className="relative aspect-[4/5] max-h-[78vh] w-full bg-[#1c1a17] sm:aspect-[4/3]">
             <img
               src={`/api/photo/${photo.id}?size=large`}
               alt={`${heading}の${photo.is_landscape ? '周辺の風景' : '写真'}`}
-              className="max-h-[78vh] w-auto max-w-full object-contain"
+              className="absolute inset-0 h-full w-full object-contain"
             />
           </div>
 
