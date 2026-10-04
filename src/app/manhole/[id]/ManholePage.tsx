@@ -18,7 +18,8 @@ import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
-import { AI_TAG_HELP, photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -937,11 +938,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
-        <p className="mb-2 text-[10.5px] leading-snug text-[#8b816f]">
-          {AI_TAG_HELP}
-        </p>
-      )}
       {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
           元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
@@ -1067,6 +1063,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
+      <AiTagNote className="mt-2" show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
     </div>
   ) : null;
 
@@ -1589,6 +1586,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           </div>
 
           {allPhotosGrid}
+          {/* 写真が代表の1枚だけの蓋は allPhotosGrid が無いので、タグの注釈をここで出す（拡大表示にはタグが出る） */}
+          {!allPhotosGrid && (
+            <AiTagNote show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
+          )}
 
           {/* ── Pokemon ── */}
           {manhole.pokemons && manhole.pokemons.length > 0 && (

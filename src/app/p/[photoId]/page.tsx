@@ -7,6 +7,8 @@ import ShareButtons from '@/components/ShareButtons';
 import PhotoDeleteButton from '@/components/PhotoDeleteButton';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags } from '@/lib/photo-ai-tags';
 import { formatDateJa } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { photoShareText } from '@/lib/share';
@@ -169,6 +171,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
             </div>
           </div>
         </article>
+        <AiTagNote className="mt-2 px-1" show={photoAiTags(photo).length > 0} />
       </main>
 
     </div>

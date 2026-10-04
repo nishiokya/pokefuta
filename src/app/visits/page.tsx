@@ -23,6 +23,8 @@ import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
@@ -819,6 +821,7 @@ export default function VisitsPage() {
                   </div>
                 ))}
               </div>
+              <AiTagNote className="mt-2" show={sampleVisits.slice(0, 6).some((sv) => photoAiTags(sv).length > 0)} />
               <p className="mt-3 text-center text-xs text-[#6A4D36]">
                 登録すると、あなたの旅写真もここに残せます
               </p>

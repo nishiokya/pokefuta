@@ -18,6 +18,8 @@ import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags } from '@/lib/photo-ai-tags';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa } from '@/lib/date';
@@ -406,6 +408,10 @@ export default function PopularPage() {
                   })}
                 </div>
               )}
+              <AiTagNote
+                className="mt-3"
+                show={sortedFeed.some((visit) => visit.photos?.[0] && photoAiTags(visit.photos[0]).length > 0)}
+              />
             </section>
 
             {/* Pagination */}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { photoAiTags } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, photoAiTags } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -25,6 +25,11 @@ test('真偽が true のときだけ出す（文字列や確率だけでは出�
 test('周辺（wide_context）と看板（signage_info）はタグにしない', () => {
   assert.deepEqual(labels({ ai_tags: { scene: 'wide_context' } }), []);
   assert.deepEqual(labels({ ai_tags: { scene: 'signage_info' } }), []);
+});
+
+test('注釈は夜を AI の判定と言わない', () => {
+  assert.match(AI_TAG_HELP, /ぬいぐるみ・風景のタグは AI/);
+  assert.match(AI_TAG_HELP, /夜のタグは撮影時刻と場所から/);
 });
 
 test('夜だけは AI の印を付けない（撮影時刻と場所から決まる）', () => {

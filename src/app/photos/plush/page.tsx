@@ -3,7 +3,9 @@ import Link from 'next/link';
 import Breadcrumb from '@/components/Breadcrumb';
 import { formatDateJa } from '@/lib/date';
 import { SITE_NAME } from '@/lib/constants';
-import { AI_TAG_HELP } from '@/lib/photo-ai-tags';
+import AiPhotoTags from '@/components/AiPhotoTags';
+import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
 
 // ベータ。中身（AI の判定）と見せ方を確かめてから検索に出す
@@ -25,7 +27,7 @@ export default async function PlushPhotosPage() {
         <Breadcrumb href="/" label="トップへ" />
         <header className="mb-4">
           <p className="mb-1 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-900 ring-1 ring-indigo-200">
-            <span className="mr-1 text-[9px] font-extrabold text-indigo-500">AI</span>ぬいぐるみ
+            ぬいぐるみ
           </p>
           <h1 className="font-pixelJp text-xl font-bold text-[#4F3828] sm:text-2xl">
             ぬいぐるみと旅するポケふた
@@ -33,9 +35,9 @@ export default async function PlushPhotosPage() {
           </h1>
           <p className="mt-1 text-sm text-[#6A4D36]">
             ぬいぐるみと一緒に撮られたポケふたの写真 {photos.length}枚
-            {photos.length >= PLUSH_PAGE_LIMIT ? `（新しい順に${PLUSH_PAGE_LIMIT}枚まで）` : ''}
+            {photos.length >= PLUSH_PAGE_LIMIT ? `（${PLUSH_PAGE_LIMIT}枚まで）` : ''}
+            <span className="ml-1 text-xs text-[#8b816f]">ぬいぐるみらしい順</span>
           </p>
-          <p className="mt-1 text-[11px] leading-snug text-[#8b816f]">{AI_TAG_HELP}</p>
         </header>
 
         {photos.length === 0 ? (
@@ -45,11 +47,8 @@ export default async function PlushPhotosPage() {
         ) : (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {photos.map((photo, index) => (
-              <li key={photo.id}>
-                <Link
-                  href={`/p/${photo.id}`}
-                  className="group block overflow-hidden rounded-[10px] border border-[#e9dfc7] bg-[#fffdf7] shadow-sm"
-                >
+              <li key={photo.id} className="overflow-hidden rounded-[10px] border border-[#e9dfc7] bg-[#fffdf7] shadow-sm">
+                <Link href={`/p/${photo.id}`} className="group block">
                   <div className="aspect-square overflow-hidden bg-[#ece2cd]">
                     <img
                       src={`/api/photo/${photo.id}?size=small`}
@@ -60,15 +59,32 @@ export default async function PlushPhotosPage() {
                       loading={index < 8 ? 'eager' : 'lazy'}
                     />
                   </div>
-                  <div className="px-2 py-1.5">
+                  <div className="px-2 pt-1.5">
+                    <div className="mb-1 flex flex-wrap gap-1">
+                      <LandscapePhotoBadge isLandscape={photo.isLandscape} />
+                      <AiPhotoTags photo={{ ai_tags: photo.aiTags, is_landscape: photo.isLandscape }} />
+                    </div>
                     <p className="truncate font-pixelJp text-[12px] font-bold text-[#4F3828]">{photo.manholeName}</p>
-                    <p className="text-[10.5px] text-[#8b816f]">{formatDateJa(photo.shotAt ?? photo.createdAt)}</p>
                   </div>
                 </Link>
+                <div className="flex items-center gap-1 px-2 pb-1.5 text-[10.5px] text-[#8b816f]">
+                  {photo.posterPublicId ? (
+                    <Link
+                      href={`/users/${encodeURIComponent(photo.posterPublicId)}/visits`}
+                      className="min-w-0 truncate font-bold text-[#7B63A8] hover:underline"
+                    >
+                      @{photo.posterName}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 truncate font-bold">@{photo.posterName}</span>
+                  )}
+                  <span className="ml-auto shrink-0">{formatDateJa(photo.shotAt ?? photo.createdAt)}</span>
+                </div>
               </li>
             ))}
           </ul>
         )}
+        <AiTagNote className="mt-4" show={photos.length > 0} />
       </main>
     </div>
   );
