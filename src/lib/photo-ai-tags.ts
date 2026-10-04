@@ -23,6 +23,8 @@ export type PhotoAiTags = {
   crop?: [number, number, number, number];
   /** 蓋が crop の正方形に収まる（はみ出し 10% 以下） */
   lid_fits?: boolean | null;
+  /** 蓋の枠 [x0, y0, x1, y1]（0〜1）。crop を決めるのに使った枠。20261005100000 */
+  lid?: [number, number, number, number];
 };
 
 export type AiTagKey = 'plush' | 'night' | 'landscape';
@@ -56,6 +58,13 @@ export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean |
  * 横長なら x0 / (1 − 幅)、縦長なら y0 / (1 − 高さ)。crop が無い・形が違う・正方形の枠でない所では
  * undefined を返し、今までどおり真ん中になる。
  */
+const unitBox = (value: unknown): [number, number, number, number] | null => {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  if (!value.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1)) return null;
+  const [x0, y0, x1, y1] = value as number[];
+  return x1 > x0 && y1 > y0 ? [x0, y0, x1, y1] : null;
+};
+
 export function photoObjectPosition(aiTags: unknown): string | undefined {
   if (!isRecord(aiTags)) return undefined;
   const crop = aiTags.crop;
@@ -71,4 +80,50 @@ export function photoObjectPosition(aiTags: unknown): string | undefined {
   const y = pct(y0, h);
   if (x === 50 && y === 50) return undefined;
   return `${x}% ${y}%`;
+}
+
+/** 蓋に合わせて拡大するときの最大倍率（一覧の正方形に対して）。320px のサムネイルを拡大するので、それ以上はぼやける */
+export const LID_ZOOM_MAX = 3;
+
+export type LidZoomStyle = {
+  position: 'absolute';
+  width: string;
+  height: string;
+  left: string;
+  top: string;
+  maxWidth: 'none';
+};
+
+/**
+ * 丸いスタンプ（マイ旅の「集めたスタンプ」）で、蓋が丸をいっぱいに埋めるように写真を置く位置。
+ * 正方形の枠（position: relative; overflow: hidden）の中に、img を absolute で大きく置く。
+ *
+ * ai_tags.lid（蓋の枠）の長いほうの辺 × 1.04 を枠の一辺にし、蓋の中心を枠の真ん中に合わせる。
+ * 写真の縦横比は ai_tags.crop から分かる（crop は短辺の正方形なので、幅 = 短辺/W、高さ = 短辺/H）。
+ * 小さい蓋は LID_ZOOM_MAX 倍まで（それ以上は蓋の周りも写る）。
+ * lid か crop が無い・形が違うときは undefined（呼び出し側は今までどおり object-fit: cover）。
+ */
+export function photoLidZoom(aiTags: unknown, maxZoom = LID_ZOOM_MAX): LidZoomStyle | undefined {
+  if (!isRecord(aiTags)) return undefined;
+  const lid = unitBox(aiTags.lid);
+  const crop = unitBox(aiTags.crop);
+  if (!lid || !crop) return undefined;
+  const aspect = (crop[3] - crop[1]) / (crop[2] - crop[0]); // W / H
+  // 写真の幅を 1 とした長さで考える（高さは 1 / aspect）
+  const height = 1 / aspect;
+  const shortSide = Math.min(1, height);
+  const lidW = lid[2] - lid[0];
+  const lidH = (lid[3] - lid[1]) * height;
+  const side = Math.max(Math.max(lidW, lidH) * 1.04, shortSide / maxZoom);
+  const cx = (lid[0] + lid[2]) / 2;
+  const cy = ((lid[1] + lid[3]) / 2) * height;
+  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+  return {
+    position: 'absolute',
+    width: pct(1 / side),
+    height: pct(height / side),
+    left: pct(0.5 - cx / side),
+    top: pct(0.5 - cy / side),
+    maxWidth: 'none',
+  };
 }

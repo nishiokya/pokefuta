@@ -23,6 +23,7 @@ import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
+import StampPhoto from '@/components/StampPhoto';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
@@ -511,6 +512,8 @@ export default function VisitsPage() {
         id: m.id,
         name: getManholeName(m),
         thumbUrl: visitSummaryByManholeId.get(m.id)?.latestVisit.photos[0]?.thumbnail_url ?? null,
+        // 蓋で丸をいっぱいにする位置（ai_tags.lid / crop）。StampPhoto が使う
+        aiTags: visitSummaryByManholeId.get(m.id)?.latestVisit.photos[0]?.ai_tags,
       })),
     [passportManholes, visitSummaryByManholeId]
   );
@@ -852,10 +855,10 @@ export default function VisitsPage() {
         <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm">
           <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, fontWeight: 800, color: '#6A4D36', marginBottom: 8 }}>集めたスタンプ</p>
           <div className="grid grid-cols-6 gap-[5px]">
-            {visitedManholesForDex.slice(0, 24).map(({ id, name, thumbUrl }) => (
+            {visitedManholesForDex.slice(0, 24).map(({ id, name, thumbUrl, aiTags }) => (
               <Link key={id} href={`/manhole/${id}`} aria-label={name} className="aspect-square overflow-hidden rounded-full border-2 border-[#bf5640]/40 bg-[#e9dfc7]">
                 {thumbUrl
-                  ? <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  ? <StampPhoto src={thumbUrl} aiTags={aiTags} />
                   : <div aria-hidden="true" className="h-full w-full bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]" />}
               </Link>
             ))}
@@ -936,14 +939,14 @@ export default function VisitsPage() {
                       <span className="font-pixelJp text-xs text-[#8C6A4A]">すべて見る {visitedManholesCount} ›</span>
                     </div>
                     <div className="grid grid-cols-8 gap-[7px]">
-                      {visitedManholesForDex.slice(0, 48).map(({ id, thumbUrl }) => (
+                      {visitedManholesForDex.slice(0, 48).map(({ id, thumbUrl, aiTags }) => (
                         <Link
                           key={id}
                           href={`/manhole/${id}`}
                           className="aspect-square overflow-hidden rounded-full border-2 border-[#bf5640]/40 bg-[#e9dfc7]"
                         >
                           {thumbUrl ? (
-                            <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                            <StampPhoto src={thumbUrl} aiTags={aiTags} />
                           ) : (
                             <div className="h-full w-full bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]" />
                           )}
