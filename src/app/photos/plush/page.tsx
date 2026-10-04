@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Breadcrumb from '@/components/Breadcrumb';
-import { formatDateJa, formatDateJaJst } from '@/lib/date';
+import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import { photoAiTags } from '@/lib/photo-ai-tags';
@@ -67,7 +67,7 @@ export default async function PlushPhotosPage() {
                 ...aiLabels,
                 ...chips.map((chip) => chip.label),
                 photo.manholeName,
-                `撮影 ${formatDateJa(shotAt)}`,
+                `撮影 ${formatDateJaJst(shotAt)}`,   // 表示と同じ JST（本番のサーバーは UTC）
                 `投稿者 ${photo.posterName}`,
                 photo.posterPublicId ? '投稿者のページへ' : '写真を見る',
               ].filter(Boolean).join('、');
