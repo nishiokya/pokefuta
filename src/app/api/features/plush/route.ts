@@ -6,7 +6,8 @@ import { loadPlushPhotos } from '@/lib/plush-photos';
 export const revalidate = 600;
 
 export async function GET() {
-  const photos = await loadPlushPhotos();
+  // 枚数は特集ページと同じ集合、カードの3枚は新着（スコア順だと同じ写真が出続け、新しい投稿が出ない）
+  const photos = await loadPlushPhotos(undefined, 'recent');
   return NextResponse.json(
     {
       success: true,
