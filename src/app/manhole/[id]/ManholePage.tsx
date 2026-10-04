@@ -1039,7 +1039,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
               <div className="flex flex-col gap-0.5 px-1.5 py-1">
                 <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                <AiPhotoTags photo={photo} />
+                <AiPhotoTags photo={photo} linkFeatures />
                 {profileHref ? (
                   <Link
                     href={profileHref}
@@ -1230,7 +1230,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     />
                     <div className="absolute bottom-12 left-3 z-[2] flex flex-wrap gap-1">
                       <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
-                      <AiPhotoTags photo={featuredPhoto} />
+                      <AiPhotoTags photo={featuredPhoto} linkFeatures />
                     </div>
                     {featuredPhoto.visit?.user_id === currentUserId && (
                       <span className="absolute right-3 top-3 rounded-full bg-[#1f9d63]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white">
