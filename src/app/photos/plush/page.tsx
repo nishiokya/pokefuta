@@ -5,7 +5,7 @@ import { formatDateJa } from '@/lib/date';
 import { SITE_NAME } from '@/lib/constants';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
-import { AI_TAG_HELP } from '@/lib/photo-ai-tags';
+import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
 
 // ベータ。中身（AI の判定）と見せ方を確かめてから検索に出す
@@ -84,7 +84,7 @@ export default async function PlushPhotosPage() {
             ))}
           </ul>
         )}
-        <p className="mt-4 text-[11px] leading-snug text-[#8b816f]">※ {AI_TAG_HELP}</p>
+        <AiTagNote className="mt-4" show={photos.length > 0} />
       </main>
     </div>
   );

@@ -18,7 +18,8 @@ import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
-import { AI_TAG_HELP, photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -1062,9 +1063,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           );
         })}
       </div>
-      {allDisplayPhotos.some((p) => photoAiTags(p).length > 0) && (
-        <p className="mt-2 text-[10.5px] leading-snug text-[#8b816f]">※ {AI_TAG_HELP}</p>
-      )}
+      <AiTagNote className="mt-2" show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
     </div>
   ) : null;
 

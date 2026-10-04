@@ -30,7 +30,7 @@ export default function AiPhotoTags({
             className={`inline-flex items-center gap-1 rounded-full bg-indigo-50 font-bold text-indigo-900 ring-1 ring-indigo-200 ${
               compact ? 'px-1.5 py-0 text-[9px]' : 'px-2 py-0.5 text-xs'
             }`}
-            aria-label={`${tag.label}（自動判定）`}
+            aria-label={tag.ai ? `${tag.label}（AIによる自動判定）` : `${tag.label}（撮影時刻と場所から自動判定）`}
           >
             {tag.label}
           </span>

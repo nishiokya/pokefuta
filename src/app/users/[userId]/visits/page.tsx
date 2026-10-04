@@ -14,6 +14,8 @@ import {
 import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
+import AiTagNote from '@/components/AiTagNote';
+import { photoAiTags } from '@/lib/photo-ai-tags';
 import ShareButtons from '@/components/ShareButtons';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
@@ -296,6 +298,11 @@ export default async function UserVisitsPage({ params }: PageProps) {
             </section>
           ))
         )}
+        <AiTagNote
+          className="mt-4"
+          show={prefectureGroups.some((group) =>
+            group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }).length > 0))}
+        />
 
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
