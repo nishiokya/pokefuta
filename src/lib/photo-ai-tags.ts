@@ -19,6 +19,10 @@ export type PhotoAiTags = {
   plush?: boolean;
   plush_score?: number;
   night?: boolean | null;
+  /** 一覧の正方形の位置 [x0, y0, x1, y1]（0〜1）。蓋の枠に寄せてある。20261004120000 */
+  crop?: [number, number, number, number];
+  /** 蓋が crop の正方形に収まる（はみ出し 10% 以下） */
+  lid_fits?: boolean | null;
 };
 
 export type AiTagKey = 'plush' | 'night' | 'landscape';
@@ -42,4 +46,29 @@ export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean |
   if (tags.night === true) out.push({ key: 'night', label: '夜', ai: false });
   if (tags.scene === 'landscape' && !photo.is_landscape) out.push({ key: 'landscape', label: '風景', ai: true });
   return out;
+}
+
+/**
+ * 正方形に切って見せるとき（object-fit: cover）の object-position。ai_tags.crop の正方形が見えるようにする。
+ *
+ * crop は k11 で「一辺が写真の短辺の正方形を、蓋の枠の中心に寄せて」置いたもの。cover で正方形の枠に
+ * 入れると見えるのは短辺の正方形なので、その位置を長辺方向の割合に直すだけでよい（画像は作らない）。
+ * 横長なら x0 / (1 − 幅)、縦長なら y0 / (1 − 高さ)。crop が無い・形が違う・正方形の枠でない所では
+ * undefined を返し、今までどおり真ん中になる。
+ */
+export function photoObjectPosition(aiTags: unknown): string | undefined {
+  if (!isRecord(aiTags)) return undefined;
+  const crop = aiTags.crop;
+  if (!Array.isArray(crop) || crop.length !== 4) return undefined;
+  if (!crop.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1)) return undefined;
+  const [x0, y0, x1, y1] = crop as number[];
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0) return undefined;
+  const pct = (offset: number, size: number) =>
+    size >= 0.999 ? 50 : Math.round(Math.min(Math.max(offset / (1 - size), 0), 1) * 1000) / 10;
+  const x = pct(x0, w);
+  const y = pct(y0, h);
+  if (x === 50 && y === 50) return undefined;
+  return `${x}% ${y}%`;
 }

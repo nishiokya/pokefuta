@@ -19,7 +19,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags, type PhotoAiTags } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -988,6 +988,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     src={`/api/photo/${photo.id}?size=small`}
                     alt=""
                     className="h-full w-full object-cover"
+                    style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                     loading="lazy"
                   />
                 </button>
@@ -1380,6 +1381,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     src={`/api/photo/${allDisplayPhotos[0].id}?size=large`}
                     alt={`@${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                    style={{ objectPosition: photoObjectPosition(allDisplayPhotos[0].ai_tags) }}
                   />
                   {getPhotoCaption(allDisplayPhotos[0]) && (
                     <span className="absolute inset-x-3 bottom-11 z-[1] flex">
@@ -1424,6 +1426,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           src={`/api/photo/${photo.id}?size=${isRepresentative ? 'large' : 'small'}`}
                           alt={`@${getPhotoUserLabel(photo)}さんのポケふた写真`}
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
                         <div className="absolute bottom-9 left-2 z-[2]">
