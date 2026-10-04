@@ -97,7 +97,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-white sm:p-6">
               <div className="mb-1 flex flex-wrap items-center gap-1">
                 <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                <AiPhotoTags photo={photo} />
+                <AiPhotoTags photo={photo} linkFeatures />
               </div>
               <div className="mb-2 flex items-center gap-2 text-sm font-bold">
                 <MapPin className="h-4 w-4" />
