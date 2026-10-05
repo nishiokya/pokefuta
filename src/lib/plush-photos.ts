@@ -2,10 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
+import { interleaveByGroup } from '@/lib/interleave-by-group';
 
 /**
  * ぬいぐるみと一緒に撮った公開写真（photo.ai_tags.plush = true）。/photos/plush の一覧に使う。
- * ぬいぐるみらしさ（plush_score）の高い順に最大 limit 枚を返す。
+ * ぬいぐるみらしさ（plush_score）の高い順（または新しい順）に最大 limit 枚を取り、投稿者を1枚ずつ順番に回して並べ直す
+ * （写真の多い人が上を埋めないように。plush_score はほとんどの写真で 0.99 以上なので、順位の意味は薄い）。
  *
  * 判定は k11 の manhole-score（20261004100000_photo_ai_tags.sql）。anon キーで読むので、
  * 返るのは RLS が許す公開訪問の写真だけ。
@@ -105,7 +107,10 @@ export async function loadPlushPhotos(
       ),
   ]);
 
-  return (data as any[])
+  // どちらの順でも投稿者を1枚ずつ順番に回す（トップの特集カードの3枚も同じ人で埋まらないように）
+  const rows = interleaveByGroup(data as any[], (row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id ?? null);
+
+  return rows
     .map((row) => {
       const visit = Array.isArray(row.visit) ? row.visit[0] : row.visit;
       const manhole = Array.isArray(row.manhole) ? row.manhole[0] : row.manhole;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, LID_ZOOM_MAX, photoAiTags, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, hasPlushClip, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -88,4 +88,31 @@ test('photoLidZoom needs both lid and crop', () => {
   assert.equal(photoLidZoom({ lid: [0.2, 0.2, 0.8, 0.8] }), undefined);
   assert.equal(photoLidZoom({ crop: [0, 0, 1, 1], lid: [0.8, 0.2, 0.2, 0.8] }), undefined);
   assert.equal(photoLidZoom(null), undefined);
+});
+
+test('ぬいぐるみの特集: 1つの枠を正方形いっぱいに切り抜く', () => {
+  // 正方形の写真、枠 0.2〜0.6（一辺 0.4）× 1 → 2.5 倍、枠の左上が正方形の左上
+  assert.deepEqual(photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.2, 0.2, 0.6, 0.6], 1), {
+    position: 'absolute', width: '250%', height: '250%', left: '-50%', top: '-50%', maxWidth: 'none',
+  });
+});
+
+test('ぬいぐるみの特集: 切り抜きは写真の外を見せず、短辺より大きくせず、最大倍率まで', () => {
+  // 写真の右下の隅の枠 → 写真の内側にずらす（右端・下端で止まる）
+  const corner = photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.8, 0.8, 1, 1], 1, 10);
+  assert.deepEqual([corner?.left, corner?.top], ['-400%', '-400%']);
+  // 写真より大きい枠 → 短辺の正方形（拡大しない）
+  assert.equal(photoBoxZoom({ crop: [0.25, 0, 0.75, 1] }, [0, 0, 1, 1], 1.2)?.height, '100%');
+  // 小さい枠は LID_ZOOM_MAX 倍まで
+  assert.equal(photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.5, 0.5, 0.51, 0.51])?.width, `${LID_ZOOM_MAX * 100}%`);
+  // crop が無いと縦横比が分からないので切り抜かない
+  assert.equal(photoBoxZoom({}, [0.2, 0.2, 0.6, 0.6]), undefined);
+});
+
+test('ぬいぐるみの特集: 蓋とぬいぐるみの枠と crop がそろった写真だけ切り抜ける', () => {
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), true);
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], lid: [0.1, 0.1, 0.5, 0.5] }), false);
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
+  assert.equal(hasPlushClip({ lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
+  assert.equal(hasPlushClip(null), false);
 });

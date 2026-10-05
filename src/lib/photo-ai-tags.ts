@@ -25,6 +25,8 @@ export type PhotoAiTags = {
   lid_fits?: boolean | null;
   /** 蓋の枠 [x0, y0, x1, y1]（0〜1）。crop を決めるのに使った枠。20261005100000 */
   lid?: [number, number, number, number];
+  /** ぬいぐるみ全部を囲む枠 [x0, y0, x1, y1]（0〜1）。plush が真の写真だけ。20261005200000 */
+  plush_box?: [number, number, number, number];
 };
 
 export type AiTagKey = 'plush' | 'night' | 'landscape';
@@ -126,4 +128,51 @@ export function photoLidZoom(aiTags: unknown, maxZoom = LID_ZOOM_MAX): LidZoomSt
     top: pct(0.5 - cy / side),
     maxWidth: 'none',
   };
+}
+
+/** AI が見つけた枠（蓋・ぬいぐるみ）。ぬいぐるみの特集でそれぞれ切り抜くのに使う。形が違う枠は null */
+export function photoAiBoxes(aiTags: unknown): { lid: [number, number, number, number] | null; plush: [number, number, number, number] | null } {
+  if (!isRecord(aiTags)) return { lid: null, plush: null };
+  return { lid: unitBox(aiTags.lid), plush: unitBox(aiTags.plush_box) };
+}
+
+/**
+ * 写真の中の1つの枠（蓋・ぬいぐるみ）だけを正方形の枠いっぱいに切り抜いて見せる位置。置き方は photoLidZoom と同じ
+ * （正方形の枠の中に img を absolute で大きく置く）。枠の長いほうの辺 × pad を一辺にし、枠の中心を真ん中に合わせる
+ * （写真の外が見えないよう、写真の端ではずらす。一辺は写真の短辺まで）。
+ * 写真の縦横比は ai_tags.crop から分かる。maxZoom 倍（一覧の正方形に対して）まで。crop が無ければ undefined。
+ * ぬいぐるみの特集で、蓋とぬいぐるみをそれぞれ切り抜いて並べるのに使う。
+ */
+export function photoBoxZoom(
+  aiTags: unknown,
+  box: [number, number, number, number],
+  pad = 1.1,
+  maxZoom = LID_ZOOM_MAX,
+): LidZoomStyle | undefined {
+  if (!isRecord(aiTags)) return undefined;
+  const crop = unitBox(aiTags.crop);
+  if (!crop) return undefined;
+  const aspect = (crop[3] - crop[1]) / (crop[2] - crop[0]); // W / H
+  const height = 1 / aspect;
+  const shortSide = Math.min(1, height);
+  // 写真の外（地の色）が見えないように、正方形は写真の短辺までにし、写真の内側にずらす
+  const side = Math.min(Math.max(Math.max(box[2] - box[0], (box[3] - box[1]) * height) * pad, shortSide / maxZoom), shortSide);
+  const clamp = (v: number, hi: number) => Math.min(Math.max(v, 0), Math.max(hi, 0));
+  const left = clamp((box[0] + box[2]) / 2 - side / 2, 1 - side);
+  const top = clamp(((box[1] + box[3]) / 2) * height - side / 2, height - side);
+  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+  return {
+    position: 'absolute',
+    width: pct(1 / side),
+    height: pct(height / side),
+    left: pct(-left / side),
+    top: pct(-top / side),
+    maxWidth: 'none',
+  };
+}
+
+/** ぬいぐるみの特集で、蓋とぬいぐるみをそれぞれ切り抜けるか（lid・plush_box・crop がそろっている） */
+export function hasPlushClip(aiTags: unknown): boolean {
+  const { lid, plush } = photoAiBoxes(aiTags);
+  return Boolean(lid && plush && isRecord(aiTags) && unitBox(aiTags.crop));
 }
