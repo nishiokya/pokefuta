@@ -39,6 +39,7 @@ jobs:
       - run: npm run test:dex-url
       - run: npm run test:manhole-detail
       - run: npm run test:manhole-list
+      - run: npm run test:regular-badges
       - run: npm run test:japanese-phrases
       - run: npm run type-check
       - run: npm run build
