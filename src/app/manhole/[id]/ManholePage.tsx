@@ -19,6 +19,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
@@ -1037,18 +1038,21 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               <div className="flex flex-col gap-0.5 px-1.5 py-1">
                 <LandscapePhotoBadge isLandscape={photo.is_landscape} />
                 <AiPhotoTags photo={photo} linkFeatures />
-                {profileHref ? (
-                  <Link
-                    href={profileHref}
-                    className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
-                  >
-                    @{userLabel}
-                  </Link>
-                ) : (
-                  <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
-                    @{userLabel}
-                  </span>
-                )}
+                <div className="flex min-w-0 items-center gap-1">
+                  {profileHref ? (
+                    <Link
+                      href={profileHref}
+                      className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
+                    >
+                      @{userLabel}
+                    </Link>
+                  ) : (
+                    <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
+                      @{userLabel}
+                    </span>
+                  )}
+                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} />
+                </div>
                 {dateLabel && (
                   // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
                   // title と aria-label で補う。
@@ -1083,6 +1087,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       text,
       postedAt,
       userLabel: getPhotoUserLabel(photo),
+      publicUserId: photo.visit?.public_user_id ?? null,
       profileHref:
         photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
           ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
@@ -1342,6 +1347,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       ) : (
                         <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
                       )}
+                      <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
                       {featuredPhoto.visit?.shot_at && (
                         <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
                           {formatPhotoDate(featuredPhoto.visit.shot_at)}

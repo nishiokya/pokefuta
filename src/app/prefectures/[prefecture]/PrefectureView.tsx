@@ -45,6 +45,7 @@ type FeedVisit = {
   shot_at: string;
   photos: Array<{ id: string; thumbnail_url?: string; url?: string; is_landscape?: boolean }>;
   display_name?: string | null;
+  public_user_id?: string | null;
 };
 
 /**
@@ -344,6 +345,7 @@ export default function PrefectureView({ overview }: { overview: PrefectureOverv
                       title={manhole ? manholeHeadingPlace(manhole) : 'ポケふた'}
                       date={formatDateJa(visit.shot_at)}
                       posterName={visit.display_name || undefined}
+                      posterPublicId={visit.public_user_id}
                       tags={(manhole?.pokemons || []).slice(0, 2)}
                     />
                   );

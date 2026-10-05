@@ -11,6 +11,7 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 // ベータ。中身（AI の判定）と見せ方を確かめてから検索に出す
 export const metadata: Metadata = {
@@ -105,6 +106,7 @@ export default async function PlushPhotosPage() {
                       <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                         <UserRound className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">投稿者 {photo.posterName}</span>
+                        <PosterRegularBadge publicUserId={photo.posterPublicId} />
                       </div>
                     </div>
                   </Link>
