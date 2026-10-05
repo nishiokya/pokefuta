@@ -170,3 +170,9 @@ export function photoSubjectZoom(aiTags: unknown, maxZoom = SUBJECT_ZOOM_MAX): L
     maxWidth: 'none',
   };
 }
+
+/** AI が見つけた枠（蓋・ぬいぐるみ）。ぬいぐるみの特集で写真に重ねて見せる。形が違う枠は null */
+export function photoAiBoxes(aiTags: unknown): { lid: [number, number, number, number] | null; plush: [number, number, number, number] | null } {
+  if (!isRecord(aiTags)) return { lid: null, plush: null };
+  return { lid: unitBox(aiTags.lid), plush: unitBox(aiTags.plush_box) };
+}

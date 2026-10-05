@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { photoAiTags, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
+import { photoAiBoxes, photoAiTags, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
-import { MapPin, UserRound } from 'lucide-react';
+import { FlaskConical, MapPin, MessageCircle, UserRound } from 'lucide-react';
+import PlushAiBoxToggle from '@/components/PlushAiBoxToggle';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
@@ -20,12 +21,47 @@ export const metadata: Metadata = {
 // 判定は毎朝書かれる。数分古くてよいので都度の読み込みは避ける
 export const revalidate = 600;
 
+// 感想は公式 X へ（/about の「フィードバック」と同じ宛先）。本文にページの URL を入れておく
+const FEEDBACK_URL = `https://x.com/intent/post?text=${encodeURIComponent('@pokemonmanhole ぬいぐるみと旅するポケふた（ベータ）の感想: ')}&url=${encodeURIComponent('https://pokefuta.com/photos/plush')}`;
+
+// AI の枠（写真の幅・高さを 1 とした割合）を、寄せた写真の上に重ねる位置
+const boxStyle = (b: [number, number, number, number]) => ({
+  left: `${b[0] * 100}%`,
+  top: `${b[1] * 100}%`,
+  width: `${(b[2] - b[0]) * 100}%`,
+  height: `${(b[3] - b[1]) * 100}%`,
+});
+
 export default async function PlushPhotosPage() {
   const photos = await loadPlushPhotos();
 
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <main className="mx-auto max-w-5xl px-4 pb-8 pt-3 sm:pt-6">
+        {/* 実験ラボの帯。AI で選んで切り抜いていること・間違いがあることを先に伝え、感想をもらう */}
+        <section className="mb-4 overflow-hidden rounded-[12px] border border-dashed border-[#7B63A8]/50 bg-[repeating-linear-gradient(135deg,#F3EEFA_0,#F3EEFA_12px,#EEE6F8_12px,#EEE6F8_24px)] p-3 sm:p-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#7B63A8] px-2.5 py-1 text-xs font-extrabold text-white">
+              <FlaskConical className="h-3.5 w-3.5" />
+              ポケふたラボ・実験中
+            </span>
+            <p className="min-w-0 flex-1 text-xs leading-relaxed text-[#4A3A66] sm:text-sm">
+              AI がぬいぐるみの写っている写真を見つけて、蓋とぬいぐるみが入るように切り抜いています。まちがいもあります。
+            </p>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <PlushAiBoxToggle targetId="plush-grid" />
+            <a
+              href={FEEDBACK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-[#5B4688] ring-1 ring-[#7B63A8]/40 transition hover:bg-[#F3EEFA]"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              感想をおくる
+            </a>
+          </div>
+        </section>
         <header className="mb-4">
           <h1 className="font-pixelJp text-xl font-bold text-[#4F3828] sm:text-2xl">
             ぬいぐるみと旅するポケふた
@@ -46,7 +82,7 @@ export default async function PlushPhotosPage() {
           // ベータ: 写真は蓋とぬいぐるみの両方が入るように寄せ（ai_tags.plush_box と lid。無ければ蓋の位置の正方形）、
           // ぬいぐるみが下に写ることが多いので、場所・撮影日・投稿者は写真に重ねず下に書く。
           // 押すと投稿者のページへ直接飛ぶ。公開IDの無い投稿者は写真の個別ページへ
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
+          <ul id="plush-grid" data-ai-boxes="off" className="group/grid grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
             {photos.map((photo, index) => {
               const chips = feedCardTags(
                 { id: photo.visitId, manhole_id: photo.manholeId, shot_at: photo.shotAt ?? photo.createdAt, manhole: { pokemons: photo.pokemons } },
@@ -57,6 +93,7 @@ export default async function PlushPhotosPage() {
               const href = photo.posterPublicId ? `/users/${encodeURIComponent(photo.posterPublicId)}/visits` : `/p/${photo.id}`;
               const shotAt = photo.shotAt ?? photo.createdAt;
               const zoom = photoSubjectZoom(photo.aiTags);
+              const boxes = photoAiBoxes(photo.aiTags);
               // カード全体に aria-label を張るので、写真の上の文字は読み上げられない。同じ内容をここに書く
               const ariaLabel = [
                 photo.isLandscape ? '周辺の風景' : null,
@@ -75,17 +112,39 @@ export default async function PlushPhotosPage() {
                     className="group block overflow-hidden rounded-[10px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
-                      <img
-                        src={`/api/photo/${photo.id}?size=small`}
-                        alt=""
-                        width={400}
-                        height={400}
-                        className={zoom
-                          ? 'transition duration-300 group-hover:scale-105'
-                          : 'h-full w-full object-cover transition duration-300 group-hover:scale-105'}
-                        style={zoom ?? { objectPosition: photoObjectPosition(photo.aiTags) }}
-                        loading={index < 6 ? 'eager' : 'lazy'}
-                      />
+                      {zoom ? (
+                        // 寄せた写真と AI の枠を同じ箱に入れて、枠が写真といっしょに動くようにする
+                        <div className="transition duration-300 group-hover:scale-105" style={zoom}>
+                          <img
+                            src={`/api/photo/${photo.id}?size=small`}
+                            alt=""
+                            width={400}
+                            height={400}
+                            className="h-full w-full"
+                            loading={index < 6 ? 'eager' : 'lazy'}
+                          />
+                          {boxes.lid && (
+                            <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FF5FA2] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.lid)}>
+                              <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FF5FA2] px-1 text-[10px] font-extrabold leading-4 text-white">蓋</span>
+                            </span>
+                          )}
+                          {boxes.plush && (
+                            <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FFD23F] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.plush)}>
+                              <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FFD23F] px-1 text-[10px] font-extrabold leading-4 text-[#4F3828]">ぬいぐるみ</span>
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <img
+                          src={`/api/photo/${photo.id}?size=small`}
+                          alt=""
+                          width={400}
+                          height={400}
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          style={{ objectPosition: photoObjectPosition(photo.aiTags) }}
+                          loading={index < 6 ? 'eager' : 'lazy'}
+                        />
+                      )}
                       {(photo.isLandscape || chips.length > 0) && (
                         <div className="absolute left-2 right-2 top-2 flex flex-wrap gap-1">
                           <LandscapePhotoBadge isLandscape={photo.isLandscape} />
