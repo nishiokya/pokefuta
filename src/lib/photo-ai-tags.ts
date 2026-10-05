@@ -176,3 +176,38 @@ export function photoAiBoxes(aiTags: unknown): { lid: [number, number, number, n
   if (!isRecord(aiTags)) return { lid: null, plush: null };
   return { lid: unitBox(aiTags.lid), plush: unitBox(aiTags.plush_box) };
 }
+
+/**
+ * 写真の中の1つの枠（蓋・ぬいぐるみ）だけを正方形の枠いっぱいに切り抜いて見せる位置。置き方は photoLidZoom と同じ
+ * （正方形の枠の中に img を absolute で大きく置く）。枠の長いほうの辺 × pad を一辺にし、枠の中心を真ん中に合わせる
+ * （写真の外が見えないよう、写真の端ではずらす。一辺は写真の短辺まで）。
+ * 写真の縦横比は ai_tags.crop から分かる。maxZoom 倍（一覧の正方形に対して）まで。crop が無ければ undefined。
+ * ぬいぐるみの特集で、蓋とぬいぐるみをそれぞれ切り抜いて並べるのに使う。
+ */
+export function photoBoxZoom(
+  aiTags: unknown,
+  box: [number, number, number, number],
+  pad = 1.1,
+  maxZoom = LID_ZOOM_MAX,
+): LidZoomStyle | undefined {
+  if (!isRecord(aiTags)) return undefined;
+  const crop = unitBox(aiTags.crop);
+  if (!crop) return undefined;
+  const aspect = (crop[3] - crop[1]) / (crop[2] - crop[0]); // W / H
+  const height = 1 / aspect;
+  const shortSide = Math.min(1, height);
+  // 写真の外（地の色）が見えないように、正方形は写真の短辺までにし、写真の内側にずらす
+  const side = Math.min(Math.max(Math.max(box[2] - box[0], (box[3] - box[1]) * height) * pad, shortSide / maxZoom), shortSide);
+  const clamp = (v: number, hi: number) => Math.min(Math.max(v, 0), Math.max(hi, 0));
+  const left = clamp((box[0] + box[2]) / 2 - side / 2, 1 - side);
+  const top = clamp(((box[1] + box[3]) / 2) * height - side / 2, height - side);
+  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+  return {
+    position: 'absolute',
+    width: pct(1 / side),
+    height: pct(height / side),
+    left: pct(-left / side),
+    top: pct(-top / side),
+    maxWidth: 'none',
+  };
+}

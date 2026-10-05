@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { photoAiBoxes, photoAiTags, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
+import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
 import { FlaskConical, MapPin, MessageCircle, UserRound } from 'lucide-react';
 import PlushAiBoxToggle from '@/components/PlushAiBoxToggle';
@@ -94,6 +94,11 @@ export default async function PlushPhotosPage() {
               const shotAt = photo.shotAt ?? photo.createdAt;
               const zoom = photoSubjectZoom(photo.aiTags);
               const boxes = photoAiBoxes(photo.aiTags);
+              // 蓋とぬいぐるみをそれぞれ切り抜いて並べる（両方の枠があるときだけ。無ければ1枚の正方形）
+              const lidClip = boxes.lid && boxes.plush ? photoBoxZoom(photo.aiTags, boxes.lid, 1.04) : undefined;
+              const plushClip = boxes.lid && boxes.plush ? photoBoxZoom(photo.aiTags, boxes.plush, 1.12) : undefined;
+              const clips = lidClip && plushClip;
+              const src = `/api/photo/${photo.id}?size=small`;
               // カード全体に aria-label を張るので、写真の上の文字は読み上げられない。同じ内容をここに書く
               const ariaLabel = [
                 photo.isLandscape ? '周辺の風景' : null,
@@ -112,39 +117,45 @@ export default async function PlushPhotosPage() {
                     className="group block overflow-hidden rounded-[10px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
-                      {zoom ? (
-                        // 寄せた写真と AI の枠を同じ箱に入れて、枠が写真といっしょに動くようにする
-                        <div className="transition duration-300 group-hover:scale-105" style={zoom}>
+                      {clips && (
+                        // 蓋（丸いスタンプ、左上）とぬいぐるみ（角丸のステッカー、右下に少し重ねる）をそれぞれ切り抜いて並べる。「元の写真で見る」で隠れる
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#FFF8EB_0,#F1E3C6_75%)] group-data-[ai-boxes=on]/grid:hidden">
+                          <div className="absolute left-[6%] top-[6%] aspect-square w-[66%] overflow-hidden rounded-full bg-[#EFE4CC] shadow-md ring-[3px] ring-white transition duration-300 group-hover:-rotate-3">
+                            <img src={src} alt="" width={400} height={400} style={lidClip} loading={index < 6 ? 'eager' : 'lazy'} />
+                          </div>
+                          <div className="absolute bottom-[6%] right-[6%] aspect-square w-[50%] rotate-[4deg] overflow-hidden rounded-[16%] bg-[#EFE4CC] shadow-lg ring-[3px] ring-white transition duration-300 group-hover:rotate-[8deg]">
+                            <img src={src} alt="" width={400} height={400} style={plushClip} loading={index < 6 ? 'eager' : 'lazy'} />
+                          </div>
+                        </div>
+                      )}
+                      <div className={clips ? 'absolute inset-0 hidden group-data-[ai-boxes=on]/grid:block' : 'absolute inset-0'}>
+                        {zoom ? (
+                          // 寄せた写真と AI の枠を同じ箱に入れて、枠が写真といっしょに動くようにする
+                          <div className="transition duration-300 group-hover:scale-105" style={zoom}>
+                            <img src={src} alt="" width={400} height={400} className="h-full w-full" loading={index < 6 ? 'eager' : 'lazy'} />
+                            {boxes.lid && (
+                              <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FF5FA2] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.lid)}>
+                                <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FF5FA2] px-1 text-[10px] font-extrabold leading-4 text-white">蓋</span>
+                              </span>
+                            )}
+                            {boxes.plush && (
+                              <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FFD23F] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.plush)}>
+                                <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FFD23F] px-1 text-[10px] font-extrabold leading-4 text-[#4F3828]">ぬいぐるみ</span>
+                              </span>
+                            )}
+                          </div>
+                        ) : (
                           <img
-                            src={`/api/photo/${photo.id}?size=small`}
+                            src={src}
                             alt=""
                             width={400}
                             height={400}
-                            className="h-full w-full"
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            style={{ objectPosition: photoObjectPosition(photo.aiTags) }}
                             loading={index < 6 ? 'eager' : 'lazy'}
                           />
-                          {boxes.lid && (
-                            <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FF5FA2] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.lid)}>
-                              <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FF5FA2] px-1 text-[10px] font-extrabold leading-4 text-white">蓋</span>
-                            </span>
-                          )}
-                          {boxes.plush && (
-                            <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FFD23F] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.plush)}>
-                              <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FFD23F] px-1 text-[10px] font-extrabold leading-4 text-[#4F3828]">ぬいぐるみ</span>
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <img
-                          src={`/api/photo/${photo.id}?size=small`}
-                          alt=""
-                          width={400}
-                          height={400}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          style={{ objectPosition: photoObjectPosition(photo.aiTags) }}
-                          loading={index < 6 ? 'eager' : 'lazy'}
-                        />
-                      )}
+                        )}
+                      </div>
                       {(photo.isLandscape || chips.length > 0) && (
                         <div className="absolute left-2 right-2 top-2 flex flex-wrap gap-1">
                           <LandscapePhotoBadge isLandscape={photo.isLandscape} />

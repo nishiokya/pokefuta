@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { ScanSearch } from 'lucide-react';
 
 /**
- * ぬいぐるみの特集（ベータ）: AI が見つけた蓋とぬいぐるみの枠を、一覧の写真に重ねて見せる切り替え。
+ * ぬいぐるみの特集（ベータ）: 切り抜き（蓋とぬいぐるみを別々に並べる）と、元の写真に AI が見つけた枠を
+ * 重ねた表示の切り替え。
  * 一覧（targetId の要素）の data-ai-boxes を on / off にするだけ。枠そのものはサーバーで描いてあり、
  * CSS（group-data-[ai-boxes=on]/grid）で出し入れする。
  */
@@ -26,7 +27,7 @@ export default function PlushAiBoxToggle({ targetId }: { targetId: string }) {
       }`}
     >
       <ScanSearch className="h-3.5 w-3.5" />
-      {on ? 'AI の枠を隠す' : 'AI が見つけた枠を見る'}
+      {on ? '切り抜きに戻す' : '元の写真で見る（AI の枠つき）'}
     </button>
   );
 }
