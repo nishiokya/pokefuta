@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, LID_ZOOM_MAX, SUBJECT_ZOOM_MAX, photoAiTags, photoLidZoom, photoObjectPosition, photoSubjectZoom } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, SUBJECT_ZOOM_MAX, hasPlushClip, photoAiTags, photoLidZoom, photoObjectPosition, photoSubjectZoom } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -119,4 +119,12 @@ test('ぬいぐるみの特集: plush_box か crop が無ければ寄せない�
   assert.equal(photoSubjectZoom(null), undefined);
   // 蓋の枠が無くてもぬいぐるみだけで寄せる
   assert.ok(photoSubjectZoom({ crop: [0, 0, 1, 1], plush_box: [0.2, 0.2, 0.6, 0.6] }));
+});
+
+test('ぬいぐるみの特集: 蓋とぬいぐるみの枠と crop がそろった写真だけ切り抜ける', () => {
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), true);
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], lid: [0.1, 0.1, 0.5, 0.5] }), false);
+  assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
+  assert.equal(hasPlushClip({ lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
+  assert.equal(hasPlushClip(null), false);
 });

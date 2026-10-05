@@ -211,3 +211,9 @@ export function photoBoxZoom(
     maxWidth: 'none',
   };
 }
+
+/** ぬいぐるみの特集で、蓋とぬいぐるみをそれぞれ切り抜けるか（lid・plush_box・crop がそろっている） */
+export function hasPlushClip(aiTags: unknown): boolean {
+  const { lid, plush } = photoAiBoxes(aiTags);
+  return Boolean(lid && plush && isRecord(aiTags) && unitBox(aiTags.crop));
+}

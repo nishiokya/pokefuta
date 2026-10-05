@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
+import { hasPlushClip, photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
 import { FlaskConical, MapPin, MessageCircle, UserRound } from 'lucide-react';
 import PlushAiBoxToggle from '@/components/PlushAiBoxToggle';
@@ -33,7 +33,8 @@ const boxStyle = (b: [number, number, number, number]) => ({
 });
 
 export default async function PlushPhotosPage() {
-  const photos = await loadPlushPhotos();
+  // 蓋とぬいぐるみをそれぞれ切り抜ける写真だけを出す（AI がぬいぐるみの枠を見つけられなかった写真は外す）
+  const photos = (await loadPlushPhotos()).filter((photo) => hasPlushClip(photo.aiTags));
 
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
@@ -118,12 +119,12 @@ export default async function PlushPhotosPage() {
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
                       {clips && (
-                        // 蓋（丸いスタンプ、左上）とぬいぐるみ（角丸のステッカー、右下に少し重ねる）をそれぞれ切り抜いて並べる。「元の写真で見る」で隠れる
+                        // 蓋（丸いスタンプ、左上、大きく）とぬいぐるみ（角丸のステッカー、蓋の半分の大きさで右下に重ねる）をそれぞれ切り抜いて並べる。「元の写真で見る」で隠れる
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#FFF8EB_0,#F1E3C6_75%)] group-data-[ai-boxes=on]/grid:hidden">
-                          <div className="absolute left-[6%] top-[6%] aspect-square w-[66%] overflow-hidden rounded-full bg-[#EFE4CC] shadow-md ring-[3px] ring-white transition duration-300 group-hover:-rotate-3">
+                          <div className="absolute left-[4%] top-[4%] aspect-square w-[80%] overflow-hidden rounded-full bg-[#EFE4CC] shadow-md ring-[3px] ring-white transition duration-300 group-hover:-rotate-3">
                             <img src={src} alt="" width={400} height={400} style={lidClip} loading={index < 6 ? 'eager' : 'lazy'} />
                           </div>
-                          <div className="absolute bottom-[6%] right-[6%] aspect-square w-[50%] rotate-[4deg] overflow-hidden rounded-[16%] bg-[#EFE4CC] shadow-lg ring-[3px] ring-white transition duration-300 group-hover:rotate-[8deg]">
+                          <div className="absolute bottom-[4%] right-[4%] aspect-square w-[40%] rotate-[4deg] overflow-hidden rounded-[16%] bg-[#EFE4CC] shadow-lg ring-[3px] ring-white transition duration-300 group-hover:rotate-[8deg]">
                             <img src={src} alt="" width={400} height={400} style={plushClip} loading={index < 6 ? 'eager' : 'lazy'} />
                           </div>
                         </div>
