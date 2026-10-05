@@ -26,6 +26,7 @@ import { formatDateJa } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
 import { manholeDisplayName } from '@/lib/manhole-label';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 type FeedVisit = {
   id: string;
@@ -373,6 +374,11 @@ export default function PopularPage() {
                             ) : (
                               <div className="mt-0.5 text-xs font-medium opacity-80">{visit.display_name}</div>
                             )
+                          )}
+                          {visit.display_name && visit.public_user_id && (
+                            <span className="ml-1 inline-block align-middle">
+                              <PosterRegularBadge publicUserId={visit.public_user_id} />
+                            </span>
                           )}
                           <div className="mt-3 flex items-center gap-4 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1">

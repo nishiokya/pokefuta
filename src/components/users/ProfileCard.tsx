@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Instagram, Pencil, UserRound } from 'lucide-react';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 // スタンプ帳(/visits)とマイ旅(/my-trip)で同じUXのユーザ情報カードを出すための共通コンポーネント。
 // 表示専用。編集は /profile（ヘッダーの名前クリックでも到達できる唯一の編集場所）に集約する。
@@ -61,7 +62,10 @@ export default function ProfileCard({ className = '' }: { className?: string }) 
           <UserRound className="h-5 w-5 text-[#8C6A4A]" />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-pixelJp text-base font-bold text-[#4F3828]">{profile.displayName}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate font-pixelJp text-base font-bold text-[#4F3828]">{profile.displayName}</p>
+            <PosterRegularBadge publicUserId={profile.publicUserId} />
+          </div>
           {profile.bio && (
             <p className="mt-0.5 text-xs leading-5 text-[#6A4D36]" style={{ fontFamily: ROUND }}>
               {profile.bio}

@@ -6,6 +6,7 @@ import { Camera, MessageCircle, Sparkles } from 'lucide-react';
 import { commentThreadState, pokefutaEvents } from '@/lib/analytics/gtag';
 import CommentComposer from './CommentComposer';
 import CommentItem, { type PublicComment } from './CommentItem';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 const PAGE_SIZE = 50;
 
@@ -21,6 +22,8 @@ export interface PhotoCommentEntry {
   /** 書かれた日時。掲示板コメントの created_at と同じ軸で並べる */
   postedAt: string;
   userLabel: string;
+  /** 称号を引く公開ID */
+  publicUserId?: string | null;
   profileHref: string | null;
   photoSrc: string;
   onOpenPhoto: () => void;
@@ -493,6 +496,7 @@ function PhotoCommentItem({ entry }: { entry: PhotoCommentEntry }) {
           ) : (
             <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">{entry.userLabel}</span>
           )}
+          <PosterRegularBadge publicUserId={entry.publicUserId} />
           <span className="inline-flex items-center gap-0.5 rounded-full bg-[#fdf1e6] px-1.5 py-px font-pixelJp text-[10px] font-bold text-[#b0643f]">
             <Camera className="h-2.5 w-2.5" strokeWidth={2.4} />
             写真のひとこと

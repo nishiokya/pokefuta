@@ -19,8 +19,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import RegularBadge from '@/components/RegularBadge';
-import { EMPTY_REGULAR_BADGES, fetchRegularBadges } from '@/lib/regular-badges';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
@@ -263,19 +262,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     samePokemon: RelatedManhole[];
   }>(derivedOf(initial));
   const [photos, setPhotos] = useState<Photo[]>([]);
-  // 投稿者名の横の称号。ブラウザで data.pokefuta.com から読む（src/lib/regular-badges.ts）
-  const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
-  useEffect(() => {
-    let cancelled = false;
-    fetchRegularBadges().then((badges) => {
-      if (!cancelled) setRegularBadges(badges);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const regularTierOf = (photo: Photo) =>
-    photo.visit?.public_user_id ? regularBadges.get(photo.visit.public_user_id) : undefined;
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -958,7 +944,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {newestFirstPhotos.map(({ photo, index }) => {
           const userLabel = getPhotoUserLabel(photo);
-          const regularTier = regularTierOf(photo);
           // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
           // 並んでいるので、表示だけ shot_at を見ると日付欄が空になり、
           // 読み上げの「撮影」も事実とズレる。
@@ -1066,7 +1051,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       @{userLabel}
                     </span>
                   )}
-                  {regularTier && <RegularBadge tier={regularTier} />}
+                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} />
                 </div>
                 {dateLabel && (
                   // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
@@ -1102,6 +1087,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       text,
       postedAt,
       userLabel: getPhotoUserLabel(photo),
+      publicUserId: photo.visit?.public_user_id ?? null,
       profileHref:
         photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
           ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
@@ -1361,10 +1347,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       ) : (
                         <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
                       )}
-                      {(() => {
-                        const tier = regularTierOf(featuredPhoto);
-                        return tier ? <RegularBadge tier={tier} /> : null;
-                      })()}
+                      <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
                       {featuredPhoto.visit?.shot_at && (
                         <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
                           {formatPhotoDate(featuredPhoto.visit.shot_at)}
