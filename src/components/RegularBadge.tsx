@@ -1,6 +1,6 @@
 import { REGULAR_BADGE_LABEL, type RegularTier } from '@/lib/regular-badges';
 
-/** 投稿者名の横に付ける 👑 常連（金）/ 常連（シルバー）。判定の条件は書かない */
+/** 投稿者名の横に付ける 👑 MASTER（金）/ EXPLORER（シルバー）。判定の条件は書かない */
 export default function RegularBadge({ tier }: { tier: RegularTier }) {
   return (
     <span

@@ -1,5 +1,5 @@
 /**
- * トップ「最新の投稿」の投稿者名に付ける 👑 常連 / 常連 バッジ。
+ * トップ「最新の投稿」の投稿者名に付ける 👑 MASTER（金）/ EXPLORER（シルバー）バッジ。
  *
  * 人を順位で並べるランキングは置かず、続けて来ている人に印を付けるだけにしている。
  * 判定の線は公開しない（pokefuta-tracker の secret）ので、画面にも条件は書かない。
@@ -24,8 +24,8 @@ export type RegularBadges = ReadonlyMap<string, RegularTier>;
 export const EMPTY_REGULAR_BADGES: RegularBadges = new Map();
 
 export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
-  crown: '👑 常連',
-  regular: '常連',
+  crown: '👑 MASTER',
+  regular: 'EXPLORER',
 };
 
 export function parseRegularBadges(data: unknown): RegularBadges {
