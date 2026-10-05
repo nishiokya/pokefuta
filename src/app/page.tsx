@@ -32,6 +32,7 @@ import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
+import { EMPTY_REGULAR_BADGES, REGULAR_BADGE_LABEL, fetchRegularBadges } from '@/lib/regular-badges';
 
 type FeedVisit = {
   id: string;
@@ -73,6 +74,7 @@ export default function HomePage() {
   // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -99,6 +101,7 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadPlushFeature();
+    fetchRegularBadges().then(setRegularBadges);
   }, []);
 
   useEffect(() => {
@@ -408,6 +411,10 @@ export default function HomePage() {
                     const latestComment = commentCount > 0 ? visit.latest_manhole_comment ?? null : null;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
+                    const regularTier = posterLabel && visit.public_user_id
+                      ? regularBadges.get(visit.public_user_id)
+                      : undefined;
+                    const regularLabel = regularTier ? REGULAR_BADGE_LABEL[regularTier] : null;
                     // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
                     // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
@@ -416,6 +423,7 @@ export default function HomePage() {
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
+                      regularLabel,
                       commentCount > 0 ? `口コミ ${commentCount}件` : null,
                       latestComment ? `最新の口コミ「${latestComment.content}」` : null,
                     ].filter(Boolean).join('、');
@@ -466,6 +474,17 @@ export default function HomePage() {
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{posterLabel}</span>
+                              {regularTier && (
+                                <span
+                                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold leading-none shadow-sm ${
+                                    regularTier === 'crown'
+                                      ? 'bg-gradient-to-b from-amber-200 to-yellow-400 text-amber-900'
+                                      : 'bg-gradient-to-b from-slate-100 to-slate-300 text-slate-700'
+                                  }`}
+                                >
+                                  {regularLabel}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
