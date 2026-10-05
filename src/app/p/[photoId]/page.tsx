@@ -22,6 +22,7 @@ import {
   getSortedTitles,
   loadPublicSharedPhoto,
 } from '@/lib/shared-photo';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 type PageProps = {
   params: {
@@ -167,6 +168,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
                 {posterHref ? (
                   <Link href={posterHref} className="flex min-w-0 items-center gap-0.5 font-extrabold text-[#7B63A8] hover:underline">
                     <span className="truncate">@{extras.posterName}</span>
+                    <PosterRegularBadge publicUserId={extras.posterPublicId} />
                     <ChevronRight className="h-4 w-4 shrink-0" />
                   </Link>
                 ) : (

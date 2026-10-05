@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import LandscapePhotoBadge from './LandscapePhotoBadge';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 const NUM = '"Outfit", "M PLUS Rounded 1c", system-ui, sans-serif';
@@ -21,6 +22,8 @@ export interface VisitPhotoCardProps {
   title: string;
   date: string;
   posterName?: string | null;
+  /** 称号を引く投稿者の公開ID。渡したときだけ名前の横に称号が出る */
+  posterPublicId?: string | null;
   tags: string[];
   /** 自分の記録の公開状態。onToggleVisibility と併せて渡したときだけバッジが出る。 */
   isPublic?: boolean;
@@ -41,6 +44,7 @@ export default function VisitPhotoCard({
   title,
   date,
   posterName,
+  posterPublicId,
   tags,
   isPublic,
   onToggleVisibility,
@@ -189,6 +193,7 @@ export default function VisitPhotoCard({
                   >
                     {visiblePosterName}
                   </span>
+                  <PosterRegularBadge publicUserId={posterPublicId} />
                 </>
               )}
             </div>

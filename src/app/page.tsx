@@ -17,6 +17,7 @@ import {
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import RegularBadge from '@/components/RegularBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
@@ -32,6 +33,7 @@ import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
+import { EMPTY_REGULAR_BADGES, REGULAR_BADGE_LABEL, fetchRegularBadges } from '@/lib/regular-badges';
 
 type FeedVisit = {
   id: string;
@@ -73,6 +75,7 @@ export default function HomePage() {
   // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -99,6 +102,7 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadPlushFeature();
+    fetchRegularBadges().then(setRegularBadges);
   }, []);
 
   useEffect(() => {
@@ -376,12 +380,14 @@ export default function HomePage() {
                         .slice(0, 4);
                       const who = item.display_name ? `${item.display_name}さん` : 'この人';
                       const summary = `${who}の投稿 ほか${item.hidden.length}枚`;
+                      // 投稿が多い人ほどここに畳まれるので、個別カードと同じバッジを出す
+                      const collapsedTier = regularBadges.get(item.public_user_id);
                       return (
                         <Link
                           key={`collapsed-${item.public_user_id}`}
                           href={`/users/${encodeURIComponent(item.public_user_id)}/visits`}
                           className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#2E2346] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
-                          aria-label={[summary, item.busiestDay >= 3 ? `1日で${item.busiestDay}枚ハシゴ` : null, '投稿をすべて見る'].filter(Boolean).join('、')}
+                          aria-label={[summary, collapsedTier ? REGULAR_BADGE_LABEL[collapsedTier] : null, item.busiestDay >= 3 ? `1日で${item.busiestDay}枚ハシゴ` : null, '投稿をすべて見る'].filter(Boolean).join('、')}
                         >
                           {/* 畳んだ写真を2x2で敷き、暗く落として文字を載せる */}
                           <div className="grid h-full w-full grid-cols-2 grid-rows-2 opacity-45">
@@ -398,7 +404,10 @@ export default function HomePage() {
                             <div className="text-base font-extrabold sm:text-lg">
                               ほか{item.hidden.length}枚
                             </div>
-                            <div className="line-clamp-1 text-xs font-semibold text-white/85 sm:text-sm">{who}の投稿</div>
+                            <div className="flex min-w-0 max-w-full items-center justify-center gap-1 text-xs font-semibold text-white/85 sm:text-sm">
+                              <span className="truncate">{who}の投稿</span>
+                              {collapsedTier && <RegularBadge tier={collapsedTier} />}
+                            </div>
                             <div className="mt-1 inline-flex items-center gap-0.5 text-xs font-extrabold text-[#FFB347]">
                               すべて見る
                               <ChevronRight className="h-3.5 w-3.5" />
@@ -418,6 +427,10 @@ export default function HomePage() {
                     const latestComment = commentCount > 0 ? visit.latest_manhole_comment ?? null : null;
 
                     const posterLabel = visit.display_name ? `投稿者 ${visit.display_name}` : null;
+                    const regularTier = posterLabel && visit.public_user_id
+                      ? regularBadges.get(visit.public_user_id)
+                      : undefined;
+                    const regularLabel = regularTier ? REGULAR_BADGE_LABEL[regularTier] : null;
                     // カード全体に aria-label を張っているので、中の要素の文言は読み上げられない。
                     // バッジを足したら、ここにも同じことを書かないと目で見える情報と食い違う。
                     const commonAriaLabel = [
@@ -426,6 +439,7 @@ export default function HomePage() {
                       locationLabel,
                       `撮影 ${formatDateJa(visit.shot_at)}`,
                       posterLabel,
+                      regularLabel,
                       commentCount > 0 ? `口コミ ${commentCount}件` : null,
                       latestComment ? `最新の口コミ「${latestComment.content}」` : null,
                     ].filter(Boolean).join('、');
@@ -476,6 +490,7 @@ export default function HomePage() {
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{posterLabel}</span>
+                              {regularTier && <RegularBadge tier={regularTier} />}
                             </div>
                           )}
                         </div>

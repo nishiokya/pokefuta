@@ -12,6 +12,7 @@ import {
   PublicPrefectureProgress,
   loadPublicUserPrefectureProgress,
 } from '@/lib/user-prefecture-progress';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 type PageProps = {
   params: {
@@ -160,6 +161,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
           >
             <ArrowLeft className="h-4 w-4" />
             {progress.displayName}のスタンプ帳を見る
+            <PosterRegularBadge publicUserId={progress.userId} />
           </Link>
         </div>
       </main>

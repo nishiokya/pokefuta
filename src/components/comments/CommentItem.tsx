@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Flag, Trash2 } from 'lucide-react';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
 
 export interface PublicComment {
   id: string;
@@ -79,6 +80,7 @@ export default function CommentItem({
           ) : (
             <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">{label}</span>
           )}
+          <PosterRegularBadge publicUserId={comment.user.public_user_id} />
           <span className="font-pixelJp text-[10px] text-[#9b917e]">
             {new Date(comment.created_at).toLocaleDateString('ja-JP')}
           </span>
