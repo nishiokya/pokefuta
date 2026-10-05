@@ -24,6 +24,7 @@ import { formatDateJa } from '@/lib/date';
 import { userVisitsShareText } from '@/lib/share';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
+import UserRegularBadge from '@/components/users/UserRegularBadge';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
   loadPublicUserPrefectureProgress,
@@ -172,9 +173,12 @@ export default async function UserVisitsPage({ params }: PageProps) {
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-8">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
-              <Stamp className="h-3.5 w-3.5" />
-              公開スタンプ帳
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
+                <Stamp className="h-3.5 w-3.5" />
+                公開スタンプ帳
+              </div>
+              <UserRegularBadge userId={data.userId} />
             </div>
             <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
               {data.displayName}のスタンプ帳
