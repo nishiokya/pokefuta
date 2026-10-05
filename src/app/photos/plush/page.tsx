@@ -3,10 +3,9 @@ import Link from 'next/link';
 import { formatDateJaJst } from '@/lib/date';
 import { feedCardTags } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { hasPlushClip, photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition, photoSubjectZoom } from '@/lib/photo-ai-tags';
+import { hasPlushClip, photoAiBoxes, photoAiTags, photoBoxZoom } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
 import { FlaskConical, MapPin, MessageCircle, UserRound } from 'lucide-react';
-import PlushAiBoxToggle from '@/components/PlushAiBoxToggle';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
@@ -23,14 +22,6 @@ export const revalidate = 600;
 
 // 感想は公式 X へ（/about の「フィードバック」と同じ宛先）。本文にページの URL を入れておく
 const FEEDBACK_URL = `https://x.com/intent/post?text=${encodeURIComponent('@pokemonmanhole ぬいぐるみと旅するポケふた（ベータ）の感想: ')}&url=${encodeURIComponent('https://pokefuta.com/photos/plush')}`;
-
-// AI の枠（写真の幅・高さを 1 とした割合）を、寄せた写真の上に重ねる位置
-const boxStyle = (b: [number, number, number, number]) => ({
-  left: `${b[0] * 100}%`,
-  top: `${b[1] * 100}%`,
-  width: `${(b[2] - b[0]) * 100}%`,
-  height: `${(b[3] - b[1]) * 100}%`,
-});
 
 export default async function PlushPhotosPage() {
   // 蓋とぬいぐるみをそれぞれ切り抜ける写真だけを出す（AI がぬいぐるみの枠を見つけられなかった写真は外す）
@@ -51,7 +42,6 @@ export default async function PlushPhotosPage() {
             </p>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <PlushAiBoxToggle targetId="plush-grid" />
             <a
               href={FEEDBACK_URL}
               target="_blank"
@@ -80,10 +70,10 @@ export default async function PlushPhotosPage() {
             まだ写真がありません。
           </p>
         ) : (
-          // ベータ: 写真は蓋とぬいぐるみの両方が入るように寄せ（ai_tags.plush_box と lid。無ければ蓋の位置の正方形）、
-          // ぬいぐるみが下に写ることが多いので、場所・撮影日・投稿者は写真に重ねず下に書く。
+          // ベータ: 写真は蓋とぬいぐるみをそれぞれ切り抜いて並べる（ai_tags.lid と plush_box）。
+          // ぬいぐるみが写真に隠れないよう、場所・撮影日・投稿者は写真に重ねず下に書く。
           // 押すと投稿者のページへ直接飛ぶ。公開IDの無い投稿者は写真の個別ページへ
-          <ul id="plush-grid" data-ai-boxes="off" className="group/grid grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
+          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
             {photos.map((photo, index) => {
               const chips = feedCardTags(
                 { id: photo.visitId, manhole_id: photo.manholeId, shot_at: photo.shotAt ?? photo.createdAt, manhole: { pokemons: photo.pokemons } },
@@ -93,12 +83,10 @@ export default async function PlushPhotosPage() {
               const aiLabels = photoAiTags(tagPhoto).map((t) => t.label);
               const href = photo.posterPublicId ? `/users/${encodeURIComponent(photo.posterPublicId)}/visits` : `/p/${photo.id}`;
               const shotAt = photo.shotAt ?? photo.createdAt;
-              const zoom = photoSubjectZoom(photo.aiTags);
               const boxes = photoAiBoxes(photo.aiTags);
-              // 蓋とぬいぐるみをそれぞれ切り抜いて並べる（両方の枠があるときだけ。無ければ1枚の正方形）
-              const lidClip = boxes.lid && boxes.plush ? photoBoxZoom(photo.aiTags, boxes.lid, 1.04) : undefined;
-              const plushClip = boxes.lid && boxes.plush ? photoBoxZoom(photo.aiTags, boxes.plush, 1.12) : undefined;
-              const clips = lidClip && plushClip;
+              // 蓋とぬいぐるみをそれぞれ切り抜いて並べる（一覧は両方の枠がある写真だけ。hasPlushClip で絞ってある）
+              const lidClip = boxes.lid ? photoBoxZoom(photo.aiTags, boxes.lid, 1.04) : undefined;
+              const plushClip = boxes.plush ? photoBoxZoom(photo.aiTags, boxes.plush, 1.12) : undefined;
               const src = `/api/photo/${photo.id}?size=small`;
               // カード全体に aria-label を張るので、写真の上の文字は読み上げられない。同じ内容をここに書く
               const ariaLabel = [
@@ -118,44 +106,14 @@ export default async function PlushPhotosPage() {
                     className="group block overflow-hidden rounded-[10px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
-                      {clips && (
-                        // 蓋（丸いスタンプ、左上、大きく）とぬいぐるみ（角丸のステッカー、蓋の半分の大きさで右下に重ねる）をそれぞれ切り抜いて並べる。「元の写真で見る」で隠れる
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#FFF8EB_0,#F1E3C6_75%)] group-data-[ai-boxes=on]/grid:hidden">
-                          <div className="absolute left-[4%] top-[4%] aspect-square w-[80%] overflow-hidden rounded-full bg-[#EFE4CC] shadow-md ring-[3px] ring-white transition duration-300 group-hover:-rotate-3">
-                            <img src={src} alt="" width={400} height={400} style={lidClip} loading={index < 6 ? 'eager' : 'lazy'} />
-                          </div>
-                          <div className="absolute bottom-[4%] right-[4%] aspect-square w-[40%] rotate-[4deg] overflow-hidden rounded-[16%] bg-[#EFE4CC] shadow-lg ring-[3px] ring-white transition duration-300 group-hover:rotate-[8deg]">
-                            <img src={src} alt="" width={400} height={400} style={plushClip} loading={index < 6 ? 'eager' : 'lazy'} />
-                          </div>
+                      {/* 蓋（丸いスタンプ、左上、大きく）とぬいぐるみ（角丸のステッカー、蓋の半分の大きさで右下に重ねる） */}
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#FFF8EB_0,#F1E3C6_75%)]">
+                        <div className="absolute left-[4%] top-[4%] aspect-square w-[80%] overflow-hidden rounded-full bg-[#EFE4CC] shadow-md ring-[3px] ring-white transition duration-300 group-hover:-rotate-3">
+                          <img src={src} alt="" width={400} height={400} style={lidClip} loading={index < 6 ? 'eager' : 'lazy'} />
                         </div>
-                      )}
-                      <div className={clips ? 'absolute inset-0 hidden group-data-[ai-boxes=on]/grid:block' : 'absolute inset-0'}>
-                        {zoom ? (
-                          // 寄せた写真と AI の枠を同じ箱に入れて、枠が写真といっしょに動くようにする
-                          <div className="transition duration-300 group-hover:scale-105" style={zoom}>
-                            <img src={src} alt="" width={400} height={400} className="h-full w-full" loading={index < 6 ? 'eager' : 'lazy'} />
-                            {boxes.lid && (
-                              <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FF5FA2] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.lid)}>
-                                <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FF5FA2] px-1 text-[10px] font-extrabold leading-4 text-white">蓋</span>
-                              </span>
-                            )}
-                            {boxes.plush && (
-                              <span className="absolute hidden rounded-[3px] border-2 border-dashed border-[#FFD23F] group-data-[ai-boxes=on]/grid:block" style={boxStyle(boxes.plush)}>
-                                <span className="absolute left-0 top-0 whitespace-nowrap rounded-br-sm bg-[#FFD23F] px-1 text-[10px] font-extrabold leading-4 text-[#4F3828]">ぬいぐるみ</span>
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <img
-                            src={src}
-                            alt=""
-                            width={400}
-                            height={400}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            style={{ objectPosition: photoObjectPosition(photo.aiTags) }}
-                            loading={index < 6 ? 'eager' : 'lazy'}
-                          />
-                        )}
+                        <div className="absolute bottom-[4%] right-[4%] aspect-square w-[40%] rotate-[4deg] overflow-hidden rounded-[16%] bg-[#EFE4CC] shadow-lg ring-[3px] ring-white transition duration-300 group-hover:rotate-[8deg]">
+                          <img src={src} alt="" width={400} height={400} style={plushClip} loading={index < 6 ? 'eager' : 'lazy'} />
+                        </div>
                       </div>
                       {(photo.isLandscape || chips.length > 0) && (
                         <div className="absolute left-2 right-2 top-2 flex flex-wrap gap-1">

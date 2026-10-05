@@ -130,48 +130,7 @@ export function photoLidZoom(aiTags: unknown, maxZoom = LID_ZOOM_MAX): LidZoomSt
   };
 }
 
-/** ぬいぐるみの特集のカードで寄せるときの最大倍率。カードは 320px のサムネイルなので、蓋の拡大より控えめにする */
-export const SUBJECT_ZOOM_MAX = 2;
-
-/**
- * ぬいぐるみの特集（/photos/plush）のカードで、蓋とぬいぐるみの両方が正方形に入るように寄せる位置。
- * 置き方は photoLidZoom と同じ（正方形の枠の中に img を absolute で大きく置く）。
- *
- * ai_tags.lid と ai_tags.plush_box を両方囲む正方形（長いほうの辺 × 1.06）に寄せる。
- * 正方形は写真の外にはみ出さないようにずらす（スタンプと違って地の色を見せない）。写真の短辺より大きくはしない。
- * plush_box か crop が無い・形が違うときは undefined（呼び出し側は今までどおり crop の object-position）。
- */
-export function photoSubjectZoom(aiTags: unknown, maxZoom = SUBJECT_ZOOM_MAX): LidZoomStyle | undefined {
-  if (!isRecord(aiTags)) return undefined;
-  const plush = unitBox(aiTags.plush_box);
-  const crop = unitBox(aiTags.crop);
-  if (!plush || !crop) return undefined;
-  const lid = unitBox(aiTags.lid);
-  const boxes = lid ? [plush, lid] : [plush];
-  const aspect = (crop[3] - crop[1]) / (crop[2] - crop[0]); // W / H
-  // 写真の幅を 1 とした長さで考える（高さは 1 / aspect）
-  const height = 1 / aspect;
-  const shortSide = Math.min(1, height);
-  const x0 = Math.min(...boxes.map((b) => b[0]));
-  const x1 = Math.max(...boxes.map((b) => b[2]));
-  const y0 = Math.min(...boxes.map((b) => b[1])) * height;
-  const y1 = Math.max(...boxes.map((b) => b[3])) * height;
-  const side = Math.min(Math.max(Math.max(x1 - x0, y1 - y0) * 1.06, shortSide / maxZoom), shortSide);
-  const clamp = (v: number, hi: number) => Math.min(Math.max(v, 0), Math.max(hi, 0));
-  const left = clamp((x0 + x1) / 2 - side / 2, 1 - side);
-  const top = clamp((y0 + y1) / 2 - side / 2, height - side);
-  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
-  return {
-    position: 'absolute',
-    width: pct(1 / side),
-    height: pct(height / side),
-    left: pct(-left / side),
-    top: pct(-top / side),
-    maxWidth: 'none',
-  };
-}
-
-/** AI が見つけた枠（蓋・ぬいぐるみ）。ぬいぐるみの特集で写真に重ねて見せる。形が違う枠は null */
+/** AI が見つけた枠（蓋・ぬいぐるみ）。ぬいぐるみの特集でそれぞれ切り抜くのに使う。形が違う枠は null */
 export function photoAiBoxes(aiTags: unknown): { lid: [number, number, number, number] | null; plush: [number, number, number, number] | null } {
   if (!isRecord(aiTags)) return { lid: null, plush: null };
   return { lid: unitBox(aiTags.lid), plush: unitBox(aiTags.plush_box) };

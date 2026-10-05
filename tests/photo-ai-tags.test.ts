@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, LID_ZOOM_MAX, SUBJECT_ZOOM_MAX, hasPlushClip, photoAiTags, photoLidZoom, photoObjectPosition, photoSubjectZoom } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, hasPlushClip, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -90,35 +90,23 @@ test('photoLidZoom needs both lid and crop', () => {
   assert.equal(photoLidZoom(null), undefined);
 });
 
-test('ぬいぐるみの特集: 蓋とぬいぐるみを両方囲む正方形に寄せる', () => {
-  // 4:3 の横長（crop は幅 0.75）。蓋は上、ぬいぐるみは左下
-  const z = photoSubjectZoom({ crop: [0.125, 0, 0.875, 1], lid: [0.4, 0.1, 0.7, 0.5], plush_box: [0.2, 0.5, 0.45, 0.9] });
-  // 囲む枠は x 0.2〜0.7（幅 0.5）、y 0.075〜0.675（写真の幅を 1 として。高さ 0.6）→ 一辺 0.636、中心 (0.45, 0.375)
-  assert.deepEqual(z, { position: 'absolute', width: '157.2%', height: '117.9%', left: '-20.8%', top: '-9%', maxWidth: 'none' });
+test('ぬいぐるみの特集: 1つの枠を正方形いっぱいに切り抜く', () => {
+  // 正方形の写真、枠 0.2〜0.6（一辺 0.4）× 1 → 2.5 倍、枠の左上が正方形の左上
+  assert.deepEqual(photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.2, 0.2, 0.6, 0.6], 1), {
+    position: 'absolute', width: '250%', height: '250%', left: '-50%', top: '-50%', maxWidth: 'none',
+  });
 });
 
-test('ぬいぐるみの特集: 正方形は写真からはみ出さず、短辺より大きくしない', () => {
-  // 両方で写真いっぱい → 短辺の正方形（拡大しない）。右端に寄っても写真の中に収める
-  const full = photoSubjectZoom({ crop: [0.25, 0, 0.75, 1], lid: [0.6, 0, 1, 0.6], plush_box: [0.0, 0.5, 1, 1] });
-  assert.equal(full?.width, '200%');
-  assert.equal(full?.height, '100%');
-  assert.equal(full?.top, '0%');
-  const edge = photoSubjectZoom({ crop: [0.25, 0, 0.75, 1], lid: [0.85, 0.4, 1, 0.55], plush_box: [0.9, 0.5, 1, 0.6] });
-  // 右端に寄せても left は −(1 − 一辺)/一辺 より右へ行かない（写真の右端で止まる）
-  const w = parseFloat(edge!.width) / 100;
-  assert.ok(Math.abs(parseFloat(edge!.left) / 100 - (1 - w)) < 0.002);
-  // 小さいものは SUBJECT_ZOOM_MAX 倍まで
-  const tiny = photoSubjectZoom({ crop: [0, 0, 1, 1], lid: [0.5, 0.5, 0.52, 0.52], plush_box: [0.52, 0.5, 0.54, 0.52] });
-  assert.equal(tiny?.width, `${SUBJECT_ZOOM_MAX * 100}%`);
-});
-
-test('ぬいぐるみの特集: plush_box か crop が無ければ寄せない（今までどおり）', () => {
-  assert.equal(photoSubjectZoom({ crop: [0, 0, 1, 1], lid: [0.2, 0.2, 0.8, 0.8] }), undefined);
-  assert.equal(photoSubjectZoom({ plush_box: [0.2, 0.2, 0.8, 0.8] }), undefined);
-  assert.equal(photoSubjectZoom({ crop: [0, 0, 1, 1], plush_box: [0.8, 0.2, 0.2, 0.8] }), undefined);
-  assert.equal(photoSubjectZoom(null), undefined);
-  // 蓋の枠が無くてもぬいぐるみだけで寄せる
-  assert.ok(photoSubjectZoom({ crop: [0, 0, 1, 1], plush_box: [0.2, 0.2, 0.6, 0.6] }));
+test('ぬいぐるみの特集: 切り抜きは写真の外を見せず、短辺より大きくせず、最大倍率まで', () => {
+  // 写真の右下の隅の枠 → 写真の内側にずらす（右端・下端で止まる）
+  const corner = photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.8, 0.8, 1, 1], 1, 10);
+  assert.deepEqual([corner?.left, corner?.top], ['-400%', '-400%']);
+  // 写真より大きい枠 → 短辺の正方形（拡大しない）
+  assert.equal(photoBoxZoom({ crop: [0.25, 0, 0.75, 1] }, [0, 0, 1, 1], 1.2)?.height, '100%');
+  // 小さい枠は LID_ZOOM_MAX 倍まで
+  assert.equal(photoBoxZoom({ crop: [0, 0, 1, 1] }, [0.5, 0.5, 0.51, 0.51])?.width, `${LID_ZOOM_MAX * 100}%`);
+  // crop が無いと縦横比が分からないので切り抜かない
+  assert.equal(photoBoxZoom({}, [0.2, 0.2, 0.6, 0.6]), undefined);
 });
 
 test('ぬいぐるみの特集: 蓋とぬいぐるみの枠と crop がそろった写真だけ切り抜ける', () => {
