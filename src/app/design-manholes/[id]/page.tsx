@@ -137,7 +137,7 @@ export default async function Page({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
 
-      <main className="mx-auto max-w-3xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-5 sm:pt-8">
         <nav className="text-xs text-[#2A2A2A]/60">
           <Link href="/design-manholes" className="hover:underline">
             みんなのデザインマンホール
@@ -146,7 +146,8 @@ export default async function Page({ params }: Props) {
           <span>{title}</span>
         </nav>
 
-        <article className="mt-4 overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white shadow-sm">
+        {/* PC は本文が --page-max-wide まで広がるので、写真と説明を横に並べる */}
+        <article className="mt-4 overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           <div className="bg-[#EFE5CE]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

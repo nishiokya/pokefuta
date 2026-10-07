@@ -30,7 +30,7 @@ export default async function PlushPhotosPage() {
 
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-5xl px-4 pb-8 pt-3 sm:pt-6">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
         {/* 実験ラボの帯。AI で選んで切り抜いていること・間違いがあることを先に伝え、感想をもらう */}
         <section className="mb-4 overflow-hidden rounded-[12px] border border-dashed border-[#7B63A8]/50 bg-[repeating-linear-gradient(135deg,#F3EEFA_0,#F3EEFA_12px,#EEE6F8_12px,#EEE6F8_24px)] p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

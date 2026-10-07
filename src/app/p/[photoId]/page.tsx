@@ -103,13 +103,14 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-4xl px-4 pb-5 pt-3 sm:pb-8 sm:pt-6">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-5 pt-3 sm:pb-8 sm:pt-6">
         {/*
           写真が主役。以前は横長の枠に切り抜き、下半分に見出しを重ねていたので、蓋やぬいぐるみが切れていた。
           写真は切らずに全体を出し、見出し以下は写真の下に置く。
           行き先は2つ: 投稿者のページ（投稿者の欄）と蓋の詳細（いちばん下）。
         */}
-        <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
+        {/* PC は本文が --page-max-wide まで広がるので、写真と見出し以下を横に並べる（縦積みのままだと写真が画面より大きくなる） */}
+        <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)] lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           {/*
             枠の比率を先に決めて場所を取っておく（読み込みが遅いと高さ0から押し広げて見出し以下がずれる。CLS）。
             写真は枠の中に切らずに収め、余りは暗い背景。DB の width/height は回転前の値のことがあるので使わない

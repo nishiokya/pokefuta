@@ -449,7 +449,7 @@ export default function DesignManholeNewPage() {
 
     return (
       <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
-        <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
+        <main className="mx-auto max-w-read px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
@@ -510,7 +510,7 @@ export default function DesignManholeNewPage() {
   if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
     return (
       <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
-        <main className="mx-auto max-w-2xl px-4 pb-8 pt-10">
+        <main className="mx-auto max-w-read px-4 pb-8 pt-10">
           <SubmissionTypeSwitcher current="design" designSubmissionSuspended />
           <div
             role="status"
@@ -550,7 +550,7 @@ export default function DesignManholeNewPage() {
   return (
     <div className="min-h-content safe-area-body bg-[#F3EEF8] pb-nav-safe text-[#2A2A2A]">
 
-      <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-read px-4 pb-8 pt-5 sm:pt-8">
         <SubmissionTypeSwitcher current="design" />
         <div className="mt-4 rounded-xl border border-[#7B63A8]/30 bg-[#F4F0FA] p-4 shadow-sm">
           <p className="text-sm font-extrabold text-[#5E4788]">ここはデザインマンホールの投稿ページです</p>

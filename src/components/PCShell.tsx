@@ -18,7 +18,7 @@ interface PCShellProps {
  */
 export default function PCShell({ children, rail, className }: PCShellProps) {
   return (
-    <div className={`mx-auto w-full max-w-[1120px] px-4 lg:px-8 ${className ?? ''}`}>
+    <div className={`mx-auto w-full max-w-page px-4 lg:px-8 ${className ?? ''}`}>
       {rail ? (
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
           {/* モバイル: rail を children より先に表示 */}

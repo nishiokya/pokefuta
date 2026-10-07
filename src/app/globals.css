@@ -17,6 +17,13 @@
     @apply bg-gradient-to-br from-pokemon-red via-pokemon-blue to-pokemon-yellow;
     @apply text-pokemon-darkBlue;
     @apply overflow-x-hidden;
+    /* スクロールバーを常に出す。下の ::-webkit-scrollbar で自作（8px）にしているので
+       Mac でもスクロールの有無で中央寄せの本文が 4px 左右にずれていた。
+       ⚠️ scrollbar-gutter: stable では止まらない（Mac のオーバーレイ設定だと、
+          スクロールしないページで溝が 0 になる。2026-10-07 に実測）。
+       html でなく body に付けるのは、html が visible のままなら body の overflow は
+       ビューポートへ伝わり body 自身はスクロール容器にならないため（sticky ヘッダーが効く） */
+    overflow-y: scroll;
   }
 
   /* Custom scrollbar for webkit browsers */

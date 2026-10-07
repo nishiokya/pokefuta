@@ -874,7 +874,7 @@ function UploadPageInner() {
   if (allUploaded) {
     return (
       <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-        <main className="mx-auto max-w-2xl px-4 pb-8 pt-10 text-center">
+        <main className="mx-auto max-w-read px-4 pb-8 pt-10 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-[#4C9A57]" />
           <h1 className="mt-4 text-xl font-bold">投稿ありがとうございます！</h1>
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
@@ -961,7 +961,7 @@ function UploadPageInner() {
       )}
 
 
-      <main className="mx-auto max-w-2xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-read px-4 pb-8 pt-5 sm:pt-8">
         <SubmissionTypeSwitcher
           current="pokefuta"
           designSubmissionSuspended={DESIGN_MANHOLE_SUBMISSION_SUSPENDED}
