@@ -113,12 +113,16 @@ export default async function SharedPhotoPage({ params }: PageProps) {
           PC は本文が --page-max-wide まで広がるので、写真と見出し以下を横に並べる（縦積みのままだと写真が画面より大きくなる）。
           右の列は 370px 前後しかないので、中の sm: の段組み（情報表2列・他の写真8列）は lg で戻している
         */}
-        <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)] lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+        <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)] lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:overflow-clip">
           {/*
             枠の比率を先に決めて場所を取っておく（読み込みが遅いと高さ0から押し広げて見出し以下がずれる。CLS）。
             写真は枠の中に切らずに収め、余りは暗い背景。DB の width/height は回転前の値のことがあるので使わない
           */}
-          <div className="relative aspect-[4/5] max-h-[78vh] w-full bg-[#1c1a17] sm:aspect-[4/3]">
+          {/*
+            PC の右列は投稿者・情報表・他の写真で写真より縦に長いので、写真を追従させて下に空白の帯を作らない。
+            sticky が効くよう、article は lg で overflow-clip（hidden だとスクロール容器になり sticky が止まる）
+          */}
+          <div className="relative aspect-[4/5] max-h-[78vh] w-full bg-[#1c1a17] sm:aspect-[4/3] lg:sticky lg:top-5">
             <img
               src={`/api/photo/${photo.id}?size=large`}
               alt={`${heading}の${photo.is_landscape ? '周辺の風景' : '写真'}`}
