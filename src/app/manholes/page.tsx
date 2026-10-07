@@ -89,7 +89,7 @@ export default function ManholesPage() {
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC] text-[#2A2A2A]">
 
-      <main className="mx-auto max-w-6xl px-4 pb-6 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-6 pt-5 sm:pt-8">
         <section className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-7 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-10 sm:py-10">
           <div className="max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFB347]/50 bg-[#FFB347]/20 px-3 py-1 text-xs font-bold text-[#7B63A8]">

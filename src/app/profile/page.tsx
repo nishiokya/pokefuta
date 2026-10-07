@@ -173,7 +173,7 @@ export default function ProfilePage() {
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
       <PCShell className="pb-32 pt-4 lg:pt-6">
-        <div className="mx-auto max-w-2xl space-y-4">
+        <div className="mx-auto max-w-read space-y-4">
 
           {/* プロフィール編集 */}
           <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm sm:p-5">

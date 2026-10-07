@@ -23,7 +23,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function PrivacyPage() {
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-3xl px-4 pb-12 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-read px-4 pb-12 pt-5 sm:pt-8">
         <h1 className="font-pixelJp text-2xl font-extrabold text-[#4F3828]">プライバシーポリシー</h1>
         <p className="mt-2 text-xs text-[#8C6A4A]">最終更新: {LAST_UPDATED}</p>
 

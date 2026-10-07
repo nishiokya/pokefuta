@@ -111,7 +111,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
 
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-3xl px-4 pb-8 pt-3 sm:pt-6">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
         <Breadcrumb href={stampBookUrl} label="スタンプ帳へ" />
         <BadgeHero prefecture={prefecture} displayName={progress.displayName} />
 

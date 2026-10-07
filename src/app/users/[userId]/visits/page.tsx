@@ -168,7 +168,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
         // displayName はユーザー入力なので、</script> 挿入によるXSSを防ぐため < をエスケープする
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
-      <main className="mx-auto max-w-5xl px-4 pb-8 pt-3 sm:pt-6">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
         <Breadcrumb href="/" label="ホームへ" />
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-8">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />

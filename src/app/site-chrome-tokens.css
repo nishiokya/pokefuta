@@ -49,4 +49,15 @@
 
   --chrome-z-header: 50;
   --chrome-z-bottomnav: 40;
+
+  /* 本文コンテナの最大幅（両サイト共通）。PC でページを移ると本文の左端が
+     ページごとに動いていた（写真館 588〜1120px の5種類、図鑑 800〜1120px の6種類）ので2段に絞った。
+       wide   … 一覧・詳細など、ほぼ全ページ（PCShell の枠）
+       narrow … 規約・投稿フォームなど「読む／入力する」だけのページ
+     Tailwind からは max-w-page / max-w-read で使う（tailwind.config.js）。
+     ⚠️ px で持つこと。ルートの font-size が 14px なので Tailwind の max-w-6xl などは
+        標準より小さく（6xl = 1008px）、図鑑の px と一致しない。
+     図鑑側は pokefuta-tracker の apps/web/assets/site-header.css に同値をコピーしている。 */
+  --page-max-wide: 1120px;
+  --page-max-narrow: 720px;
 }

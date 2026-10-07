@@ -40,6 +40,11 @@ module.exports = {
         'rpg-sm': '4px 4px 0 rgba(0, 0, 0, 0.5)',
         'rpg-inset': 'inset 0 0 0 2px #ECF0F1, inset 0 0 0 4px #34495E',
       },
+      // 本文コンテナの幅は site-chrome-tokens.css の --page-max-* が正
+      maxWidth: {
+        page: 'var(--page-max-wide)',
+        read: 'var(--page-max-narrow)',
+      },
       spacing: {
         'rpg-1': '4px',
         'rpg-2': '8px',

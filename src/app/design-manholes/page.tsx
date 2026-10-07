@@ -104,7 +104,7 @@ export default async function DesignManholesPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
 
-      <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-5 sm:pt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold sm:text-xl">みんなのデザインマンホール</h1>

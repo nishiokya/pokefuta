@@ -90,7 +90,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
 
-      <main className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pt-8">
+      <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-5 sm:pt-8">
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-7 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-10">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
