@@ -207,7 +207,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
                 <dd className="font-bold text-[#4F3828]">{formatDateJaJst(photo.created_at)}</dd>
               </div>
               {photo.manhole.address && (
-                <div className="flex items-center gap-2 rounded-[8px] bg-white/70 px-3 py-2 sm:col-span-2">
+                <div className="flex items-center gap-2 rounded-[8px] bg-white/70 px-3 py-2 sm:col-span-2 lg:col-span-1">
                   <MapPin className="h-4 w-4 shrink-0 text-[#2b7a78]" />
                   <dt className="shrink-0 text-xs font-bold text-[#8b816f]">住所</dt>
                   <dd className="min-w-0 truncate font-bold text-[#4F3828]">{photo.manhole.address}</dd>
