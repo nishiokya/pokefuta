@@ -109,7 +109,10 @@ export default async function SharedPhotoPage({ params }: PageProps) {
           写真は切らずに全体を出し、見出し以下は写真の下に置く。
           行き先は2つ: 投稿者のページ（投稿者の欄）と蓋の詳細（いちばん下）。
         */}
-        {/* PC は本文が --page-max-wide まで広がるので、写真と見出し以下を横に並べる（縦積みのままだと写真が画面より大きくなる） */}
+        {/*
+          PC は本文が --page-max-wide まで広がるので、写真と見出し以下を横に並べる（縦積みのままだと写真が画面より大きくなる）。
+          右の列は 370px 前後しかないので、中の sm: の段組み（情報表2列・他の写真8列）は lg で戻している
+        */}
         <article className="overflow-hidden rounded-[12px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)] lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           {/*
             枠の比率を先に決めて場所を取っておく（読み込みが遅いと高さ0から押し広げて見出し以下がずれる。CLS）。
@@ -192,7 +195,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
               </div>
             )}
 
-            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
               <div className="flex items-center gap-2 rounded-[8px] bg-white/70 px-3 py-2">
                 <Camera className="h-4 w-4 shrink-0 text-[#B5483C]" />
                 <dt className="text-xs font-bold text-[#8b816f]">撮影日</dt>
@@ -219,7 +222,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
                   このポケふたの他の写真
                   <span className="text-xs font-bold text-[#8b816f]">{extras.otherCount}枚</span>
                 </h2>
-                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-8 lg:grid-cols-4">
                   {extras.otherPhotos.map((other) => (
                     <li key={other.id}>
                       <Link href={`/p/${other.id}`} className="block aspect-square overflow-hidden rounded-[6px] bg-[#ece2cd]" aria-label={`${formatDateJaJst(other.shotAt ?? '')}撮影の写真`}>
