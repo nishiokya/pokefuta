@@ -313,7 +313,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <Sparkles className="h-5 w-5 text-[#B5483C]" />
             あなたもポケふた旅へ
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-3">
             <CtaCard
               href="/visits"
               icon={<Stamp className="h-5 w-5" />}
@@ -332,12 +332,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
               icon={<MapIcon className="h-5 w-5" />}
               title="全国マップで見る"
               description="都道府県ごとの設置状況をチェック"
-            />
-            <CtaCard
-              href="/popular"
-              icon={<Camera className="h-5 w-5" />}
-              title="人気のポケふた"
-              description="みんなが訪れているポケふたを見る"
             />
           </div>
         </section>

@@ -91,6 +91,13 @@ const nextConfig = {
       destination: '/login',
       permanent: true,
     },
+    // 人気のポケふた（/popular）は閉じた。30日で十数ビュー・検索流入なし、入口は公開スタンプ帳の
+    // カード1枚だけだった。ブックマークやログイン後の戻り先を行き止まりにしないためトップへ送る
+    {
+      source: '/popular',
+      destination: '/',
+      permanent: true,
+    },
   ],
   headers: async () => [
     {

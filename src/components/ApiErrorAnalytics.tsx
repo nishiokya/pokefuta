@@ -43,7 +43,6 @@ function derivePageType(pathname: string): string {
   if (/^\/manhole\//.test(pathname)) return 'manhole_detail';
   if (pathname === '/') return 'gallery_index';
   if (pathname === '/visits') return 'visits';
-  if (pathname === '/popular') return 'popular';
   if (pathname === '/upload') return 'upload';
   // デザインふたを 'other' に丸めると、投稿APIのエラーがどの画面から出たか分からない
   if (pathname === '/design-manholes/new') return 'design_manhole_new';

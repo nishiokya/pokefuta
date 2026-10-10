@@ -40,12 +40,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/popular`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 0.7,
-    },
-    {
       url: `${baseUrl}/design-manholes`,
       lastModified,
       changeFrequency: 'daily',
