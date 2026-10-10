@@ -1174,6 +1174,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
           <div
             className="relative min-h-0 flex-1"
+            // 写真の外（余白）を押したときだけ閉じる。写真そのものを押しても閉じない
             onClick={(event) => {
               if (event.target === event.currentTarget) closeViewer();
             }}
@@ -1193,7 +1194,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               key={featuredPhoto.id}
               src={`/api/photo/${featuredPhoto.id}?size=large`}
               alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
-              className="pointer-events-none absolute inset-0 m-auto max-h-full max-w-full object-contain"
+              className="absolute inset-0 m-auto max-h-full max-w-full object-contain"
             />
             {viewerHasMany && (
               <>
@@ -1219,7 +1220,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
           {/* サムネ列。何枚あって今どれを見ているかを見せ、押せば直接飛ぶ */}
           {viewerHasMany && (
-            <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-2.5">
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-2.5" style={{ scrollbarWidth: 'none' }}>
               <span className="shrink-0 font-['Outfit'] text-xs font-bold text-white/70">
                 {safeIdx + 1} / {allDisplayPhotos.length}
               </span>
@@ -1382,6 +1383,62 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </p>
             )
           )}
+
+          {/*
+            蓋の情報。どれもページを開いた時点で手元にある（追加の取得なし）。地図は重いので出さない。
+            スマホは写真を小さくしないよう、称号の1行だけ（横に送る）。
+          */}
+          <div className="flex flex-col gap-3 border-t border-white/10 pt-3 lg:mt-auto">
+            {(titleBadges.length > 0 || statBadges.length > 0) && (
+              <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0">
+                {titleBadges.map((title, idx) => (
+                  <span
+                    key={`${title.key}-${idx}`}
+                    className={`shrink-0 rounded-full px-2.5 py-1 font-pixelJp text-[11px] font-bold ${getTitlePillClass(idx)}`}
+                  >
+                    {title.emoji || '★'} {title.label}
+                  </span>
+                ))}
+                {statBadges.map((badge) => (
+                  <span
+                    key={badge.key}
+                    className="shrink-0 rounded-full border border-white/20 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white/80"
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            )}
+            {headingPokemons.length > 0 && (
+              <div className="hidden flex-wrap gap-1.5 lg:flex">
+                {headingPokemons.map((pokemon) => (
+                  <Link
+                    key={pokemon}
+                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white hover:bg-white/20"
+                  >
+                    <span className="text-[10px] text-[#f6e4b6]">◓</span>
+                    {pokemon}
+                  </Link>
+                ))}
+              </div>
+            )}
+            <div className="hidden items-start gap-2 lg:flex">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/60" strokeWidth={2.2} />
+              <div className="min-w-0 flex-1 font-pixelJp text-xs leading-snug text-white/80">
+                <p>{manhole.address || `${manhole.prefecture}${manhole.city || manhole.municipality || ''}`}</p>
+                {landmarkLabel(manhole) && <p className="mt-0.5 text-white/60">{landmarkLabel(manhole)}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={openInMaps}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#1f9d63] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white hover:bg-[#1a8a56]"
+              >
+                <Navigation className="h-3 w-3" strokeWidth={2.6} />
+                経路案内
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
