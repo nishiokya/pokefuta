@@ -21,11 +21,7 @@ export default function NotFound() {
           <div className="lost__head">
             <p className="lost__code">404 NOT FOUND</p>
             <h1 className="lost__title" id="lost-title">ページが見つかりませんでした</h1>
-            <p className="lost__lead">
-              URLが変わったか、ページが削除された可能性があります。
-              <br />
-              かわりに、こんなポケふたはいかが？
-            </p>
+            <p className="lost__lead">URLが変わったか、ページが削除された可能性があります。</p>
           </div>
           <LostManholePick />
         </section>
