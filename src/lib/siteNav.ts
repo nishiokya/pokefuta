@@ -28,7 +28,6 @@ export type RouteChrome = {
  */
 const ROUTES: Record<string, RouteChrome> = {
   '/': { title: SITE_NAME },
-  '/popular': { title: SITE_NAME },
   '/nearby': { title: 'ポケふたを探す', activeNav: 'search' },
   '/manhole': { title: 'ポケふた', activeNav: 'search' },
   '/manholes': { title: '全国ポケふた一覧', activeNav: 'search' },

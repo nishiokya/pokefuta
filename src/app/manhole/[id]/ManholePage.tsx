@@ -1670,13 +1670,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               ラベルどおり図鑑（data.pokefuta.com）の都道府県ページへ直接送る。
               以前は写真館の `/manholes?q=` に送っていたが、写真が1枚も出ない
               クライアント描画の一覧で、ラベルの「図鑑」とも一致していなかった。
-
-              写真館側にも `/prefectures/[prefecture]` ができたが、ここは図鑑のまま。
-              蓋の詳細を見ている人が県名を押すのは「他にどこに設置されているか」を
-              知りたいときで、それは図鑑の担当。写真の集まり具合を見たい人はトップの
-              残り県チップから県ページへ行く。**リンクの文言でどちらか分かるように
-              揃えてある**（ここは「設置情報を図鑑で見る」、県ページ末尾は「市町村別の
-              設置場所・登場ポケモンを図鑑で見る」）。 */}
+              写真館の `/prefectures/[prefecture]` も今は図鑑の県ページへ転送するだけ。 */}
           {prefectureDexHref && (
             <a
               href={prefectureDexHref}

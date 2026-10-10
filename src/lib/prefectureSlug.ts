@@ -39,6 +39,32 @@ export function prefectureDexUrl(prefecture: string | null | undefined): string 
 }
 
 /**
+ * URL の都道府県（日本語名 `宮崎県` か、図鑑と同じローマ字 slug `miyazaki`）を正式な都道府県名に直す。
+ *
+ * 写真館の `/prefectures/[prefecture]` は図鑑の県ページへ転送するだけになったので、
+ * 以前の県ページに貼られたどちらの形のリンクも、ここで図鑑の URL に直せるようにしておく。
+ * 多重エンコードされた URL でも拾えるよう、decode は保険付きで行う。
+ */
+export function resolvePrefectureParam(param: string): string | null {
+  let value = param;
+  try {
+    value = decodeURIComponent(param);
+  } catch {
+    // 不正なパーセント記法。素の値で照合する
+  }
+  value = value.trim();
+  if (!value) return null;
+
+  if (value in PREFECTURE_SLUGS) return value;
+
+  const lowered = value.toLowerCase();
+  const bySlug = Object.entries(PREFECTURE_SLUGS).find(
+    ([, slug]) => slug === lowered
+  );
+  return bySlug ? bySlug[0] : null;
+}
+
+/**
  * 図鑑の**同じ蓋**のページ URL。
  *
  * 図鑑側は蓋ページを写真館と同じマスター（tracker の `docs/pokefuta.ndjson`。

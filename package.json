@@ -21,7 +21,7 @@
     "test:json-ld": "tsx --test tests/json-ld.test.ts",
     "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
     "test:prefecture-completion": "tsx --test tests/prefecture-completion.test.ts",
-    "test:dex-url": "tsx --test tests/dex-url.test.ts",
+    "test:dex-url": "tsx --test tests/dex-url.test.ts tests/prefecture-param.test.ts",
     "test:manhole-detail": "tsx --test tests/manhole-detail.test.ts",
     "test:manhole-list": "tsx --test tests/manhole-list-client.test.ts",
     "test:regular-badges": "tsx --test tests/regular-badges.test.ts",
