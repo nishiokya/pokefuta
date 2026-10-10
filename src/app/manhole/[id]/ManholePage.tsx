@@ -1452,14 +1452,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             {headingPokemons.length > 0 && (
               <div className="hidden flex-wrap gap-1.5 lg:flex">
                 {headingPokemons.map((pokemon) => (
-                  <Link
+                  // ページ下の「登場ポケモン」と同じく図鑑のポケモンページへ（/manholes は閉じた）
+                  <a
                     key={pokemon}
-                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    href={pokemonDexUrl(pokemon)}
+                    aria-label={`ポケふた図鑑で${pokemon}を見る`}
                     className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white hover:bg-white/20"
                   >
                     <span className="text-[10px] text-[#f6e4b6]">◓</span>
                     {pokemon}
-                  </Link>
+                  </a>
                 ))}
               </div>
             )}
