@@ -1,8 +1,9 @@
 /**
- * トップ「最新の投稿」の投稿者名に付ける 👑 MASTER（金）/ EXPLORER（シルバー）バッジ。
+ * 投稿者名に付ける 👑 MASTER（金）/ EXPLORER（シルバー）/ 🌱 ROOKIE（若葉）バッジ。
  *
  * 人を順位で並べるランキングは置かず、続けて来ている人に印を付けるだけにしている。
  * 判定の線は公開しない（pokefuta-tracker の secret）ので、画面にも条件は書かない。
+ * ROOKIE は初めて投稿してから1か月の人。来たばかりの人に気づいてもらうための印。
  *
  * 判定は pokefuta-tracker の export_app_snapshot.py が日次で焼き、
  * data.pokefuta.com（GitHub Pages）の `/api/regulars.json` から直接読む。
@@ -16,7 +17,7 @@ export const STATIC_REGULARS_URL = `${STATIC_BASE}/api/regulars.json`;
 
 const STATIC_TIMEOUT_MS = 3000;
 
-export type RegularTier = 'crown' | 'regular';
+export type RegularTier = 'crown' | 'regular' | 'rookie';
 
 /** 公開ID（app_user.id）→ 段階 */
 export type RegularBadges = ReadonlyMap<string, RegularTier>;
@@ -26,7 +27,10 @@ export const EMPTY_REGULAR_BADGES: RegularBadges = new Map();
 export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
   crown: '👑 MASTER',
   regular: 'EXPLORER',
+  rookie: '🌱 ROOKIE',
 };
+
+const isTier = (v: unknown): v is RegularTier => typeof v === 'string' && Object.hasOwn(REGULAR_BADGE_LABEL, v);
 
 export function parseRegularBadges(data: unknown): RegularBadges {
   if (!data || typeof data !== 'object') return EMPTY_REGULAR_BADGES;
@@ -36,7 +40,7 @@ export function parseRegularBadges(data: unknown): RegularBadges {
   }
   const tiers = new Map<string, RegularTier>();
   for (const [id, tier] of Object.entries(body.users as Record<string, unknown>)) {
-    if (tier === 'crown' || tier === 'regular') tiers.set(id, tier);
+    if (isTier(tier)) tiers.set(id, tier);
   }
   return tiers;
 }
