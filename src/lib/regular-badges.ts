@@ -30,7 +30,7 @@ export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
   rookie: '🌱 ROOKIE',
 };
 
-const isTier = (v: unknown): v is RegularTier => typeof v === 'string' && Object.hasOwn(REGULAR_BADGE_LABEL, v);
+const isTier = (v: unknown): v is RegularTier => typeof v === 'string' && Object.prototype.hasOwnProperty.call(REGULAR_BADGE_LABEL, v);
 
 export function parseRegularBadges(data: unknown): RegularBadges {
   if (!data || typeof data !== 'object') return EMPTY_REGULAR_BADGES;
