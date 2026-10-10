@@ -22,6 +22,13 @@ test('都道府県でない値は null（転送せず 404 にする）', () => {
   assert.equal(resolvePrefectureParam('%E3%81%82%'), null);
 });
 
+test('プロトタイプの名前は都道府県として通さない', () => {
+  assert.equal(resolvePrefectureParam('toString'), null);
+  assert.equal(resolvePrefectureParam('__proto__'), null);
+  assert.equal(prefectureDexUrl('toString'), null);
+  assert.equal(prefectureDexUrl('constructor'), null);
+});
+
 test('旧県ページの転送先は図鑑の県ページ', () => {
   assert.equal(prefectureDexUrl(resolvePrefectureParam('tokyo')), 'https://data.pokefuta.com/prefectures/tokyo/');
   assert.equal(prefectureDexUrl(resolvePrefectureParam(encodeURIComponent('東京都'))), 'https://data.pokefuta.com/prefectures/tokyo/');

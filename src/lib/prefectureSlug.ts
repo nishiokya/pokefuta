@@ -32,9 +32,15 @@ export const PREFECTURE_SLUGS: Readonly<Record<string, string>> = {
   鹿児島県: 'kagoshima', 沖縄県: 'okinawa',
 };
 
+// `in` や `obj[key]` だと `toString` などプロトタイプの名前まで通る。
+// URL の値をそのまま渡す経路（旧県ページの転送）があるので、自分のキーだけを見る
+function isPrefectureName(value: string): boolean {
+  return Object.prototype.hasOwnProperty.call(PREFECTURE_SLUGS, value);
+}
+
 /** 図鑑の都道府県ページ URL。未知の都道府県名なら null（リンクを出さない）。 */
 export function prefectureDexUrl(prefecture: string | null | undefined): string | null {
-  const slug = prefecture ? PREFECTURE_SLUGS[prefecture] : undefined;
+  const slug = prefecture && isPrefectureName(prefecture) ? PREFECTURE_SLUGS[prefecture] : undefined;
   return slug ? `${DEX_SITE_ORIGIN}/prefectures/${slug}/` : null;
 }
 
@@ -55,7 +61,7 @@ export function resolvePrefectureParam(param: string): string | null {
   value = value.trim();
   if (!value) return null;
 
-  if (value in PREFECTURE_SLUGS) return value;
+  if (isPrefectureName(value)) return value;
 
   const lowered = value.toLowerCase();
   const bySlug = Object.entries(PREFECTURE_SLUGS).find(
