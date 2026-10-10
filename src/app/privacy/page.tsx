@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const LAST_UPDATED = '2026年8月22日';
+const LAST_UPDATED = '2026年10月11日';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -58,6 +58,10 @@ export default function PrivacyPage() {
             投稿写真、表示名、キャプション、コメント、訪問日、訪問したマンホール等は、
             本サービス上または運営者のSNS・ブログ等で公開される場合があります。
             メールアドレスと写真のEXIF情報は、公開プロフィールとしては表示しません。
+          </p>
+          <p className="mt-2">
+            また、訪問記録と写真の撮影日時（非公開にした記録を含みます）を、個人が特定できない形に集計した統計
+            （例: マンホールを回るのにかかる時間の目安）を公開する場合があります。統計には人数や個人の記録は含めません。
           </p>
         </Section>
 
