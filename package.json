@@ -20,6 +20,7 @@
     "test:feed-card-tags": "tsx --test tests/feed-card-tags.test.ts",
     "test:json-ld": "tsx --test tests/json-ld.test.ts",
     "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
+    "test:lid-spin": "tsx --test tests/lid-spin.test.ts",
     "test:prefecture-completion": "tsx --test tests/prefecture-completion.test.ts",
     "test:dex-url": "tsx --test tests/dex-url.test.ts tests/prefecture-param.test.ts tests/pokemon-dex-url.test.ts",
     "test:manhole-detail": "tsx --test tests/manhole-detail.test.ts",
