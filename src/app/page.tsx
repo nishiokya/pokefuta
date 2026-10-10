@@ -78,6 +78,8 @@ export default function HomePage() {
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
+  // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
+  const [isSp, setIsSp] = useState<boolean | null>(null);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -111,6 +113,14 @@ export default function HomePage() {
   useEffect(() => {
     loadFeed();
   }, [currentPage]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => setIsSp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const loadFeed = async () => {
     setLoading(true);
@@ -227,8 +237,7 @@ export default function HomePage() {
         必要な分だけ残す。
       */}
       <PCShell className="pb-10 pt-2 sm:pt-5 lg:pb-12 lg:pt-6">
-      {/* flex-col は、スマホだけ口コミを最新の投稿より後ろへ並べ替えるため（order）。PC は書いた順のまま */}
-      <main className="flex flex-col">
+      <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
           <div className="relative max-w-3xl">
@@ -316,7 +325,7 @@ export default function HomePage() {
 
           {/*
             特集は2つ（ぬいぐるみ・デザインふた）。見出しの列（max-w-3xl）の外に出してヒーローの全幅を使う。
-            PC は写真3枚と説明の横長カード、スマホは同じ2枚を横に並べた縦長の小さなカード
+            PC は写真3枚と説明の横長カード、スマホは同じ2枚を横に並べた縦長の小さなカード（写真は2枚。360px 幅で収まるように）
             （スマホのファーストビューに最新の投稿を残すため、縦に積まない）。
             どちらも取れたものだけ出し、両方取れなければパネルごと出さない
           */}
@@ -331,13 +340,13 @@ export default function HomePage() {
               >
                 {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは縮める */}
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                  {plushFeature.photos.map((photo) => {
+                  {plushFeature.photos.map((photo, index) => {
                     const { lid, plush } = photoAiBoxes(photo.ai_tags);
                     const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
                     const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
                     const src = `/api/photo/${photo.id}?size=small`;
                     return (
-                      <div key={photo.id} className="relative h-14 w-14">
+                      <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''}`}>
                         <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
                           <img src={src} alt="" width={56} height={56} loading="lazy"
                             className={lidClip ? undefined : 'h-full w-full object-cover'}
@@ -371,8 +380,8 @@ export default function HomePage() {
               >
                 {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                  {designFeature.map((d) => (
-                    <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
+                  {designFeature.map((d, index) => (
+                    <div key={d.id} className={`h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm ${index === 2 ? 'max-sm:hidden' : ''}`}>
                       <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
                     </div>
                   ))}
@@ -404,8 +413,13 @@ export default function HomePage() {
         )}
 
         {/* 口コミが少ないうちは最新の投稿に口コミ付きの蓋が来ないので、別枠で拾う */}
-        {/* スマホは最新の投稿の後ろへ（order-2）。ファーストビューを投稿の写真に使う */}
-        <div className="order-2 sm:order-none">{currentPage === 1 && <RecentComments />}</div>
+        {/*
+          口コミの位置は画面幅で変える。PC はここ（最新の投稿の上）、スマホは最新の投稿の後ろ
+          （ファーストビューを投稿の写真に使う）。CSS の order だと読み上げ・Tab の順が見た目と
+          食い違うので、置く場所そのものを変える。幅が分かるまでは出さない（RecentComments は
+          データが来るまで何も描かないので、出すのが少し遅れてもずれない）。一度だけ描くので取得も1回
+        */}
+        {currentPage === 1 && isSp === false && <RecentComments />}
 
         {/* Photo Gallery */}
         {!loading && (
@@ -671,9 +685,11 @@ export default function HomePage() {
           </>
         )}
 
+        {currentPage === 1 && isSp === true && <RecentComments />}
+
         {/* 補助情報より写真を先に見せる。特にスマホのファーストビューを塞がない。 */}
         {!loading && (
-        <section className="order-3 mt-8 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:order-none sm:p-6">
+        <section className="mt-8 overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-gradient-to-br from-[#F4F0FA] to-[#FFF8EB] p-5 shadow-sm sm:p-6">
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#7B63A8] text-white shadow-sm">
               <ImageIcon className="h-5 w-5" />
@@ -722,7 +738,7 @@ export default function HomePage() {
 
         {/* 写真がまだないポケふた（募集枠なので、最新の投稿を見終わった一番下に置く） */}
         {!rareLoading && rareManholes.length > 0 && (
-          <section className="order-3 mt-8 sm:order-none">
+          <section className="mt-8">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-extrabold">
                 <Stamp className="h-5 w-5 text-[#7B63A8]" />
