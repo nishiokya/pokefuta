@@ -17,7 +17,7 @@ import { ArrowLeft } from 'lucide-react';
  * `スタンプ帳`(/visits) はログイン状態に関係なく必ず出る。** このタブと同じ
  * 行き先を Breadcrumb でも出すと、同じリンクが画面に2つ並ぶだけになる。
  *
- * （`siteNav.ts` で `bare: true` のページ（`/login` `/api-docs`）はクロムを
+ * （`siteNav.ts` で `bare: true` のページ（`/login`）はクロムを
  * 描画しない。ただし Breadcrumb を置くページはいずれも bare ではない。）
  *
  * `マイ旅`(/my-trip) だけは面によって違う。SP 下タブは未ログインでも

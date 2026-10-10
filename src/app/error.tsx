@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useHeaderTitle } from '@/components/SiteChrome';
 import Link from 'next/link';
+import { DEX_MAP_URL } from '@/lib/prefectureSlug';
 import { MapPin, Camera, Navigation, History, Home, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function Error({
@@ -97,10 +98,10 @@ export default function Error({
             こちらもおすすめ
           </h3>
           <div className="space-y-2">
-            <Link href="/map" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
+            <a href={DEX_MAP_URL} className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <MapPin className="w-4 h-4 text-rpg-blue" />
               <span className="font-pixelJp text-xs text-rpg-textDark">マップから探す</span>
-            </Link>
+            </a>
             <Link href="/nearby" className="flex items-center gap-2 p-2 hover:bg-white/70 transition-colors">
               <Navigation className="w-4 h-4 text-rpg-blue" />
               <span className="font-pixelJp text-xs text-rpg-textDark">近くのポケふたを探す</span>

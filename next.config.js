@@ -91,6 +91,25 @@ const nextConfig = {
       destination: '/login',
       permanent: true,
     },
+    // 写真館の全国マップ・全国一覧は閉じて図鑑へ送る。どちらも図鑑に同じ役割のページがあり、
+    // 写真館側は 90 日で /map 165・/manholes 66 ビューだった。/manholes?q= の検索語は図鑑に
+    // 受け口が無い。クエリは付いたまま図鑑のトップへ行くが、図鑑側は読まない
+    {
+      source: '/map',
+      destination: 'https://data.pokefuta.com/map',
+      permanent: true,
+    },
+    {
+      source: '/manholes',
+      destination: 'https://data.pokefuta.com/',
+      permanent: true,
+    },
+    // 開発用の Swagger UI（/api-docs）は撤去した。本番では元から中身が出ていなかった
+    {
+      source: '/api-docs',
+      destination: '/',
+      permanent: true,
+    },
     // 人気のポケふた（/popular）は閉じた。30日で十数ビュー・検索流入なし、入口は公開スタンプ帳の
     // カード1枚だけだった。ブックマークやログイン後の戻り先を行き止まりにしないためトップへ送る
     {

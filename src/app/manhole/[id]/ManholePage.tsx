@@ -46,6 +46,7 @@ import { officialLinks, type StatBadge } from '@/lib/manhole-stats';
 import type { RelatedManhole } from '@/lib/manhole-detail';
 import type { ManholeDetailPayload } from '@/lib/manhole-detail-payload';
 import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
+import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import type { ManholeTitle } from '@/types/database';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
@@ -1451,14 +1452,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             {headingPokemons.length > 0 && (
               <div className="hidden flex-wrap gap-1.5 lg:flex">
                 {headingPokemons.map((pokemon) => (
-                  <Link
+                  // ページ下の「登場ポケモン」と同じく図鑑のポケモンページへ（/manholes は閉じた）
+                  <a
                     key={pokemon}
-                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    href={pokemonDexUrl(pokemon)}
+                    aria-label={`ポケふた図鑑で${pokemon}を見る`}
                     className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white hover:bg-white/20"
                   >
                     <span className="text-[10px] text-[#f6e4b6]">◓</span>
                     {pokemon}
-                  </Link>
+                  </a>
                 ))}
               </div>
             )}
@@ -1837,9 +1840,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </h3>
               <div className="flex flex-wrap gap-2">
                 {manhole.pokemons.map((pokemon) => (
-                  <Link
+                  <a
                     key={pokemon}
-                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    href={pokemonDexUrl(pokemon)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white px-3 py-1.5 font-pixelJp text-xs font-bold text-[#6f6657] transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
                     aria-label={`ポケふた図鑑で${pokemon}を見る`}
                   >
@@ -1847,7 +1850,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       ◓
                     </span>
                     {pokemon}
-                  </Link>
+                  </a>
                 ))}
               </div>
             </div>

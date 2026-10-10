@@ -30,6 +30,7 @@ import {
   loadPublicUserPrefectureProgress,
 } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
+import { DEX_MAP_URL } from '@/lib/prefectureSlug';
 
 type PageProps = {
   params: {
@@ -328,7 +329,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
               description="現在地から近い順に見つけられます"
             />
             <CtaCard
-              href="/map"
+              href={DEX_MAP_URL}
               icon={<MapIcon className="h-5 w-5" />}
               title="全国マップで見る"
               description="都道府県ごとの設置状況をチェック"

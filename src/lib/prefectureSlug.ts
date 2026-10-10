@@ -1,7 +1,7 @@
 /**
  * 都道府県名 → 図鑑サイト（data.pokefuta.com）の都道府県ページ URL。
  *
- * 写真館の `/manholes?q=<都道府県>` は、全件（482件・約700KB）をクライアントで
+ * 写真館の `/manholes?q=<都道府県>`（2026-10 に閉じた）は、全件（482件・約700KB）をクライアントで
  * 取得してから部分一致で絞るだけの完全クライアント描画で、写真も1枚も出ない。
  * 図鑑側は同じ内容を47都道府県ぶん静的生成していて（マップ・現地写真・トリビア・
  * 一覧・ポケモン・近隣県）、リンクのラベル「ポケふた図鑑で◯◯を見る」とも一致する。
@@ -12,6 +12,12 @@
  */
 
 export const DEX_SITE_ORIGIN = 'https://data.pokefuta.com';
+
+/**
+ * 全国マップは図鑑の担当。写真館にも `/map` があったが、同じ地図を2ドメインに持っていて
+ * 写真館側は 90 日で 165 ビューしかなかったので閉じ、ここへ転送している（next.config.js）。
+ */
+export const DEX_MAP_URL = `${DEX_SITE_ORIGIN}/map`;
 
 export const PREFECTURE_SLUGS: Readonly<Record<string, string>> = {
   北海道: 'hokkaido', 青森県: 'aomori', 岩手県: 'iwate',
