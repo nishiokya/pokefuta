@@ -645,6 +645,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   // （photos から並びを作る関数は早期 return の後ろにあるので、ここでは ref で受け取る）。
   const viewerOrderRef = useRef<number[]>([]);
   const viewerTouchXRef = useRef<number | null>(null);
+  const viewerDialogRef = useRef<HTMLDivElement | null>(null);
   const closeViewer = () => {
     cancelCommentEdit();
     setPhotoExpanded(false);
@@ -661,9 +662,38 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   // キー操作の effect は開閉のときだけ張り直すので、最新の関数は ref 越しに呼ぶ。
   const viewerActionsRef = useRef({ close: closeViewer, step: stepViewer });
   viewerActionsRef.current = { close: closeViewer, step: stepViewer };
+  // aria-modal だけでは背後のページは操作できたままなので、開いたらフォーカスを中へ移し、
+  // Tab は中で一周させ、閉じたら開く前の要素（押した写真）へ戻す。
   useEffect(() => {
     if (!photoExpanded) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusables = () =>
+      Array.from(
+        viewerDialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      ).filter((el) => el.offsetParent !== null);
+    (focusables()[0] ?? viewerDialogRef.current)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        const items = focusables();
+        if (items.length === 0) {
+          event.preventDefault();
+          return;
+        }
+        const first = items[0];
+        const last = items[items.length - 1];
+        const active = document.activeElement;
+        const inside = viewerDialogRef.current?.contains(active) ?? false;
+        if (event.shiftKey && (active === first || !inside)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || !inside)) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
       if (event.key === 'Escape') viewerActionsRef.current.close();
@@ -676,6 +706,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKeyDown);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [photoExpanded]);
 
@@ -1153,10 +1184,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   );
   const photoViewer = photoExpanded && featuredPhoto ? (
     <div
+      ref={viewerDialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="写真の拡大表示"
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[#14120f] lg:bg-black/75 lg:p-8 lg:backdrop-blur-sm"
+      className="fixed inset-0 z-[55] flex items-center justify-center bg-[#14120f] focus:outline-none lg:bg-black/75 lg:p-8 lg:backdrop-blur-sm"
       onClick={(event) => {
         if (event.target === event.currentTarget) closeViewer();
       }}
