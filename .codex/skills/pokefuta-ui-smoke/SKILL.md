@@ -7,7 +7,7 @@ description: Verify this pokefuta repository's core logged-out UI/business behav
 
 ## Overview
 
-Use this repository-specific skill to check the two most important public screens: the top page (`/`) and the map page (`/map`). Keep the scenario small, but run it carefully enough to catch obvious business logic and visual regressions without logging in.
+Use this repository-specific skill to check the two most important public screens: the top page (`/`) and the redirects for retired pages (`/map` and friends). The nationwide map now lives on the dex site (data.pokefuta.com). Keep the scenario small, but run it carefully enough to catch obvious business logic and visual regressions without logging in.
 
 ## Test Mode
 
@@ -66,25 +66,18 @@ Visual checks:
 - The RPG window styling remains readable against the dark background.
 - Bottom navigation does not cover the main content at the end of the page.
 
-## Scenario 2: Map Page
+## Scenario 2: Retired Pages Redirect
 
-Open `/map`.
+The photo site's `/map`, `/manholes`, `/prefectures/*`, `/popular`, and `/api-docs` were retired in 2026-10.
+Do not open them in the browser; check the redirect with `curl -s -o /dev/null -w '%{http_code} %{redirect_url}'`.
 
-Expected logged-out business behavior:
+Expected:
 
-- The page reaches a stable state after the initial `読み込み中` state.
-- The heading is `ポケふたマップ` for logged-out users.
-- The explanation says nationwide pokefuta pins are shown and pins navigate to detail pages.
-- A map area renders with a visible map container, not a blank collapsed block.
-- When public manhole data is available, the count text appears as `全N件のポケふたを表示中`.
-- When prefecture counts are available, the floating list shows `都道府県`, `コード順`, and `数順`.
-
-Visual checks:
-
-- The map takes most of the viewport height and is not hidden behind other UI.
-- The floating prefecture list stays inside the map area and remains usable.
-- Leaflet controls, markers, and attribution do not overlap important app controls.
-- Bottom navigation remains visible and does not obscure the map summary.
+- `/map` → `308 https://data.pokefuta.com/map`
+- `/manholes` → `308 https://data.pokefuta.com/`
+- `/prefectures/tokyo` and `/prefectures/東京都` (percent-encoded) → `308 https://data.pokefuta.com/prefectures/tokyo/`
+- `/prefectures/foo` → `404`
+- `/popular` and `/api-docs` → `308 /`
 
 ## Failure Signals
 
@@ -92,7 +85,8 @@ Treat these as issues worth reporting:
 
 - Runtime error overlay, blank page, hydration error, or repeated loading state.
 - Public API failure that prevents the page shell from rendering.
-- Login-only redirect from `/` or `/map`.
+- Login-only redirect from `/`.
+- A retired page rendering a page instead of redirecting.
 - Map container has zero height or only a blank background after load.
 - Content visibly overlaps, extends off-screen, or becomes unreadable at mobile size.
 
@@ -113,5 +107,5 @@ Verified logged-out smoke:
 - Commands: type-check passed, lint passed.
 - Viewports: 390x844 and 1280x800.
 - /: public feed shell and bottom nav rendered without visible layout break.
-- /map: logged-out map shell, prefecture list, and count rendered without visible layout break.
+- retired pages: `/map`, `/manholes`, `/prefectures/*`, `/popular`, `/api-docs` redirect as expected.
 ```
