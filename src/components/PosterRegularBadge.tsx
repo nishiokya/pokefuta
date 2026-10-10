@@ -5,7 +5,7 @@ import RegularBadge from '@/components/RegularBadge';
 import { fetchRegularBadges, type RegularBadges } from '@/lib/regular-badges';
 
 /**
- * 投稿者名の横に出す称号（👑 MASTER / EXPLORER）。公開ID を渡すだけで使える。
+ * 投稿者名の横に出す称号（👑 MASTER / EXPLORER / 🌱 ROOKIE）。公開ID を渡すだけで使える。
  *
  * ブラウザで data.pokefuta.com の regulars.json を読んで後から出す。サーバで組み立てるページに
  * 置いても SSR の仕事は増えない（src/lib/regular-badges.ts）。1ページに何個置いても
