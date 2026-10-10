@@ -46,6 +46,7 @@ import { officialLinks, type StatBadge } from '@/lib/manhole-stats';
 import type { RelatedManhole } from '@/lib/manhole-detail';
 import type { ManholeDetailPayload } from '@/lib/manhole-detail-payload';
 import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
+import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import type { ManholeTitle } from '@/types/database';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
@@ -1609,9 +1610,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </h3>
               <div className="flex flex-wrap gap-2">
                 {manhole.pokemons.map((pokemon) => (
-                  <Link
+                  <a
                     key={pokemon}
-                    href={`/manholes?q=${encodeURIComponent(pokemon)}`}
+                    href={pokemonDexUrl(pokemon)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-[#e9dfc7] bg-white px-3 py-1.5 font-pixelJp text-xs font-bold text-[#6f6657] transition-colors hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
                     aria-label={`ポケふた図鑑で${pokemon}を見る`}
                   >
@@ -1619,7 +1620,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       ◓
                     </span>
                     {pokemon}
-                  </Link>
+                  </a>
                 ))}
               </div>
             </div>

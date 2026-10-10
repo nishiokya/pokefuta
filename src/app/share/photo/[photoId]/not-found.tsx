@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DEX_MAP_URL } from '@/lib/prefectureSlug';
 import { HeaderTitle } from '@/components/SiteChrome';
 import { CameraOff, Home, List, Navigation } from 'lucide-react';
 
@@ -40,13 +41,13 @@ export default function SharedPhotoNotFound() {
               <Navigation className="h-4 w-4" />
               近くを探す
             </Link>
-            <Link
-              href="/map"
+            <a
+              href={DEX_MAP_URL}
               className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-[#8C6A4A]/20 bg-white px-4 py-3 text-sm font-extrabold text-[#4F3828] transition hover:bg-[#F8F1E4]"
             >
               <List className="h-4 w-4" />
               マップで見る
-            </Link>
+            </a>
           </div>
         </section>
       </main>

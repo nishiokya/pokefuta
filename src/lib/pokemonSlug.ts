@@ -1,0 +1,171 @@
+/**
+ * ポケモン名（ポケふたデータの表記）→ 図鑑（data.pokefuta.com）のポケモンページ slug。
+ *
+ * 蓋の詳細の「登場ポケモン」チップは、以前は写真館の `/manholes?q=<ポケモン>` に送っていた。
+ * そこは全件をクライアントで読んで絞るだけの一覧で写真も出ないので閉じ、図鑑の
+ * `/pokemon/<slug>/`（そのポケモンが描かれた蓋の一覧・地図）へ直接送る。
+ *
+ * 正は pokefuta-tracker の `docs/pokemon_metadata.json` と `generate_pokemon_pages.py` の
+ * 名前の照合（地方のすがたの「アローラ」等の接頭辞つき表記を含む）。ここはその結果を、
+ * 図鑑に実在するページ（549件、2026-10-10 時点）だけに絞って写したもの。
+ * 新しいポケモンの蓋が増えて載っていなければ、チップは図鑑のポケモン一覧へ送る。
+ */
+
+import { DEX_SITE_ORIGIN } from './prefectureSlug';
+
+export const POKEMON_DEX_SLUGS: Readonly<Record<string, string>> = {
+  ゴンベ: 'munchlax',
+  アオガラス: 'corvisquire', アギルダー: 'accelgor', アグノム: 'azelf', アゲハント: 'beautifly',
+  アゴジムシ: 'grubbin', アシレーヌ: 'primarina', アブソル: 'absol', アブリボン: 'ribombee',
+  アブリー: 'cutiefly', アマカジ: 'bounsweet', アママイコ: 'steenee', アマルス: 'amaura',
+  アマージョ: 'tsareena', アメタマ: 'surskit', アメモース: 'masquerain', アルクジラ: 'cetoddle',
+  アローライシツブテ: 'geodude-alola', アローラキュウコン: 'ninetales-alola', アローラサンド: 'sandshrew-alola', アローラサンドパン: 'sandslash-alola',
+  アローラダグトリオ: 'dugtrio-alola', アローラナッシー: 'exeggutor-alola', アローラニャース: 'meowth-alola', アローラライチュウ: 'raichu-alola',
+  アローラロコン: 'vulpix-alola', アーケン: 'archen', アーボ: 'ekans', アーマーガア: 'corviknight',
+  イエッサン: 'indeedee', イキリンコ: 'squawkabilly', イシツブテ: 'geodude', イルカマン: 'palafin',
+  イルミーゼ: 'illumise', イワパレス: 'crustle', イワンコ: 'rockruff', イワーク: 'onix',
+  イーブイ: 'eevee', ウインディ: 'arcanine', ウソッキー: 'sudowoodo', ウッウ: 'cramorant',
+  ウデッポウ: 'clauncher', ウパー: 'wooper', ウミディグダ: 'wiglett', ウリムー: 'swinub',
+  ウーラオス: 'urshifu', ウールー: 'wooloo', エアームド: 'skarmory', エイパム: 'aipom',
+  エネコ: 'skitty', エネコロロ: 'delcatty', エムリット: 'mesprit', エモンガ: 'emolga',
+  エリキテル: 'helioptile', エルフーン: 'whimsicott', エルレイド: 'gallade', エレキッド: 'elekid',
+  エレザード: 'heliolisk', エレズン: 'toxel', エレブー: 'electabuzz', エンテイ: 'entei',
+  エンペルト: 'empoleon', エーフィ: 'espeon', オクタン: 'octillery', オタチ: 'sentret',
+  オタマロ: 'tympole', オトシドリ: 'bombirdier', オドシシ: 'stantler', オドリドリ: 'oricorio',
+  オニゴーリ: 'glalie', オニスズメ: 'spearow', オムスター: 'omastar', オムナイト: 'omanyte',
+  オーガポン: 'ogerpon', オーロット: 'trevenant', カイオーガ: 'kyogre', カイデン: 'wattrel',
+  カイリキー: 'machamp', カイリュー: 'dragonite', カイロス: 'pinsir', カジッチュ: 'applin',
+  カジリガメ: 'drednaw', カチコール: 'bergmite', カビゴン: 'snorlax', カブト: 'kabuto',
+  カプサイジ: 'capsakid', カミッチュ: 'dipplin', カメックス: 'blastoise', カメール: 'wartortle',
+  カモネギ: 'farfetchd', カラカラ: 'cubone', カラサリス: 'silcoon', カラナクシ: 'shellos',
+  ガチゴラス: 'tyrantrum', ガブリアス: 'garchomp', ガマガル: 'palpitoad', ガマゲロゲ: 'seismitoad',
+  ガラルカモネギ: 'farfetchd-galar', ガラルダルマッカ: 'darumaka-galar', ガラルデスマス: 'yamask-galar', ガラルニャース: 'meowth-galar',
+  ガラルヒヒダルマ: 'darmanitan-galar', ガラルポニータ: 'ponyta-galar', ガラルヤドン: 'slowpoke-galar', ガーディ: 'growlithe',
+  キテルグマ: 'bewear', キノガッサ: 'breloom', キバゴ: 'axew', キマワリ: 'sunflora',
+  キモリ: 'treecko', キャタピー: 'caterpie', キャモメ: 'wingull', キュウコン: 'ninetales',
+  キュワワー: 'comfey', キリキザン: 'bisharp', キルリア: 'kirlia', キレイハナ: 'bellossom',
+  キングドラ: 'kingdra', ギアル: 'klink', ギギアル: 'klang', ギャラドス: 'gyarados',
+  ギャロップ: 'rapidash', ギルガルド: 'aegislash', クスネ: 'nickit', クチート: 'mawile',
+  クマシュン: 'cubchoo', クラブ: 'krabby', クルマユ: 'swadloon', クルミル: 'sewaddle',
+  クレセリア: 'cresselia', クワガノン: 'vikavolt', クワッス: 'quaxly', グランブル: 'granbull',
+  グルトン: 'lechonk', グレイシア: 'glaceon', グレッグル: 'croagunk', ケイコウオ: 'finneon',
+  ケッキング: 'slaking', ケロマツ: 'froakie', ケンタロス: 'tauros', ケンホロウ: 'unfezant',
+  ケーシィ: 'abra', ゲコガシラ: 'frogadier', ゲッコウガ: 'greninja', コアルヒー: 'ducklett',
+  コイキング: 'magikarp', コイル: 'magnemite', コオリッポ: 'eiscue', ココガラ: 'rookidee',
+  ココドラ: 'aron', コジオ: 'nacli', コスモッグ: 'cosmog', コダック: 'psyduck',
+  コマタナ: 'pawniard', コラッタ: 'rattata', コロモリ: 'woobat', コータス: 'torkoal',
+  ゴクリン: 'gulpin', ゴチミル: 'gothorita', ゴマゾウ: 'phanpy', ゴリランダー: 'rillaboom',
+  ゴルーグ: 'golurk', ゴロンダ: 'pangoro', ゴローニャ: 'golem', ゴローン: 'graveler',
+  ゴーゴート: 'gogoat', ゴーリキー: 'machoke', サイホーン: 'rhyhorn', サクラビス: 'gorebyss',
+  サザンドラ: 'hydreigon', サシカマス: 'arrokuda', サッチムシ: 'blipbug', サニーゴ: 'corsola',
+  サメハダー: 'sharpedo', サルノリ: 'grookey', サンダース: 'jolteon', サンド: 'sandshrew',
+  サンドパン: 'sandslash', サーナイト: 'gardevoir', ザングース: 'zangoose', シェルダー: 'shellder',
+  シキジカ: 'deerling', シズクモ: 'dewpider', シビシラス: 'tynamo', シビビール: 'eelektrik',
+  シビルドン: 'eelektross', シャリタツ: 'tatsugiri', シャワーズ: 'vaporeon', シュバルゴ: 'escavalier',
+  シンボラー: 'sigilyph', シードラ: 'seadra', ジグザグマ: 'zigzagoon', ジバコイル: 'magnezone',
+  ジャラコ: 'jangmo-o', ジャラランガ: 'kommo-o', ジャランゴ: 'hakamo-o', ジャローダ: 'serperior',
+  ジュカイン: 'sceptile', ジュゴン: 'dewgong', ジュナイパー: 'decidueye', ジュペッタ: 'banette',
+  ジュラルドン: 'duraludon', ジラーチ: 'jirachi', ジーランス: 'relicanth', スイクン: 'suicune',
+  スコヴィラン: 'scovillain', スターミー: 'starmie', スナバァ: 'sandygast', スバメ: 'taillow',
+  スワンナ: 'swanna', ズガイドス: 'cranidos', セレビィ: 'celebi', ゼニガメ: 'squirtle',
+  ソルロック: 'solrock', ソーナノ: 'wynaut', タイカイデン: 'kilowattrel', タイレーツ: 'falinks',
+  タッツー: 'horsea', タツベイ: 'bagon', タテトプス: 'shieldon', タネボー: 'seedot',
+  タブンネ: 'audino', タマゲタケ: 'foongus', タマザラシ: 'spheal', タマタマ: 'exeggcute',
+  タマンタ: 'mantyke', ダイケンキ: 'samurott', ダイノーズ: 'probopass', ダクマ: 'kubfu',
+  ダグトリオ: 'dugtrio', ダブラン: 'duosion', ダルマッカ: 'darumaka', ダンゴロ: 'roggenrola',
+  ダーテング: 'shiftry', チェリム: 'cherrim', チェリンボ: 'cherubi', チコリータ: 'chikorita',
+  チゴラス: 'tyrunt', チャデス: 'poltchageist', チュリネ: 'petilil', チョンチー: 'chinchou',
+  チリーン: 'chimecho', チルタリス: 'altaria', チルット: 'swablu', ツツケラ: 'pikipek',
+  ツボツボ: 'shuckle', ツンベアー: 'beartic', テッポウオ: 'remoraid', テールナー: 'braixen',
+  ディアルガ: 'dialga', ディグダ: 'diglett', デデンネ: 'dedenne', デンヂムシ: 'charjabug',
+  デンリュウ: 'ampharos', トゲキッス: 'togekiss', トゲチック: 'togetic', トゲデマル: 'togedemaru',
+  トゲピー: 'togepi', トサキント: 'goldeen', トドグラー: 'sealeo', トリトドン: 'gastrodon',
+  トロッゴン: 'carkol', トロピウス: 'tropius', ドオー: 'clodsire', ドガース: 'koffing',
+  ドククラゲ: 'tentacruel', ドゴーム: 'loudred', ドサイドン: 'rhyperior', ドジョッチ: 'barboach',
+  ドダイトス: 'torterra', ドッコラー: 'timburr', ドドゲザン: 'kingambit', ドレディア: 'lilligant',
+  ドロバンコ: 'mudbray', ドータクン: 'bronzong', ドードリオ: 'dodrio', ドードー: 'doduo',
+  ドーミラー: 'bronzor', ナエトル: 'turtwig', ナゲツケサル: 'passimian', ナゾノクサ: 'oddish',
+  ナックラー: 'trapinch', ナッシー: 'exeggutor', ナットレイ: 'ferrothorn', ナマケロ: 'slakoth',
+  ナマコブシ: 'pyukumuku', ナマズン: 'whiscash', ナミイルカ: 'finizen', ニャイキング: 'perrserker',
+  ニャオニクス: 'meowstic', ニャスパー: 'espurr', ニャヒート: 'torracat', ニャビー: 'litten',
+  ニャルマー: 'glameow', ニャース: 'meowth', ニョロゾ: 'poliwhirl', ニョロトノ: 'politoed',
+  ニョロモ: 'poliwag', ニンフィア: 'sylveon', ヌイコグマ: 'stufful', ヌオー: 'quagsire',
+  ヌマクロー: 'marshtomp', ネイティオ: 'xatu', ネギガナイト: 'sirfetchd', ネッコアラ: 'komala',
+  ネンドール: 'claydol', ノクタス: 'cacturne', ノズパス: 'nosepass', ハクリュー: 'dragonair',
+  ハスブレロ: 'lombre', ハスボー: 'lotad', ハッサム: 'scizor', ハネッコ: 'hoppip',
+  ハピナス: 'blissey', ハブネーク: 'seviper', ハヤシガメ: 'grotle', ハラバリー: 'bellibolt',
+  ハリマロン: 'chespin', ハリーセン: 'qwilfish', ハンテール: 'huntail', ハーデリア: 'herdier',
+  バウッツェル: 'dachsbun', バオッキー: 'simisear', バオップ: 'pansear', バクフーン: 'typhlosion',
+  バクーダ: 'camerupt', バサギリ: 'kleavor', バタフリー: 'butterfree', バチュル: 'joltik',
+  バチンウニ: 'pincurchin', バチンキー: 'thwackey', バニプッチ: 'vanillite', バニリッチ: 'vanillish',
+  バネブー: 'spoink', バリコオル: 'mr-rime', バリヤード: 'mr-mime', バルビート: 'volbeat',
+  バンバドロ: 'mudsdale', パチリス: 'pachirisu', パッチール: 'spinda', パピモッチ: 'fidough',
+  パルキア: 'palkia', パルシェン: 'cloyster', パールル: 'clamperl', ヒコザル: 'chimchar',
+  ヒスイウォーグル: 'braviary-hisui', ヒスイガーディ: 'growlithe-hisui', ヒトカゲ: 'charmander', ヒトツキ: 'honedge',
+  ヒトデマン: 'staryu', ヒトモシ: 'litwick', ヒドイデ: 'mareanie', ヒノアラシ: 'cyndaquil',
+  ヒノヤコマ: 'fletchinder', ヒバニー: 'scorbunny', ヒヒダルマ: 'darmanitan', ヒマナッツ: 'sunkern',
+  ヒメグマ: 'teddiursa', ヒメンカ: 'gossifleur', ヒヤップ: 'panpour', ヒラヒナ: 'flittle',
+  ヒンバス: 'feebas', ビクティニ: 'victini', ビッパ: 'bidoof', ビリジオン: 'virizion',
+  ビーダル: 'bibarel', ビードル: 'weedle', ピィ: 'cleffa', ピカチュウ: 'pikachu',
+  ピクシー: 'clefable', ピジョット: 'pidgeot', ピジョン: 'pidgeotto', ピチュー: 'pichu',
+  ピッピ: 'clefairy', ピンプク: 'happiny', ファイアロー: 'talonflame', ファイヤー: 'moltres',
+  フィオネ: 'phione', フカマル: 'gible', フクスロー: 'dartrix', フシギソウ: 'ivysaur',
+  フシギダネ: 'bulbasaur', フシギバナ: 'venusaur', フタチマル: 'dewott', フラエッテ: 'floette',
+  フラベベ: 'flabebe', フラージェス: 'florges', フレフワン: 'aromatisse', フローゼル: 'floatzel',
+  フーディン: 'alakazam', ブイゼル: 'buizel', ブビィ: 'magby', ブラッキー: 'umbreon',
+  ブリムオン: 'hatterene', ブルンゲル: 'jellicent', ブルー: 'snubbull', ブロロン: 'varoom',
+  ブースター: 'flareon', ブーバー: 'magmar', プクリン: 'wigglytuff', プテラ: 'aerodactyl',
+  ププリン: 'igglybuff', プラスル: 'plusle', プリン: 'jigglypuff', プルリル: 'frillish',
+  プロトーガ: 'tirtouga', ヘラクロス: 'heracross', ヘルガー: 'houndoom', ベイリーフ: 'bayleef',
+  ベロベルト: 'lickilicky', ペリッパー: 'pelipper', ペロッパフ: 'swirlix', ペロリーム: 'slurpuff',
+  ホウオウ: 'ho-oh', ホエルオー: 'wailord', ホエルコ: 'wailmer', ホシガリス: 'skwovet',
+  ホルビー: 'bunnelby', ホーホー: 'hoothoot', ボスゴドラ: 'aggron', ボルトロス: 'thundurus',
+  ボーマンダ: 'salamence', ポチエナ: 'poochyena', ポッチャマ: 'piplup', ポットデス: 'polteageist',
+  ポッポ: 'pidgey', ポニータ: 'ponyta', ポポッコ: 'skiploom', ポワルン: 'castform',
+  マイナン: 'minun', マクノシタ: 'makuhita', マケンカニ: 'crabrawler', マシェード: 'shiinotic',
+  マダツボミ: 'bellsprout', マッギョ: 'stunfisk', マニューラ: 'weavile', マネネ: 'mime-jr',
+  マフィティフ: 'mabosstiff', マフォクシー: 'delphox', マホイップ: 'alcremie', マホミル: 'milcery',
+  ママンボウ: 'alomomola', マメパト: 'pidove', マユルド: 'cascoon', マラカッチ: 'maractus',
+  マリル: 'marill', マリルリ: 'azumarill', マンキー: 'mankey', マンタイン: 'mantine',
+  マーイーカ: 'inkay', ミジュマル: 'oshawott', ミニリュウ: 'dratini', ミノマダム: 'wormadam',
+  ミノムッチ: 'burmy', ミブリム: 'hatenna', ミミロップ: 'lopunny', ミミロル: 'buneary',
+  ミュウ: 'mew', ミルタンク: 'miltank', ミロカロス: 'milotic', ムクバード: 'staravia',
+  ムクホーク: 'staraptor', ムチュール: 'smoochum', ムックル: 'starly', メェークル: 'skiddo',
+  メタグロス: 'metagross', メタモン: 'ditto', メッソン: 'sobble', メテノ: 'minior',
+  メノクラゲ: 'tentacool', メブキジカ: 'sawsbuck', メリープ: 'mareep', メルタン: 'meltan',
+  メロエッタ: 'meloetta', モクロー: 'rowlet', モココ: 'flaaffy', モスノウ: 'frosmoth',
+  モトトカゲ: 'cyclizar', モノズ: 'deino', モルペコ: 'morpeko', ヤクデ: 'sizzlipede',
+  ヤジロン: 'baltoy', ヤトウモリ: 'salandit', ヤドキング: 'slowking', ヤドラン: 'slowbro',
+  ヤドン: 'slowpoke', ヤナップ: 'pansage', ヤバソチャ: 'sinistcha', ヤバチャ: 'sinistea',
+  ヤミラミ: 'sableye', ヤヤコマ: 'fletchling', ヤレユータン: 'oranguru', ヤンチャム: 'pancham',
+  ヤンヤンマ: 'yanma', ユキカブリ: 'snover', ユキノオー: 'abomasnow', ユキハミ: 'snom',
+  ユキメノコ: 'froslass', ユキワラシ: 'snorunt', ユクシー: 'uxie', ヨワシ: 'wishiwashi',
+  ヨーギラス: 'larvitar', ライコウ: 'raikou', ライチュウ: 'raichu', ラクライ: 'electrike',
+  ラッキー: 'chansey', ラティアス: 'latias', ラティオス: 'latios', ラビフット: 'raboot',
+  ラフレシア: 'vileplume', ラブカス: 'luvdisc', ラプラス: 'lapras', ラランテス: 'lurantis',
+  ラルトス: 'ralts', ランクルス: 'reuniclus', ランプラー: 'lampent', リオル: 'riolu',
+  リグレー: 'elgyem', リザードン: 'charizard', リリーラ: 'lileep', リーシャン: 'chingling',
+  リーフィア: 'leafeon', ルカリオ: 'lucario', ルガルガン: 'lycanroc', ルギア: 'lugia',
+  ルチャブル: 'hawlucha', ルナトーン: 'lunatone', ルリリ: 'azurill', ルンパッパ: 'ludicolo',
+  レアコイル: 'magneton', レジアイス: 'regice', レジギガス: 'regigigas', レジスチル: 'registeel',
+  レジロック: 'regirock', レックウザ: 'rayquaza', レディバ: 'ledyba', レパルダス: 'liepard',
+  レントラー: 'luxray', ロコン: 'vulpix', ロズレイド: 'roserade', ロゼリア: 'roselia',
+  ワカシャモ: 'combusken', ワシボン: 'rufflet', ワタシラガ: 'eldegoss', ワタッコ: 'jumpluff',
+  ワッカネズミ: 'tandemaus', ワニノコ: 'totodile', ワンパチ: 'yamper', ワンリキー: 'machop',
+};
+
+// データには「ゴンべ」のように一部がひらがなの表記がある。図鑑側と同じくカタカナに寄せて引く
+function toKatakana(text: string): string {
+  return text.replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+}
+
+/** 図鑑のポケモンページ URL。載っていないポケモンなら図鑑のポケモン一覧。 */
+export function pokemonDexUrl(pokemon: string): string {
+  const name = pokemon.trim();
+  const own = (key: string) =>
+    Object.prototype.hasOwnProperty.call(POKEMON_DEX_SLUGS, key) ? POKEMON_DEX_SLUGS[key] : undefined;
+  const slug = own(name) ?? own(toKatakana(name));
+  return slug
+    ? `${DEX_SITE_ORIGIN}/pokemon/${encodeURIComponent(slug)}/`
+    : `${DEX_SITE_ORIGIN}/pokemon/`;
+}

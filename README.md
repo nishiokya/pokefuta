@@ -6,8 +6,6 @@
 
 **📱 本番環境**: [https://pokefuta.com](https://pokefuta.com)
 
-**📚 API ドキュメント**: http://localhost:3000/api-docs (開発環境のみ)
-
 ## 📱 概要
 
 家族や個人の「訪問したポケモンマンホール」の写真・訪問記録を、スマホからサクッと登録・閲覧・共有できる仕組みです。
@@ -24,7 +22,6 @@
 - 🔍 **検索/フィルタ** - 県・市・ポケモン別
 - 📊 **訪問統計** - 訪問数、都道府県達成数
 - 🔗 **共有リンク** - 訪問記録を共有（署名URL）
-- 📖 **API ドキュメント** - Swagger/OpenAPI 自動生成
 
 ### 将来機能
 - 📱 LINE OAuth + Bot通知
@@ -46,7 +43,6 @@
 - **Database**: Supabase PostgreSQL + PostGIS (地理拡張)
 - **Storage**: Cloudflare R2 (S3互換)
 - **API**: Next.js API Routes
-- **API Documentation**: Swagger/OpenAPI
 
 ### インフラ
 - **Hosting**: AWS Amplify Hosting
@@ -271,28 +267,15 @@ npm run dev
 - キャッシュ: ブラウザキャッシュで高速表示
 - 期限付き: URLの再利用を防止
 
-## 🗺️ マップ機能
+## 🗺️ マップ・一覧
 
-- **ベースレイヤ**: OpenStreetMap
-- **マーカー**: 訪問済み（✓ 緑）/ 未訪問（? 赤）
-- **フィルタ**: 都道府県別表示
-- **ユーザー位置**: リアルタイム表示
-- **ポップアップ**: マンホール詳細・ポケモン情報
+全国マップ・都道府県・ポケモン別の一覧は図鑑（https://data.pokefuta.com）の担当。
+写真館の `/map` `/manholes` `/prefectures/*` は閉じて、図鑑の同じ役割のページへ転送している（`next.config.js`）。
 
 ## 📖 API ドキュメント
 
-### Swagger/OpenAPI
-
-本番環境: **開発環境のみ有効**（本番では403エラー）
-
-- **Swagger UI**: http://localhost:3000/api-docs
-- **OpenAPI JSON**: http://localhost:3000/api/swagger
-
-### 新規API作成時のルール
-
-1. **すべてのAPI Routeファイルに`@swagger`コメントを追加**
-2. **認証が必要な場合は`security: - cookieAuth: []`を追加**
-3. **Swagger UIで表示を確認**
+Swagger UI（`/api-docs`・`/api/swagger`）は撤去した。API の説明は各 `route.ts` の
+`@swagger` 形式の JSDoc コメントにある（生成はしていない）。新しい API を足すときも同じ形で書く。
 
 ## 🔒 セキュリティ
 
@@ -399,12 +382,10 @@ npm run build
 ## 🛠️ 主要なページ
 
 - `/` - ホーム（訪問記録一覧・最近の写真）
-- `/map` - 地図表示（マンホール位置・訪問状況）
 - `/nearby` - 近くのポケふた検索
 - `/upload` - 写真アップロード
 - `/visits` - 訪問履歴
 - `/manhole/[id]` - マンホール詳細
-- `/api-docs` - Swagger UI（開発環境のみ）
 
 ## 📄 ライセンス
 

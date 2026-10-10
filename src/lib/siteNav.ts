@@ -30,8 +30,6 @@ const ROUTES: Record<string, RouteChrome> = {
   '/': { title: SITE_NAME },
   '/nearby': { title: 'ポケふたを探す', activeNav: 'search' },
   '/manhole': { title: 'ポケふた', activeNav: 'search' },
-  '/manholes': { title: '全国ポケふた一覧', activeNav: 'search' },
-  '/map': { title: 'ポケふたマップ', activeNav: 'search' },
   '/visits': { title: 'スタンプ帳', activeNav: 'stamp' },
   '/my-trip': { title: 'マイ旅', activeNav: 'mytrip' },
   '/upload': { title: 'ポケふたを投稿' },
@@ -44,7 +42,6 @@ const ROUTES: Record<string, RouteChrome> = {
 
   // クロムを出さないページ
   '/login': { title: SITE_NAME, bare: true },
-  '/api-docs': { title: SITE_NAME, bare: true },
 };
 
 const FALLBACK: RouteChrome = { title: SITE_NAME };
