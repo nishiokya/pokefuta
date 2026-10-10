@@ -1129,210 +1129,260 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   );
 
   // ── 写真の拡大ビューア ──
-  // 画面全体に重ね、閉じれば押す前の位置に戻る。左右（キー・スワイプ・ボタン）で送る。
+  // ページの上に重ねて開き、閉じれば押す前の位置に戻る。左右（キー・スワイプ・ボタン）と
+  // 下のサムネ列で送る。送り順はページ上部の写真枠と同じ（代表写真が1枚目）。
   // 以前はページ上部の写真枠を差し替えてそこへスクロールしていたうえ、タグ・ひとこと・
   // 投稿者・いいね・削除をすべて写真の上に重ねていて蓋の絵柄が隠れていた。
-  // 写真の上には何も載せず、情報と操作は下の帯にまとめる。
-  viewerOrderRef.current = newestFirstPhotos.map(({ index }) => index);
-  const viewerPos = viewerOrderRef.current.indexOf(safeIdx);
+  // 写真の上には何も載せず、情報と操作は横（スマホは下）の欄にまとめる。
+  // PC は画面いっぱいの黒にせず、暗くしたページの上に枠で出す（どの蓋を見ているかを見失わない）。
+  viewerOrderRef.current = allDisplayPhotos.map((_, index) => index);
   const viewerHasMany = allDisplayPhotos.length > 1;
   const viewerCaption =
     featuredPhoto && isMeaningfulVisitComment(featuredPhoto.visit?.comment)
       ? normalizeVisitComment(featuredPhoto.visit?.comment)
       : '';
+  const viewerCloseButton = (
+    <button
+      type="button"
+      onClick={closeViewer}
+      aria-label="閉じる"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+    >
+      <X className="h-5 w-5" strokeWidth={2.4} />
+    </button>
+  );
   const photoViewer = photoExpanded && featuredPhoto ? (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="写真の拡大表示"
-      className="fixed inset-0 z-[55] flex flex-col bg-[#14120f] safe-area-inset"
+      className="fixed inset-0 z-[55] flex items-center justify-center bg-[#14120f] lg:bg-black/75 lg:p-8 lg:backdrop-blur-sm"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeViewer();
+      }}
     >
-      <div className="flex shrink-0 items-center gap-2 px-3 py-2.5 text-white">
-        {viewerHasMany && (
-          <span className="font-['Outfit'] text-xs font-bold opacity-80">
-            {viewerPos + 1} / {allDisplayPhotos.length}
-          </span>
-        )}
-        {featuredPhoto.visit?.user_id === currentUserId && (
-          <span className="rounded-full bg-[#1f9d63]/95 px-2.5 py-0.5 font-pixelJp text-[11px] font-bold">
-            あなたの投稿
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={closeViewer}
-          aria-label="閉じる"
-          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
-        >
-          <X className="h-5 w-5" strokeWidth={2.4} />
-        </button>
-      </div>
+      <div className="flex h-full w-full flex-col overflow-hidden bg-[#14120f] safe-area-inset lg:h-[min(86vh,820px)] lg:max-w-6xl lg:flex-row lg:rounded-[18px] lg:shadow-2xl">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* スマホの上の行。PC は右の欄に蓋の名前と × を出す */}
+          <div className="flex shrink-0 items-center gap-2 px-3 py-2.5 text-white lg:hidden">
+            <span className="min-w-0 truncate font-pixelJp text-xs font-bold opacity-80">
+              {manholeHeadingPlace(manhole)}
+            </span>
+            <span className="ml-auto" />
+            {viewerCloseButton}
+          </div>
 
-      <div
-        className="relative min-h-0 flex-1"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) closeViewer();
-        }}
-        onTouchStart={(event) => {
-          viewerTouchXRef.current = event.touches[0]?.clientX ?? null;
-        }}
-        onTouchEnd={(event) => {
-          const startX = viewerTouchXRef.current;
-          viewerTouchXRef.current = null;
-          const endX = event.changedTouches[0]?.clientX;
-          if (startX === null || endX === undefined) return;
-          const dx = endX - startX;
-          if (Math.abs(dx) > 50) stepViewer(dx < 0 ? 1 : -1);
-        }}
-      >
-        <img
-          key={featuredPhoto.id}
-          src={`/api/photo/${featuredPhoto.id}?size=large`}
-          alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
-          className="pointer-events-none absolute inset-0 m-auto max-h-full max-w-full object-contain"
-        />
-        {viewerHasMany && (
-          <>
-            <button
-              type="button"
-              onClick={() => stepViewer(-1)}
-              aria-label="前の写真"
-              className="absolute left-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/65"
-            >
-              <ChevronLeft className="h-6 w-6" strokeWidth={2.4} />
-            </button>
-            <button
-              type="button"
-              onClick={() => stepViewer(1)}
-              aria-label="次の写真"
-              className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/65"
-            >
-              <ChevronRight className="h-6 w-6" strokeWidth={2.4} />
-            </button>
-          </>
-        )}
-      </div>
+          <div
+            className="relative min-h-0 flex-1"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) closeViewer();
+            }}
+            onTouchStart={(event) => {
+              viewerTouchXRef.current = event.touches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(event) => {
+              const startX = viewerTouchXRef.current;
+              viewerTouchXRef.current = null;
+              const endX = event.changedTouches[0]?.clientX;
+              if (startX === null || endX === undefined) return;
+              const dx = endX - startX;
+              if (Math.abs(dx) > 50) stepViewer(dx < 0 ? 1 : -1);
+            }}
+          >
+            <img
+              key={featuredPhoto.id}
+              src={`/api/photo/${featuredPhoto.id}?size=large`}
+              alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
+              className="pointer-events-none absolute inset-0 m-auto max-h-full max-w-full object-contain"
+            />
+            {viewerHasMany && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => stepViewer(-1)}
+                  aria-label="前の写真"
+                  className="absolute left-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/65 lg:left-3 lg:h-11 lg:w-11"
+                >
+                  <ChevronLeft className="h-6 w-6" strokeWidth={2.4} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepViewer(1)}
+                  aria-label="次の写真"
+                  className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/65 lg:right-3 lg:h-11 lg:w-11"
+                >
+                  <ChevronRight className="h-6 w-6" strokeWidth={2.4} />
+                </button>
+              </>
+            )}
+          </div>
 
-      <div className="mx-auto flex w-full max-w-2xl shrink-0 flex-col gap-2 px-4 pb-4 pt-3 text-white">
-        <div className="flex min-w-0 items-center gap-2">
-          {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
-            <Link
-              href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
-              className="min-w-0 truncate text-sm font-bold underline"
-            >
-              @{getPhotoUserLabel(featuredPhoto)}
-            </Link>
-          ) : (
-            <span className="min-w-0 truncate text-sm font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
+          {/* サムネ列。何枚あって今どれを見ているかを見せ、押せば直接飛ぶ */}
+          {viewerHasMany && (
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-2.5">
+              <span className="shrink-0 font-['Outfit'] text-xs font-bold text-white/70">
+                {safeIdx + 1} / {allDisplayPhotos.length}
+              </span>
+              {allDisplayPhotos.map((photo, index) => (
+                <button
+                  key={photo.id}
+                  type="button"
+                  onClick={() => {
+                    cancelCommentEdit();
+                    setSelectedPhotoIdx(index);
+                  }}
+                  aria-label={`${index + 1}枚目の写真を表示`}
+                  aria-current={index === safeIdx ? 'true' : undefined}
+                  className={`h-12 w-12 shrink-0 overflow-hidden rounded-[8px] border-2 transition-opacity ${
+                    index === safeIdx ? 'border-white opacity-100' : 'border-transparent opacity-50 hover:opacity-90'
+                  }`}
+                >
+                  <img
+                    src={`/api/photo/${photo.id}?size=small`}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
+                    loading="lazy"
+                  />
+                </button>
+              ))}
+            </div>
           )}
-          <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
-          {featuredPhoto.visit?.shot_at && (
-            <span className="shrink-0 font-['Outfit'] text-xs opacity-80">
-              {formatPhotoDate(featuredPhoto.visit.shot_at)}
+        </div>
+
+        <div className="flex max-h-[34vh] shrink-0 flex-col gap-2.5 overflow-y-auto border-t border-white/10 px-4 pb-4 pt-3 text-white lg:max-h-none lg:w-[340px] lg:border-l lg:border-t-0 lg:p-5">
+          <div className="hidden items-start gap-2 lg:flex">
+            <p className="min-w-0 flex-1 font-pixelJp text-sm font-bold leading-snug text-white/85">
+              {manholeHeadingPlace(manhole)}
+            </p>
+            {viewerCloseButton}
+          </div>
+          {featuredPhoto.visit?.user_id === currentUserId && (
+            <span className="self-start rounded-full bg-[#1f9d63]/95 px-2.5 py-0.5 font-pixelJp text-[11px] font-bold">
+              あなたの投稿
             </span>
           )}
-          <span className="ml-auto flex shrink-0 items-center gap-2">
-            {featuredPhoto.visit?.id && (
-              <PhotoLikeButton
-                key={featuredPhoto.visit.id}
-                visitId={featuredPhoto.visit.id}
-                isLoggedIn={isLoggedIn}
-                loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
-              />
+
+          <div className="flex min-w-0 items-center gap-2">
+            {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
+              <Link
+                href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
+                className="min-w-0 truncate text-sm font-bold underline"
+              >
+                @{getPhotoUserLabel(featuredPhoto)}
+              </Link>
+            ) : (
+              <span className="min-w-0 truncate text-sm font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
             )}
-            {featuredPhoto.visit?.user_id === currentUserId && (
+            <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
+            {featuredPhoto.visit?.shot_at && (
+              <span className="shrink-0 font-['Outfit'] text-xs opacity-80">
+                {formatPhotoDate(featuredPhoto.visit.shot_at)}
+              </span>
+            )}
+            <span className="ml-auto flex shrink-0 items-center gap-2">
+              {featuredPhoto.visit?.id && (
+                <PhotoLikeButton
+                  key={featuredPhoto.visit.id}
+                  visitId={featuredPhoto.visit.id}
+                  isLoggedIn={isLoggedIn}
+                  loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                />
+              )}
+              {featuredPhoto.visit?.user_id === currentUserId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // 削除の確認はこのビューアの下に出るので、先に閉じる
+                    const { id, visit } = featuredPhoto;
+                    closeViewer();
+                    handleDeleteClick(id, visit?.id);
+                  }}
+                  className="shrink-0 rounded-full bg-red-800/80 px-2.5 py-1 text-[11px] font-bold text-white"
+                >
+                  削除
+                </button>
+              )}
+            </span>
+          </div>
+          {(featuredPhoto.is_landscape || photoAiTags(featuredPhoto).length > 0) && (
+            <div className="flex flex-wrap gap-1">
+              <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
+              <AiPhotoTags photo={featuredPhoto} linkFeatures />
+            </div>
+          )}
+          {featuredPhoto.visit?.user_id === currentUserId && featuredPhoto.visit?.id ? (
+            editingCommentVisitId === featuredPhoto.visit.id ? (
+              <div className="rounded-[14px] bg-white/95 p-3 text-[#2c2a26] shadow-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor={`photo-comment-${featuredPhoto.visit.id}`}
+                    className="font-pixelJp text-xs font-bold text-[#2c2a26]"
+                  >
+                    写真のひとこと
+                  </label>
+                  <button
+                    type="button"
+                    onClick={cancelCommentEdit}
+                    disabled={commentSaving}
+                    aria-label="編集をやめる"
+                    className="rounded-full p-1 text-[#6f6657] hover:bg-[#f1e8d4] disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2.4} />
+                  </button>
+                </div>
+                <textarea
+                  id={`photo-comment-${featuredPhoto.visit.id}`}
+                  value={commentDraft}
+                  onChange={(event) => setCommentDraft(event.target.value)}
+                  rows={3}
+                  autoFocus
+                  placeholder="見つけた場所・駐車場・行き方など"
+                  disabled={commentSaving}
+                  className="mt-2 w-full resize-none rounded-[10px] border border-[#d7c8a7] bg-white px-3 py-2 font-pixelJp text-xs leading-relaxed text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-2 focus:ring-[#bf5640]/30 disabled:opacity-60"
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`font-pixelJp text-[10px] ${commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH ? 'text-[#bf5640]' : 'text-[#9b917e]'}`}>
+                    {commentDraft.trim().length}/{VISIT_COMMENT_MAX_LENGTH}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void savePhotoComment(featuredPhoto.visit!.id)}
+                    disabled={commentSaving || commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH}
+                    className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#bf5640] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white disabled:opacity-50"
+                  >
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                    {commentSaving ? '保存中…' : commentDraft.trim() ? '保存' : 'ひとことを削除'}
+                  </button>
+                </div>
+                {commentSaveError && (
+                  <p className="mt-2 font-pixelJp text-[11px] font-bold text-[#bf5640]">
+                    {commentSaveError}
+                  </p>
+                )}
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={() => {
-                  // 削除の確認はこのビューアの下に出るので、先に閉じる
-                  const { id, visit } = featuredPhoto;
-                  closeViewer();
-                  handleDeleteClick(id, visit?.id);
-                }}
-                className="shrink-0 rounded-full bg-red-800/80 px-2.5 py-1 text-[11px] font-bold text-white"
+                onClick={() => startCommentEdit(featuredPhoto)}
+                className="inline-flex min-w-0 max-w-full items-center gap-1.5 self-start rounded-[12px] bg-white/10 px-2.5 py-1.5 text-left hover:bg-white/20"
               >
-                削除
-              </button>
-            )}
-          </span>
-        </div>
-        {(featuredPhoto.is_landscape || photoAiTags(featuredPhoto).length > 0) && (
-          <div className="flex flex-wrap gap-1">
-            <LandscapePhotoBadge isLandscape={featuredPhoto.is_landscape} />
-            <AiPhotoTags photo={featuredPhoto} linkFeatures />
-          </div>
-        )}
-        {featuredPhoto.visit?.user_id === currentUserId && featuredPhoto.visit?.id ? (
-          editingCommentVisitId === featuredPhoto.visit.id ? (
-            <div className="rounded-[14px] bg-white/95 p-3 text-[#2c2a26] shadow-lg">
-              <div className="flex items-center justify-between gap-2">
-                <label
-                  htmlFor={`photo-comment-${featuredPhoto.visit.id}`}
-                  className="font-pixelJp text-xs font-bold text-[#2c2a26]"
-                >
-                  写真のひとこと
-                </label>
-                <button
-                  type="button"
-                  onClick={cancelCommentEdit}
-                  disabled={commentSaving}
-                  aria-label="編集をやめる"
-                  className="rounded-full p-1 text-[#6f6657] hover:bg-[#f1e8d4] disabled:opacity-50"
-                >
-                  <X className="h-4 w-4" strokeWidth={2.4} />
-                </button>
-              </div>
-              <textarea
-                id={`photo-comment-${featuredPhoto.visit.id}`}
-                value={commentDraft}
-                onChange={(event) => setCommentDraft(event.target.value)}
-                rows={3}
-                autoFocus
-                placeholder="見つけた場所・駐車場・行き方など"
-                disabled={commentSaving}
-                className="mt-2 w-full resize-none rounded-[10px] border border-[#d7c8a7] bg-white px-3 py-2 font-pixelJp text-xs leading-relaxed text-[#2c2a26] placeholder:text-[#9b917e] focus:outline-none focus:ring-2 focus:ring-[#bf5640]/30 disabled:opacity-60"
-              />
-              <div className="mt-2 flex items-center gap-2">
-                <span className={`font-pixelJp text-[10px] ${commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH ? 'text-[#bf5640]' : 'text-[#9b917e]'}`}>
-                  {commentDraft.trim().length}/{VISIT_COMMENT_MAX_LENGTH}
+                <Pencil className="h-3 w-3 shrink-0" strokeWidth={2.4} />
+                <span className="line-clamp-2 min-w-0 font-pixelJp text-xs font-bold leading-snug">
+                  {featuredPhoto.visit.comment?.trim() || 'ひとことを追加'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void savePhotoComment(featuredPhoto.visit!.id)}
-                  disabled={commentSaving || commentDraft.trim().length > VISIT_COMMENT_MAX_LENGTH}
-                  className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#bf5640] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white disabled:opacity-50"
-                >
-                  <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
-                  {commentSaving ? '保存中…' : commentDraft.trim() ? '保存' : 'ひとことを削除'}
-                </button>
-              </div>
-              {commentSaveError && (
-                <p className="mt-2 font-pixelJp text-[11px] font-bold text-[#bf5640]">
-                  {commentSaveError}
-                </p>
-              )}
-            </div>
+                <span className="shrink-0 font-pixelJp text-[10px] font-bold opacity-80">編集</span>
+              </button>
+            )
           ) : (
-            <button
-              type="button"
-              onClick={() => startCommentEdit(featuredPhoto)}
-              className="inline-flex min-w-0 max-w-full items-center gap-1.5 self-start rounded-[12px] bg-white/10 px-2.5 py-1.5 text-left hover:bg-white/20"
-            >
-              <Pencil className="h-3 w-3 shrink-0" strokeWidth={2.4} />
-              <span className="line-clamp-2 min-w-0 font-pixelJp text-xs font-bold leading-snug">
-                {featuredPhoto.visit.comment?.trim() || 'ひとことを追加'}
-              </span>
-              <span className="shrink-0 font-pixelJp text-[10px] font-bold opacity-80">編集</span>
-            </button>
-          )
-        ) : (
-          viewerCaption && (
-            // 写真に重ねていたときは2行で切っていた。帯に移したので全文を出す（長ければ帯の中で送る）。
-            <p className="max-h-[22vh] overflow-y-auto whitespace-pre-line break-words font-pixelJp text-[13px] font-semibold leading-relaxed text-white/90">
-              {viewerCaption}
-            </p>
-          )
-        )}
+            viewerCaption && (
+              // 写真に重ねていたときは2行で切っていた。欄に移したので全文を出す（長ければ欄ごと送る）。
+              <p className="whitespace-pre-line break-words font-pixelJp text-[13px] font-semibold leading-relaxed text-white/90">
+                {viewerCaption}
+              </p>
+            )
+          )}
+        </div>
       </div>
     </div>
   ) : null;
