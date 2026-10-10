@@ -74,8 +74,12 @@ export default function HomePage() {
   const [completionLoaded, setCompletionLoaded] = useState(false);
   // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
+  // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
+  const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
+  // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
+  const [isSp, setIsSp] = useState<boolean | null>(null);
   const feedPerPage = 24;
   const { trackView, trackSubmissionEntry } = useAnalytics();
 
@@ -102,12 +106,21 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadPlushFeature();
+    loadDesignFeature();
     fetchRegularBadges().then(setRegularBadges);
   }, []);
 
   useEffect(() => {
     loadFeed();
   }, [currentPage]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => setIsSp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const loadFeed = async () => {
     setLoading(true);
@@ -153,6 +166,18 @@ export default function HomePage() {
       const data = await response.json();
       if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos)) return;
       setPlushFeature({ count: data.count, photos: data.photos });
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadDesignFeature = async () => {
+    try {
+      const response = await fetch('/api/design-manholes?limit=3');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.success || !Array.isArray(data.design_manholes)) return;
+      setDesignFeature(data.design_manholes);
     } catch {
       // ignore
     }
@@ -296,50 +321,84 @@ export default function HomePage() {
               ヒーローの末尾に置くのは以前のパネルと同じ理由。/api/features/plush の応答を待って
               現れるので、CTA より上に置くと遅れて割り込んでボタンを押し下げる。
             */}
-            {plushFeature && plushFeature.count > 0 && (
-              <div className="mt-4 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-4">
-                <p className="mb-2 text-xs font-extrabold tracking-wide text-[#7B63A8]">特集</p>
-                <Link
-                  href="/photos/plush"
-                  className="group flex items-center gap-3 rounded-lg bg-white p-2 shadow-sm transition hover:shadow"
-                >
-                  {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
-                  <div className="flex shrink-0 gap-1">
-                    {plushFeature.photos.map((photo) => {
-                      const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                      const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                      const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                      const src = `/api/photo/${photo.id}?size=small`;
-                      return (
-                        <div key={photo.id} className="relative h-14 w-14">
-                          <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                            <img src={src} alt="" width={56} height={56} loading="lazy"
-                              className={lidClip ? undefined : 'h-full w-full object-cover'}
-                              style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                          </div>
-                          {plushClip && (
-                            <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                              <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-sm font-extrabold text-[#4A4A4A]">
-                      ぬいぐるみと旅するポケふた
-                      <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
-                    </p>
-                    <p className="text-xs text-[#6A4D36]">
-                      ぬいぐるみと一緒に撮られた写真 {plushFeature.count}枚
-                      <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                    </p>
-                  </div>
-                </Link>
-              </div>
-            )}
           </div>
+
+          {/*
+            特集は2つ（ぬいぐるみ・デザインふた）。見出しの列（max-w-3xl）の外に出してヒーローの全幅を使う。
+            PC は写真3枚と説明の横長カード、スマホは同じ2枚を横に並べた縦長の小さなカード（写真は2枚。360px 幅で収まるように）
+            （スマホのファーストビューに最新の投稿を残すため、縦に積まない）。
+            どちらも取れたものだけ出し、両方取れなければパネルごと出さない
+          */}
+          {((plushFeature && plushFeature.count > 0) || (designFeature && designFeature.length > 0)) && (
+            <div className="relative mt-3 rounded-[8px] border border-[#7B63A8]/20 bg-[#F4F0FA] p-2.5 sm:mt-4 sm:p-4">
+              <p className="mb-1.5 text-xs font-extrabold tracking-wide text-[#7B63A8] sm:mb-2">特集</p>
+              <div className="grid grid-cols-2 gap-2">
+              {plushFeature && plushFeature.count > 0 && (
+              <Link
+                href="/photos/plush"
+                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+              >
+                {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは縮める */}
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {plushFeature.photos.map((photo, index) => {
+                    const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                    const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                    const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                    const src = `/api/photo/${photo.id}?size=small`;
+                    return (
+                      <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''}`}>
+                        <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                          <img src={src} alt="" width={56} height={56} loading="lazy"
+                            className={lidClip ? undefined : 'h-full w-full object-cover'}
+                            style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                        </div>
+                        {plushClip && (
+                          <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                            <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
+                    <span className="truncate">ぬいぐるみと旅するポケふた</span>
+                    <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                  </p>
+                  <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className="hidden sm:inline">ぬいぐるみと一緒に撮られた</span>写真 {plushFeature.count}枚
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
+                </div>
+              </Link>
+              )}
+              {designFeature && designFeature.length > 0 && (
+              <Link
+                href="/design-manholes"
+                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+              >
+                {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {designFeature.map((d, index) => (
+                    <div key={d.id} className={`h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm ${index === 2 ? 'max-sm:hidden' : ''}`}>
+                      <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
+                  <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className="hidden sm:inline">投稿されたデザインマンホール </span>
+                    {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
+                </div>
+              </Link>
+              )}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Loading State */}
@@ -354,7 +413,13 @@ export default function HomePage() {
         )}
 
         {/* 口コミが少ないうちは最新の投稿に口コミ付きの蓋が来ないので、別枠で拾う */}
-        {currentPage === 1 && <RecentComments />}
+        {/*
+          口コミの位置は画面幅で変える。PC はここ（最新の投稿の上）、スマホは最新の投稿の後ろ
+          （ファーストビューを投稿の写真に使う）。CSS の order だと読み上げ・Tab の順が見た目と
+          食い違うので、置く場所そのものを変える。幅が分かるまでは出さない（RecentComments は
+          データが来るまで何も描かないので、出すのが少し遅れてもずれない）。一度だけ描くので取得も1回
+        */}
+        {currentPage === 1 && isSp === false && <RecentComments />}
 
         {/* Photo Gallery */}
         {!loading && (
@@ -619,6 +684,8 @@ export default function HomePage() {
             )}
           </>
         )}
+
+        {currentPage === 1 && isSp === true && <RecentComments />}
 
         {/* 補助情報より写真を先に見せる。特にスマホのファーストビューを塞がない。 */}
         {!loading && (
