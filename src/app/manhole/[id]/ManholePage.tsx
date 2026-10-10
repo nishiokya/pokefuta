@@ -660,8 +660,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     });
   };
   // キー操作の effect は開閉のときだけ張り直すので、最新の関数は ref 越しに呼ぶ。
-  const viewerActionsRef = useRef({ close: closeViewer, step: stepViewer });
-  viewerActionsRef.current = { close: closeViewer, step: stepViewer };
+  const viewerActionsRef = useRef({ close: closeViewer, step: stepViewer, cancelEdit: cancelCommentEdit });
+  viewerActionsRef.current = { close: closeViewer, step: stepViewer, cancelEdit: cancelCommentEdit };
   // aria-modal だけでは背後のページは操作できたままなので、開いたらフォーカスを中へ移し、
   // Tab は中で一周させ、閉じたら開く前の要素（押した写真）へ戻す。
   useEffect(() => {
@@ -695,9 +695,15 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         return;
       }
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
-      if (event.key === 'Escape') viewerActionsRef.current.close();
-      else if (event.key === 'ArrowLeft') viewerActionsRef.current.step(-1);
+      const typing = !!target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
+      // ひとことの編集中の Esc は編集をやめるだけ（もう一度押せば閉じる）。矢印キーは文字入力に使うので送らない
+      if (event.key === 'Escape') {
+        if (typing) viewerActionsRef.current.cancelEdit();
+        else viewerActionsRef.current.close();
+        return;
+      }
+      if (typing) return;
+      if (event.key === 'ArrowLeft') viewerActionsRef.current.step(-1);
       else if (event.key === 'ArrowRight') viewerActionsRef.current.step(1);
     };
     const prevOverflow = document.body.style.overflow;
