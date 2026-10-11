@@ -31,7 +31,7 @@ test('改行は残し、CRLF と連続空白は畳む', () => {
 const photo = (id: string, visitId: string, comment: string | null, createdAt = '2026-08-01T00:00:00.000Z') => ({
   id,
   created_at: createdAt,
-  visit: { id: visitId, comment, created_at: createdAt, shot_at: null, user_id: 'u', is_public: true },
+  visit: { id: visitId, comment, created_at: createdAt, shot_at: null, is_own: false, is_public: true },
 });
 
 test('ひとこと一覧は書かれた新しい順・ゴミ除外・訪問単位で1件', () => {

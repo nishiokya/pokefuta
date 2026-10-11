@@ -444,10 +444,13 @@ export async function GET(request: NextRequest) {
         publicUserIdMap.set(row.auth_uid, row.public_user_id ?? null);
       }
     });
-    const enrichedVisits = processedVisits.map((v: any) => ({
+    // user_id（auth UID）は返さない。未ログインでも読める応答なので、投稿者は public_user_id で指し、
+    // 「自分の訪問か」はここで判定した is_own で渡す。
+    const enrichedVisits = processedVisits.map(({ user_id: authUid, ...v }: any) => ({
       ...v,
-      display_name: displayNameMap.get(v.user_id) ?? null,
-      public_user_id: publicUserIdMap.get(v.user_id) ?? null,
+      is_own: Boolean(viewerUserId && authUid === viewerUserId),
+      display_name: displayNameMap.get(authUid) ?? null,
+      public_user_id: publicUserIdMap.get(authUid) ?? null,
     }));
 
     // Apply client-side filters if needed
