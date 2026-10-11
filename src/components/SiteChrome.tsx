@@ -59,7 +59,7 @@ export function HeaderTitle({ value }: { value: string }) {
 
 function BrandMark({ size = 30 }: { size?: number }) {
   return (
-    // Header-only mark drawn on a 30px grid (favicons use brand-icon.svg); decorative beside the site label.
+    // Header-only mark (favicons use the separate navy lid in brand-icon.svg); decorative beside the site label.
     // eslint-disable-next-line @next/next/no-img-element
     <img src="/brand-mark.svg" width={size} height={size} alt="" aria-hidden="true" style={{ flexShrink: 0 }} />
   );
