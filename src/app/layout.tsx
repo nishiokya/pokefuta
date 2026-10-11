@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   manifest: '/manifest.json',
   icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/brand-icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-48.png', type: 'image/png', sizes: '48x48' },
+      { url: '/favicon-96.png', type: 'image/png', sizes: '96x96' },
+    ],
     apple: '/apple-touch-icon.png',
   },
   keywords: ['ポケモン', 'ポケふた', 'マンホール', '訪問記録', '写真', 'スタンプ帳'],

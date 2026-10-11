@@ -57,28 +57,11 @@ export function HeaderTitle({ value }: { value: string }) {
 // パーツ
 // ─────────────────────────────────────────────
 
-function PokeballMark({ size = 28 }: { size?: number }) {
-  const core = size * 0.38;
+function BrandMark({ size = 28 }: { size?: number }) {
   return (
-    <span
-      style={{
-        position: 'relative',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border: '2px solid var(--chrome-ink)',
-        background: '#fff',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
-      <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '50%', background: 'var(--chrome-ball-red)' }} />
-      <span style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: 'var(--chrome-ink)', transform: 'translateY(-50%)' }} />
-      <span style={{ position: 'relative', zIndex: 1, width: core, height: core, borderRadius: '50%', border: '2px solid var(--chrome-ink)', background: '#fff' }} />
-    </span>
+    // Shared with the directory header and favicons; decorative beside the site label.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/brand-icon.svg" width={size} height={size} alt="" aria-hidden="true" style={{ flexShrink: 0 }} />
   );
 }
 
@@ -103,12 +86,12 @@ type ChromeState = {
 // ─────────────────────────────────────────────
 
 /**
- * 同じモンスターボールなのに別サイト、という状態を解消するための導線。
+ * 共通マークを使う写真館と図鑑を切り替える導線。
  *
  * 図鑑側（pokefuta-tracker の inject_site_header.py / site-header.css）と
  * 見た目・文言・項目順を揃えている。片方だけ変えないこと。
  *
- * SP はページタイトルが横幅を占めるのでボール＋キャレットだけを出す。
+ * SP はページタイトルが横幅を占めるのでマーク＋キャレットだけを出す。
  * そのぶんホームへは1タップで行けなくなるが、メニューの先頭が「写真館」＝ `/` なので
  * 到達性は保たれる（図鑑側も同じ扱い）。
  */
@@ -175,7 +158,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
           fontFamily: ROUND,
         }}
       >
-        <PokeballMark size={variant === 'pc' ? 28 : 30} />
+        <BrandMark size={variant === 'pc' ? 28 : 30} />
         {variant === 'pc' && (
           <span style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
             ポケふた
