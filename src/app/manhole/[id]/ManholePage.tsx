@@ -19,6 +19,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
+import { placeNote } from '@/lib/manhole-place-notes';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
@@ -1853,6 +1854,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   </a>
                 ))}
               </div>
+              {placeNote(manhole) && (
+                <p className="mt-3 font-pixelJp text-xs leading-relaxed text-[#6f6657]">{placeNote(manhole)}</p>
+              )}
             </div>
           )}
 
