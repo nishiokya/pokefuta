@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient, hasSupabaseAuthCookie } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
+import { loadOwnVisitNotes } from '@/lib/own-visit-notes';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import { fetchSnapshotNames, withSnapshotName } from '@/lib/manhole-snapshot';
 import {
@@ -172,10 +173,20 @@ export async function GET(request: NextRequest) {
     let query;
     if (viewerUserId) {
       // ✅ ログイン時: 従来通り、自分の訪問記録のみ
+      // 列を名指しする。`*` は SELECT を渡していない note（20261012110000）まで要求して
+      // 42501 になる。note は下で get_own_visit_notes() から足す。
       query = supabase
         .from('visit')
         .select(`
-          *,
+          id,
+          user_id,
+          manhole_id,
+          shot_at,
+          shot_location,
+          comment,
+          is_public,
+          created_at,
+          updated_at,
           ${manholeEmbed} (
             id,
             title,
@@ -372,6 +383,10 @@ export async function GET(request: NextRequest) {
     const snapshotNames = await snapshotNamesPromise;
 
     // Post-process data
+    // ログイン時は自分の訪問だけを返しているので、その note を本人用の関数で足す。
+    // 未ログインでは null（note キーごと落とす）。
+    const ownVisitNotes = viewerUserId ? await loadOwnVisitNotes(supabase, visitIds) : null;
+
     const processedVisits = (visits || []).map(visit => {
       // カードの先頭は場所の代表として使われるため、蓋写真を風景より優先する。
       // 風景しかない投稿は残し、呼び出し側で分類ラベルを表示する。
@@ -399,10 +414,10 @@ export async function GET(request: NextRequest) {
         manhole: withSnapshotName(visit.manhole as any, snapshotNames),
         shot_at: visit.shot_at,
         shot_location: visit.shot_location,
-        // 未ログイン(anon)レスポンスは note を select していないため、
-        // undefined にして JSON.stringify にキーごと落としてもらう（null だと
-        // キー自体は残ってしまい "note フィールドを返さない" 要件を満たせない）
-        note: 'note' in visit ? visit.note : undefined,
+        // 未ログイン(anon)レスポンスでは undefined にして JSON.stringify にキーごと
+        // 落としてもらう（null だとキー自体は残ってしまい "note フィールドを返さない"
+        // 要件を満たせない）。ログイン時は本人の note（無ければ null）
+        note: ownVisitNotes ? ownVisitNotes.get(visit.id) ?? null : undefined,
         comment: visit.comment,
         is_public: visit.is_public,
         created_at: visit.created_at,

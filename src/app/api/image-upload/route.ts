@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
 import { getAuthUserDisplayName } from '@/lib/auth/displayName';
+import { loadOwnVisitNotes } from '@/lib/own-visit-notes';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
@@ -413,7 +414,9 @@ export async function POST(request: NextRequest) {
         const { data: visitData, error: visitError } = await supabase
           .from('visit')
           .insert(visitInsert)
-          .select()
+          // 列を名指しする。引数なしの select() は RETURNING * になり、
+          // SELECT を渡していない note（20261012110000）で 42501 になる。
+          .select('id')
           .single();
 
         if (!visitError && visitData) {
@@ -623,7 +626,6 @@ export async function GET(request: NextRequest) {
             shot_at,
             created_at,
             manhole_id,
-            note,
             comment,
             is_public
           )
@@ -701,6 +703,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // note（非公開メモ）は visit から select できない。本人の写真の分だけ専用の関数で読む。
+      const ownVisitNotes = viewerUserId
+        ? await loadOwnVisitNotes(
+            supabase,
+            (images || [])
+              .map((img: any) => img?.visit)
+              .filter((v: any) => v?.user_id === viewerUserId)
+              .map((v: any) => v.id)
+          )
+        : new Map<string, string>();
+
       const enrichedImages = (images || []).map((img: any) => {
         const visit = img?.visit;
         if (visit && typeof visit === 'object' && !Array.isArray(visit)) {
@@ -715,7 +728,7 @@ export async function GET(request: NextRequest) {
             ...img,
             visit: {
               ...visitWithoutUid,
-              note: isOwnVisit ? visit.note : undefined,
+              note: isOwnVisit ? ownVisitNotes.get(visit.id) : undefined,
               is_own: isOwnVisit,
               display_name: displayName,
               public_user_id: publicUserId
