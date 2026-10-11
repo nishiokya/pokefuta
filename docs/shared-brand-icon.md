@@ -6,7 +6,8 @@
 
 カメラは上寄せにして、ふたの白い下半分の露出を減らす。
 
-- `public/brand-icon.svg` をヘッダーとfaviconで共用する。
+- `public/brand-icon.svg` はfavicon・アプリアイコン用。ヘッダー（30px）は `public/brand-mark.svg` を使う。
+- `brand-mark.svg` は `brand-icon.svg` と同じ絵で、30px表示用に輪郭線を太くし（ふたの縁1.3→2、カメラの縁を約1.7倍）、viewBoxを内容に合わせて詰め、ふたの下半分を背景に溶けない `#F6E6C4` にしたもの。48pxの線のまま30pxに縮めると0.8px程度になってにじむため。絵の形・配置は変えない。PC/SPとも30pxで表示する。
 - 図鑑の `apps/web/assets/brand-icon.svg` は同じふたに白い見開きの本を重ねる。写真館はカメラ、図鑑は本で区別する。ふたの形と配色を変更するときは両サイトを揃える。
 - faviconは16/32/48pxのICO、48/96pxのPNG、SVG。ホーム画面用は180px、manifest用は余白をつけた192/512px。
 - Apple用180pxとmanifest用192/512pxは全面不透明な `#FFF5DE` のキャンバスへ合成する。書き出し後に実寸と透明画素ゼロを確認する。SVGの透明部分を残したまま周囲だけ塗らない。
