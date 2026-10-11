@@ -708,11 +708,15 @@ export async function GET(request: NextRequest) {
           const publicUserId = publicUserIdByAuthUid.get(visit.user_id) ?? null;
           // note は非公開メモ（GPS座標・撮影日時等を含む）のため本人の訪問以外には返さない
           const isOwnVisit = Boolean(viewerUserId && visit.user_id === viewerUserId);
+          // user_id（auth UID）は返さない。誰でも読める応答なので、投稿者は public_user_id で指し、
+          // 「自分の写真か」はここで判定した is_own で渡す（CLAUDE.md「公開リポジトリに書かないもの」）。
+          const { user_id: _authUid, ...visitWithoutUid } = visit;
           return {
             ...img,
             visit: {
-              ...visit,
+              ...visitWithoutUid,
               note: isOwnVisit ? visit.note : undefined,
+              is_own: isOwnVisit,
               display_name: displayName,
               public_user_id: publicUserId
             }

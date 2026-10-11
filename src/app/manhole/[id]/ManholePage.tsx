@@ -78,7 +78,8 @@ interface Photo {
   quality_eligible?: boolean | null;
   visit?: {
     id: string;
-    user_id: string;
+    /** 見ている人の写真か。サーバが判定する（auth UID は応答に載せない）。 */
+    is_own?: boolean;
     display_name?: string | null;
     public_user_id?: string | null;
     shot_at: string;
@@ -93,8 +94,8 @@ const getPhotoUserLabel = (photo: Photo) => {
   const name = photo.visit?.display_name;
   const trimmedName = name?.trim();
   if (trimmedName) return trimmedName;
-  const uid = photo.visit?.user_id;
-  if (uid && uid.length >= 8) return `ユーザー:${uid.slice(0, 8)}`;
+  const publicId = photo.visit?.public_user_id;
+  if (publicId && publicId.length >= 8) return `ユーザー:${publicId.slice(0, 8)}`;
   return '名無しのトレーナー';
 };
 
@@ -510,7 +511,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   };
 
   const startCommentEdit = (photo: Photo) => {
-    if (!photo.visit?.id || photo.visit.user_id !== currentUserId) return;
+    if (!photo.visit?.id || !photo.visit.is_own) return;
     setEditingCommentVisitId(photo.visit.id);
     setCommentDraft(photo.visit.comment ?? '');
     setCommentSaveError(null);
@@ -1035,7 +1036,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           // 自分の写真は「@自分」を自分のプロフィールへ飛ばしても意味が薄いので、
           // 拡大表示側（:941）と同じくリンクにしない。
           const profileHref =
-            photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
+            !photo.visit?.is_own && photo.visit?.public_user_id
               ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
               : null;
           return (
@@ -1158,7 +1159,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       userLabel: getPhotoUserLabel(photo),
       publicUserId: photo.visit?.public_user_id ?? null,
       profileHref:
-        photo.visit?.user_id !== currentUserId && photo.visit?.public_user_id
+        !photo.visit?.is_own && photo.visit?.public_user_id
           ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
           : null,
       photoSrc: `/api/photo/${photo.id}?size=small`,
@@ -1298,14 +1299,14 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             </p>
             {viewerCloseButton}
           </div>
-          {featuredPhoto.visit?.user_id === currentUserId && (
+          {featuredPhoto.visit?.is_own && (
             <span className="self-start rounded-full bg-[#1f9d63]/95 px-2.5 py-0.5 font-pixelJp text-[11px] font-bold">
               あなたの投稿
             </span>
           )}
 
           <div className="flex min-w-0 items-center gap-2">
-            {featuredPhoto.visit?.user_id !== currentUserId && featuredPhoto.visit?.public_user_id ? (
+            {!featuredPhoto.visit?.is_own && featuredPhoto.visit?.public_user_id ? (
               <Link
                 href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
                 className="min-w-0 truncate text-sm font-bold underline"
@@ -1330,7 +1331,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
                 />
               )}
-              {featuredPhoto.visit?.user_id === currentUserId && (
+              {featuredPhoto.visit?.is_own && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1352,7 +1353,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               <AiPhotoTags photo={featuredPhoto} linkFeatures />
             </div>
           )}
-          {featuredPhoto.visit?.user_id === currentUserId && featuredPhoto.visit?.id ? (
+          {featuredPhoto.visit?.is_own && featuredPhoto.visit?.id ? (
             editingCommentVisitId === featuredPhoto.visit.id ? (
               <div className="rounded-[14px] bg-white/95 p-3 text-[#2c2a26] shadow-lg">
                 <div className="flex items-center justify-between gap-2">
@@ -1710,7 +1711,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             「訪れた人のひとこと」の1位と同じ文が二重に並ぶので、他人の分はそちらと
             写真上の吹き出しに任せ、ここは自分の記録の操作に絞った。
           */}
-          {featuredPhoto && featuredPhoto.visit?.user_id === currentUserId && (() => {
+          {featuredPhoto && featuredPhoto.visit?.is_own && (() => {
             const memo = featuredPhoto.visit?.note || featuredPhoto.visit?.comment;
             const isPublic = featuredPhoto.visit?.is_public;
             return (

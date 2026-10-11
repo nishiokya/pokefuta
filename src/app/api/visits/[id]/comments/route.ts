@@ -98,6 +98,8 @@ export async function GET(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    const viewerUserId = session?.user?.id ?? null;
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -131,13 +133,13 @@ export async function GET(
 
     const displayNameByAuthUid = await loadPublicDisplayNameMap(supabase, userIds);
 
-    const enriched = (comments || []).map((c: any) => {
-      const uid = c.user_id;
+    // user_id（auth UID）は返さない。「自分のコメントか」は is_own で渡す。
+    const enriched = (comments || []).map(({ user_id: uid, ...c }: any) => {
       const displayName = typeof uid === 'string' ? (displayNameByAuthUid.get(uid) ?? null) : null;
       return {
         ...c,
+        is_own: Boolean(viewerUserId && uid === viewerUserId),
         user: {
-          id: uid,
           display_name: displayName,
         }
       };
