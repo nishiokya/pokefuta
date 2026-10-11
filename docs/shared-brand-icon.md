@@ -4,6 +4,8 @@
 
 内側の格子線は太い白（`#FFFDF4`）、外枠は茶色の細い縁。白いカメラは初稿から約10%縮小。配色は赤白で確定。
 
+カメラは上寄せにして、ふたの白い下半分の露出を減らす。
+
 - `public/brand-icon.svg` をヘッダーとfaviconで共用する。
 - 図鑑の `apps/web/assets/brand-icon.svg` と同一のSVGを使う。変更時は両サイトを更新する。
 - faviconは16/32/48pxのICO、48/96pxのPNG、SVG。ホーム画面用は180px、manifest用は余白をつけた192/512px。
