@@ -57,11 +57,11 @@ export function HeaderTitle({ value }: { value: string }) {
 // パーツ
 // ─────────────────────────────────────────────
 
-function BrandMark({ size = 28 }: { size?: number }) {
+function BrandMark({ size = 30 }: { size?: number }) {
   return (
-    // Shared with the directory header and favicons; decorative beside the site label.
+    // Header-only mark drawn on a 30px grid (favicons use brand-icon.svg); decorative beside the site label.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand-icon.svg" width={size} height={size} alt="" aria-hidden="true" style={{ flexShrink: 0 }} />
+    <img src="/brand-mark.svg" width={size} height={size} alt="" aria-hidden="true" style={{ flexShrink: 0 }} />
   );
 }
 
@@ -158,7 +158,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
           fontFamily: ROUND,
         }}
       >
-        <BrandMark size={variant === 'pc' ? 28 : 30} />
+        <BrandMark size={30} />
         {variant === 'pc' && (
           <span style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
             ポケふた
