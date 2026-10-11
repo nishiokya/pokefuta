@@ -1,6 +1,6 @@
 # Repository guidance
 
-- ヘッダーとfaviconの共通マークは `public/brand-icon.svg`。図鑑と同時に更新し、`docs/shared-brand-icon.md` を参照する。
+- ヘッダーのマークは `public/brand-mark.svg`、favicon・アプリアイコンは `public/brand-icon.svg`（別の絵）。図鑑と同時に更新し、`docs/shared-brand-icon.md` を参照する。
 
 - Codex / Claude Code で作業を始める前に `docs/development-workflow.md` を読む。
 - 各マシンでは clean な基準 clone の `main` を最新に保ち、実作業は原則として最新の `origin/main` から作ったタスク専用 worktree で行う。dirty な基準 clone を自動で stash・reset・上書きしない。
