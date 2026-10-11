@@ -29,12 +29,17 @@ const photo = (
   quality_eligible: options.eligible,
   is_landscape: options.isLandscape,
   ai_tags: options.aiTags,
+  owner: options.userId ?? 'community',
   visit: {
-    user_id: options.userId ?? 'community',
+    is_own: false,
     is_public: options.isPublic ?? true,
     comment: options.comment ?? null,
   },
 });
+
+/** API と同じく、見ている人ごとに is_own を付けた写真にする（null は未ログイン）。 */
+const asViewer = <P extends ReturnType<typeof photo>>(photos: P[], viewer: string | null) =>
+  photos.map((p) => ({ ...p, visit: { ...p.visit, is_own: viewer !== null && p.owner === viewer } }));
 
 test('scored photos rank ahead of unscored photos, then by score', () => {
   const ranked = rankManholePhotos([
@@ -68,10 +73,10 @@ test('photos judged ineligible go after unscored ones, even with a high score', 
 });
 
 test('a manhole whose photos are all ineligible still gets a representative', () => {
-  const result = orderManholePhotosForViewer([
+  const result = orderManholePhotosForViewer(asViewer([
     photo('worse', { qualityScore: 0.3, eligible: false }),
     photo('better', { qualityScore: 0.5, eligible: false }),
-  ], null);
+  ], null));
 
   assert.equal(result.representativePhoto?.id, 'better');
 });
@@ -82,7 +87,7 @@ test('a landscape never outranks a lid, even with a comment and higher score', (
     photo('lid', { qualityScore: 0.1 }),
   ];
   for (const viewer of [null, 'me']) {
-    const result = orderManholePhotosForViewer(photos, viewer);
+    const result = orderManholePhotosForViewer(asViewer(photos, viewer));
     assert.equal(result.representativePhoto?.id, 'lid');
     assert.deepEqual(result.orderedPhotos.map(p => p.id), ['lid', 'scenery']);
   }
@@ -93,10 +98,10 @@ test('landscape-only galleries stay visible without a representative or private-
     photo('public-scenery', { isLandscape: true }),
     photo('private-scenery', { isLandscape: true, userId: 'me', isPublic: false }),
   ];
-  const anonymous = orderManholePhotosForViewer(photos, null);
+  const anonymous = orderManholePhotosForViewer(asViewer(photos, null));
   assert.equal(anonymous.representativePhoto, null);
   assert.deepEqual(anonymous.orderedPhotos.map(p => p.id), ['public-scenery']);
-  const owner = orderManholePhotosForViewer(photos, 'me');
+  const owner = orderManholePhotosForViewer(asViewer(photos, 'me'));
   assert.equal(owner.representativePhoto, null);
   assert.equal(owner.orderedPhotos.length, 2);
   assert.equal(owner.myPhotos.length, 1);
@@ -135,21 +140,21 @@ test('equal or missing scores fall back to newest photo first', () => {
 });
 
 test('a logged-in viewer sees their highest-ranked photo as representative', () => {
-  const result = orderManholePhotosForViewer([
+  const result = orderManholePhotosForViewer(asViewer([
     photo('global-best', { score: 99, userId: 'other' }),
     photo('mine-low', { score: 20, userId: 'me' }),
     photo('mine-high', { score: 60, userId: 'me' }),
-  ], 'me');
+  ], 'me'));
 
   assert.equal(result.representativePhoto?.id, 'mine-high');
   assert.deepEqual(result.orderedPhotos.map(({ id }) => id), ['mine-high', 'global-best', 'mine-low']);
 });
 
 test('logged-out viewers use the global score leader and cannot see private photos', () => {
-  const result = orderManholePhotosForViewer([
+  const result = orderManholePhotosForViewer(asViewer([
     photo('public', { score: 70, userId: 'other' }),
     photo('private', { score: 100, userId: 'other', isPublic: false }),
-  ], null);
+  ], null));
 
   assert.deepEqual(result.orderedPhotos.map(({ id }) => id), ['public']);
   assert.equal(result.representativePhoto?.id, 'public');
@@ -160,7 +165,7 @@ test('logged-out viewers use the global score leader and cannot see private phot
 const shot = (id: string, shotAt: string | null, createdAt: string) => ({
   id,
   created_at: createdAt,
-  visit: { user_id: 'community', is_public: true, shot_at: shotAt },
+  visit: { is_public: true, shot_at: shotAt },
 });
 
 test('chronological order uses shot_at, not upload time', () => {

@@ -755,10 +755,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   // ── Derived photo state ────────────────────────────────────────────
   const isLoggedIn = currentUserId !== null;
-  const { myPhotos, orderedPhotos: allDisplayPhotos, representativePhoto } = orderManholePhotosForViewer(
-    photos,
-    currentUserId
-  );
+  const { myPhotos, orderedPhotos: allDisplayPhotos, representativePhoto } = orderManholePhotosForViewer(photos);
   const photoState: 'none' | 'mine' | 'community' =
     photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
   const hasMyLidPhoto = myPhotos.some(photo => !photo.is_landscape);

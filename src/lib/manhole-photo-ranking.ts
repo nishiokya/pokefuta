@@ -13,7 +13,8 @@ export type RankableManholePhoto = {
   /** 投稿者が選んだ周辺風景。品質採点とは別に代表候補から除く。 */
   is_landscape?: boolean;
   visit?: {
-    user_id?: string | null;
+    /** 見ている人の写真か。API がサーバで判定して返す（auth UID は応答に載せない）。 */
+    is_own?: boolean;
     is_public?: boolean;
     shot_at?: string | null;
     comment?: string | null;
@@ -162,16 +163,15 @@ export const orderManholePhotosNewestFirst = <T extends RankableManholePhoto>(ph
     })
     .map(({ photo, index }) => ({ photo, index }));
 
-export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(
-  photos: T[],
-  currentUserId: string | null
-) => {
-  const myPhotos = currentUserId
-    ? rankManholePhotos(photos.filter((photo) => photo.visit?.user_id === currentUserId))
-    : [];
+/**
+ * 見ている人向けの並び。「自分の写真」は API が返す `visit.is_own` で判定する
+ * （以前は `visit.user_id === currentUserId` だったが、auth UID は応答から外した）。
+ */
+export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(photos: T[]) => {
+  const myPhotos = rankManholePhotos(photos.filter((photo) => photo.visit?.is_own === true));
   const visiblePhotos = rankManholePhotos(
     photos.filter(
-      (photo) => photo.visit?.is_public === true || photo.visit?.user_id === currentUserId
+      (photo) => photo.visit?.is_public === true || photo.visit?.is_own === true
     )
   );
   const representativePhoto = myPhotos.find(photo => !photo.is_landscape)
