@@ -55,6 +55,27 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 - ローカルの Supabase キーは `iss: supabase-demo` の固定デモキー。本番キーを置かない
 - `npm run type-check` に含まれる `tools/check-supabase-target.js` が上記を検査する
 
+## 公開リポジトリに書かないもの
+
+このリポジトリは公開。PR 本文・コミット・マイグレーション・コードのコメントに次を書かない。
+2026-10-11 の点検では、全履歴・PR・Issue に秘密は出ていなかった。この状態を保つ。
+
+- **他ユーザーの名前・表示名・行動・auth UID。** 指すときは公開ID（`photo_id`・visit の id・`public_user_id`・`manhole_id`）
+- **本番の資格情報**（service role キー・`SUPABASE_ACCESS_TOKEN`・DB パスワード・R2 の鍵・専用ロールのパスワード）。GitHub Actions の secrets か、各自の手元（上の「資格情報の置き場所」）に置く
+- Supabase の anon キー（`NEXT_PUBLIC_SUPABASE_ANON_KEY`）は公開前提の値。守りは RLS とテーブル権限で効かせ、anon キーが漏れても困らない状態を保つ
+
+## 共有キャッシュとセッション
+
+**`Cache-Control: public`（`s-maxage` を含む）を付ける応答では、クッキーを読む Supabase クライアントを作らない。**
+
+- 公開データは `createAnonClient()`（`src/lib/supabase/anon.ts`、クッキーを読まない）で読む
+- ログインで出し分けるルートは、認証クッキー付きのリクエストへの応答を `private, no-store` にする（`hasSupabaseAuthCookie()`）
+- viewer の有無（`getSession()` の結果）でキャッシュ可否を決めない。トークン更新に失敗すると viewer が null のまま削除の Set-Cookie が出る
+
+背景: 2026-09-26、CloudFront（Amplify）がトークン更新の Set-Cookie ごと API 応答を共有キャッシュし、
+別の利用者がそのログイン状態を引き継いで投稿が別人名義で保存された（#275 で修正、#276・#278 でデータ修正）。
+クッキーに束縛されたクライアント（`createRouteHandlerClient`）は、読み出しのついでにトークンを更新して Set-Cookie を書く。
+
 ## 検査スクリプト
 
 `npm run type-check` に組み込み済み:
