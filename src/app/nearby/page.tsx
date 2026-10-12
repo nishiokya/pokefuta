@@ -71,6 +71,9 @@ export default function NearbyPage() {
   // 近傍の読み込みの通し番号。最新の呼び出し以外の応答は画面に反映しない
   // （範囲変更の読み込み中に現在地を更新すると、古い応答が後から上書きしていた。#322 の Codex レビュー）
   const nearbyLoadSeqRef = useRef(0);
+  // 現在地の取得の通し番号。「現在地を更新」を続けて押すと応答が逆順に届くことがあり、
+  // 古い成功（や既定の中心での失敗）が後から勝っていた（#322 の Codex レビュー）
+  const geolocationSeqRef = useRef(0);
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
@@ -177,8 +180,11 @@ export default function NearbyPage() {
       setResultsFromDevice(false);
       // 現在地の取得を待つ間に、それまでに出した読み込みの応答が届いても捨てる
       nearbyLoadSeqRef.current += 1;
+      const geolocationSeq = ++geolocationSeqRef.current;
+      const isStaleGeolocation = () => geolocationSeq !== geolocationSeqRef.current;
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (isStaleGeolocation()) return;
           trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
@@ -190,6 +196,7 @@ export default function NearbyPage() {
           loadNearbyManholes(location.lat, location.lng);
         },
         (error) => {
+          if (isStaleGeolocation()) return;
           console.error('Location access denied:', error);
           setLocationError('位置情報の取得に失敗しました。設定で位置情報の使用を許可してください。');
           const defaultLocation = {
