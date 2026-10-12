@@ -1,13 +1,10 @@
 import Link from 'next/link';
 import { DEX_MAP_URL } from '@/lib/prefectureSlug';
-import { HeaderTitle } from '@/components/SiteChrome';
 import { CameraOff, Home, List, Navigation } from 'lucide-react';
 
 export default function SharedPhotoNotFound() {
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <HeaderTitle value="写真が見つかりません" />
-
       <main className="mx-auto flex min-h-[calc(100vh-9rem)] w-full max-w-read items-center px-4 py-8">
         <section className="w-full overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF8EB] shadow-[0_12px_30px_rgba(95,68,42,0.13)]">
           <div className="relative overflow-hidden bg-[#E9DEC9] px-5 py-10 text-center sm:px-8">

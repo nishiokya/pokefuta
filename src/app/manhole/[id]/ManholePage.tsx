@@ -14,7 +14,6 @@ import dynamic from 'next/dynamic';
 import type { SnapshotManhole } from '@/lib/manhole-snapshot';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
-import { useHeaderTitle } from '@/components/SiteChrome';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
@@ -717,9 +716,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [photoExpanded]);
-
-  // 早期 return より前に呼ぶ（フックの呼び出し順を固定するため）
-  useHeaderTitle(manhole ? `${manhole.city || manhole.municipality || '場所未設定'}のポケふた` : undefined);
 
   if (loading) {
     return (
