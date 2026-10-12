@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  BookOpen,
   Camera,
   MapPin,
   Navigation,
@@ -19,6 +20,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
+import { nearbyArea } from '@/lib/nearby-area';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -322,6 +324,12 @@ export default function NearbyPage() {
     nearbyManholes;
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
+  // 現在地のだいたいの地域と図鑑リンク。未訪問タブで絞っても地域は変わらないので全件から出す。
+  // 位置情報が取れず既定の中心で探しているときは、その地域を「いる場所」と言わない。
+  const area = useMemo(
+    () => (locationError ? null : nearbyArea(nearbyManholes)),
+    [locationError, nearbyManholes]
+  );
 
   const authNearbyRail = (
     <div className="space-y-3">
@@ -564,6 +572,30 @@ export default function NearbyPage() {
                 }}
               />
             </div>
+
+            {area && area.prefectures.length > 0 && (
+              <div className="mt-3 border-t border-[#e9dfc7] pt-3">
+                {area.areaLabel && (
+                  <p style={{ fontFamily: ROUND, fontSize: 11, fontWeight: 700, color: '#9b917e' }}>
+                    いまいるのは だいたい <span className="text-[#2c2a26]">{area.areaLabel}</span> あたり
+                  </p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {area.prefectures.map((prefecture) => (
+                    <a
+                      key={prefecture.name}
+                      href={prefecture.dexUrl}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[#e9dfc7] bg-white px-3 text-xs font-bold text-[#6f6657] shadow-sm transition hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+                      aria-label={`${prefecture.name}のポケふたを図鑑で見る`}
+                    >
+                      <BookOpen className="h-4 w-4 shrink-0" />
+                      {prefecture.name}の図鑑
+                      <span aria-hidden="true">›</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
