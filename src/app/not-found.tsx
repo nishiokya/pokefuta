@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { HeaderTitle } from '@/components/SiteChrome';
 import LostManholePick from '@/components/LostManholePick';
 import { SITE_NAME } from '@/lib/constants';
 import './not-found.css';
@@ -14,8 +13,6 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe">
-      <HeaderTitle value="ページが見つかりません" />
-
       <main className="lost">
         <section className="lost__card" aria-labelledby="lost-title">
           <div className="lost__head">

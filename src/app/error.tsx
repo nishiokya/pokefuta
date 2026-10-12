@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useHeaderTitle } from '@/components/SiteChrome';
 import Link from 'next/link';
 import { DEX_MAP_URL } from '@/lib/prefectureSlug';
 import { MapPin, Camera, Navigation, History, Home, AlertCircle, RefreshCw } from 'lucide-react';
@@ -13,10 +12,6 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  // クロムはエラーバウンダリの外側にあるので、そのままだと遷移前の
-  // ページタイトル（/nearby なら「ポケふたを探す」）が残る
-  useHeaderTitle('エラー');
-
   useEffect(() => {
     // Log the error to an error reporting service
     console.error('Error occurred:', error);

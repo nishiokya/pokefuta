@@ -1,10 +1,9 @@
-import { SITE_NAME } from './constants';
-
 /**
  * サイト共通クロム（ヘッダー／下タブ）のルート定義。
  *
  * ヘッダーは `layout.tsx` の SiteChrome が常時描画するので、ページ側は
- * 何も書かない。ページごとの差分（タイトル・アクティブタブ）はすべてここで持つ。
+ * 何も書かない。ページごとの差分（アクティブタブ・クロムを出さないページ）はすべてここで持つ。
+ * SP ヘッダーの文字は図鑑と同じく「ポケふた｜写真館」で固定し、ページ名は出さない。
  *
  * 以前は各ページが `<Header title=... />` を手書きしていたため、20ページ中
  * 13ページが PC 用ナビを描き忘れて「PC なのにナビの無い SP ヘッダー」になっていた。
@@ -14,8 +13,6 @@ import { SITE_NAME } from './constants';
 export type NavKey = 'search' | 'stamp' | 'mytrip' | 'design';
 
 export type RouteChrome = {
-  /** SP ヘッダーに出すページタイトル */
-  title: string;
   /** ナビでアクティブ表示にするタブ */
   activeNav?: NavKey;
   /** クロムを一切出さない（ログイン画面など、導線を断ちたいページ） */
@@ -23,28 +20,22 @@ export type RouteChrome = {
 };
 
 /**
- * 前方一致で引く。より長いキーを優先するので、`/design-manholes/new` は
- * `/design-manholes` より先に一致する。
+ * 前方一致で引く（`/design-manholes/new` は `/design-manholes` に一致する）。
+ * 複数のキーに一致したときは、より長いキーを優先する。
+ * 表に無いページは FALLBACK（どのタブも光らせない）。
  */
 const ROUTES: Record<string, RouteChrome> = {
-  '/': { title: SITE_NAME },
-  '/nearby': { title: 'ポケふたを探す', activeNav: 'search' },
-  '/manhole': { title: 'ポケふた', activeNav: 'search' },
-  '/visits': { title: 'スタンプ帳', activeNav: 'stamp' },
-  '/my-trip': { title: 'マイ旅', activeNav: 'mytrip' },
-  '/upload': { title: 'ポケふたを投稿' },
-  '/profile': { title: 'プロフィール' },
-  '/about': { title: 'このアプリについて' },
-  '/design-manholes': { title: 'デザインマンホール', activeNav: 'design' },
-  '/design-manholes/new': { title: 'デザインマンホール投稿', activeNav: 'design' },
-  '/p': { title: SITE_NAME },
-  '/users': { title: SITE_NAME },
+  '/nearby': { activeNav: 'search' },
+  '/manhole': { activeNav: 'search' },
+  '/visits': { activeNav: 'stamp' },
+  '/my-trip': { activeNav: 'mytrip' },
+  '/design-manholes': { activeNav: 'design' },
 
   // クロムを出さないページ
-  '/login': { title: SITE_NAME, bare: true },
+  '/login': { bare: true },
 };
 
-const FALLBACK: RouteChrome = { title: SITE_NAME };
+const FALLBACK: RouteChrome = {};
 
 export function resolveChrome(pathname: string): RouteChrome {
   let best: RouteChrome | null = null;
