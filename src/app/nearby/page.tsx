@@ -20,6 +20,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
+import type { CoverPhoto } from '@/lib/manhole-cover-photos';
 import { nearbyArea } from '@/lib/nearby-area';
 
 interface ManholeWithDistance extends Manhole {
@@ -36,7 +37,16 @@ interface ManholeWithDistance extends Manhole {
       is_landscape?: boolean;
     }>;
   };
+  /** 自分の訪問に写真が無い蓋に出す、公開写真からの代表1枚（/api/manholes/cover-photos） */
+  cover_photo?: CoverPhoto;
 }
+
+type OwnVisit = NonNullable<ManholeWithDistance['visit']>;
+
+/** 一覧に並べる蓋の数。/api/manholes から100件取り、近い順にここまで出す */
+const NEARBY_DISPLAY_LIMIT = 50;
+/** /api/manholes/cover-photos が1回に受け付ける蓋の数 */
+const COVER_PHOTO_CHUNK = 100;
 
 type SearchTab = 'nearby' | 'all' | 'unvisited';
 
@@ -79,6 +89,76 @@ export default function NearbyPage() {
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
+  // 自分の訪問は「近く」と「一覧」で同じものを使うので1回だけ取る
+  const ownVisitsRef = useRef<Promise<Map<number, OwnVisit>> | null>(null);
+
+  /**
+   * 自分の訪問を蓋ごとに1件。写真のある訪問を優先し、その中で新しいもの。
+   *
+   * ログインしていないときは取らない。/api/visits はログアウト中だと全員の公開訪問を返すので、
+   * 以前は他人の訪問日が「訪問 〇〇」と出ていた。
+   * 件数は全件（以前「近く」は既定の100件で切れ、それより古い訪問の蓋が未訪問扱いになっていた）。
+   */
+  const loadOwnVisits = () => {
+    ownVisitsRef.current ??= (async () => {
+      const byManholeId = new Map<number, OwnVisit>();
+      try {
+        const supabase = createBrowserClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return byManholeId;
+
+        const response = await fetch('/api/visits?limit=10000');
+        if (!response.ok) return byManholeId;
+        const data = await response.json();
+        if (!data.success || !Array.isArray(data.visits)) return byManholeId;
+
+        data.visits.forEach((visit: any) => {
+          if (!visit.manhole_id) return;
+          const existing = byManholeId.get(visit.manhole_id);
+          const hasPhoto = (visit.photos?.length ?? 0) > 0;
+          const existingHasPhoto = (existing?.photos?.length ?? 0) > 0;
+          if (
+            !existing ||
+            (hasPhoto && !existingHasPhoto) ||
+            (hasPhoto === existingHasPhoto && new Date(visit.shot_at) > new Date(existing.shot_at))
+          ) {
+            byManholeId.set(visit.manhole_id, visit);
+          }
+        });
+      } catch (error) {
+        console.error('Failed to load own visits:', error);
+      }
+      return byManholeId;
+    })();
+    return ownVisitsRef.current;
+  };
+
+  /**
+   * 自分の写真が無い蓋に、公開写真から代表1枚を付ける。失敗した分はプレースホルダーのまま出す。
+   * 「一覧」は全件（約500）なので API の上限（100件）ごとに分けて取る。
+   */
+  const attachCoverPhotos = async (manholes: ManholeWithDistance[]) => {
+    const ids = manholes.filter((m) => !m.visit?.photos?.length).map((m) => m.id);
+    const chunks: number[][] = [];
+    for (let i = 0; i < ids.length; i += COVER_PHOTO_CHUNK) {
+      chunks.push(ids.slice(i, i + COVER_PHOTO_CHUNK));
+    }
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        try {
+          const response = await fetch(`/api/manholes/cover-photos?ids=${chunk.join(',')}`);
+          if (!response.ok) return {};
+          const data = await response.json();
+          return (data.photos ?? {}) as Record<string, CoverPhoto>;
+        } catch (error) {
+          console.error('Failed to load cover photos:', error);
+          return {};
+        }
+      })
+    );
+    const photos: Record<string, CoverPhoto> = Object.assign({}, ...results);
+    return manholes.map((m) => (photos[m.id] ? { ...m, cover_photo: photos[m.id] } : m));
+  };
 
   useEffect(() => {
     document.title = pageTitle('ポケふたを探す');
@@ -145,29 +225,15 @@ export default function NearbyPage() {
 
       const manholes = manholesData.manholes;
 
-      // Fetch all visits with a high limit to ensure we get all visits
-      const visitsResponse = await fetch('/api/visits?limit=10000');
-      const visitsByManholeId = new Map<number, any>();
+      const visitsByManholeId = await loadOwnVisits();
 
-      if (visitsResponse.ok) {
-        const visitsData = await visitsResponse.json();
-        if (visitsData.success && visitsData.visits) {
-          visitsData.visits.forEach((visit: any) => {
-            if (visit.manhole_id) {
-              const existing = visitsByManholeId.get(visit.manhole_id);
-              if (!existing || new Date(visit.shot_at) > new Date(existing.shot_at)) {
-                visitsByManholeId.set(visit.manhole_id, visit);
-              }
-            }
-          });
-        }
-      }
-
-      const manholesWithVisits = manholes.map((manhole: any) => ({
-        ...manhole,
-        distance: undefined, // Don't show distance for "all" tab
-        visit: visitsByManholeId.get(manhole.id)
-      }));
+      const manholesWithVisits = await attachCoverPhotos(
+        manholes.map((manhole: any) => ({
+          ...manhole,
+          distance: undefined, // Don't show distance for "all" tab
+          visit: visitsByManholeId.get(manhole.id)
+        }))
+      );
 
       setAllManholes(manholesWithVisits);
     } catch (error) {
@@ -258,31 +324,16 @@ export default function NearbyPage() {
         return;
       }
 
-      const visitsResponse = await fetch('/api/visits');
-      const visitsByManholeId = new Map<number, any>();
+      const visitsByManholeId = await loadOwnVisits();
 
-      if (visitsResponse.ok) {
-        const visitsData = await visitsResponse.json();
-        console.log('Visits data:', visitsData);
-        if (visitsData.success && visitsData.visits) {
-          visitsData.visits.forEach((visit: any) => {
-            if (visit.manhole_id) {
-              const existing = visitsByManholeId.get(visit.manhole_id);
-              if (!existing || new Date(visit.shot_at) > new Date(existing.shot_at)) {
-                visitsByManholeId.set(visit.manhole_id, visit);
-              }
-            }
-          });
-          console.log(`Found ${visitsByManholeId.size} visited manholes`);
-        }
-      }
-
-      const manholesWithVisits = allNearbyManholes
-        .map((manhole: any) => ({
-          ...manhole,
-          visit: visitsByManholeId.get(manhole.id)
-        }))
-        .slice(0, 50);
+      const manholesWithVisits = await attachCoverPhotos(
+        allNearbyManholes
+          .slice(0, NEARBY_DISPLAY_LIMIT)
+          .map((manhole: any) => ({
+            ...manhole,
+            visit: visitsByManholeId.get(manhole.id)
+          }))
+      );
 
       if (isStale()) return;
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
@@ -363,7 +414,8 @@ export default function NearbyPage() {
   */
   const displayManholes =
     activeTab === 'all' ? filteredAllManholes :
-    activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit) :
+    // 訪問済みかは /api/manholes の is_visited（サーバが自分の訪問を全件見て付ける）でも判定する
+    activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit && !m.is_visited) :
     nearbyManholes;
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
@@ -729,20 +781,22 @@ export default function NearbyPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {displayManholes.map((manhole) => {
-                    const photo = manhole.visit?.photos?.[0];
+                    // 自分の写真を優先し、無ければ公開写真の代表1枚
+                    const photo = manhole.visit?.photos?.[0] ?? manhole.cover_photo;
+                    const visitedAt = manhole.visit?.shot_at ?? manhole.last_visit ?? undefined;
                     return (
                       <VisitPhotoCard
                         key={manhole.id}
                         manholeId={manhole.id}
                         // マイ旅と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
                         // 一覧に数十枚並べると読み込みが終わらない。
-                        thumbnailUrl={photo?.thumbnail_url || photo?.url}
+                        thumbnailUrl={photo?.thumbnail_url || (photo && 'url' in photo ? photo.url : undefined)}
                         isLandscape={photo?.is_landscape}
                         // 見出しは詳細ページの h1 と同じ（施設名があれば「〈県〉〈市区町村〉 〈施設名〉のポケふた」）。
                         title={manholeHeadingPlace(manhole)}
                         date={`#${manhole.id}`}
                         // 施設名は見出しに入ったので、ここは訪問日だけ。VisitPhotoCard 側で省略記号付きに切り詰まる。
-                        posterName={manhole.visit ? `訪問 ${formatDate(manhole.visit.shot_at)}` : undefined}
+                        posterName={visitedAt ? `訪問 ${formatDate(visitedAt)}` : undefined}
                         tags={(manhole.pokemons || []).slice(0, 2)}
                         cornerLabel={
                           activeTab !== 'all' && manhole.distance !== undefined

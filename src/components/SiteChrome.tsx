@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -13,8 +13,8 @@ import { AUTH_NAV_ITEMS, GUEST_NAV_ITEMS, isSubmissionPage, NavKey, resolveChrom
  * サイト共通クロム（SPヘッダー／PCトップナビ／SP下タブ）。
  *
  * `layout.tsx` が全ページを包むので、ページ側にヘッダーの記述は一切要らない。
- * ページ固有のタイトルは `@/lib/siteNav` のルート表で持ち、動的なものだけ
- * `useHeaderTitle()` で上書きする。
+ * SP ヘッダーの文字は図鑑と同じく「ポケふた｜写真館」で固定する（ページ名は出さない）。
+ * ページごとの差分（アクティブタブなど）は `@/lib/siteNav` のルート表で持つ。
  *
  * 認証セッションの読み込みはここ1箇所。以前は Header / PCTopNav / BottomNav が
  * それぞれ getSession() していて1ページで3回叩いていた。
@@ -25,43 +25,21 @@ const X_ACCOUNT_URL = 'https://x.com/pokemonmanhole';
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 
 // ─────────────────────────────────────────────
-// 動的タイトル
-// ─────────────────────────────────────────────
-
-const TitleOverrideContext = createContext<((title: string | null) => void) | null>(null);
-
-/**
- * ルート表で決まらないタイトル（`${市町村}のポケふた` など）を上書きする。
- * `undefined` を渡すとルート表の既定に戻る。
- */
-export function useHeaderTitle(title: string | undefined) {
-  const setOverride = useContext(TitleOverrideContext);
-
-  useEffect(() => {
-    if (!setOverride) return;
-    setOverride(title ?? null);
-    return () => setOverride(null);
-  }, [setOverride, title]);
-}
-
-/**
- * サーバーコンポーネントからタイトルを指定するための薄いラッパー。
- * not-found.tsx などフックを直接呼べない場所で使う。
- */
-export function HeaderTitle({ value }: { value: string }) {
-  useHeaderTitle(value);
-  return null;
-}
-
-// ─────────────────────────────────────────────
 // パーツ
 // ─────────────────────────────────────────────
 
-function BrandMark({ size = 30 }: { size?: number }) {
+function BrandMark({ size = 30 }: { size?: number | string }) {
   return (
     // Header-only mark (favicons use the separate navy lid in brand-icon.svg); decorative beside the site label.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand-mark.svg" width={size} height={size} alt="" aria-hidden="true" style={{ flexShrink: 0 }} />
+    <img
+      src="/brand-mark.svg"
+      width={30}
+      height={30}
+      alt=""
+      aria-hidden="true"
+      style={{ flexShrink: 0, width: size, height: size }}
+    />
   );
 }
 
@@ -91,9 +69,8 @@ type ChromeState = {
  * 図鑑側（pokefuta-tracker の inject_site_header.py / site-header.css）と
  * 見た目・文言・項目順を揃えている。片方だけ変えないこと。
  *
- * SP はページタイトルが横幅を占めるのでマーク＋キャレットだけを出す。
- * そのぶんホームへは1タップで行けなくなるが、メニューの先頭が「写真館」＝ `/` なので
- * 到達性は保たれる（図鑑側も同じ扱い）。
+ * SP も PC も「マーク＋ポケふた｜写真館＋キャレット」。SP は文字を幅に合わせて小さくする
+ * （図鑑の .site-header__brand-name と同じ clamp）。ホームへはメニューの先頭「写真館」＝ `/` から行ける。
  */
 function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
   const pathname = usePathname();
@@ -142,7 +119,8 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
   });
 
   return (
-    <div ref={containerRef} className="relative flex-shrink-0">
+    // SP は図鑑と同じく、狭い画面ではサイト名を「…」で切って認証ボタンを押し出さない
+    <div ref={containerRef} className={variant === 'pc' ? 'relative flex-shrink-0' : 'relative min-w-0'}>
       <button
         ref={triggerRef}
         type="button"
@@ -150,24 +128,37 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label="サイトを切り替える"
-        className="flex items-center gap-2 rounded-lg px-1.5 transition hover:bg-[var(--chrome-accent-soft)]"
+        className="flex min-w-0 max-w-full items-center rounded-lg transition hover:bg-[var(--chrome-accent-soft)]"
         style={{
+          // SP は図鑑の .site-switch__trigger と同じく幅に合わせて詰める（320px 幅でも認証ボタンと並ぶように）
+          gap: variant === 'pc' ? 8 : 'clamp(5px, 1.8vw, 7px)',
+          padding: variant === 'pc' ? '0 6px' : '0 clamp(6px, 2vw, 8px) 0 4px',
           minHeight: 'var(--chrome-tap-min)',
           fontWeight: 700,
           color: variant === 'pc' ? 'var(--chrome-ink-pc)' : 'var(--chrome-ink)',
           fontFamily: ROUND,
         }}
       >
-        <BrandMark size={30} />
-        {variant === 'pc' && (
-          <span style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
-            ポケふた
-            <span aria-hidden="true" style={{ margin: '0 4px', opacity: 0.45, fontWeight: 600 }}>
-              ｜
-            </span>
-            写真館
+        {/* SP のマークは図鑑の .site-header__mark と同じ大きさ */}
+        <BrandMark size={variant === 'pc' ? 30 : 'clamp(26px, 8vw, 30px)'} />
+        <span
+          style={{
+            fontSize: variant === 'pc' ? 18 : 'clamp(12.5px, 3.4vw, 15px)',
+            whiteSpace: 'nowrap',
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          ポケふた
+          <span
+            aria-hidden="true"
+            style={{ margin: variant === 'pc' ? '0 4px' : '0 clamp(2px, 1vw, 4px)', opacity: 0.45, fontWeight: 600 }}
+          >
+            ｜
           </span>
-        )}
+          写真館
+        </span>
         <span
           aria-hidden="true"
           style={{
@@ -176,6 +167,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
             borderLeft: '4px solid transparent',
             borderRight: '4px solid transparent',
             borderTop: '5px solid currentColor',
+            flexShrink: 0,
             opacity: 0.55,
             transform: open ? 'rotate(180deg)' : undefined,
           }}
@@ -215,11 +207,13 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
 // ─────────────────────────────────────────────
 
 /**
- * 要素は「ロゴ / ページタイトル / 認証」の3つだけ。
+ * 要素は「ロゴ（ポケふた｜写真館） / 認証」だけ。図鑑の SP ヘッダーと同じ並び・同じ形にしている。
+ * 以前は真ん中にページ名（「石垣のポケふた」など）を出していたが、ページごとに変わって
+ * 図鑑と揃わなかったのでやめた。
  * Info・X・図鑑・デザインふたをヘッダーに並べていた頃はタップ領域が潰れていたので、
  * ナビは下タブ、ユーティリティはフッターへ分けている。
  */
-function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) {
+function SpHeader({ user, authLoaded }: ChromeState) {
   return (
     <header
       // z-50 / 下タブの z-40 は --chrome-z-header / --chrome-z-bottomnav と対応。
@@ -239,14 +233,17 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
       }}
     >
       <div
-        className="mx-auto flex max-w-6xl items-center gap-2 px-3"
-        style={{ minHeight: 'calc(var(--chrome-height) - 1px)' }}
+        className="mx-auto flex max-w-6xl items-center"
+        style={{
+          minHeight: 'calc(var(--chrome-height) - 1px)',
+          // 図鑑の .site-header__inner と同じ。段（@media）で切らず幅に合わせて連続的に詰める
+          padding: '4px clamp(6px, 2.4vw, 12px)',
+          gap: 'clamp(4px, 2vw, 8px)',
+        }}
       >
         <SiteSwitcher variant="sp" />
 
-        <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ fontFamily: ROUND }}>
-          {title}
-        </span>
+        <div className="flex-1" />
 
         {authLoaded &&
           (user ? (
@@ -266,13 +263,16 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
               <span className="truncate">{displayNameOf(user)}</span>
             </Link>
           ) : (
-            <div className="flex flex-shrink-0 items-center gap-1.5">
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {/* 図鑑の .site-auth__login / .site-auth__signup と同じ形（枠線のピル＋塗りのピル） */}
               <Link
                 href="/login?mode=login"
-                className="flex items-center rounded-lg border px-3 text-xs font-bold"
+                className="flex items-center whitespace-nowrap rounded-full border font-bold"
                 style={{
                   minHeight: 'var(--chrome-tap-min)',
-                  borderColor: 'var(--chrome-accent)',
+                  padding: '0 clamp(9px, 2.6vw, 13px)',
+                  fontSize: 'clamp(12px, 3.2vw, 13px)',
+                  borderColor: 'var(--chrome-accent-border)',
                   color: 'var(--chrome-accent)',
                 }}
               >
@@ -280,15 +280,16 @@ function SpHeader({ title, user, authLoaded }: ChromeState & { title: string }) 
               </Link>
               <Link
                 href="/login?mode=signup"
-                aria-label="新規登録"
-                className="flex items-center justify-center rounded-full text-white shadow-sm"
+                className="flex items-center whitespace-nowrap rounded-full font-bold text-white"
                 style={{
-                  minWidth: 'var(--chrome-tap-min)',
                   minHeight: 'var(--chrome-tap-min)',
+                  padding: '0 clamp(9px, 2.6vw, 13px)',
+                  fontSize: 'clamp(12px, 3.2vw, 13px)',
                   background: 'var(--chrome-accent)',
+                  boxShadow: '0 2px 0 #5f55b8',
                 }}
               >
-                <UserPlus className="h-4 w-4" />
+                新規登録
               </Link>
             </div>
           ))}
@@ -639,7 +640,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const route = resolveChrome(pathname);
 
-  const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
   useEffect(() => {
@@ -677,24 +677,15 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   }, []);
 
   const state: ChromeState = { user, authLoaded, activeNav: route.activeNav, pathname };
-  const title = titleOverride ?? route.title;
-
-  // setState を直接渡すと参照が毎回変わり、useHeaderTitle の effect が回り続ける
-  const setOverride = useMemo(() => (value: string | null) => setTitleOverride(value), []);
+  if (route.bare) return <>{children}</>;
 
   return (
-    <TitleOverrideContext.Provider value={setOverride}>
-      {route.bare ? (
-        children
-      ) : (
-        <>
-          <SpHeader {...state} title={title} />
-          <PcTopNav {...state} />
-          {children}
-          <SpUtilityFooter {...state} />
-          <BottomNav {...state} />
-        </>
-      )}
-    </TitleOverrideContext.Provider>
+    <>
+      <SpHeader {...state} />
+      <PcTopNav {...state} />
+      {children}
+      <SpUtilityFooter {...state} />
+      <BottomNav {...state} />
+    </>
   );
 }
