@@ -71,6 +71,8 @@ export default function NearbyPage() {
   // 近傍の読み込みの通し番号。最新の呼び出し以外の応答は画面に反映しない
   // （範囲変更の読み込み中に現在地を更新すると、古い応答が後から上書きしていた。#322 の Codex レビュー）
   const nearbyLoadSeqRef = useRef(0);
+  const radiusRef = useRef(radius);
+  radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   useEffect(() => {
@@ -209,6 +211,9 @@ export default function NearbyPage() {
     // 呼んだ時点の出どころを持っておく（読み込み中に現在地が変わっても取り違えない）
     const fromDevice = locationFromDeviceRef.current;
     const seq = ++nearbyLoadSeqRef.current;
+    // 範囲は呼んだ時点の最新を読む。現在地の取得を待つ間に範囲を変えると、
+    // 位置情報のコールバックは古い描画のこの関数を持っていて古い radius で探していた（#322 の Codex レビュー）
+    const radius = radiusRef.current;
     const isStale = () => seq !== nearbyLoadSeqRef.current;
     setResultsFromDevice(false);
     try {
