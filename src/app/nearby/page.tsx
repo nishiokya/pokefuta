@@ -62,6 +62,12 @@ export default function NearbyPage() {
   const { trackNearbyRadiusChange, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   // 直前に読み込んだ半径。初回ロード（既定30km）では送らず、実際に動かしたときだけ送る。
   const loadedRadiusRef = useRef<number | null>(null);
+  // userLocation が端末の現在地か、位置情報が取れずに使った既定の中心か
+  const locationFromDeviceRef = useRef(false);
+  // いま並んでいる近傍結果が端末の現在地で探したものか。「いまいるのは」はこれが true のときだけ出す。
+  // locationError だけで判定すると、現在地の更新中や再読み込みの失敗時に前の結果（既定の中心のものを含む）を
+  // 新しい現在地の地域として出してしまう（#322 の Codex レビュー）。
+  const [resultsFromDevice, setResultsFromDevice] = useState(false);
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   useEffect(() => {
@@ -163,6 +169,7 @@ export default function NearbyPage() {
   const getCurrentLocationAndLoadManholes = () => {
     if (navigator.geolocation) {
       setLoading(true);
+      setResultsFromDevice(false);
       navigator.geolocation.getCurrentPosition(
         (position) => {
           trackGeolocationEnable();
@@ -170,6 +177,7 @@ export default function NearbyPage() {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
+          locationFromDeviceRef.current = true;
           setUserLocation(location);
           setLocationError(null);
           loadNearbyManholes(location.lat, location.lng);
@@ -181,6 +189,7 @@ export default function NearbyPage() {
             lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
             lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
           };
+          locationFromDeviceRef.current = false;
           setUserLocation(defaultLocation);
           loadNearbyManholes(defaultLocation.lat, defaultLocation.lng);
         }
@@ -192,6 +201,9 @@ export default function NearbyPage() {
   };
 
   const loadNearbyManholes = async (lat: number, lng: number) => {
+    // 呼んだ時点の出どころを持っておく（読み込み中に現在地が変わっても取り違えない）
+    const fromDevice = locationFromDeviceRef.current;
+    setResultsFromDevice(false);
     try {
       setDataError(null);
       console.log(`Loading manholes near ${lat}, ${lng} with radius ${radius}km`);
@@ -247,6 +259,7 @@ export default function NearbyPage() {
 
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
       setNearbyManholes(manholesWithVisits);
+      setResultsFromDevice(fromDevice);
       const previousRadius = loadedRadiusRef.current;
       loadedRadiusRef.current = radius;
       if (previousRadius !== null && previousRadius !== radius) {
@@ -325,10 +338,10 @@ export default function NearbyPage() {
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
   // 現在地のだいたいの地域と図鑑リンク。未訪問タブで絞っても地域は変わらないので全件から出す。
-  // 位置情報が取れず既定の中心で探しているときは、その地域を「いる場所」と言わない。
+  // 端末の現在地で探して読み込みが済んだ結果だけを「いる場所」として扱う（resultsFromDevice 参照）。
   const area = useMemo(
-    () => (locationError ? null : nearbyArea(nearbyManholes)),
-    [locationError, nearbyManholes]
+    () => (resultsFromDevice ? nearbyArea(nearbyManholes) : null),
+    [resultsFromDevice, nearbyManholes]
   );
 
   const authNearbyRail = (
