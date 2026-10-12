@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  BookOpen,
   Camera,
   MapPin,
   Navigation,
@@ -20,6 +21,7 @@ import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
+import { nearbyArea } from '@/lib/nearby-area';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -70,6 +72,22 @@ export default function NearbyPage() {
   const { trackNearbyRadiusChange, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   // 直前に読み込んだ半径。初回ロード（既定30km）では送らず、実際に動かしたときだけ送る。
   const loadedRadiusRef = useRef<number | null>(null);
+  // userLocation が端末の現在地か、位置情報が取れずに使った既定の中心か
+  const locationFromDeviceRef = useRef(false);
+  // いま並んでいる近傍結果が端末の現在地で探したものか。「いまいるのは」はこれが true のときだけ出す。
+  // locationError だけで判定すると、現在地の更新中や再読み込みの失敗時に前の結果（既定の中心のものを含む）を
+  // 新しい現在地の地域として出してしまう（#322 の Codex レビュー）。
+  const [resultsFromDevice, setResultsFromDevice] = useState(false);
+  // 近傍の読み込みの通し番号。最新の呼び出し以外の応答は画面に反映しない
+  // （範囲変更の読み込み中に現在地を更新すると、古い応答が後から上書きしていた。#322 の Codex レビュー）
+  const nearbyLoadSeqRef = useRef(0);
+  // 現在地の取得の通し番号。「現在地を更新」を続けて押すと応答が逆順に届くことがあり、
+  // 古い成功（や既定の中心での失敗）が後から勝っていた（#322 の Codex レビュー）
+  const geolocationSeqRef = useRef(0);
+  // 現在地の取得待ちか。待っている間は範囲を変えても古い位置で探さない（取れたら最新の範囲で探す）
+  const geolocationPendingRef = useRef(false);
+  const radiusRef = useRef(radius);
+  radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
   // 自分の訪問は「近く」と「一覧」で同じものを使うので1回だけ取る
   const ownVisitsRef = useRef<Promise<Map<number, OwnVisit>> | null>(null);
@@ -191,6 +209,7 @@ export default function NearbyPage() {
     if (!sessionChecked || activeTab === 'all') return;
     if (activeTab === 'unvisited' && !isLoggedIn) return;
     if (!userLocation) return;
+    if (geolocationPendingRef.current) return;
     loadNearbyManholes(userLocation.lat, userLocation.lng);
   }, [radius]);
 
@@ -227,24 +246,36 @@ export default function NearbyPage() {
   const getCurrentLocationAndLoadManholes = () => {
     if (navigator.geolocation) {
       setLoading(true);
+      setResultsFromDevice(false);
+      // 現在地の取得を待つ間に、それまでに出した読み込みの応答が届いても捨てる
+      nearbyLoadSeqRef.current += 1;
+      const geolocationSeq = ++geolocationSeqRef.current;
+      const isStaleGeolocation = () => geolocationSeq !== geolocationSeqRef.current;
+      geolocationPendingRef.current = true;
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (isStaleGeolocation()) return;
+          geolocationPendingRef.current = false;
           trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
+          locationFromDeviceRef.current = true;
           setUserLocation(location);
           setLocationError(null);
           loadNearbyManholes(location.lat, location.lng);
         },
         (error) => {
+          if (isStaleGeolocation()) return;
+          geolocationPendingRef.current = false;
           console.error('Location access denied:', error);
           setLocationError('位置情報の取得に失敗しました。設定で位置情報の使用を許可してください。');
           const defaultLocation = {
             lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
             lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
           };
+          locationFromDeviceRef.current = false;
           setUserLocation(defaultLocation);
           loadNearbyManholes(defaultLocation.lat, defaultLocation.lng);
         }
@@ -256,6 +287,14 @@ export default function NearbyPage() {
   };
 
   const loadNearbyManholes = async (lat: number, lng: number) => {
+    // 呼んだ時点の出どころを持っておく（読み込み中に現在地が変わっても取り違えない）
+    const fromDevice = locationFromDeviceRef.current;
+    const seq = ++nearbyLoadSeqRef.current;
+    // 範囲は呼んだ時点の最新を読む。現在地の取得を待つ間に範囲を変えると、
+    // 位置情報のコールバックは古い描画のこの関数を持っていて古い radius で探していた（#322 の Codex レビュー）
+    const radius = radiusRef.current;
+    const isStale = () => seq !== nearbyLoadSeqRef.current;
+    setResultsFromDevice(false);
     try {
       setDataError(null);
       console.log(`Loading manholes near ${lat}, ${lng} with radius ${radius}km`);
@@ -265,6 +304,7 @@ export default function NearbyPage() {
       if (!manholesResponse.ok) {
         const errorText = await manholesResponse.text();
         console.error('Failed to load nearby manholes:', errorText);
+        if (isStale()) return;
         setDataError(`マンホールデータの取得に失敗しました: ${manholesResponse.status}`);
         setLoading(false);
         return;
@@ -278,6 +318,7 @@ export default function NearbyPage() {
 
       if (!Array.isArray(allNearbyManholes)) {
         console.error('Invalid response format:', manholesData);
+        if (isStale()) return;
         setDataError('マンホールデータの形式が不正です');
         setLoading(false);
         return;
@@ -294,8 +335,10 @@ export default function NearbyPage() {
           }))
       );
 
+      if (isStale()) return;
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
       setNearbyManholes(manholesWithVisits);
+      setResultsFromDevice(fromDevice);
       const previousRadius = loadedRadiusRef.current;
       loadedRadiusRef.current = radius;
       if (previousRadius !== null && previousRadius !== radius) {
@@ -307,9 +350,11 @@ export default function NearbyPage() {
       }
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
+      if (isStale()) return;
       setDataError(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
-      setLoading(false);
+      // 古い読み込みが終わっても、新しい読み込みの「検索中」は消さない
+      if (!isStale()) setLoading(false);
     }
   };
 
@@ -374,6 +419,12 @@ export default function NearbyPage() {
     nearbyManholes;
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
+  // 現在地のだいたいの地域と図鑑リンク。未訪問タブで絞っても地域は変わらないので全件から出す。
+  // 端末の現在地で探して読み込みが済んだ結果だけを「いる場所」として扱う（resultsFromDevice 参照）。
+  const area = useMemo(
+    () => (resultsFromDevice ? nearbyArea(nearbyManholes) : null),
+    [resultsFromDevice, nearbyManholes]
+  );
 
   const authNearbyRail = (
     <div className="space-y-3">
@@ -616,6 +667,30 @@ export default function NearbyPage() {
                 }}
               />
             </div>
+
+            {area && area.prefectures.length > 0 && (
+              <div className="mt-3 border-t border-[#e9dfc7] pt-3">
+                {area.areaLabel && (
+                  <p style={{ fontFamily: ROUND, fontSize: 11, fontWeight: 700, color: '#9b917e' }}>
+                    いまいるのは だいたい <span className="text-[#2c2a26]">{area.areaLabel}</span> あたり
+                  </p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {area.prefectures.map((prefecture) => (
+                    <a
+                      key={prefecture.name}
+                      href={prefecture.dexUrl}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[#e9dfc7] bg-white px-3 text-xs font-bold text-[#6f6657] shadow-sm transition hover:border-[#d7c8a7] hover:bg-[#fbf6ea] hover:text-[#bf5640]"
+                      aria-label={`${prefecture.name}のポケふたを図鑑で見る`}
+                    >
+                      <BookOpen className="h-4 w-4 shrink-0" />
+                      {prefecture.name}の図鑑
+                      <span aria-hidden="true">›</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
