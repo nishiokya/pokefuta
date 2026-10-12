@@ -74,6 +74,8 @@ export default function NearbyPage() {
   // 現在地の取得の通し番号。「現在地を更新」を続けて押すと応答が逆順に届くことがあり、
   // 古い成功（や既定の中心での失敗）が後から勝っていた（#322 の Codex レビュー）
   const geolocationSeqRef = useRef(0);
+  // 現在地の取得待ちか。待っている間は範囲を変えても古い位置で探さない（取れたら最新の範囲で探す）
+  const geolocationPendingRef = useRef(false);
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
@@ -127,6 +129,7 @@ export default function NearbyPage() {
     if (!sessionChecked || activeTab === 'all') return;
     if (activeTab === 'unvisited' && !isLoggedIn) return;
     if (!userLocation) return;
+    if (geolocationPendingRef.current) return;
     loadNearbyManholes(userLocation.lat, userLocation.lng);
   }, [radius]);
 
@@ -182,9 +185,11 @@ export default function NearbyPage() {
       nearbyLoadSeqRef.current += 1;
       const geolocationSeq = ++geolocationSeqRef.current;
       const isStaleGeolocation = () => geolocationSeq !== geolocationSeqRef.current;
+      geolocationPendingRef.current = true;
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (isStaleGeolocation()) return;
+          geolocationPendingRef.current = false;
           trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
@@ -197,6 +202,7 @@ export default function NearbyPage() {
         },
         (error) => {
           if (isStaleGeolocation()) return;
+          geolocationPendingRef.current = false;
           console.error('Location access denied:', error);
           setLocationError('位置情報の取得に失敗しました。設定で位置情報の使用を許可してください。');
           const defaultLocation = {
