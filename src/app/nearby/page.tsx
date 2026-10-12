@@ -68,6 +68,9 @@ export default function NearbyPage() {
   // locationError だけで判定すると、現在地の更新中や再読み込みの失敗時に前の結果（既定の中心のものを含む）を
   // 新しい現在地の地域として出してしまう（#322 の Codex レビュー）。
   const [resultsFromDevice, setResultsFromDevice] = useState(false);
+  // 近傍の読み込みの通し番号。最新の呼び出し以外の応答は画面に反映しない
+  // （範囲変更の読み込み中に現在地を更新すると、古い応答が後から上書きしていた。#322 の Codex レビュー）
+  const nearbyLoadSeqRef = useRef(0);
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
 
   useEffect(() => {
@@ -170,6 +173,8 @@ export default function NearbyPage() {
     if (navigator.geolocation) {
       setLoading(true);
       setResultsFromDevice(false);
+      // 現在地の取得を待つ間に、それまでに出した読み込みの応答が届いても捨てる
+      nearbyLoadSeqRef.current += 1;
       navigator.geolocation.getCurrentPosition(
         (position) => {
           trackGeolocationEnable();
@@ -203,6 +208,8 @@ export default function NearbyPage() {
   const loadNearbyManholes = async (lat: number, lng: number) => {
     // 呼んだ時点の出どころを持っておく（読み込み中に現在地が変わっても取り違えない）
     const fromDevice = locationFromDeviceRef.current;
+    const seq = ++nearbyLoadSeqRef.current;
+    const isStale = () => seq !== nearbyLoadSeqRef.current;
     setResultsFromDevice(false);
     try {
       setDataError(null);
@@ -213,6 +220,7 @@ export default function NearbyPage() {
       if (!manholesResponse.ok) {
         const errorText = await manholesResponse.text();
         console.error('Failed to load nearby manholes:', errorText);
+        if (isStale()) return;
         setDataError(`マンホールデータの取得に失敗しました: ${manholesResponse.status}`);
         setLoading(false);
         return;
@@ -226,6 +234,7 @@ export default function NearbyPage() {
 
       if (!Array.isArray(allNearbyManholes)) {
         console.error('Invalid response format:', manholesData);
+        if (isStale()) return;
         setDataError('マンホールデータの形式が不正です');
         setLoading(false);
         return;
@@ -257,6 +266,7 @@ export default function NearbyPage() {
         }))
         .slice(0, 50);
 
+      if (isStale()) return;
       console.log(`Setting ${manholesWithVisits.length} manholes with visit info`);
       setNearbyManholes(manholesWithVisits);
       setResultsFromDevice(fromDevice);
@@ -271,9 +281,11 @@ export default function NearbyPage() {
       }
     } catch (error) {
       console.error('Failed to load nearby manholes:', error);
+      if (isStale()) return;
       setDataError(`データの読み込みに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
-      setLoading(false);
+      // 古い読み込みが終わっても、新しい読み込みの「検索中」は消さない
+      if (!isStale()) setLoading(false);
     }
   };
 
