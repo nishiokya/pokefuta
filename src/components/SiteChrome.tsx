@@ -22,7 +22,7 @@ import { AUTH_NAV_ITEMS, GUEST_NAV_ITEMS, isSubmissionPage, NavKey, resolveChrom
 
 const DATA_SITE_URL = 'https://data.pokefuta.com/';
 const X_ACCOUNT_URL = 'https://x.com/pokemonmanhole';
-const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
+const ROUND = 'var(--chrome-font)';
 
 // ─────────────────────────────────────────────
 // パーツ
@@ -130,9 +130,9 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
         aria-label="サイトを切り替える"
         className="flex min-w-0 max-w-full items-center rounded-lg transition hover:bg-[var(--chrome-accent-soft)]"
         style={{
-          // SP は図鑑の .site-switch__trigger と同じく幅に合わせて詰める（320px 幅でも認証ボタンと並ぶように）
-          gap: variant === 'pc' ? 8 : 'clamp(5px, 1.8vw, 7px)',
-          padding: variant === 'pc' ? '0 6px' : '0 clamp(6px, 2vw, 8px) 0 4px',
+          // 図鑑の .site-switch__trigger と同じ値。SP は幅に合わせて詰める（320px 幅でも認証ボタンと並ぶように）
+          gap: variant === 'pc' ? 7 : 'clamp(5px, 1.8vw, 7px)',
+          padding: variant === 'pc' ? '0 8px 0 4px' : '0 clamp(6px, 2vw, 8px) 0 4px',
           minHeight: 'var(--chrome-tap-min)',
           fontWeight: 700,
           color: variant === 'pc' ? 'var(--chrome-ink-pc)' : 'var(--chrome-ink)',
@@ -225,6 +225,7 @@ function SpHeader({ user, authLoaded }: ChromeState) {
         WebkitBackdropFilter: 'blur(8px)',
         borderBottom: '1px solid var(--chrome-sp-border)',
         color: 'var(--chrome-ink)',
+        fontFamily: ROUND,
         // ヘッダーは本文の外側にあるので、上の safe-area はここが持つ。
         // 本文側は .safe-area-body（左右のみ）で、二重適用にならないようにしている
         paddingTop: 'env(safe-area-inset-top)',
@@ -318,6 +319,7 @@ function pcNavLinkStyle(isActive: boolean): React.CSSProperties {
   return {
     fontSize: 13.5,
     fontWeight: 600,
+    lineHeight: 1.2,
     color: isActive ? 'var(--chrome-pc-nav-active)' : 'var(--chrome-pc-nav)',
     padding: '7px 13px',
     borderRadius: 'var(--chrome-radius-nav)',
@@ -343,6 +345,7 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         padding: '0 32px',
         background: 'var(--chrome-pc-bg)',
         borderBottom: '1px solid var(--chrome-pc-border)',
+        fontFamily: ROUND,
         // スイッチャーのメニューが本文の positioned 要素（固定CTA z-40 など）に
         // 負けないよう、ナビ自身に stacking context を持たせる
         position: 'relative',

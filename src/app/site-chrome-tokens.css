@@ -42,6 +42,10 @@
   --chrome-cta: #bf5640;
   --chrome-cta-shadow: #a8462f;
 
+  /* クロムの書体。--font-chrome は layout.tsx の next/font（M PLUS Rounded 1c 700/800）。
+     図鑑は site-header.css で同じ書体を Google Fonts から読む */
+  --chrome-font: var(--font-chrome), "M PLUS Rounded 1c", "Noto Sans JP", system-ui, sans-serif;
+
   --chrome-radius-nav: 9px;
   --chrome-radius-pill: 999px;
 
