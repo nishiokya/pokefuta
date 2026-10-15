@@ -120,6 +120,7 @@ function UploadPageInner() {
   const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number } | null>(null);
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
+  const [isAndroid, setIsAndroid] = useState(false);
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
@@ -129,6 +130,9 @@ function UploadPageInner() {
   const waitingManholePhotoRef = useRef(false);
   const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
+  const missingGpsMessage = isAndroid
+    ? '写真にGPS位置情報がありません。Androidのカメラ設定で位置情報をONにし、「カメラで撮影」から撮り直してください。GPSなし写真の投稿は現在開発中です。'
+    : 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
   useEffect(() => {
@@ -167,6 +171,8 @@ function UploadPageInner() {
   }, []);
 
   useEffect(() => {
+    setIsAndroid(/Android/i.test(navigator.userAgent));
+
     // ページタイトル設定
     document.title = pageTitle('ポケふたを投稿');
 
@@ -316,7 +322,7 @@ function UploadPageInner() {
         return {
           ...photo,
           photoStatus: 'invalid_gps',
-          error: 'GPS座標が見つかりません。写真の位置情報を有効にしてください。'
+          error: missingGpsMessage
         };
       }
 
@@ -343,7 +349,7 @@ function UploadPageInner() {
     setPhotos(reevaluated);
     blockReasons.forEach(reason => funnel.blocked(reason, 'photo'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manholes]);
+  }, [isAndroid, manholes]);
 
   const extractMetadata = async (file: File): Promise<PhotoMetadata> => {
     try {
@@ -468,7 +474,7 @@ function UploadPageInner() {
 
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
-      distanceError = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
+      distanceError = missingGpsMessage;
       photoStatus = 'invalid_gps';
       funnel.blocked('invalid_gps', 'photo');
     } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
@@ -535,7 +541,7 @@ function UploadPageInner() {
     setVisitNote(noteLines.join('\n'));
 
     setLoading(false);
-  }, [manholes]);
+  }, [isAndroid, manholes]);
 
   // 送信中の写真。差し替えを止める判定と、二重送信の防止に使う
   const isUploading = photos.some(photo => photo.uploading);
@@ -547,6 +553,10 @@ function UploadPageInner() {
     },
     maxFiles: 1,
     multiple: false,
+    // Android 10以降では、端末内の既存写真をブラウザへ渡す際にGPS EXIFが
+    // 除去される。GPSなし投稿の確認フローができるまでは、その経路を開かない。
+    noClick: isAndroid,
+    noDrag: isAndroid,
     // 送信中の差し替えを禁じる。許すと in-flight の送信が UI から消えたまま完了し、
     // 計測も「いま画面にある別の写真」の属性で上書きされる
     disabled: isUploading
@@ -565,7 +575,7 @@ function UploadPageInner() {
 
     // ✅ GPS座標の必須チェック
     if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
-      const errorMsg = 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
+      const errorMsg = missingGpsMessage;
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -996,7 +1006,12 @@ function UploadPageInner() {
             写真 <span className="text-[#B5483C]">*</span>
           </h2>
           <div
-            {...getRootProps()}
+            {...getRootProps({
+              onClick: () => {
+                if (isAndroid && !isUploading) captureFromCamera();
+              },
+              'aria-label': isAndroid ? 'カメラでポケふたを撮影' : '投稿する写真を選択',
+            })}
             className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
               isDragActive
                 ? 'border-[#7B63A8] bg-[#7B63A8]/10'
@@ -1012,28 +1027,42 @@ function UploadPageInner() {
                   alt="投稿する写真のプレビュー"
                   className="mx-auto max-h-64 rounded-lg object-contain"
                 />
-                <p className="mt-2 text-xs text-[#2A2A2A]/50">タップして写真を変更できます</p>
+                <p className="mt-2 text-xs text-[#2A2A2A]/50">
+                  {isAndroid ? 'タップして撮り直せます' : 'タップして写真を変更できます'}
+                </p>
               </>
             ) : (
               <>
-                <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
+                {isAndroid ? (
+                  <Camera className="mx-auto mb-2 h-10 w-10 text-[#7B63A8]/50" />
+                ) : (
+                  <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
+                )}
                 <p className="text-sm text-[#2A2A2A]/60">
-                  {isDragActive ? '写真をドロップ！' : 'タップして写真を選択（またはドラッグ&ドロップ）'}
+                  {isAndroid
+                    ? 'タップしてカメラで撮影'
+                    : isDragActive
+                      ? '写真をドロップ！'
+                      : 'タップして写真を選択（またはドラッグ&ドロップ）'}
                 </p>
                 <p className="mt-1 text-xs text-[#2A2A2A]/50">
-                  JPEG, PNG, HEIC形式に対応
+                  {isAndroid
+                    ? '端末内の写真からの投稿は現在開発中です'
+                    : 'JPEG, PNG, HEIC形式に対応'}
                 </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    captureFromCamera();
-                  }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
-                >
-                  <Camera className="h-4 w-4" />
-                  カメラで撮影
-                </button>
+                {!isAndroid && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      captureFromCamera();
+                    }}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+                  >
+                    <Camera className="h-4 w-4" />
+                    カメラで撮影
+                  </button>
+                )}
               </>
             )}
           </div>
