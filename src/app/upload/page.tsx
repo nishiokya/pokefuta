@@ -557,6 +557,7 @@ function UploadPageInner() {
     // 除去される。GPSなし投稿の確認フローができるまでは、その経路を開かない。
     noClick: isAndroid,
     noDrag: isAndroid,
+    noKeyboard: isAndroid,
     // 送信中の差し替えを禁じる。許すと in-flight の送信が UI から消えたまま完了し、
     // 計測も「いま画面にある別の写真」の属性で上書きされる
     disabled: isUploading
@@ -1009,6 +1010,13 @@ function UploadPageInner() {
             {...getRootProps({
               onClick: () => {
                 if (isAndroid && !isUploading) captureFromCamera();
+              },
+              onKeyDown: (event) => {
+                if (!isAndroid || isUploading || event.repeat) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  captureFromCamera();
+                }
               },
               'aria-label': isAndroid ? 'カメラでポケふたを撮影' : '投稿する写真を選択',
             })}
