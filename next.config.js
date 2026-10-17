@@ -44,6 +44,12 @@ const nextConfig = {
     trustHost: true,
     serverComponentsExternalPackages: ['sharp'],
     outputFileTracingIncludes: {
+      // サイト共通の OG 画像（layout の OGP_IMAGE_URL）。renderOgpFallback もテンプレート一式を読む
+      '/opengraph-image': [
+        './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
+        './public/ogp/pokefuta_ogp_template.svg',
+        './public/ogp/manhole-photo-mosaic-left-600x630.webp',
+      ],
       '/manhole/[id]/opengraph-image': [
         './public/ogp/fonts/NotoSansCJKjp-Bold.otf',
         './public/ogp/pokefuta_ogp_template.svg',
