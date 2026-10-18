@@ -7,7 +7,9 @@ type Variant = { id: string; name: string; accept?: string; capture?: 'environme
 
 // accept の書き方で、Android の Chrome が開く選択画面（標準の写真選択・ファイル・Google フォトなど）が変わる
 const VARIANTS: Variant[] = [
-  { id: 'A', name: '今の投稿画面と同じ', accept: 'image/*' },
+  // /upload の react-dropzone が描く input と同じ値（#324 より前の Android もこれで選んでいた）
+  { id: 'A', name: '今の投稿画面と同じ', accept: 'image/*,.jpeg,.jpg,.png,.heic,.heif' },
+  { id: 'A2', name: 'image/* だけ', accept: 'image/*' },
   { id: 'B', name: '形式を並べる', accept: 'image/jpeg,image/png,image/heic' },
   { id: 'C', name: '拡張子で指定', accept: '.jpg,.jpeg,.png,.heic' },
   { id: 'D', name: '画像以外も混ぜる', accept: 'image/*,application/pdf' },
