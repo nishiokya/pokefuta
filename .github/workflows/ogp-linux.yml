@@ -42,6 +42,7 @@ jobs:
       - run: npm run test:regular-badges
       - run: npm run test:japanese-phrases
       - run: npm run test:site-nav
+      - run: npm run test:monthly-topics
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux

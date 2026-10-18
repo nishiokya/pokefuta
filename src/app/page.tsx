@@ -21,6 +21,7 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
+import MonthlyTopics from '@/components/MonthlyTopics';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
@@ -320,6 +321,12 @@ export default function HomePage() {
               現れるので、CTA より上に置くと遅れて割り込んでボタンを押し下げる。
             */}
           </div>
+
+          {/*
+            「◯月の話題」（初めての写真・久しぶりの撮影・にぎわう県）。特集より上に置く。
+            どちらも応答を待って現れるので、CTA より下（ヒーローの末尾）に置く理由は特集と同じ
+          */}
+          <MonthlyTopics />
 
           {/*
             特集は2つ（ぬいぐるみ・デザインふた）。見出しの列（max-w-3xl）の外に出してヒーローの全幅を使う。
