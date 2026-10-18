@@ -67,8 +67,8 @@ async function fetchOwnVisits(): Promise<OwnVisit[] | null> {
     if (!res.ok) throw new Error(`visits ${res.status}`);
     const body = await res.json();
     if (!body?.success || !body.authenticated) return null;
-    const page = (body.visits ?? []) as { id: string; manhole_id: number; shot_at: string }[];
-    visits.push(...page.map(({ id, manhole_id, shot_at }) => ({ id, manhole_id, shot_at })));
+    const page = (body.visits ?? []) as { id: string; manhole_id: number; shot_at: string; is_public: boolean }[];
+    visits.push(...page.map(({ id, manhole_id, shot_at, is_public }) => ({ id, manhole_id, shot_at, is_public: is_public !== false })));
     if (page.length < 100) return visits;
   }
 }
@@ -259,7 +259,11 @@ export default function BulkUploadPage() {
   };
 
   /** 訪問1つ分を送る。送信済みの写真は飛ばす（再送で二重に投稿しない） */
-  const sendGroup = async (group: BulkVisitGroup<Manhole>, results: Record<string, 'done' | 'failed'>) => {
+  const sendGroup = async (
+    group: BulkVisitGroup<Manhole>,
+    results: Record<string, 'done' | 'failed'>,
+    runResults: Record<string, 'done' | 'failed'>
+  ) => {
     setSendState((prev) => ({ ...prev, [group.key]: 'sending' }));
     let visitId = visitIdByGroupRef.current[group.key] ?? group.existingVisitId ?? null;
     let failed = false;
@@ -272,9 +276,11 @@ export default function BulkUploadPage() {
         visitId = await sendPhoto(group, photos[id], visitId);
         if (visitId) visitIdByGroupRef.current[group.key] = visitId;
         results[id] = 'done';
+        runResults[id] = 'done';
       } catch (error) {
         console.error('Bulk upload failed:', error);
         results[id] = 'failed';
+        runResults[id] = 'failed';
         failed = true;
         lastError = error instanceof Error ? error.message : String(error);
       }
@@ -295,28 +301,49 @@ export default function BulkUploadPage() {
     } catch {
       // 使えなければ諦める
     }
+    // 画面は累計（results）で、GA4 はこの回の分（runResults）だけで数える。再送で二重に数えない
     const results: Record<string, 'done' | 'failed'> = { ...photoResult };
+    const runResults: Record<string, 'done' | 'failed'> = {};
+    const succeededBefore = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
     setSendState((prev) => ({ ...prev, ...Object.fromEntries(targets.map((g) => [g.key, 'waiting' as SendState])) }));
     const queue = [...targets];
     const worker = async () => {
       for (let group = queue.shift(); group && !abortRef.current; group = queue.shift()) {
-        await sendGroup(group, results);
+        await sendGroup(group, results, runResults);
       }
     };
     await Promise.all(Array.from({ length: SEND_CONCURRENCY }, worker));
     wakeLock?.release().catch(() => {});
 
-    const succeeded = Object.values(results).filter((r) => r === 'done').length;
-    const failedCount = Object.values(results).filter((r) => r === 'failed').length;
-    const succeededKeys = new Set(
-      groups.filter((g) => g.photoIds.some((id) => results[id] === 'done')).map((g) => g.key)
+    const runSucceededKeys = new Set(
+      groups
+        .filter((g) => !succeededBefore.has(g.key) && g.photoIds.some((id) => runResults[id] === 'done'))
+        .map((g) => g.key)
+    );
+    const newManholesBefore = countNewManholes(groups, classification?.newManholeIds ?? new Set(), succeededBefore);
+    const newManholesNow = countNewManholes(
+      groups,
+      classification?.newManholeIds ?? new Set(),
+      new Set([...succeededBefore, ...runSucceededKeys])
     );
     pokefutaEvents.bulkComplete({
-      photo_succeeded: succeeded,
-      photo_failed: failedCount,
-      new_manhole_count: countNewManholes(groups, succeededKeys),
+      photo_succeeded: Object.values(runResults).filter((r) => r === 'done').length,
+      photo_failed: Object.values(runResults).filter((r) => r === 'failed').length,
+      new_manhole_count: newManholesNow - newManholesBefore,
       is_aborted: abortRef.current,
     });
+
+    // この回で作った訪問を自分の訪問に足しておく。「続けて投稿する」で同じ蓋・同じ日の写真を選んだとき、
+    // 投稿済みとして判定され、新しい訪問を作らずにそこへ足せるように
+    const created = groups
+      .filter((g) => !g.existingVisitId && visitIdByGroupRef.current[g.key])
+      .map((g) => ({ id: visitIdByGroupRef.current[g.key], manhole_id: g.manhole.id, shot_at: g.firstShotAt.toISOString(), is_public: isPublic }));
+    if (created.length > 0) {
+      setOwnVisits((prev) => {
+        const known = new Set((prev ?? []).map((v) => v.id));
+        return [...(prev ?? []), ...created.filter((v) => !known.has(v.id))];
+      });
+    }
     setPhase('done');
   };
 
@@ -351,7 +378,11 @@ export default function BulkUploadPage() {
   const doneCount = Object.values(photoResult).filter((r) => r === 'done').length;
   const failedCount = Object.values(photoResult).filter((r) => r === 'failed').length;
   const succeededKeys = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
-  const newManholeCount = countNewManholes(groups, succeededKeys);
+  const newManholeCount = countNewManholes(groups, classification?.newManholeIds ?? new Set(), succeededKeys);
+  // 投稿済みの訪問に足す写真は、その訪問の公開設定に従う（サーバーは送った is_public を使わない）
+  const visibilityMismatch = groups.some(
+    (g) => g.existingVisitIsPublic !== null && g.existingVisitIsPublic !== isPublic && g.photoIds.some((id) => selected.has(id))
+  );
 
   // ---------- 描画 ----------
 
@@ -570,6 +601,11 @@ export default function BulkUploadPage() {
                       }}
                     />
                   </label>
+                  {visibilityMismatch && (
+                    <p className="mt-2 rounded-lg bg-[#FAF0DC] p-2 text-xs leading-relaxed text-[#5C4410]">
+                      投稿済みの訪問に足す写真は、その訪問の公開設定のままになります（カードに表示）。
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={submit}
@@ -693,7 +729,11 @@ function VisitCard({
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-[#2A2A2A]/60">
             <span>{formatShotAt(group.firstShotAt)}</span>
             <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />蓋から {formatMeters(minDistance)}</span>
-            {posted && <span>チェックすると、その訪問に写真を足します</span>}
+            {posted && (
+              <span>
+                チェックすると、その訪問（{group.existingVisitIsPublic ? '公開' : '非公開'}）に写真を足します。公開設定はその訪問のままです
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
@@ -784,8 +824,13 @@ function DoneSummary({
   trackNavClick: (label: string) => void;
 }) {
   return (
-    <section className="rounded-xl border border-[#4C9A57]/30 bg-[#EAF4EC] p-5" aria-live="polite">
-      <p className="text-lg font-extrabold">{placeCount} か所・{doneCount} 枚を投稿しました</p>
+    <section
+      className={`rounded-xl border p-5 ${doneCount > 0 ? 'border-[#4C9A57]/30 bg-[#EAF4EC]' : 'border-[#B5483C]/30 bg-[#FBEAE8]'}`}
+      aria-live="polite"
+    >
+      <p className="text-lg font-extrabold">
+        {doneCount > 0 ? `${placeCount} か所・${doneCount} 枚を投稿しました` : '投稿できませんでした'}
+      </p>
       {newManholeCount > 0 && <p className="mt-1 font-bold text-[#BF5640]">新しく集めた蓋 {newManholeCount} 枚</p>}
       {(failedCount > 0 || aborted) && (
         <div className="mt-3 rounded-lg bg-white p-3 text-sm">

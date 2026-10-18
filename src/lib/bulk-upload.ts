@@ -25,12 +25,17 @@ export interface OwnVisit {
   id: string;
   manhole_id: number;
   shot_at: string;
+  /** 写真を足すとき、サーバーはこの訪問の公開設定に従う（送った is_public は使わない） */
+  is_public: boolean;
 }
 
 export type BulkPhotoStatus = 'ok' | 'posted' | 'far' | 'no_gps';
 
 export interface NearestManhole<M extends BulkManhole> {
   manhole: M;
+  /** 判定用。丸めない（サーバーも丸めずに 50m と比べる） */
+  distanceKm: number;
+  /** 表示用 */
   distanceM: number;
 }
 
@@ -43,6 +48,8 @@ export interface BulkVisitGroup<M extends BulkManhole> {
   photoIds: string[];
   /** 同じ蓋・同じ日の訪問が既にあれば、その id（写真を足す先） */
   existingVisitId: string | null;
+  /** 足す先の訪問の公開設定。足した写真はこれに従う */
+  existingVisitIsPublic: boolean | null;
   /** 自分がまだ一度も訪問していない蓋。同じ蓋が今回複数日あれば、一番早い日だけ true */
   isNewManhole: boolean;
   /** 一番早い写真の撮影日時。並べ替えと、新しく作る訪問の shot_at に使う */
@@ -57,6 +64,8 @@ export interface BulkClassification<M extends BulkManhole> {
   /** 写真 id → 状態（ok / posted は所属するグループで決まる） */
   statusById: Record<string, BulkPhotoStatus>;
   distanceMById: Record<string, number>;
+  /** 自分がまだ一度も訪問していない蓋（表示の「初めて」とは別に、数えるために持つ） */
+  newManholeIds: Set<number>;
 }
 
 const JST_DAY = new Intl.DateTimeFormat('en-CA', {
@@ -87,7 +96,7 @@ export function findNearestManholeAnyDistance<M extends BulkManhole>(
       nearest = manhole;
     }
   }
-  return nearest ? { manhole: nearest, distanceM: Math.round(minKm * 1000) } : null;
+  return nearest ? { manhole: nearest, distanceKm: minKm, distanceM: Math.round(minKm * 1000) } : null;
 }
 
 export function classifyBulkPhotos<M extends BulkManhole>(
@@ -97,11 +106,11 @@ export function classifyBulkPhotos<M extends BulkManhole>(
 ): BulkClassification<M> {
   const visitedManholeIds = new Set(ownVisits.map((v) => v.manhole_id));
   // 同じ蓋・同じ日に訪問が複数あるときは、先に投稿した方（一覧の後ろ＝古い方）に足す
-  const existingVisitByKey = new Map<string, string>();
+  const existingVisitByKey = new Map<string, OwnVisit>();
   for (const visit of ownVisits) {
     const shotAt = new Date(visit.shot_at);
     if (Number.isNaN(shotAt.getTime())) continue;
-    existingVisitByKey.set(`${visit.manhole_id}:${jstDayKey(shotAt)}`, visit.id);
+    existingVisitByKey.set(`${visit.manhole_id}:${jstDayKey(shotAt)}`, visit);
   }
 
   const groupsByKey = new Map<string, BulkVisitGroup<M>>();
@@ -117,7 +126,7 @@ export function classifyBulkPhotos<M extends BulkManhole>(
       continue;
     }
     const nearest = findNearestManholeAnyDistance(photo.latitude as number, photo.longitude as number, manholes);
-    if (!nearest || nearest.distanceM > MAX_DISTANCE_KM * 1000) {
+    if (!nearest || nearest.distanceKm > MAX_DISTANCE_KM) {
       far.push({ photoId: photo.id, nearest });
       statusById[photo.id] = 'far';
       continue;
@@ -135,7 +144,8 @@ export function classifyBulkPhotos<M extends BulkManhole>(
         manhole: nearest.manhole,
         day,
         photoIds: [photo.id],
-        existingVisitId: existingVisitByKey.get(key) ?? null,
+        existingVisitId: existingVisitByKey.get(key)?.id ?? null,
+        existingVisitIsPublic: existingVisitByKey.get(key)?.is_public ?? null,
         isNewManhole: false,
         firstShotAt: photo.shotAt,
       });
@@ -144,11 +154,11 @@ export function classifyBulkPhotos<M extends BulkManhole>(
 
   // 撮影の古い順（旅の順番で見返せる）
   const groups = [...groupsByKey.values()].sort((a, b) => a.firstShotAt.getTime() - b.firstShotAt.getTime());
-  const flaggedNew = new Set<number>();
+  const newManholeIds = new Set<number>();
   for (const group of groups) {
-    if (!visitedManholeIds.has(group.manhole.id) && !flaggedNew.has(group.manhole.id)) {
+    if (!visitedManholeIds.has(group.manhole.id) && !newManholeIds.has(group.manhole.id)) {
       group.isNewManhole = true;
-      flaggedNew.add(group.manhole.id);
+      newManholeIds.add(group.manhole.id);
     }
     // 写真の中も撮影順に
     for (const photoId of group.photoIds) {
@@ -160,14 +170,22 @@ export function classifyBulkPhotos<M extends BulkManhole>(
     group.photoIds.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
   }
 
-  return { groups, far, noGps, statusById, distanceMById };
+  return { groups, far, noGps, statusById, distanceMById, newManholeIds };
 }
 
-/** 完了時の「新しく集めた蓋」。実際に送れた訪問のうち、初めての蓋の数 */
-export function countNewManholes<M extends BulkManhole>(groups: BulkVisitGroup<M>[], succeededKeys: Set<string>): number {
+/**
+ * 完了時の「新しく集めた蓋」。初めての蓋のうち、どれか1日分でも送れたものの数。
+ * 表示の「初めて」は一番早い日にしか付かないので、それには頼らない
+ * （早い日を外したり失敗したりして、後の日だけ送れても集めたことになる）。
+ */
+export function countNewManholes<M extends BulkManhole>(
+  groups: BulkVisitGroup<M>[],
+  newManholeIds: Set<number>,
+  succeededKeys: Set<string>
+): number {
   const ids = new Set<number>();
   for (const group of groups) {
-    if (group.isNewManhole && succeededKeys.has(group.key)) ids.add(group.manhole.id);
+    if (newManholeIds.has(group.manhole.id) && succeededKeys.has(group.key)) ids.add(group.manhole.id);
   }
   return ids.size;
 }

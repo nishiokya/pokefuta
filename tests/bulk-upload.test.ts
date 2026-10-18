@@ -67,14 +67,16 @@ test('同じ蓋・同じ日（日本時間）の自分の訪問があれば投�
     manholes,
     [
       // JST では 2026-03-09 09:30。UTC の日付は同じだが、日本時間で比べていることを見る
-      { id: 'v-old', manhole_id: 1, shot_at: '2026-03-09T00:30:00Z' },
+      { id: 'v-old', manhole_id: 1, shot_at: '2026-03-09T00:30:00Z', is_public: false },
       // 別の日の訪問は「投稿済み」にしないが、蓋は「初めて」ではなくなる
-      { id: 'v-other-day', manhole_id: 2, shot_at: '2026-03-01T00:00:00Z' },
+      { id: 'v-other-day', manhole_id: 2, shot_at: '2026-03-01T00:00:00Z', is_public: true },
     ]
   );
   const g1 = result.groups.find((g) => g.manhole.id === 1)!;
   const g2 = result.groups.find((g) => g.manhole.id === 2)!;
   assert.equal(g1.existingVisitId, 'v-old');
+  // 足した写真は足す先の公開設定に従うので、画面で出すために持つ
+  assert.equal(g1.existingVisitIsPublic, false);
   assert.equal(result.statusById.p1, 'posted');
   assert.equal(g2.existingVisitId, null);
   assert.equal(result.statusById.p2, 'ok');
@@ -85,13 +87,13 @@ test('日本時間の日付またぎ: UTC で同じ日でも JST で別の日な
   const result = classifyBulkPhotos(
     [{ id: 'p1', latitude: 35.0, longitude: 135.0, shotAt: at('2026-03-09T16:00:00Z') }], // JST 3/10 01:00
     manholes,
-    [{ id: 'v1', manhole_id: 1, shot_at: '2026-03-09T01:00:00Z' }] // JST 3/9 10:00
+    [{ id: 'v1', manhole_id: 1, shot_at: '2026-03-09T01:00:00Z', is_public: true }] // JST 3/9 10:00
   );
   assert.equal(result.groups[0].existingVisitId, null);
 });
 
 test('新しく集めた蓋は、送れた訪問だけで数える', () => {
-  const { groups } = classifyBulkPhotos(
+  const { groups, newManholeIds } = classifyBulkPhotos(
     [
       { id: 'p1', latitude: 35.0, longitude: 135.0, shotAt: at('2026-03-09T01:00:00Z') },
       { id: 'p2', latitude: 35.1, longitude: 135.1, shotAt: at('2026-03-09T02:00:00Z') },
@@ -99,6 +101,31 @@ test('新しく集めた蓋は、送れた訪問だけで数える', () => {
     manholes,
     []
   );
-  assert.equal(countNewManholes(groups, new Set(['1:2026-03-09', '2:2026-03-09'])), 2);
-  assert.equal(countNewManholes(groups, new Set(['1:2026-03-09'])), 1);
+  assert.equal(countNewManholes(groups, newManholeIds, new Set(['1:2026-03-09', '2:2026-03-09'])), 2);
+  assert.equal(countNewManholes(groups, newManholeIds, new Set(['1:2026-03-09'])), 1);
+});
+
+test('初めての蓋は、「初めて」が付いた早い日が送れなくても、後の日が送れれば数える', () => {
+  const { groups, newManholeIds } = classifyBulkPhotos(
+    [
+      { id: 'p1', latitude: 35.0, longitude: 135.0, shotAt: at('2026-03-09T01:00:00Z') },
+      { id: 'p2', latitude: 35.0, longitude: 135.0, shotAt: at('2026-03-10T01:00:00Z') },
+    ],
+    manholes,
+    []
+  );
+  assert.equal(groups[0].isNewManhole, true);
+  assert.equal(groups[1].isNewManhole, false);
+  assert.equal(countNewManholes(groups, newManholeIds, new Set(['1:2026-03-10'])), 1);
+});
+
+test('50m の判定は丸める前の距離で行う（サーバーと同じ）', () => {
+  // 0.000452度 ≒ 50.26m。丸めると 50m になり、以前は投稿できる側に入っていた
+  const result = classifyBulkPhotos(
+    [{ id: 'p1', latitude: 35.000452, longitude: 135.0, shotAt: at('2026-03-09T01:00:00Z') }],
+    manholes,
+    []
+  );
+  assert.equal(result.statusById.p1, 'far');
+  assert.equal(result.far[0].nearest?.distanceM, 50);
 });
