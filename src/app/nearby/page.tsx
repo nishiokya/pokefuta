@@ -59,17 +59,26 @@ type LocationFailure = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
 
 const LOCATION_FAILURE_CODES: Record<number, LocationFailure> = { 1: 'denied', 2: 'unavailable', 3: 'timeout' };
 
+/** 許可の確認に答えないまま待つ上限。これを過ぎたら新しい順の一覧を出す（取得の timeout 15秒より長く） */
+const GEOLOCATION_DEADLINE_MS = 20000;
+
 /** 位置情報が取れないときに並べる、最近写真が投稿された蓋の数 */
 const RECENT_DISPLAY_LIMIT = 30;
 
+type Platform = 'ios-safari' | 'ios-other' | 'android' | 'other';
+
 /**
- * 端末の種類。直し方の手順を出し分けるだけに使う（分からなければ両方出す）。
+ * 端末とブラウザの種類。直し方の手順を出し分けるだけに使う（分からなければ両方出す）。
  * iPadOS の Safari は Mac と同じ UA を名乗るので、タッチ対応で見分ける。
+ * iPhone の Chrome / Firefox / Edge は、Safari の設定を変えても位置情報が使えるようにならない
+ * （アプリごとの位置情報の許可を見る）ので、Safari と分ける（#330 の Copilot レビュー）。
  */
-function detectPlatform(): 'ios' | 'android' | 'other' {
+function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'other';
   const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+    return /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) ? 'ios-other' : 'ios-safari';
+  }
   if (/Android/.test(ua)) return 'android';
   return 'other';
 }
@@ -113,6 +122,9 @@ export default function NearbyPage() {
   const geolocationSeqRef = useRef(0);
   // 現在地の取得待ちか。待っている間は範囲を変えても古い位置で探さない（取れたら最新の範囲で探す）
   const geolocationPendingRef = useRef(false);
+  // 現在地の取得の締め切り（GEOLOCATION_DEADLINE_MS）のタイマー
+  const geolocationDeadlineRef = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(geolocationDeadlineRef.current), []);
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
@@ -304,6 +316,7 @@ export default function NearbyPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (isStaleGeolocation()) return;
+          window.clearTimeout(geolocationDeadlineRef.current);
           geolocationPendingRef.current = false;
           setLocationFailure(null);
           trackGeolocationEnable();
@@ -317,6 +330,7 @@ export default function NearbyPage() {
         },
         (error) => {
           if (isStaleGeolocation()) return;
+          window.clearTimeout(geolocationDeadlineRef.current);
           geolocationPendingRef.current = false;
           console.error('Location unavailable:', error);
           failLocation(LOCATION_FAILURE_CODES[error.code] ?? 'unavailable');
@@ -324,6 +338,13 @@ export default function NearbyPage() {
         // 既定は timeout が無限で、端末の位置情報サービスが応答しないと「検索中」のまま終わらなかった
         { timeout: 15000, maximumAge: 60000 }
       );
+      // timeout は許可の確認を待つ時間を含まない。確認に答えないままだと「検索中」が終わらないので、
+      // こちらでも締め切りを置いて新しい順の一覧を出す。後から許可されて位置が届いたら、そのまま近くを探す
+      // （failLocation は geolocationSeq を進めないので、届いた応答は捨てない。#330 の Copilot レビュー）
+      window.clearTimeout(geolocationDeadlineRef.current);
+      geolocationDeadlineRef.current = window.setTimeout(() => {
+        if (!isStaleGeolocation() && geolocationPendingRef.current) failLocation('timeout');
+      }, GEOLOCATION_DEADLINE_MS);
     } else {
       failLocation('unsupported');
     }
@@ -350,13 +371,18 @@ export default function NearbyPage() {
     if (recentRequestedRef.current) return;
     recentRequestedRef.current = true;
     try {
-      const response = await fetch('/api/visits?with_photos=true&limit=100&order_by=created_at', { credentials: 'omit' });
-      if (!response.ok) throw new Error(`status ${response.status}`);
-      const data = await response.json();
+      // limit は訪問の数で、蓋の数ではない。同じ蓋への訪問が続くと蓋が足りないので、集まるまで次のページも読む（最大3ページ）
       const ids: number[] = [];
-      for (const visit of Array.isArray(data?.visits) ? data.visits : []) {
-        const id = visit?.manhole_id;
-        if (typeof id === 'number' && !ids.includes(id)) ids.push(id);
+      for (let page = 0; page < 3 && ids.length < RECENT_DISPLAY_LIMIT; page += 1) {
+        const response = await fetch(`/api/visits?with_photos=true&limit=100&offset=${page * 100}&order_by=created_at`, { credentials: 'omit' });
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const data = await response.json();
+        const visits = Array.isArray(data?.visits) ? data.visits : [];
+        for (const visit of visits) {
+          const id = visit?.manhole_id;
+          if (typeof id === 'number' && !ids.includes(id)) ids.push(id);
+        }
+        if (visits.length < 100) break;
       }
       setRecentManholeIds(ids.slice(0, RECENT_DISPLAY_LIMIT));
     } catch (error) {
@@ -868,7 +894,9 @@ export default function NearbyPage() {
                   <MapPin className="mx-auto mb-2 h-9 w-9 text-[#c9bda4] sm:mb-3 sm:h-10 sm:w-10" />
                   <p className="text-sm font-bold text-[#2c2a26]">
                     {showingRecent
-                      ? '最近写真が投稿されたポケふたを読み込めませんでした'
+                      ? activeTab === 'unvisited' && recentManholes.length > 0
+                        ? '最近写真が投稿されたポケふたは、すべて訪問済みです'
+                        : '最近写真が投稿されたポケふたを読み込めませんでした'
                       : activeTab === 'unvisited'
                       ? '近くに未訪問のポケふたが見つかりませんでした'
                       : activeTab === 'all'
@@ -936,7 +964,7 @@ export default function NearbyPage() {
  * なので denied は「設定で許可してから押す」手順を、端末に合わせて具体的に書く。
  */
 function LocationHelp({ failure, onRetry }: { failure: LocationFailure; onRetry: () => void }) {
-  const [platform, setPlatform] = useState<'ios' | 'android' | 'other'>('other');
+  const [platform, setPlatform] = useState<Platform>('other');
   useEffect(() => setPlatform(detectPlatform()), []);
 
   const title = {
@@ -947,18 +975,21 @@ function LocationHelp({ failure, onRetry }: { failure: LocationFailure; onRetry:
   }[failure];
 
   const steps: Array<{ label: string; text: string }> = [];
+  const isIos = platform === 'ios-safari' || platform === 'ios-other';
   if (failure === 'denied') {
-    if (platform !== 'android') {
-      steps.push({ label: 'iPhone', text: 'アドレスバーの「ぁあ」→「Webサイトの設定」→「位置情報」を「許可」。出てこないときは 設定アプリ →（アプリ →）Safari →「位置情報」を「確認」か「許可」に' });
+    if (platform === 'ios-other') {
+      steps.push({ label: 'iPhone', text: '設定アプリ →（アプリ →）お使いのブラウザ（Chrome など）→「位置情報」を「このAppの使用中」に' });
+    } else if (platform !== 'android') {
+      steps.push({ label: 'iPhone（Safari）', text: 'アドレスバーの「ぁあ」→「Webサイトの設定」→「位置情報」を「許可」。出てこないときは 設定アプリ →（アプリ →）Safari →「位置情報」を「確認」か「許可」に' });
     }
-    if (platform !== 'ios') {
+    if (!isIos) {
       steps.push({ label: 'Android', text: 'アドレスバー左のアイコン →「権限」→「位置情報」を許可' });
     }
   } else if (failure === 'unavailable') {
     if (platform !== 'android') {
       steps.push({ label: 'iPhone', text: '設定アプリ →「プライバシーとセキュリティ」→「位置情報サービス」をオン' });
     }
-    if (platform !== 'ios') {
+    if (!isIos) {
       steps.push({ label: 'Android', text: '画面上から下にスワイプして「位置情報」をオン' });
     }
   }
