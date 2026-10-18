@@ -367,6 +367,59 @@ export interface VisitTipSavedParams extends VisitTipEventParams {
   used_suggestion: boolean;
 }
 
+/**
+ * まとめて投稿（/upload/bulk）の台帳。`tools/check-ga4-contract.js` が送信漏れを落とす。
+ *
+ * 1枚ずつの投稿ファネル（SUBMISSION_FUNNEL_EVENTS）とは混ぜない。混ぜると
+ * `p_photo_upload_start = complete + failed + blocked{postsend}` の等式が崩れる。
+ * 投稿の総数は `p_photo_upload_complete` の件数 + `p_bulk_complete` の photo_succeeded で見る。
+ *
+ * デプロイ前に GA4 管理画面で登録が要る（遡及しない）:
+ *   カスタムディメンション … なし（数はカスタム指標にする場合のみ登録）
+ *   カスタム指標 … file_count / ok_count / posted_count / far_count / no_gps_count /
+ *                  photo_count / visit_count / photo_succeeded / photo_failed / new_manhole_count
+ */
+export const BULK_UPLOAD_EVENTS = [
+  'p_bulk_start',          // 1. まとめて投稿の画面に到達（分母）
+  'p_bulk_files_selected', // 2. 写真を選んで読み終えた（振り分けの内訳つき）
+  'p_bulk_submit',         // 3. 投稿ボタンを押した
+  'p_bulk_complete',       // 4. 送り終えた（成功・失敗の枚数つき。中止も含む）
+] as const;
+
+export interface BulkStartParams extends GAEventParams {
+  is_logged_in: boolean;
+  /** Android は写真を選ばせず PC へ案内する。その表示が出た到達を分けて見る */
+  is_android: boolean;
+}
+
+export interface BulkFilesSelectedParams extends GAEventParams {
+  file_count: number;
+  ok_count: number;
+  posted_count: number;
+  far_count: number;
+  no_gps_count: number;
+}
+
+export interface BulkSubmitParams extends GAEventParams {
+  photo_count: number;
+  visit_count: number;
+  is_public: boolean;
+}
+
+export interface BulkCompleteParams extends GAEventParams {
+  photo_succeeded: number;
+  photo_failed: number;
+  new_manhole_count: number;
+  /** 中止ボタンで止めたか、送信の途中でページを離れたか（離れた場合は pagehide / アンマウントで送る） */
+  is_aborted: boolean;
+  /**
+   * この回の失敗で一番多かった原因。API が返す code（`src/lib/api-error-code.ts`）を優先し、
+   * 無ければ classifyClientSubmissionError の種別。失敗が無ければ送らない。
+   * 1枚ずつの p_submission_failed.error_code と同じ値の空間（まとめて投稿の失敗はこちらで集計する）
+   */
+  error_code?: string;
+}
+
 export interface TitleReportParams extends GAEventParams {
   /** 発生箇所。GA4 予約語の source は使わない。 */
   surface: string;
@@ -652,6 +705,12 @@ export const pokefutaEvents = {
   // 次に来る人へひとこと（VISIT_TIP_EVENTS）
   visitTipPromptView:  (p: VisitTipEventParams)  => trackEvent('p_visit_tip_prompt_view', p),
   visitTipSaved:       (p: VisitTipSavedParams)  => trackEvent('p_visit_tip_saved', p),
+
+  // --- まとめて投稿（BULK_UPLOAD_EVENTS の順） ---
+  bulkStart:          (p: BulkStartParams)         => trackEvent('p_bulk_start', p),
+  bulkFilesSelected:  (p: BulkFilesSelectedParams) => trackEvent('p_bulk_files_selected', p),
+  bulkSubmit:         (p: BulkSubmitParams)        => trackEvent('p_bulk_submit', p),
+  bulkComplete:       (p: BulkCompleteParams)      => trackEvent('p_bulk_complete', p),
 
   // タグ（称号）の間違い指摘
   titleReport:         (p: TitleReportParams)    => trackEvent('p_title_report', p),

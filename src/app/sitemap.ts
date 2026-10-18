@@ -40,6 +40,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${baseUrl}/help/android-photos`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
       // 検索資産ではないが、投稿の削除根拠になる文書なのでリンク先として安定させる。
       url: `${baseUrl}/terms`,
       lastModified,

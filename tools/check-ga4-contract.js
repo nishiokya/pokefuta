@@ -535,6 +535,21 @@ for (const surface of ['upload_form', 'upload_complete']) {
   );
 }
 
+// 4f. まとめて投稿。1枚ずつのファネルとは別の台帳にし、4つ揃っていることを担保する。
+//     complete が欠けると、まとめて投稿した分が投稿数から黙って消える。
+for (const eventName of readLedger('BULK_UPLOAD_EVENTS')) {
+  expect(
+    analyticsCode.includes(`trackEvent('${eventName}'`),
+    `${eventName} は BULK_UPLOAD_EVENTS にあるが、送信するヘルパーが gtag.ts に無い`
+  );
+}
+for (const helper of ['bulkStart', 'bulkFilesSelected', 'bulkSubmit', 'bulkComplete']) {
+  expect(
+    callerCode.includes(`${helper}({`),
+    `${helper} がどこからも呼ばれていない（まとめて投稿の計測に穴が空く）`
+  );
+}
+
 // 4e. タグの間違い指摘。受け皿（manhole_title_report）を読む運用の手前で、
 //     指摘がどれだけ来ているかを GA4 からも見られるようにしておく。
 expect(
