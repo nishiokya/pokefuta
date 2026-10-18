@@ -92,6 +92,16 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
   },
   redirects: async () => [
+    // www 付きは apex へまとめる。www でも 200 を返していて、Search Console で重複の扱いになっていた。
+    // CloudFront のキャッシュは host ごとに分かれている（www で取っても apex は Miss）ので、
+    // この転送が apex 側に混ざって転送が止まらなくなることはない。認証クッキーは .pokefuta.com
+    // スコープなのでログインは切れない。クエリは Next.js が付けたまま送る
+    {
+      source: '/:path*',
+      has: [{ type: 'host', value: 'www.pokefuta.com' }],
+      destination: 'https://pokefuta.com/:path*',
+      permanent: true,
+    },
     {
       source: '/signup',
       destination: '/login',
