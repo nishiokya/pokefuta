@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import { HelpShell, Section, Steps } from '../HelpParts';
 
 // Android のスマホでは、撮ってある写真をブラウザで選ぶと位置情報（EXIF の GPS）が消える。
 // 2026-10 に実機で、accept の書き方・選ぶアプリ（標準の写真選択・Google フォト・ファイル）を変えても
@@ -15,24 +15,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-8">
-      <h2 className="mb-2 font-pixelJp text-base font-bold text-[#4F3828]">{title}</h2>
-      <div className="flex flex-col gap-2 text-sm leading-relaxed text-[#6A4D36]">{children}</div>
-    </section>
-  );
-}
-
-function Steps({ children }: { children: ReactNode }) {
-  return <ol className="ml-5 list-decimal space-y-1.5">{children}</ol>;
-}
-
 export default function AndroidPhotosHelpPage() {
   return (
-    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-read px-4 pb-12 pt-5 sm:pt-8">
-        <h1 className="font-pixelJp text-2xl font-extrabold text-[#4F3828]">Android の写真を PC に移して投稿する</h1>
+    <HelpShell title="Android の写真を PC に移して投稿する" current="/help/android-photos">
 
         <div className="mt-6 rounded-xl border border-[#B07818]/30 bg-[#FAF0DC] p-4 text-sm leading-relaxed text-[#5C4410]">
           <p>
@@ -105,15 +90,6 @@ export default function AndroidPhotosHelpPage() {
           </ul>
         </Section>
 
-        <div className="mt-10 flex flex-wrap gap-2">
-          <Link href="/upload/bulk" className="rounded-lg bg-[#BF5640] px-4 py-2 text-sm font-bold text-white">
-            まとめて投稿を開く
-          </Link>
-          <Link href="/upload" className="rounded-lg border border-[#2A2A2A]/20 bg-white px-4 py-2 text-sm font-bold">
-            1枚ずつ投稿する
-          </Link>
-        </div>
-      </main>
-    </div>
+    </HelpShell>
   );
 }

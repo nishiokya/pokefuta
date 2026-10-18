@@ -28,8 +28,10 @@ import { filesFromDataTransfer, isImageFile, makeThumbnail } from './browser-fil
 // Android のスマホはブラウザで写真を選ぶと GPS が消えるので、写真を選ばせずに PC へ案内する。
 // 仕様: vault inbox/dev/pokefuta/spec「まとめて投稿ページ（PC・iPhone）仕様」
 
-/** /upload と同じキー。公開設定はセッション内だけ引き継ぐ */
-const IS_PUBLIC_SESSION_KEY = 'pokefuta:is_public';
+// まとめて投稿は公開だけ。何十枚もの写真を一度に非公開で抱え込むと、
+// 蓋のページに写真が集まらず、本人も公開し直す手間が大きいため（非公開にしたい写真は1枚ずつの投稿で）
+const IS_PUBLIC = true;
+
 /** 同時に送る訪問の数 */
 const SEND_CONCURRENCY = 2;
 // ベータ。不具合は X の @pokemonmanhole で受ける（/photos/plush と同じ形）
@@ -44,23 +46,6 @@ interface BulkPhoto {
   metadata: PhotoMetadata;
   shotAt: Date;
   thumbnail: string | null;
-}
-
-function readSessionIsPublic(): boolean | null {
-  try {
-    const raw = sessionStorage.getItem(IS_PUBLIC_SESSION_KEY);
-    return raw === null ? null : raw === 'true';
-  } catch {
-    return null;
-  }
-}
-
-function writeSessionIsPublic(value: boolean): void {
-  try {
-    sessionStorage.setItem(IS_PUBLIC_SESSION_KEY, String(value));
-  } catch {
-    // 書けなくても投稿は続けられる
-  }
 }
 
 /** 自分の訪問を全部読む（100件ずつ）。ログインしていなければ null */
@@ -131,7 +116,6 @@ export default function BulkUploadPage() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [landscape, setLandscape] = useState<Set<string>>(new Set());
-  const [isPublic, setIsPublic] = useState(true);
   const [isDragActive, setIsDragActive] = useState(false);
 
   const [sendState, setSendState] = useState<Record<string, SendState>>({});
@@ -200,8 +184,6 @@ export default function BulkUploadPage() {
     setIsAndroid(android);
     trackView('/upload/bulk', 'まとめて投稿', 'upload', true); // middleware がログインを保証
     pokefutaEvents.bulkStart({ is_logged_in: true, is_android: android });
-    const saved = readSessionIsPublic();
-    if (saved !== null) setIsPublic(saved);
     if (android) return;
 
     (async () => {
@@ -392,7 +374,7 @@ export default function BulkUploadPage() {
     form.append('shot_at', photo.shotAt.toISOString());
     form.append('latitude', String(photo.metadata.latitude));
     form.append('longitude', String(photo.metadata.longitude));
-    form.append('is_public', String(isPublic));
+    form.append('is_public', String(IS_PUBLIC));
     if (photo.metadata.exifPayload) form.append('exif', JSON.stringify(photo.metadata.exifPayload));
     if (visitId) {
       form.append('visit_id', visitId);
@@ -509,7 +491,7 @@ export default function BulkUploadPage() {
     // 投稿済みとして判定され、新しい訪問を作らずにそこへ足せるように
     const created = groups
       .filter((g) => !g.existingVisitId && visitIdByGroupRef.current[g.key])
-      .map((g) => ({ id: visitIdByGroupRef.current[g.key], manhole_id: g.manhole.id, shot_at: g.firstShotAt.toISOString(), is_public: isPublic }));
+      .map((g) => ({ id: visitIdByGroupRef.current[g.key], manhole_id: g.manhole.id, shot_at: g.firstShotAt.toISOString(), is_public: IS_PUBLIC }));
     if (created.length > 0) {
       setOwnVisits((prev) => {
         const known = new Set((prev ?? []).map((v) => v.id));
@@ -521,7 +503,7 @@ export default function BulkUploadPage() {
 
   const submit = () => {
     if (selectedCount === 0) return;
-    pokefutaEvents.bulkSubmit({ photo_count: selectedCount, visit_count: selectedGroups.length, is_public: isPublic });
+    pokefutaEvents.bulkSubmit({ photo_count: selectedCount, visit_count: selectedGroups.length, is_public: IS_PUBLIC });
     void runSend(selectedGroups);
   };
 
@@ -571,7 +553,7 @@ export default function BulkUploadPage() {
       return;
     }
     // 再送も1回の投稿として数える（complete だけが増えないように）
-    pokefutaEvents.bulkSubmit({ photo_count: pendingIds.length, visit_count: pendingGroups.length, is_public: isPublic });
+    pokefutaEvents.bulkSubmit({ photo_count: pendingIds.length, visit_count: pendingGroups.length, is_public: IS_PUBLIC });
     void runSend(pendingGroups, results);
   };
 
@@ -595,10 +577,6 @@ export default function BulkUploadPage() {
   const failedCount = Object.values(photoResult).filter((r) => r === 'failed').length;
   const succeededKeys = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
   const newManholeCount = countNewManholes(groups, classification?.newManholeIds ?? new Set(), succeededKeys);
-  // 投稿済みの訪問に足す写真は、その訪問の公開設定に従う（サーバーは送った is_public を使わない）
-  const visibilityMismatch = groups.some(
-    (g) => g.existingVisitIsPublic !== null && g.existingVisitIsPublic !== isPublic && g.photoIds.some((id) => selected.has(id))
-  );
 
   // ---------- 描画 ----------
 
@@ -640,7 +618,10 @@ export default function BulkUploadPage() {
           まとめて投稿
           <BetaBadge />
         </h1>
-        <Link href="/upload" className="text-sm underline hover:opacity-80">1枚ずつ投稿する</Link>
+        <span className="flex gap-3 text-sm">
+          <Link href="/help/bulk-upload" className="underline hover:opacity-80">使い方</Link>
+          <Link href="/upload" className="underline hover:opacity-80">1枚ずつ投稿する</Link>
+        </span>
       </div>
       <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/70">
         旅行の写真をまとめて選ぶと、写真の位置情報から蓋を見つけて、ポケふたの写真だけを投稿します。
@@ -784,7 +765,10 @@ export default function BulkUploadPage() {
             {classification.far.length > 0 && (
               <details className="rounded-xl bg-white/50 p-4 text-sm">
                 <summary className="cursor-pointer font-bold">近くにポケふたが無い {classification.far.length} 枚</summary>
-                <p className="mt-2 text-xs text-[#2A2A2A]/60">蓋から 50m 以内で撮った写真だけを投稿できます。一番近い蓋と距離を出しています。</p>
+                <p className="mt-2 text-xs text-[#2A2A2A]/60">
+                  蓋から 50m 以内で撮った写真だけを投稿できます。一番近い蓋と距離を出しています。
+                  <Link href="/help/bulk-upload-trouble#far" target="_blank" className="underline">蓋の写真なのにここに入るとき</Link>
+                </p>
                 <ul className="mt-2 grid gap-1 text-xs">
                   {classification.far.map(({ photoId, nearest }) => (
                     <li key={photoId} className="flex flex-wrap gap-x-2">
@@ -802,6 +786,7 @@ export default function BulkUploadPage() {
                 <p className="mt-2 text-xs leading-relaxed text-[#2A2A2A]/60">
                   撮影時にカメラの位置情報が OFF だった写真、Google フォトで場所が「推定」の写真、LINE で受け取った写真、
                   iPhone の写真選択の「オプション」で位置情報を外した写真には位置情報がありません。
+                  <Link href="/help/bulk-upload-trouble#no-gps" target="_blank" className="ml-1 underline">詳しく</Link>
                 </p>
                 <ul className="mt-2 grid gap-1 text-xs text-[#2A2A2A]/70">
                   {classification.noGps.map((id) => (
@@ -816,27 +801,13 @@ export default function BulkUploadPage() {
             <aside className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] z-20 rounded-xl border border-[#2A2A2A]/10 bg-white p-4 shadow-lg lg:top-24 lg:bottom-auto">
               {phase === 'review' ? (
                 <>
-                  <label className="flex items-center justify-between gap-3 text-sm" htmlFor="bulk-is-public">
-                    <span>
-                      <span className="font-bold">{isPublic ? '公開' : '非公開'}</span>
-                      <span className="block text-xs text-[#2A2A2A]/60">{isPublic ? '蓋のページに写真が並びます' : '自分のスタンプ帳にだけ残ります'}</span>
+                  <p className="text-sm">
+                    <span className="font-bold">公開で投稿します</span>
+                    <span className="block text-xs text-[#2A2A2A]/60">
+                      写真は蓋のページに並びます。非公開にしたい写真は
+                      <Link href="/upload" className="underline">1枚ずつの投稿</Link>から
                     </span>
-                    <input
-                      id="bulk-is-public"
-                      type="checkbox"
-                      className="h-5 w-5 accent-[#4C9A57]"
-                      checked={isPublic}
-                      onChange={(e) => {
-                        setIsPublic(e.target.checked);
-                        writeSessionIsPublic(e.target.checked);
-                      }}
-                    />
-                  </label>
-                  {visibilityMismatch && (
-                    <p className="mt-2 rounded-lg bg-[#FAF0DC] p-2 text-xs leading-relaxed text-[#5C4410]">
-                      投稿済みの訪問に足す写真は、その訪問の公開設定のままになります（カードに表示）。
-                    </p>
-                  )}
+                  </p>
                   <button
                     type="button"
                     onClick={submit}
@@ -966,6 +937,10 @@ function VisitCard({
   const count = group.photoIds.filter((id) => selected.has(id)).length;
   const minDistance = Math.min(...group.photoIds.map((id) => distanceMById[id] ?? Infinity));
   const posted = !!group.existingVisitId;
+  // 非公開の訪問に写真を足すと、その写真も非公開になる（サーバーは足す先の訪問の公開設定に従う）。
+  // まとめて投稿は公開だけなので、非公開の訪問には足させない
+  const privateVisit = posted && group.existingVisitIsPublic === false;
+  const disabled = locked || privateVisit;
   const stripe =
     state === 'done' ? 'border-l-[#4C9A57]' : state === 'failed' ? 'border-l-[#B5483C]' : count > 0 ? 'border-l-[#BF5640]' : 'border-l-[#2A2A2A]/15';
 
@@ -983,16 +958,18 @@ function VisitCard({
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-[#2A2A2A]/60">
             <span>{formatShotAt(group.firstShotAt)}</span>
             <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />蓋から {formatMeters(minDistance)}</span>
-            {posted && (
+            {posted && !privateVisit && <span>チェックすると、その訪問に写真を足します</span>}
+            {privateVisit && (
               <span>
-                チェックすると、その訪問（{group.existingVisitIsPublic ? '公開' : '非公開'}）に写真を足します。公開設定はその訪問のままです
+                この日の訪問は非公開なので、まとめて投稿では写真を足せません。
+                <Link href="/visits" className="underline">スタンプ帳</Link>で公開にすると足せます
               </span>
             )}
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <SendBadge state={state} />
-          {!locked && (
+          {!disabled && (
             <button type="button" className="underline text-[#2A2A2A]/70" onClick={() => onToggleGroup(count === 0)}>
               {count === 0 ? 'すべて選ぶ' : 'すべて外す'}
             </button>
@@ -1014,7 +991,7 @@ function VisitCard({
               <li key={id} className="grid gap-1">
                 <button
                   type="button"
-                  disabled={locked}
+                  disabled={disabled}
                   onClick={() => onTogglePhoto(id)}
                   aria-pressed={isOn}
                   aria-label={`${photo.file.name} を${isOn ? '外す' : '選ぶ'}`}
@@ -1033,7 +1010,7 @@ function VisitCard({
                   {result === 'failed' && <span className="absolute inset-x-0 bottom-0 bg-[#B5483C] py-0.5 text-center text-[10px] font-bold text-white">失敗</span>}
                 </button>
                 <label className={`flex items-center gap-1 text-[11px] ${isOn ? '' : 'invisible'}`}>
-                  <input type="checkbox" disabled={locked} checked={isScenery} onChange={() => onToggleLandscape(id)} />
+                  <input type="checkbox" disabled={disabled} checked={isScenery} onChange={() => onToggleLandscape(id)} />
                   周辺の風景
                 </label>
               </li>
