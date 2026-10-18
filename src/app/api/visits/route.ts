@@ -139,7 +139,10 @@ export async function GET(request: NextRequest) {
       : '';
 
     // Default keeps existing behavior; home feed can override with order_by=created_at
-    const orderBy: 'shot_at' | 'created_at' = orderByRaw === 'created_at' ? 'created_at' : 'shot_at';
+    // last_photo_at は「最後に写真が足された時刻」。まとめて投稿が既存の訪問に写真を足しても
+    // 新着の先頭に来る（20261018160000）。新着として見せる一覧はこちらを使う
+    const orderBy: 'shot_at' | 'created_at' | 'last_photo_at' =
+      orderByRaw === 'created_at' || orderByRaw === 'last_photo_at' ? orderByRaw : 'shot_at';
 
     // 都道府県の絞り込みは **range() より前** に効かせる。
     //
@@ -187,6 +190,7 @@ export async function GET(request: NextRequest) {
           is_public,
           created_at,
           updated_at,
+          last_photo_at,
           ${manholeEmbed} (
             id,
             title,
@@ -222,6 +226,7 @@ export async function GET(request: NextRequest) {
           is_public,
           created_at,
           updated_at,
+          last_photo_at,
           ${manholeEmbed} (
             id,
             title,
@@ -422,6 +427,7 @@ export async function GET(request: NextRequest) {
         is_public: visit.is_public,
         created_at: visit.created_at,
         updated_at: visit.updated_at,
+        last_photo_at: visit.last_photo_at,
         photos: photos.map((photo: any) => ({
           id: photo.id,
           is_landscape: photo.is_landscape,

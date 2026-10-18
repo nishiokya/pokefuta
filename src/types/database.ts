@@ -246,6 +246,7 @@ export interface Database {
           note: string | null;
           comment: string | null;  // 訪問コメント（公開可能）
           is_public: boolean;  // 公開/非公開フラグ
+          last_photo_at: string;  // 最後に写真が足された時刻（photo のトリガが進める。新着の並び順）
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Insert: {
@@ -257,6 +258,7 @@ export interface Database {
           note?: string | null;
           comment?: string | null;  // 訪問コメント（公開可能）
           is_public?: boolean;  // 公開/非公開フラグ（デフォルト: true）
+          last_photo_at?: string;  // 書いても無視される（トリガで now()）
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Update: {
@@ -267,6 +269,7 @@ export interface Database {
           note?: string | null;
           comment?: string | null;  // 訪問コメント（公開可能）
           is_public?: boolean;  // 公開/非公開フラグ
+          last_photo_at?: string;  // anon / authenticated からの書き込みはトリガで戻される
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Relationships: [];

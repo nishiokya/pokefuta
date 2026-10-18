@@ -170,7 +170,7 @@ export default function VisitsPage() {
     try {
       const [data, visitsRes] = await Promise.all([
         fetchAllManholes(),
-        fetch('/api/visits?with_photos=true&limit=6&order_by=created_at', { credentials: 'omit' }),
+        fetch('/api/visits?with_photos=true&limit=6&order_by=last_photo_at', { credentials: 'omit' }),
       ]);
       if (data) {
         const apiManholes: Manhole[] = Array.isArray(data.manholes)

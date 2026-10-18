@@ -40,6 +40,7 @@ type FeedVisit = {
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons'> | null;
   shot_at: string;
   created_at: string;
+  last_photo_at?: string | null;
   shot_location?: string | null;
   public_user_id?: string | null;
   photos: Array<{
@@ -126,7 +127,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true`,
+        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=last_photo_at&with_latest_comment=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -214,7 +215,8 @@ export default function HomePage() {
   const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
 
   const sortedFeed = [...feed].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (a, b) =>
+      new Date(b.last_photo_at ?? b.created_at).getTime() - new Date(a.last_photo_at ?? a.created_at).getTime()
   );
   const sameDayCounts = sameDayVisitorCounts(sortedFeed);
   const feedById = new Map(sortedFeed.map((visit) => [visit.id, visit]));
