@@ -319,6 +319,8 @@ export default function NearbyPage() {
           window.clearTimeout(geolocationDeadlineRef.current);
           geolocationPendingRef.current = false;
           setLocationFailure(null);
+          // 締め切り（GEOLOCATION_DEADLINE_MS）の後に届いたときは failLocation が「検索中」を消しているので、付け直す
+          setLoading(true);
           trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
@@ -868,7 +870,7 @@ export default function NearbyPage() {
                       ? unvisitedOnly && recentManholes.length > 0
                         ? '最近写真が投稿されたポケふたは、すべて訪問済みです'
                         : '最近写真が投稿されたポケふたを読み込めませんでした'
-                      : unvisitedOnly
+                      : activeTab === 'nearby' && unvisitedOnly
                       ? '近くに未訪問のポケふたが見つかりませんでした'
                       : activeTab === 'all'
                       ? 'ポケふたが見つかりませんでした'
@@ -948,22 +950,26 @@ function LocationHelp({ failure, onRetry }: { failure: LocationFailure; onRetry:
   }[failure];
 
   const steps: Array<{ label: string; text: string }> = [];
-  const isIos = platform === 'ios-safari' || platform === 'ios-other';
+  // other は PC（UA で iPhone・iPad・Android と判定できなかったもの）。PC で拒否したままの人が一番多いので、PC の手順を出す
   if (failure === 'denied') {
     if (platform === 'ios-other') {
       steps.push({ label: 'iPhone', text: '設定アプリ →（アプリ →）お使いのブラウザ（Chrome など）→「位置情報」を「このAppの使用中」に' });
-    } else if (platform !== 'android') {
+    } else if (platform === 'ios-safari') {
       steps.push({ label: 'iPhone（Safari）', text: 'アドレスバーの「ぁあ」→「Webサイトの設定」→「位置情報」を「許可」。出てこないときは 設定アプリ →（アプリ →）Safari →「位置情報」を「確認」か「許可」に' });
-    }
-    if (!isIos) {
+    } else if (platform === 'android') {
       steps.push({ label: 'Android', text: 'アドレスバー左のアイコン →「権限」→「位置情報」を許可' });
+    } else {
+      steps.push({ label: 'Chrome・Edge', text: 'アドレスバー左のアイコン →「位置情報」を「許可」' });
+      steps.push({ label: 'Mac の Safari', text: 'メニューの Safari →「設定」→「Webサイト」→「位置情報」でこのサイトを「許可」' });
     }
   } else if (failure === 'unavailable') {
-    if (platform !== 'android') {
+    if (platform === 'ios-safari' || platform === 'ios-other') {
       steps.push({ label: 'iPhone', text: '設定アプリ →「プライバシーとセキュリティ」→「位置情報サービス」をオン' });
-    }
-    if (!isIos) {
+    } else if (platform === 'android') {
       steps.push({ label: 'Android', text: '画面上から下にスワイプして「位置情報」をオン' });
+    } else {
+      steps.push({ label: 'Mac', text: 'システム設定 →「プライバシーとセキュリティ」→「位置情報サービス」でお使いのブラウザをオン' });
+      steps.push({ label: 'Windows', text: '設定 →「プライバシーとセキュリティ」→「位置情報」をオン' });
     }
   }
 

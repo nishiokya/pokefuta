@@ -165,7 +165,8 @@ export default function VisitPhotoCard({
                   lineHeight: 1.4,
                   boxShadow: '0 1px 3px rgba(30,22,10,.25)',
                   background: visitStatus === 'visited' ? '#e2f2e9' : '#bf5640',
-                  color: visitStatus === 'visited' ? '#1f9d63' : '#fff',
+                  // 薄緑の地に #1f9d63 だとコントラストが 2.99:1 で足りない（10px の文字は 4.5:1 以上が要る）
+                  color: visitStatus === 'visited' ? '#166534' : '#fff',
                 }}
               >
                 {visitStatus === 'visited' ? '✓ 訪問済み' : '未訪問'}
