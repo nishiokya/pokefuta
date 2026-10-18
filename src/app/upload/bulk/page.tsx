@@ -93,7 +93,7 @@ function formatShotAt(date: Date): string {
 }
 
 export default function BulkUploadPage() {
-  const { trackView, trackNavClick } = useAnalytics();
+  const { track, trackView, trackNavClick } = useAnalytics();
   const [isAndroid, setIsAndroid] = useState(false);
   const [phase, setPhase] = useState<Phase>('select');
 
@@ -153,6 +153,18 @@ export default function BulkUploadPage() {
     });
   }, []);
 
+  /**
+   * 準備（蓋の一覧・自分の訪問）に失敗して写真を選べないまま止まったこと。
+   * 数えないと、ただ開いて離れた人と区別できない。投稿の失敗ではないので p_app_error で送る
+   */
+  const reportPrepareFailure = (cause: 'manholes' | 'visits' | 'session') => {
+    track('p_app_error', {
+      error_code: 'bulk_prepare_failed',
+      error_type: cause,
+      surface: 'upload_bulk',
+    });
+  };
+
   useEffect(() => {
     document.title = pageTitle('まとめて投稿');
     const android = /Android/i.test(navigator.userAgent);
@@ -169,6 +181,7 @@ export default function BulkUploadPage() {
         if (!list) throw new Error('manholes');
         if (visits === null) {
           setLoadError('ログインが切れています。ログインし直してから開いてください。');
+          reportPrepareFailure('session');
           return;
         }
         setManholes(list.manholes as unknown as Manhole[]);
@@ -177,6 +190,7 @@ export default function BulkUploadPage() {
         console.error('Failed to prepare bulk upload:', error);
         // 自分の投稿が読めないまま進むと、投稿済みの判定ができず同じ訪問が二重にできる
         setLoadError('蓋の一覧かあなたの投稿を読めませんでした。ページを再読み込みしてください。');
+        reportPrepareFailure(error instanceof Error && error.message === 'manholes' ? 'manholes' : 'visits');
       }
     })();
   }, [trackView]);
@@ -383,9 +397,15 @@ export default function BulkUploadPage() {
       }
       setPhotoResult({ ...results });
     }
-    const unsent = group.photoIds.some((id) => selected.has(id) && !results[id]);
-    setSendState((prev) => ({ ...prev, [group.key]: failed || unsent ? 'failed' : 'done' }));
-    setGroupError((prev) => ({ ...prev, [group.key]: failed ? lastError : unsent ? '中止したため送っていない写真があります' : '' }));
+    // この回の結果だけでなく、前回までの失敗も含めて決める（再送を途中で止めると、前回の失敗が残る）
+    const selectedIds = group.photoIds.filter((id) => selected.has(id));
+    const allDone = selectedIds.every((id) => results[id] === 'done');
+    const anyFailed = selectedIds.some((id) => results[id] === 'failed');
+    setSendState((prev) => ({ ...prev, [group.key]: allDone ? 'done' : 'failed' }));
+    setGroupError((prev) => ({
+      ...prev,
+      [group.key]: allDone ? '' : failed ? lastError : anyFailed ? '送れなかった写真があります' : '中止したため送っていない写真があります',
+    }));
   };
 
   const runSend = async (targets: BulkVisitGroup<Manhole>[]) => {
