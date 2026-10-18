@@ -412,6 +412,12 @@ export interface BulkCompleteParams extends GAEventParams {
   new_manhole_count: number;
   /** 中止ボタンで止めたか */
   is_aborted: boolean;
+  /**
+   * この回の失敗で一番多かった原因。API が返す code（`src/lib/api-error-code.ts`）を優先し、
+   * 無ければ classifyClientSubmissionError の種別。失敗が無ければ送らない。
+   * 1枚ずつの p_submission_failed.error_code と同じ値の空間（まとめて投稿の失敗はこちらで集計する）
+   */
+  error_code?: string;
 }
 
 export interface TitleReportParams extends GAEventParams {

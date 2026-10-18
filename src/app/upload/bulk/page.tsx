@@ -18,6 +18,7 @@ import {
 } from '@/lib/bulk-upload';
 import { pokefutaEvents } from '@/lib/analytics/gtag';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { pageTitle } from '@/lib/constants';
 import { filesFromDataTransfer, isImageFile, makeThumbnail } from './browser-files';
 
@@ -73,6 +74,20 @@ async function fetchOwnVisits(): Promise<OwnVisit[] | null> {
   }
 }
 
+/** 送信の失敗。API の code（無ければ通信の種別）を持って、完了イベントに載せる */
+class BulkSendError extends Error {
+  constructor(message: string, readonly code: string, options?: { cause?: unknown }) {
+    super(message, options);
+  }
+}
+
+/** 一番多かった失敗の原因 */
+function topErrorCode(codes: string[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
 function formatShotAt(date: Date): string {
   return date.toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -104,6 +119,9 @@ export default function BulkUploadPage() {
   // 訪問ができたら、その訪問に残りの写真を足す（再送でも同じ訪問に足す）
   const visitIdByGroupRef = useRef<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  // 写真の取り込み中に、もう一度選ばれた分を受け付けない（フォルダの読み込みは時間がかかり、
+  // 遅い方が先の取り込み結果を上書きする）
+  const ingestingRef = useRef(false);
 
   useEffect(() => {
     document.title = pageTitle('まとめて投稿');
@@ -133,18 +151,48 @@ export default function BulkUploadPage() {
     })();
   }, [trackView]);
 
-  // 送信中にページを離れようとしたら止める
+  // 送信中にページを離れようとしたら止める。サイト内のリンクは beforeunload が出ないので、
+  // クリックを先に捕まえて確かめる
   useEffect(() => {
     if (phase !== 'sending') return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
+    const onClickCapture = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.('a[href]');
+      if (!anchor || (anchor as HTMLAnchorElement).target === '_blank') return;
+      if (!window.confirm('送信中です。ページを移ると、まだ送っていない写真は送られません。移りますか？')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('click', onClickCapture, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onClickCapture, true);
+    };
   }, [phase]);
 
+  // ページを離れたら、まだ送っていない写真は送らない（送信中の1枚は終わるまで待たない）
+  useEffect(() => () => {
+    abortRef.current = true;
+  }, []);
+
   const ready = manholes !== null && ownVisits !== null;
+
+  /** 取り込みは同時に1つだけ。フォルダの読み込みを含めて、終わるまで次を受け付けない */
+  const ingest = useCallback(async (getFiles: () => Promise<File[]>) => {
+    if (ingestingRef.current) return;
+    ingestingRef.current = true;
+    try {
+      await readFiles(await getFiles());
+    } finally {
+      ingestingRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manholes, ownVisits]);
 
   const readFiles = useCallback(
     async (rawFiles: File[]) => {
@@ -235,7 +283,7 @@ export default function BulkUploadPage() {
     try {
       compressed = await imageCompression(photo.file, { maxSizeMB: 2, maxWidthOrHeight: 1920, useWebWorker: true });
     } catch (error) {
-      throw new Error('この画像形式は変換できませんでした（HEIC は Safari で開くか、JPEG に書き出してください）', { cause: error });
+      throw new BulkSendError('この画像形式は変換できませんでした（HEIC は Safari で開くか、JPEG に書き出してください）', 'unsupported_format', { cause: error });
     }
     const form = new FormData();
     form.append('file', compressed);
@@ -252,9 +300,18 @@ export default function BulkUploadPage() {
       const note = buildAutoVisitNote(photo.metadata, group.manhole);
       if (note) form.append('note', note);
     }
-    const res = await fetch('/api/image-upload', { method: 'POST', body: form });
+    let res: Response;
+    try {
+      res = await fetch('/api/image-upload', { method: 'POST', body: form });
+    } catch (error) {
+      throw new BulkSendError('通信できませんでした。電波の良いところで「もう一度送る」を押してください', classifyClientSubmissionError(error), { cause: error });
+    }
     const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.success) throw new Error(body?.error || `送信に失敗しました（${res.status}）`);
+    if (!res.ok || !body?.success) {
+      const message = body?.error || `送信に失敗しました（${res.status}）`;
+      const code = typeof body?.code === 'string' ? body.code : classifyClientSubmissionError(new Error(message), res.status);
+      throw new BulkSendError(message, code);
+    }
     return (typeof body.visit_id === 'string' ? body.visit_id : visitId) as string;
   };
 
@@ -262,7 +319,8 @@ export default function BulkUploadPage() {
   const sendGroup = async (
     group: BulkVisitGroup<Manhole>,
     results: Record<string, 'done' | 'failed'>,
-    runResults: Record<string, 'done' | 'failed'>
+    runResults: Record<string, 'done' | 'failed'>,
+    errorCodes: string[]
   ) => {
     setSendState((prev) => ({ ...prev, [group.key]: 'sending' }));
     let visitId = visitIdByGroupRef.current[group.key] ?? group.existingVisitId ?? null;
@@ -281,6 +339,7 @@ export default function BulkUploadPage() {
         console.error('Bulk upload failed:', error);
         results[id] = 'failed';
         runResults[id] = 'failed';
+        errorCodes.push(error instanceof BulkSendError ? error.code : classifyClientSubmissionError(error));
         failed = true;
         lastError = error instanceof Error ? error.message : String(error);
       }
@@ -304,12 +363,13 @@ export default function BulkUploadPage() {
     // 画面は累計（results）で、GA4 はこの回の分（runResults）だけで数える。再送で二重に数えない
     const results: Record<string, 'done' | 'failed'> = { ...photoResult };
     const runResults: Record<string, 'done' | 'failed'> = {};
+    const errorCodes: string[] = [];
     const succeededBefore = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
     setSendState((prev) => ({ ...prev, ...Object.fromEntries(targets.map((g) => [g.key, 'waiting' as SendState])) }));
     const queue = [...targets];
     const worker = async () => {
       for (let group = queue.shift(); group && !abortRef.current; group = queue.shift()) {
-        await sendGroup(group, results, runResults);
+        await sendGroup(group, results, runResults, errorCodes);
       }
     };
     await Promise.all(Array.from({ length: SEND_CONCURRENCY }, worker));
@@ -331,6 +391,7 @@ export default function BulkUploadPage() {
       photo_failed: Object.values(runResults).filter((r) => r === 'failed').length,
       new_manhole_count: newManholesNow - newManholesBefore,
       is_aborted: abortRef.current,
+      ...(errorCodes.length > 0 ? { error_code: topErrorCode(errorCodes) } : {}),
     });
 
     // この回で作った訪問を自分の訪問に足しておく。「続けて投稿する」で同じ蓋・同じ日の写真を選んだとき、
@@ -449,7 +510,10 @@ export default function BulkUploadPage() {
               e.preventDefault();
               setIsDragActive(false);
               if (!ready) return;
-              void readFiles(await filesFromDataTransfer(e.dataTransfer));
+              // dataTransfer はイベントの間しか読めないので、項目だけ先に取り出しておく
+              const dataTransfer = e.dataTransfer;
+              const entriesPromise = filesFromDataTransfer(dataTransfer);
+              void ingest(() => entriesPromise);
             }}
             className={`flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-6 text-center transition ${
               isDragActive ? 'border-[#BF5640] bg-[#FFF3EE]' : 'border-[#7B63A8]/30 bg-white/70 hover:bg-white'
@@ -470,7 +534,7 @@ export default function BulkUploadPage() {
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
               e.target.value = '';
-              void readFiles(files);
+              void ingest(async () => files);
             }}
           />
           <ul className="mt-3 space-y-1 text-xs leading-relaxed text-[#2A2A2A]/60">
