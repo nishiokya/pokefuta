@@ -27,6 +27,8 @@ export interface OwnVisit {
   shot_at: string;
   /** 写真を足すとき、サーバーはこの訪問の公開設定に従う（送った is_public は使わない） */
   is_public: boolean;
+  /** この訪問の写真のファイルサイズ。応答が失われた写真が保存されていたかを照合するのに使う */
+  photo_sizes?: number[];
 }
 
 export type BulkPhotoStatus = 'ok' | 'posted' | 'far' | 'no_gps';

@@ -12,6 +12,7 @@ import {
   BULK_MAX_FILES,
   classifyBulkPhotos,
   countNewManholes,
+  jstDayKey,
   type BulkClassification,
   type BulkVisitGroup,
   type OwnVisit,
@@ -70,16 +71,36 @@ async function fetchOwnVisits(): Promise<OwnVisit[] | null> {
     if (!res.ok) throw new Error(`visits ${res.status}`);
     const body = await res.json();
     if (!body?.success || !body.authenticated) return null;
-    const page = (body.visits ?? []) as { id: string; manhole_id: number; shot_at: string; is_public: boolean }[];
-    visits.push(...page.map(({ id, manhole_id, shot_at, is_public }) => ({ id, manhole_id, shot_at, is_public: is_public !== false })));
+    const page = (body.visits ?? []) as {
+      id: string;
+      manhole_id: number;
+      shot_at: string;
+      is_public: boolean;
+      photos?: { file_size?: number | null }[];
+    }[];
+    visits.push(
+      ...page.map(({ id, manhole_id, shot_at, is_public, photos }) => ({
+        id,
+        manhole_id,
+        shot_at,
+        is_public: is_public !== false,
+        photo_sizes: (photos ?? []).map((p) => p.file_size).filter((n): n is number => typeof n === 'number'),
+      }))
+    );
     if (page.length < 100) return visits;
   }
 }
 
 /** 送信の失敗。API の code（無ければ通信の種別）を持って、完了イベントに載せる */
 class BulkSendError extends Error {
-  constructor(message: string, readonly code: string, options?: { cause?: unknown }) {
+  /**
+   * サーバーで保存されたか分からない失敗（応答が来なかった・壊れていた・5xx）。
+   * API は訪問と写真を保存してから応答するので、応答だけ失われると保存済みのことがある
+   */
+  readonly uncertain: boolean;
+  constructor(message: string, readonly code: string, options?: { cause?: unknown; uncertain?: boolean }) {
     super(message, options);
+    this.uncertain = options?.uncertain ?? false;
   }
 }
 
@@ -125,6 +146,7 @@ export default function BulkUploadPage() {
   // 遅い方が先の取り込み結果を上書きする）
   const ingestingRef = useRef(false);
   // 送信中の回の結果。p_bulk_complete を、送り終えたとき・ページを離れたときのどちらか1回だけ送る
+  // ページが bfcache に入って戻ってきたら、そこからは新しい回として数える（送った分を取りこぼさない）
   const runRef = useRef<{
     runResults: Record<string, 'done' | 'failed'>;
     errorCodes: string[];
@@ -132,7 +154,12 @@ export default function BulkUploadPage() {
     groups: BulkVisitGroup<Manhole>[];
     newManholeIds: Set<number>;
     flushed: boolean;
+    /** 画面に出す累計（再送をまたいで持つ） */
+    cumulative: Record<string, 'done' | 'failed'>;
   } | null>(null);
+  // 応答が失われて、保存されたか分からない写真と、そのとき送ったファイルサイズ（再送前の照合用）
+  const uncertainIdsRef = useRef<Set<string>>(new Set());
+  const sentSizeByIdRef = useRef<Record<string, number>>({});
 
   /** この回の p_bulk_complete を送る。二度目以降は何もしない */
   const flushBulkComplete = useCallback((isAborted: boolean) => {
@@ -226,7 +253,22 @@ export default function BulkUploadPage() {
   // - アンマウント（Next.js の Link によるクライアント遷移。pagehide は出ない）: 次の写真は送らないが、
   //   送信中の1枚は終わるまで待ち、runSend の最後でその結果も含めて送る（先に送ると成功を取りこぼす）
   useEffect(() => {
-    const onPageHide = () => flushBulkComplete(true);
+    const onPageHide = (event: PageTransitionEvent) => {
+      flushBulkComplete(true);
+      // bfcache に入るだけなら、戻ってきた後も送信は続く。続きを新しい回として数え直す
+      const run = runRef.current;
+      if (event.persisted && run) {
+        runRef.current = {
+          ...run,
+          runResults: {},
+          errorCodes: [],
+          succeededBefore: new Set(
+            run.groups.filter((g) => g.photoIds.some((id) => run.cumulative[id] === 'done')).map((g) => g.key)
+          ),
+          flushed: false,
+        };
+      }
+    };
     window.addEventListener('pagehide', onPageHide);
     return () => {
       window.removeEventListener('pagehide', onPageHide);
@@ -309,6 +351,9 @@ export default function BulkUploadPage() {
     setAborted(false);
     abortRef.current = false;
     visitIdByGroupRef.current = {};
+    uncertainIdsRef.current = new Set();
+    sentSizeByIdRef.current = {};
+    runRef.current = null;
     setPhase('select');
   };
 
@@ -339,6 +384,7 @@ export default function BulkUploadPage() {
     } catch (error) {
       throw new BulkSendError('この画像形式は変換できませんでした（HEIC は Safari で開くか、JPEG に書き出してください）', 'unsupported_format', { cause: error });
     }
+    sentSizeByIdRef.current[photo.id] = compressed.size;
     const form = new FormData();
     form.append('file', compressed);
     form.append('is_landscape', String(landscape.has(photo.id)));
@@ -358,24 +404,23 @@ export default function BulkUploadPage() {
     try {
       res = await fetch('/api/image-upload', { method: 'POST', body: form });
     } catch (error) {
-      throw new BulkSendError('通信できませんでした。電波の良いところで「もう一度送る」を押してください', classifyClientSubmissionError(error), { cause: error });
+      throw new BulkSendError('通信できませんでした。電波の良いところで「もう一度送る」を押してください', classifyClientSubmissionError(error), {
+        cause: error,
+        uncertain: true,
+      });
     }
     const body = await res.json().catch(() => null);
     if (!res.ok || !body?.success) {
       const message = body?.error || `送信に失敗しました（${res.status}）`;
       const code = typeof body?.code === 'string' ? body.code : classifyClientSubmissionError(new Error(message), res.status);
-      throw new BulkSendError(message, code);
+      // 5xx と、成功のはずの応答が読めなかったときは、保存されたか分からない
+      throw new BulkSendError(message, code, { uncertain: res.status >= 500 || (res.ok && !body) });
     }
     return (typeof body.visit_id === 'string' ? body.visit_id : visitId) as string;
   };
 
   /** 訪問1つ分を送る。送信済みの写真は飛ばす（再送で二重に投稿しない） */
-  const sendGroup = async (
-    group: BulkVisitGroup<Manhole>,
-    results: Record<string, 'done' | 'failed'>,
-    runResults: Record<string, 'done' | 'failed'>,
-    errorCodes: string[]
-  ) => {
+  const sendGroup = async (group: BulkVisitGroup<Manhole>, results: Record<string, 'done' | 'failed'>) => {
     setSendState((prev) => ({ ...prev, [group.key]: 'sending' }));
     let visitId = visitIdByGroupRef.current[group.key] ?? group.existingVisitId ?? null;
     let failed = false;
@@ -384,18 +429,32 @@ export default function BulkUploadPage() {
       if (!selected.has(id)) continue;
       if (results[id] === 'done') continue;
       if (abortRef.current) break;
+      // 計測は今の回（bfcache から戻ると差し替わる）に書く
+      const run = runRef.current;
       try {
         visitId = await sendPhoto(group, photos[id], visitId);
         if (visitId) visitIdByGroupRef.current[group.key] = visitId;
         results[id] = 'done';
-        runResults[id] = 'done';
+        if (run) runRef.current!.runResults[id] = 'done';
+        uncertainIdsRef.current.delete(id);
       } catch (error) {
         console.error('Bulk upload failed:', error);
         results[id] = 'failed';
-        runResults[id] = 'failed';
-        errorCodes.push(error instanceof BulkSendError ? error.code : classifyClientSubmissionError(error));
+        if (run) {
+          runRef.current!.runResults[id] = 'failed';
+          runRef.current!.errorCodes.push(error instanceof BulkSendError ? error.code : classifyClientSubmissionError(error));
+        }
         failed = true;
         lastError = error instanceof Error ? error.message : String(error);
+        if (error instanceof BulkSendError && error.uncertain) {
+          uncertainIdsRef.current.add(id);
+          // 訪問を作るはずの1枚目が保存されたか分からないまま次を送ると、同じ蓋・同じ日に
+          // 訪問がもう1つできる。このカードは止めて、再送の前に照合する
+          if (!visitId) {
+            setPhotoResult({ ...results });
+            break;
+          }
+        }
       }
       setPhotoResult({ ...results });
     }
@@ -410,7 +469,7 @@ export default function BulkUploadPage() {
     }));
   };
 
-  const runSend = async (targets: BulkVisitGroup<Manhole>[]) => {
+  const runSend = async (targets: BulkVisitGroup<Manhole>[], baseResults: Record<string, 'done' | 'failed'> = photoResult) => {
     setPhase('sending');
     abortRef.current = false;
     setAborted(false);
@@ -421,10 +480,10 @@ export default function BulkUploadPage() {
       // 使えなければ諦める
     }
     // 画面は累計（results）で、GA4 はこの回の分（runResults）だけで数える。再送で二重に数えない
-    const results: Record<string, 'done' | 'failed'> = { ...photoResult };
+    const results: Record<string, 'done' | 'failed'> = { ...baseResults };
     const runResults: Record<string, 'done' | 'failed'> = {};
     const errorCodes: string[] = [];
-    const succeededBefore = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
+    const succeededBefore = new Set(groups.filter((g) => g.photoIds.some((id) => baseResults[id] === 'done')).map((g) => g.key));
     runRef.current = {
       runResults,
       errorCodes,
@@ -432,12 +491,13 @@ export default function BulkUploadPage() {
       groups,
       newManholeIds: classification?.newManholeIds ?? new Set(),
       flushed: false,
+      cumulative: results,
     };
     setSendState((prev) => ({ ...prev, ...Object.fromEntries(targets.map((g) => [g.key, 'waiting' as SendState])) }));
     const queue = [...targets];
     const worker = async () => {
       for (let group = queue.shift(); group && !abortRef.current; group = queue.shift()) {
-        await sendGroup(group, results, runResults, errorCodes);
+        await sendGroup(group, results);
       }
     };
     await Promise.all(Array.from({ length: SEND_CONCURRENCY }, worker));
@@ -465,10 +525,54 @@ export default function BulkUploadPage() {
     void runSend(selectedGroups);
   };
 
-  const retryFailed = () => {
+  /**
+   * 再送の前に、応答が失われた写真がサーバーに保存されていないかを照合する。
+   * 自分の訪問を読み直し、同じ蓋・同じ日の訪問があればそこへ足す先にし、
+   * 送ったときと同じファイルサイズの写真があれば保存済みとみなして送らない。
+   */
+  const reconcileUncertain = async (targets: BulkVisitGroup<Manhole>[], results: Record<string, 'done' | 'failed'>) => {
+    if (uncertainIdsRef.current.size === 0) return;
+    const visits = await fetchOwnVisits();
+    if (!visits) return;
+    for (const group of targets) {
+      const matching = visits.filter(
+        (v) => v.manhole_id === group.manhole.id && jstDayKey(new Date(v.shot_at)) === group.day
+      );
+      if (matching.length === 0) continue;
+      if (!visitIdByGroupRef.current[group.key] && !group.existingVisitId) {
+        visitIdByGroupRef.current[group.key] = matching[0].id;
+      }
+      const sizes = new Set(matching.flatMap((v) => v.photo_sizes ?? []));
+      for (const id of group.photoIds) {
+        const size = sentSizeByIdRef.current[id];
+        if (uncertainIdsRef.current.has(id) && size != null && sizes.has(size)) {
+          results[id] = 'done';
+          uncertainIdsRef.current.delete(id);
+        }
+      }
+    }
+  };
+
+  const retryFailed = async () => {
     const targets = groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'failed' || (selected.has(id) && !photoResult[id])));
     if (targets.length === 0) return;
-    void runSend(targets);
+    const results = { ...photoResult };
+    try {
+      await reconcileUncertain(targets, results);
+    } catch (error) {
+      // 照合できなくても再送はする（訪問が二重になる可能性は残る）
+      console.error('Failed to reconcile before retry:', error);
+    }
+    setPhotoResult(results);
+    const pendingIds = targets.flatMap((g) => g.photoIds.filter((id) => selected.has(id) && results[id] !== 'done'));
+    const pendingGroups = targets.filter((g) => g.photoIds.some((id) => selected.has(id) && results[id] !== 'done'));
+    if (pendingIds.length === 0) {
+      setPhase('done');
+      return;
+    }
+    // 再送も1回の投稿として数える（complete だけが増えないように）
+    pokefutaEvents.bulkSubmit({ photo_count: pendingIds.length, visit_count: pendingGroups.length, is_public: isPublic });
+    void runSend(pendingGroups, results);
   };
 
   const summary = useMemo(() => {
