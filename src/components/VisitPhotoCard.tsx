@@ -35,6 +35,8 @@ export interface VisitPhotoCardProps {
    * 公開トグルと同じ位置なので、**トグルを渡すページでは使わない**。
    */
   cornerLabel?: ReactNode;
+  /** 自分がこの蓋に行ったか（/nearby）。渡したときだけ左上にバッジが出る */
+  visitStatus?: 'visited' | 'unvisited';
 }
 
 export default function VisitPhotoCard({
@@ -50,6 +52,7 @@ export default function VisitPhotoCard({
   onToggleVisibility,
   isVisibilitySaving = false,
   cornerLabel,
+  visitStatus,
 }: VisitPhotoCardProps) {
   const visiblePosterName = posterName?.trim();
   const isPrivate = isPublic === false;
@@ -147,7 +150,27 @@ export default function VisitPhotoCard({
               {cornerLabel}
             </span>
           )}
-          <div style={{ position: 'absolute', left: 8, top: 8 }}>
+          <div style={{ position: 'absolute', left: 8, top: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            {visitStatus && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  fontFamily: ROUND,
+                  fontWeight: 800,
+                  fontSize: 10,
+                  lineHeight: 1.4,
+                  boxShadow: '0 1px 3px rgba(30,22,10,.25)',
+                  background: visitStatus === 'visited' ? '#e2f2e9' : '#bf5640',
+                  color: visitStatus === 'visited' ? '#1f9d63' : '#fff',
+                }}
+              >
+                {visitStatus === 'visited' ? '✓ 訪問済み' : '未訪問'}
+              </span>
+            )}
             <LandscapePhotoBadge isLandscape={isLandscape} />
           </div>
           <div style={{ position: 'absolute', left: 12, bottom: 10, right: 12, color: '#fff' }}>

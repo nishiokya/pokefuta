@@ -48,7 +48,12 @@ const NEARBY_DISPLAY_LIMIT = 50;
 /** /api/manholes/cover-photos が1回に受け付ける蓋の数 */
 const COVER_PHOTO_CHUNK = 100;
 
-type SearchTab = 'nearby' | 'all' | 'unvisited';
+/**
+ * 「近く」と「一覧」の2つ。以前は「未訪問」も別タブだったが、近くの結果を絞り込むだけの同じ一覧で、
+ * 訪問済みかどうかも一覧から読み取れなかった。今は近くに統合し、カードに「訪問済み / 未訪問」を出して
+ * 「未訪問だけ」で絞り込む（ログイン時のみ）。`?tab=unvisited` の古いリンクは近く＋未訪問だけで開く
+ */
+type SearchTab = 'nearby' | 'all';
 
 /**
  * 現在地が取れなかった理由。GeolocationPositionError の code に対応する（unsupported はブラウザに機能が無い）。
@@ -86,7 +91,6 @@ function detectPlatform(): Platform {
 const searchTabs: Array<{ key: SearchTab; label: string }> = [
   { key: 'nearby', label: '近く' },
   { key: 'all', label: '一覧' },
-  { key: 'unvisited', label: '未訪問' },
 ];
 
 export default function NearbyPage() {
@@ -104,6 +108,7 @@ export default function NearbyPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
+  const [unvisitedOnly, setUnvisitedOnly] = useState(false);
   const [query, setQuery] = useState('');
   const { trackNearbyRadiusChange, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   // 直前に読み込んだ半径。初回ロード（既定30km）では送らず、実際に動かしたときだけ送る。
@@ -204,7 +209,7 @@ export default function NearbyPage() {
     trackNearbyOpen();
 
     const tab = new URLSearchParams(window.location.search).get('tab');
-    const initialTab: SearchTab = tab === 'all' || tab === 'unvisited' ? tab : 'nearby';
+    const initialTab: SearchTab = tab === 'all' ? 'all' : 'nearby';
     setActiveTab(initialTab);
     loadAllManholes();
 
@@ -228,11 +233,7 @@ export default function NearbyPage() {
         return;
       }
 
-      if (initialTab === 'unvisited' && !loggedIn) {
-        setActiveTab('all');
-        setLoading(false);
-        return;
-      }
+      if (tab === 'unvisited' && loggedIn) setUnvisitedOnly(true);
 
       getCurrentLocationAndLoadManholes();
     })();
@@ -261,14 +262,13 @@ export default function NearbyPage() {
   }, [locationFailure]);
 
   useEffect(() => {
-    if (sessionChecked && !isLoggedIn && activeTab === 'unvisited') {
-      setActiveTab('all');
+    if (sessionChecked && !isLoggedIn && unvisitedOnly) {
+      setUnvisitedOnly(false);
     }
-  }, [activeTab, isLoggedIn, sessionChecked]);
+  }, [unvisitedOnly, isLoggedIn, sessionChecked]);
 
   useEffect(() => {
     if (!sessionChecked || activeTab === 'all') return;
-    if (activeTab === 'unvisited' && !isLoggedIn) return;
     if (!userLocation) return;
     if (geolocationPendingRef.current) return;
     loadNearbyManholes(userLocation.lat, userLocation.lng);
@@ -484,12 +484,13 @@ export default function NearbyPage() {
 
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
-    if ((tab === 'nearby' || tab === 'unvisited') && !userLocation && nearbyManholes.length === 0 && !locationFailure) {
+    if (tab === 'nearby' && !userLocation && nearbyManholes.length === 0 && !locationFailure) {
       getCurrentLocationAndLoadManholes();
     }
   };
 
-  const visibleSearchTabs = searchTabs.filter((tab) => isLoggedIn || tab.key !== 'unvisited');
+  const visibleSearchTabs = searchTabs;
+  const isUnvisited = (m: ManholeWithDistance) => !m.visit && !m.is_visited;
 
   const filteredAllManholes = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -529,10 +530,10 @@ export default function NearbyPage() {
 
   const displayManholes =
     showingRecent
-      ? activeTab === 'unvisited' ? recentManholes.filter((m) => !m.visit && !m.is_visited) : recentManholes
+      ? unvisitedOnly ? recentManholes.filter(isUnvisited) : recentManholes
       : activeTab === 'all' ? filteredAllManholes :
     // 訪問済みかは /api/manholes の is_visited（サーバが自分の訪問を全件見て付ける）でも判定する
-    activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit && !m.is_visited) :
+    unvisitedOnly ? nearbyManholes.filter(isUnvisited) :
     nearbyManholes;
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
@@ -541,51 +542,6 @@ export default function NearbyPage() {
   const area = useMemo(
     () => (resultsFromDevice ? nearbyArea(nearbyManholes) : null),
     [resultsFromDevice, nearbyManholes]
-  );
-
-  const authNearbyRail = (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-        <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-          {showingRecent
-            ? activeTab === 'unvisited' ? '未訪問（最近の投稿）' : '最近の投稿'
-            : activeTab === 'nearby' ? '近くのポケふた' : activeTab === 'unvisited' ? '未訪問' : '一覧'}
-        </p>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
-          {([
-            ['発見', displayManholes.length, '#2c2a26'],
-            // 位置情報が取れずに新しい順の一覧を出しているときは、範囲の数字を出さない（全国の蓋が「30km 以内」に見える）
-            showingRecent
-              ? ['並び', '新しい順', '#6f6657']
-              : activeTab === 'nearby' || activeTab === 'unvisited'
-              ? ['範囲', `${radius}km`, '#6f6657']
-              : ['総数', allManholes.length, '#6f6657'],
-          ] as [string, string | number, string][]).map(([label, value, color]) => (
-            <div key={label} className="bg-[#fffdf7] px-3 py-2.5 text-center">
-              <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
-              <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color }}>{value}</p>
-            </div>
-          ))}
-        </div>
-        {(activeTab === 'nearby' || activeTab === 'unvisited') && nearestDistance !== undefined && (
-          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
-            最寄り {nearestDistance < 1 ? `${Math.round(nearestDistance * 1000)}m` : `${nearestDistance.toFixed(1)}km`}
-          </p>
-        )}
-        {activeTab === 'all' && query && (
-          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
-            「{query}」で絞り込み中
-          </p>
-        )}
-      </div>
-      <Link
-        href={uploadHref}
-        className="flex items-center justify-center gap-2 rounded-[12px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm"
-      >
-        <Camera className="h-4 w-4" />
-        写真を投稿する
-      </Link>
-    </div>
   );
 
   const guestNearbyRail = (
@@ -621,7 +577,9 @@ export default function NearbyPage() {
     切り替わり、横にもズレる。初回訪問者は実際に未ログインなので、
     ゲスト表示を初期状態にするのが当たっている場合が多い。
   */
-  const nearbyRail = isLoggedIn ? authNearbyRail : guestNearbyRail;
+  // ログイン時はレールを出さない（以前の「近くのポケふた」の数字の枠と「写真を投稿する」は、
+  // 数字が上の検索パネルと、投稿が右下の固定ボタンと重複していた）
+  const nearbyRail = isLoggedIn ? undefined : guestNearbyRail;
 
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
@@ -731,22 +689,17 @@ export default function NearbyPage() {
         */}
         {userLocation && activeTab !== 'all' && (
           <section id="nearby-controls" className="mt-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm sm:mt-5 sm:p-4">
-            {/*
-              PC で同じ数字を2か所に出さない。ただし隠してよいのは
-              **レールが統計を出しているログイン時だけ** で、未ログインの
-              レールは勧誘カードなので、隠すと数字がどこにも出なくなる。
-            */}
+            {/* ログイン時は「未訪問」の数も並べる（範囲内の近くの蓋のうち、行っていないもの） */}
             <div
-              className={`grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] ${
-                isLoggedIn ? 'lg:hidden' : ''
-              }`}
+              className={`grid gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] ${isLoggedIn ? 'grid-cols-4' : 'grid-cols-3'}`}
             >
               {([
                 ['発見', displayManholes.length, '#2c2a26'],
+                ...(isLoggedIn ? [['未訪問', nearbyManholes.filter(isUnvisited).length, '#bf5640']] : []),
                 ['範囲', `${radius}km`, '#6f6657'],
                 /*
                   最寄りも並んでいる一覧に合わせる。nearbyManholes[0] だと
-                  「未訪問」タブで、一覧に出ていない訪問済みの蓋までの距離を
+                  「未訪問だけ」のとき、一覧に出ていない訪問済みの蓋までの距離を
                   出してしまう（近傍結果は距離順なので絞り込んでも先頭が最寄り）。
                 */
                 ['最寄り', displayManholes.length > 0 ? formatDistance(displayManholes[0].distance) : '-', '#6f6657'],
@@ -834,6 +787,29 @@ export default function NearbyPage() {
                   </button>
                 );
               })}
+              {/* 未訪問は近くの結果の絞り込み（別タブにしない）。押すたびに切り替わり、押されているかは色と aria-pressed で示す */}
+              {activeTab === 'nearby' && isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => setUnvisitedOnly((v) => !v)}
+                  aria-pressed={unvisitedOnly}
+                  className={`ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] border px-3 text-sm font-bold transition sm:px-4 ${
+                    unvisitedOnly
+                      ? 'border-[#bf5640] bg-[#bf5640] text-white'
+                      : 'border-[#e9dfc7] bg-white text-[#bf5640] hover:bg-[#fdeae2]'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                      unvisitedOnly ? 'border-white bg-white text-[#bf5640]' : 'border-[#bf5640]'
+                    }`}
+                  >
+                    {unvisitedOnly ? '✓' : ''}
+                  </span>
+                  未訪問だけ
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -851,12 +827,7 @@ export default function NearbyPage() {
                   placeholder="地域名・ポケモン名で検索"
                 />
               </label>
-              {/* PC はレールが「発見 / 総数」を出す。未ログインのレールは勧誘カードなので隠さない */}
-              <div
-                className={`grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] sm:min-w-[15rem] ${
-                  isLoggedIn ? 'lg:hidden' : ''
-                }`}
-              >
+              <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] sm:min-w-[15rem]">
                 {([
                   ['総数', allManholes.length, '#6f6657'],
                   ['表示中', filteredAllManholes.length, '#2c2a26'],
@@ -871,7 +842,7 @@ export default function NearbyPage() {
           </section>
         )}
 
-        {(((activeTab === 'nearby' || activeTab === 'unvisited') && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
+        {((activeTab === 'nearby' && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
           <div className="flex items-center justify-center py-7 sm:py-10">
             <div className="text-center">
               <div className="font-bold text-[#6f6657]">
@@ -881,7 +852,7 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {!(((activeTab === 'nearby' || activeTab === 'unvisited') && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
+        {!((activeTab === 'nearby' && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-3 sm:mt-5">
             {showingRecent && displayManholes.length > 0 && (
               <h2 className="mb-2 text-sm font-extrabold text-[#2c2a26]">
@@ -894,10 +865,10 @@ export default function NearbyPage() {
                   <MapPin className="mx-auto mb-2 h-9 w-9 text-[#c9bda4] sm:mb-3 sm:h-10 sm:w-10" />
                   <p className="text-sm font-bold text-[#2c2a26]">
                     {showingRecent
-                      ? activeTab === 'unvisited' && recentManholes.length > 0
+                      ? unvisitedOnly && recentManholes.length > 0
                         ? '最近写真が投稿されたポケふたは、すべて訪問済みです'
                         : '最近写真が投稿されたポケふたを読み込めませんでした'
-                      : activeTab === 'unvisited'
+                      : unvisitedOnly
                       ? '近くに未訪問のポケふたが見つかりませんでした'
                       : activeTab === 'all'
                       ? 'ポケふたが見つかりませんでした'
@@ -927,6 +898,8 @@ export default function NearbyPage() {
                         // 施設名は見出しに入ったので、ここは訪問日だけ。VisitPhotoCard 側で省略記号付きに切り詰まる。
                         posterName={visitedAt ? `訪問 ${formatDate(visitedAt)}` : undefined}
                         tags={(manhole.pokemons || []).slice(0, 2)}
+                        // ログイン時は行ったかどうかを全カードに出す（未ログインは自分の訪問が無いので出さない）
+                        visitStatus={isLoggedIn ? (isUnvisited(manhole) ? 'unvisited' : 'visited') : undefined}
                         cornerLabel={
                           activeTab !== 'all' && manhole.distance !== undefined
                             ? formatDistance(manhole.distance)
