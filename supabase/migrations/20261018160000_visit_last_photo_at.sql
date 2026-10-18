@@ -11,7 +11,9 @@
 -- max_rows に当たるので、visit に列として持たせてトリガで更新する。
 --
 -- 書き込みの決まり:
---   - 写真の INSERT（と visit_id の付け替え）のたびに、その訪問の値を進める（戻さない）
+--   - 写真の INSERT（と visit_id の付け替え）のたびに、その訪問の値を DB の now() に進める（戻さない）。
+--     photo.created_at は使わない。authenticated は自分の写真の created_at を指定できるので、
+--     未来の日時で INSERT すれば訪問を新着の先頭に固定できてしまう
 --   - 写真を消しても戻さない。「最後に写真が足された時刻」であって「今ある写真の最新」ではない
 --   - anon / authenticated は直接書けない（自分の訪問を先頭に固定できてしまうため）。
 --     visit はテーブル単位で UPDATE を GRANT しているので、列の REVOKE では塞げない
@@ -32,14 +34,18 @@
 --
 -- visit にはトリガが無いので、埋め戻しの UPDATE で updated_at は動かない。
 -- 写真の無い訪問は created_at にしておく（NOT NULL にして並びを安定させる）。
+-- created_at はどちらも利用者が指定できた値なので、未来の日時は now() で頭打ちにする。
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.visit ADD COLUMN IF NOT EXISTS last_photo_at timestamptz;
 
 UPDATE public.visit AS v
-SET last_photo_at = GREATEST(
-  v.created_at,
-  COALESCE((SELECT max(p.created_at) FROM public.photo AS p WHERE p.visit_id = v.id), v.created_at)
+SET last_photo_at = LEAST(
+  now(),
+  GREATEST(
+    v.created_at,
+    COALESCE((SELECT max(p.created_at) FROM public.photo AS p WHERE p.visit_id = v.id), v.created_at)
+  )
 )
 WHERE v.last_photo_at IS NULL;
 
@@ -88,6 +94,8 @@ REVOKE EXECUTE ON FUNCTION public.visit_protect_last_photo_at() FROM PUBLIC, ano
 -- 写真の INSERT は投稿者本人（authenticated）で走り、visit の UPDATE 権限と RLS は
 -- 自分の行に限られる。2. のトリガに戻されないよう SECURITY DEFINER で書く。
 -- 書くのは NEW.visit_id の行の last_photo_at だけ。
+-- UPDATE OF visit_id は同じ値の再指定でも発火するので、実際に変わったときだけ進める
+-- （写真を足さずに新着へ戻れないように）。
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.photo_bump_visit_last_photo_at()
@@ -100,9 +108,12 @@ BEGIN
   IF NEW.visit_id IS NULL THEN
     RETURN NULL;
   END IF;
+  IF TG_OP = 'UPDATE' AND OLD.visit_id IS NOT DISTINCT FROM NEW.visit_id THEN
+    RETURN NULL;
+  END IF;
 
   UPDATE public.visit
-  SET last_photo_at = GREATEST(last_photo_at, COALESCE(NEW.created_at, now()))
+  SET last_photo_at = GREATEST(last_photo_at, now())
   WHERE id = NEW.visit_id;
   RETURN NULL;
 END;
