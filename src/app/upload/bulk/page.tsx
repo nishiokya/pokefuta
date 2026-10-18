@@ -959,7 +959,8 @@ function VisitCard({
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-[#2A2A2A]/60">
             <span>{formatShotAt(group.firstShotAt)}</span>
             <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />蓋から {formatMeters(minDistance)}</span>
-            {posted && !privateVisit && <span>チェックすると、その訪問に写真を足します</span>}
+            {/* 足した写真は訪問の作成日時のまま並ぶので、トップの新着には上がらない（新着は visit.created_at 順） */}
+            {posted && !privateVisit && <span>チェックすると、その訪問に写真を足します（トップページの新着には出ません）</span>}
             {privateVisit && (
               <span>
                 この日の訪問は非公開なので、まとめて投稿では写真を足せません。

@@ -55,7 +55,7 @@ export default function BulkUploadHelpPage() {
             <span className="font-bold">投稿できる</span>: 位置情報があり、蓋から 50m 以内で撮った写真です。最初から選ばれています
           </li>
           <li>
-            <span className="font-bold">投稿済みの訪問に当たった</span>: 同じ蓋・同じ日の投稿がもうある写真です。最初は外してあり、選ぶとその投稿に写真を足します
+            <span className="font-bold">投稿済みの訪問に当たった</span>: 同じ蓋・同じ日の投稿がもうある写真です。最初は外してあり、選ぶとその投稿に写真を足します。足した写真は蓋のページには載りますが、トップページの新着には出ません
           </li>
           <li>
             <span className="font-bold">近くにポケふたが無い</span>: 蓋から 50m より遠くで撮った写真です。一番近い蓋と距離を出します。風景や食事の写真もここに入るので、気にしなくて大丈夫です
