@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isDebugUser } from '@/lib/debug-access';
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 
 // /upload/gps-test の結果を受け取り、サーバーのログに1行出すだけ。DB にも R2 にも書かない。
-// 開発者以外には 404 を返し、ルートがあること自体を見せない。
+// ログインしている人だけ受け付ける（ログを荒らされないため）。検証が終わったら消す。
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +13,10 @@ const STRING_FIELDS = ['variant', 'accept', 'capture', 'route', 'fileType', 'mak
 const NUMBER_FIELDS = ['fileSize', 'gpsKeyCount', 'exifKeyCount', 'lat', 'lng'] as const;
 
 export async function POST(request: NextRequest) {
-  if (!(await isDebugUser())) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
+  const supabase = createRouteHandlerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
   }
 
   const raw = await request.text();
