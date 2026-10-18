@@ -22,6 +22,7 @@ import AiTagNote from '@/components/AiTagNote';
 import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
+import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -208,6 +209,10 @@ export default function HomePage() {
     }
   };
 
+  // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
+  const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
+  const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
+
   const sortedFeed = [...feed].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -319,6 +324,48 @@ export default function HomePage() {
               ヒーローの末尾に置くのは以前のパネルと同じ理由。/api/features/plush の応答を待って
               現れるので、CTA より上に置くと遅れて割り込んでボタンを押し下げる。
             */}
+          </div>
+
+          {/*
+            行動のカード2枚。「近くを探す」は常連が一番使う機能（/nearby）で、待たずに出せるので左に置く。
+            「◯◯で募集中」は見出しの「写真で埋めよう」の残りを、写真の無い蓋が一番多い県で具体的に見せる。
+            completion の応答を待って右に現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
+          */}
+          <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+            <Link
+              href="/nearby"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
+                <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+              </span>
+              <span className="min-w-0">
+                {/* スマホは幅が半分なので短くする（「探す」が次の行に落ちないように） */}
+                <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">近くのポケふた<span className="max-sm:hidden">を探す</span></span>
+                <span className="block whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
+                  現在地から<span className="max-sm:hidden">近い順</span><span className="sm:hidden">探す</span><span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                </span>
+              </span>
+            </Link>
+            {wantedPrefecture && wantedHref && (
+              <a
+                href={wantedHref}
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4"
+              >
+                {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">
+                  ？
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">
+                    {wantedPrefecture.prefecture.replace(/[県府都]$/, '')}で<span className="text-[#B5483C]">募集中</span>
+                  </span>
+                  <span className="block whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className="max-sm:hidden">写真が無いポケふた </span>あと<b className="text-[#B5483C]">{wantedPrefecture.missing}</b>枚
+                  </span>
+                </span>
+              </a>
+            )}
           </div>
 
           {/*
