@@ -86,7 +86,8 @@ export default function BulkUploadHelpPage() {
           <Link href="/upload" className="underline">1枚ずつの投稿</Link>から投稿してください。
         </p>
         <p>
-          同じ蓋・同じ日の訪問が非公開のときは、その訪問に写真を足せません。スタンプ帳でその訪問を公開にすると足せます。
+          同じ蓋・同じ日の訪問が非公開のときは、その訪問に写真を足せません。
+          <Link href="/my-trip" className="underline">マイ旅</Link>でその訪問を公開にしてから、まとめて投稿を開き直して写真を選び直すと足せます。
         </p>
       </Section>
 

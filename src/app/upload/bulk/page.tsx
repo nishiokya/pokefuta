@@ -619,7 +619,8 @@ export default function BulkUploadPage() {
           <BetaBadge />
         </h1>
         <span className="flex gap-3 text-sm">
-          <Link href="/help/bulk-upload" className="underline hover:opacity-80">使い方</Link>
+          {/* 読み込んだ写真と選択を残すため、別タブで開く */}
+          <Link href="/help/bulk-upload" target="_blank" className="underline hover:opacity-80">使い方</Link>
           <Link href="/upload" className="underline hover:opacity-80">1枚ずつ投稿する</Link>
         </span>
       </div>
@@ -805,7 +806,7 @@ export default function BulkUploadPage() {
                     <span className="font-bold">公開で投稿します</span>
                     <span className="block text-xs text-[#2A2A2A]/60">
                       写真は蓋のページに並びます。非公開にしたい写真は
-                      <Link href="/upload" className="underline">1枚ずつの投稿</Link>から
+                      <Link href="/upload" target="_blank" className="underline">1枚ずつの投稿</Link>から
                     </span>
                   </p>
                   <button
@@ -962,7 +963,8 @@ function VisitCard({
             {privateVisit && (
               <span>
                 この日の訪問は非公開なので、まとめて投稿では写真を足せません。
-                <Link href="/visits" className="underline">スタンプ帳</Link>で公開にすると足せます
+                <Link href="/my-trip" target="_blank" className="underline">マイ旅</Link>
+                で公開にしてから、このページを開き直して写真を選び直すと足せます
               </span>
             )}
           </p>
