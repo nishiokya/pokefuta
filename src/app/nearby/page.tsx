@@ -48,12 +48,49 @@ const NEARBY_DISPLAY_LIMIT = 50;
 /** /api/manholes/cover-photos が1回に受け付ける蓋の数 */
 const COVER_PHOTO_CHUNK = 100;
 
-type SearchTab = 'nearby' | 'all' | 'unvisited';
+/**
+ * 「近く」と「一覧」の2つ。以前は「未訪問」も別タブだったが、近くの結果を絞り込むだけの同じ一覧で、
+ * 訪問済みかどうかも一覧から読み取れなかった。今は近くに統合し、カードに「訪問済み / 未訪問」を出して
+ * 「未訪問だけ」で絞り込む（ログイン時のみ）。`?tab=unvisited` の古いリンクは近く＋未訪問だけで開く
+ */
+type SearchTab = 'nearby' | 'all';
+
+/**
+ * 現在地が取れなかった理由。GeolocationPositionError の code に対応する（unsupported はブラウザに機能が無い）。
+ * 以前は理由を問わず日本の中心（長野あたり）の既定位置で探していて、関係のない蓋が「近く」として並んでいた。
+ * 今は取れなかった理由と直し方を出し、一覧は「最近写真が投稿されたポケふた（新しい順）」に替える。
+ */
+type LocationFailure = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
+
+const LOCATION_FAILURE_CODES: Record<number, LocationFailure> = { 1: 'denied', 2: 'unavailable', 3: 'timeout' };
+
+/** 許可の確認に答えないまま待つ上限。これを過ぎたら新しい順の一覧を出す（取得の timeout 15秒より長く） */
+const GEOLOCATION_DEADLINE_MS = 20000;
+
+/** 位置情報が取れないときに並べる、最近写真が投稿された蓋の数 */
+const RECENT_DISPLAY_LIMIT = 30;
+
+type Platform = 'ios-safari' | 'ios-other' | 'android' | 'other';
+
+/**
+ * 端末とブラウザの種類。直し方の手順を出し分けるだけに使う（分からなければ両方出す）。
+ * iPadOS の Safari は Mac と同じ UA を名乗るので、タッチ対応で見分ける。
+ * iPhone の Chrome / Firefox / Edge は、Safari の設定を変えても位置情報が使えるようにならない
+ * （アプリごとの位置情報の許可を見る）ので、Safari と分ける（#330 の Copilot レビュー）。
+ */
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+    return /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) ? 'ios-other' : 'ios-safari';
+  }
+  if (/Android/.test(ua)) return 'android';
+  return 'other';
+}
 
 const searchTabs: Array<{ key: SearchTab; label: string }> = [
   { key: 'nearby', label: '近く' },
   { key: 'all', label: '一覧' },
-  { key: 'unvisited', label: '未訪問' },
 ];
 
 export default function NearbyPage() {
@@ -62,12 +99,16 @@ export default function NearbyPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [allLoading, setAllLoading] = useState(true);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationFailure, setLocationFailure] = useState<LocationFailure | null>(null);
+  // 位置情報が取れないときの一覧（最近写真が投稿された蓋の id、新しい順）。null は未取得
+  const [recentManholeIds, setRecentManholeIds] = useState<number[] | null>(null);
+  const recentRequestedRef = useRef(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [radius, setRadius] = useState(30);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('nearby');
+  const [unvisitedOnly, setUnvisitedOnly] = useState(false);
   const [query, setQuery] = useState('');
   const { trackNearbyRadiusChange, trackNearbyOpen, trackGeolocationEnable } = useAnalytics();
   // 直前に読み込んだ半径。初回ロード（既定30km）では送らず、実際に動かしたときだけ送る。
@@ -75,7 +116,7 @@ export default function NearbyPage() {
   // userLocation が端末の現在地か、位置情報が取れずに使った既定の中心か
   const locationFromDeviceRef = useRef(false);
   // いま並んでいる近傍結果が端末の現在地で探したものか。「いまいるのは」はこれが true のときだけ出す。
-  // locationError だけで判定すると、現在地の更新中や再読み込みの失敗時に前の結果（既定の中心のものを含む）を
+  // locationFailure だけで判定すると、現在地の更新中や再読み込みの失敗時に前の結果（既定の中心のものを含む）を
   // 新しい現在地の地域として出してしまう（#322 の Codex レビュー）。
   const [resultsFromDevice, setResultsFromDevice] = useState(false);
   // 近傍の読み込みの通し番号。最新の呼び出し以外の応答は画面に反映しない
@@ -86,6 +127,9 @@ export default function NearbyPage() {
   const geolocationSeqRef = useRef(0);
   // 現在地の取得待ちか。待っている間は範囲を変えても古い位置で探さない（取れたら最新の範囲で探す）
   const geolocationPendingRef = useRef(false);
+  // 現在地の取得の締め切り（GEOLOCATION_DEADLINE_MS）のタイマー
+  const geolocationDeadlineRef = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(geolocationDeadlineRef.current), []);
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const uploadHref = isLoggedIn ? '/upload' : '/login?redirect=/upload';
@@ -165,7 +209,7 @@ export default function NearbyPage() {
     trackNearbyOpen();
 
     const tab = new URLSearchParams(window.location.search).get('tab');
-    const initialTab: SearchTab = tab === 'all' || tab === 'unvisited' ? tab : 'nearby';
+    const initialTab: SearchTab = tab === 'all' ? 'all' : 'nearby';
     setActiveTab(initialTab);
     loadAllManholes();
 
@@ -189,25 +233,42 @@ export default function NearbyPage() {
         return;
       }
 
-      if (initialTab === 'unvisited' && !loggedIn) {
-        setActiveTab('all');
-        setLoading(false);
-        return;
-      }
+      if (tab === 'unvisited' && loggedIn) setUnvisitedOnly(true);
 
       getCurrentLocationAndLoadManholes();
     })();
   }, []);
 
+  // 設定で位置情報を許可し直したら、ページを開き直さなくても探し直す（Permissions API が無い端末は「もう一度試す」で）
   useEffect(() => {
-    if (sessionChecked && !isLoggedIn && activeTab === 'unvisited') {
-      setActiveTab('all');
+    if (!locationFailure || typeof navigator === 'undefined' || !navigator.permissions?.query) return;
+    let status: PermissionStatus | null = null;
+    let cancelled = false;
+    const onChange = () => {
+      if (status?.state === 'granted') getCurrentLocationAndLoadManholes();
+    };
+    navigator.permissions
+      .query({ name: 'geolocation' })
+      .then((result) => {
+        if (cancelled) return;
+        status = result;
+        result.addEventListener('change', onChange);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      status?.removeEventListener('change', onChange);
+    };
+  }, [locationFailure]);
+
+  useEffect(() => {
+    if (sessionChecked && !isLoggedIn && unvisitedOnly) {
+      setUnvisitedOnly(false);
     }
-  }, [activeTab, isLoggedIn, sessionChecked]);
+  }, [unvisitedOnly, isLoggedIn, sessionChecked]);
 
   useEffect(() => {
     if (!sessionChecked || activeTab === 'all') return;
-    if (activeTab === 'unvisited' && !isLoggedIn) return;
     if (!userLocation) return;
     if (geolocationPendingRef.current) return;
     loadNearbyManholes(userLocation.lat, userLocation.lng);
@@ -255,7 +316,11 @@ export default function NearbyPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           if (isStaleGeolocation()) return;
+          window.clearTimeout(geolocationDeadlineRef.current);
           geolocationPendingRef.current = false;
+          setLocationFailure(null);
+          // 締め切り（GEOLOCATION_DEADLINE_MS）の後に届いたときは failLocation が「検索中」を消しているので、付け直す
+          setLoading(true);
           trackGeolocationEnable();
           const location = {
             lat: position.coords.latitude,
@@ -263,26 +328,69 @@ export default function NearbyPage() {
           };
           locationFromDeviceRef.current = true;
           setUserLocation(location);
-          setLocationError(null);
           loadNearbyManholes(location.lat, location.lng);
         },
         (error) => {
           if (isStaleGeolocation()) return;
+          window.clearTimeout(geolocationDeadlineRef.current);
           geolocationPendingRef.current = false;
-          console.error('Location access denied:', error);
-          setLocationError('位置情報の取得に失敗しました。設定で位置情報の使用を許可してください。');
-          const defaultLocation = {
-            lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
-            lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
-          };
-          locationFromDeviceRef.current = false;
-          setUserLocation(defaultLocation);
-          loadNearbyManholes(defaultLocation.lat, defaultLocation.lng);
-        }
+          console.error('Location unavailable:', error);
+          failLocation(LOCATION_FAILURE_CODES[error.code] ?? 'unavailable');
+        },
+        // 既定は timeout が無限で、端末の位置情報サービスが応答しないと「検索中」のまま終わらなかった
+        { timeout: 15000, maximumAge: 60000 }
       );
+      // timeout は許可の確認を待つ時間を含まない。確認に答えないままだと「検索中」が終わらないので、
+      // こちらでも締め切りを置いて新しい順の一覧を出す。後から許可されて位置が届いたら、そのまま近くを探す
+      // （failLocation は geolocationSeq を進めないので、届いた応答は捨てない。#330 の Copilot レビュー）
+      window.clearTimeout(geolocationDeadlineRef.current);
+      geolocationDeadlineRef.current = window.setTimeout(() => {
+        if (!isStaleGeolocation() && geolocationPendingRef.current) failLocation('timeout');
+      }, GEOLOCATION_DEADLINE_MS);
     } else {
-      setLocationError('このブラウザは位置情報をサポートしていません。');
-      setLoading(false);
+      failLocation('unsupported');
+    }
+  };
+
+  /** 現在地が取れなかった。前の結果（別の場所のもの）を消し、新しい順の一覧に替える */
+  const failLocation = (failure: LocationFailure) => {
+    nearbyLoadSeqRef.current += 1;
+    locationFromDeviceRef.current = false;
+    setLocationFailure(failure);
+    setUserLocation(null);
+    setNearbyManholes([]);
+    setResultsFromDevice(false);
+    setLoading(false);
+    loadRecentManholes();
+  };
+
+  /**
+   * 最近写真が投稿された蓋（新しい順）。トップの「最新の投稿」と同じ取り方で、全員の公開訪問を読む
+   * （credentials: 'omit'。ログイン中にクッキーを送ると自分の訪問だけが返る）。
+   * 蓋の中身（自分の訪問・代表写真）は「一覧」タブ用に読み込み済みの allManholes から引く
+   */
+  const loadRecentManholes = async () => {
+    if (recentRequestedRef.current) return;
+    recentRequestedRef.current = true;
+    try {
+      // limit は訪問の数で、蓋の数ではない。同じ蓋への訪問が続くと蓋が足りないので、集まるまで次のページも読む（最大3ページ）
+      const ids: number[] = [];
+      for (let page = 0; page < 3 && ids.length < RECENT_DISPLAY_LIMIT; page += 1) {
+        const response = await fetch(`/api/visits?with_photos=true&limit=100&offset=${page * 100}&order_by=created_at`, { credentials: 'omit' });
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const data = await response.json();
+        const visits = Array.isArray(data?.visits) ? data.visits : [];
+        for (const visit of visits) {
+          const id = visit?.manhole_id;
+          if (typeof id === 'number' && !ids.includes(id)) ids.push(id);
+        }
+        if (visits.length < 100) break;
+      }
+      setRecentManholeIds(ids.slice(0, RECENT_DISPLAY_LIMIT));
+    } catch (error) {
+      console.error('Failed to load recent manholes:', error);
+      recentRequestedRef.current = false;
+      setRecentManholeIds([]);
     }
   };
 
@@ -378,12 +486,13 @@ export default function NearbyPage() {
 
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
-    if ((tab === 'nearby' || tab === 'unvisited') && !userLocation && nearbyManholes.length === 0) {
+    if (tab === 'nearby' && !userLocation && nearbyManholes.length === 0 && !locationFailure) {
       getCurrentLocationAndLoadManholes();
     }
   };
 
-  const visibleSearchTabs = searchTabs.filter((tab) => isLoggedIn || tab.key !== 'unvisited');
+  const visibleSearchTabs = searchTabs;
+  const isUnvisited = (m: ManholeWithDistance) => !m.visit && !m.is_visited;
 
   const filteredAllManholes = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -412,10 +521,21 @@ export default function NearbyPage() {
     「未訪問」タブでレールの《発見》だけが絞り込み前の件数を出していた
     （一覧は0件なのにレールは7と表示される）。数える対象は1か所に持つ。
   */
+  // 位置情報が取れないときの「近く」「未訪問」は、最近写真が投稿された蓋（新しい順）
+  const recentManholes = useMemo(() => {
+    if (!recentManholeIds) return [];
+    const byId = new Map(allManholes.map((m) => [m.id, m]));
+    return recentManholeIds.map((id) => byId.get(id)).filter((m): m is ManholeWithDistance => Boolean(m));
+  }, [recentManholeIds, allManholes]);
+  const showingRecent = Boolean(locationFailure) && activeTab !== 'all';
+  const recentLoading = showingRecent && (allLoading || recentManholeIds === null);
+
   const displayManholes =
-    activeTab === 'all' ? filteredAllManholes :
+    showingRecent
+      ? unvisitedOnly ? recentManholes.filter(isUnvisited) : recentManholes
+      : activeTab === 'all' ? filteredAllManholes :
     // 訪問済みかは /api/manholes の is_visited（サーバが自分の訪問を全件見て付ける）でも判定する
-    activeTab === 'unvisited' ? nearbyManholes.filter((m) => !m.visit && !m.is_visited) :
+    unvisitedOnly ? nearbyManholes.filter(isUnvisited) :
     nearbyManholes;
   // レールの「最寄り」も並んでいる一覧に合わせる（上と同じ理由）。
   const nearestDistance = displayManholes[0]?.distance;
@@ -424,46 +544,6 @@ export default function NearbyPage() {
   const area = useMemo(
     () => (resultsFromDevice ? nearbyArea(nearbyManholes) : null),
     [resultsFromDevice, nearbyManholes]
-  );
-
-  const authNearbyRail = (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
-        <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-          {activeTab === 'nearby' ? '近くのポケふた' : activeTab === 'unvisited' ? '未訪問' : '一覧'}
-        </p>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
-          {([
-            ['発見', displayManholes.length, '#2c2a26'],
-            activeTab === 'nearby' || activeTab === 'unvisited'
-              ? ['範囲', `${radius}km`, '#6f6657']
-              : ['総数', allManholes.length, '#6f6657'],
-          ] as [string, string | number, string][]).map(([label, value, color]) => (
-            <div key={label} className="bg-[#fffdf7] px-3 py-2.5 text-center">
-              <p style={{ fontFamily: ROUND, fontSize: 10, color: '#9b917e', fontWeight: 700 }}>{label}</p>
-              <p style={{ fontFamily: NUM, fontWeight: 800, fontSize: 20, color }}>{value}</p>
-            </div>
-          ))}
-        </div>
-        {(activeTab === 'nearby' || activeTab === 'unvisited') && nearestDistance !== undefined && (
-          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
-            最寄り {nearestDistance < 1 ? `${Math.round(nearestDistance * 1000)}m` : `${nearestDistance.toFixed(1)}km`}
-          </p>
-        )}
-        {activeTab === 'all' && query && (
-          <p style={{ fontFamily: ROUND, fontSize: 11, color: '#9b917e', marginTop: 8 }}>
-            「{query}」で絞り込み中
-          </p>
-        )}
-      </div>
-      <Link
-        href={uploadHref}
-        className="flex items-center justify-center gap-2 rounded-[12px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm"
-      >
-        <Camera className="h-4 w-4" />
-        写真を投稿する
-      </Link>
-    </div>
   );
 
   const guestNearbyRail = (
@@ -499,7 +579,9 @@ export default function NearbyPage() {
     切り替わり、横にもズレる。初回訪問者は実際に未ログインなので、
     ゲスト表示を初期状態にするのが当たっている場合が多い。
   */
-  const nearbyRail = isLoggedIn ? authNearbyRail : guestNearbyRail;
+  // ログイン時はレールを出さない（以前の「近くのポケふた」の数字の枠と「写真を投稿する」は、
+  // 数字が上の検索パネルと、投稿が右下の固定ボタンと重複していた）
+  const nearbyRail = isLoggedIn ? undefined : guestNearbyRail;
 
   return (
     <div className="min-h-content safe-area-body pb-nav-safe bg-[#efe6cf] text-[#2A2A2A]">
@@ -592,10 +674,8 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {locationError && (
-          <div className="mt-4 rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-            <p className="text-sm font-bold text-red-700">{locationError}</p>
-          </div>
+        {locationFailure && activeTab !== 'all' && (
+          <LocationHelp failure={locationFailure} onRetry={getCurrentLocationAndLoadManholes} />
         )}
 
         {dataError && (
@@ -611,22 +691,17 @@ export default function NearbyPage() {
         */}
         {userLocation && activeTab !== 'all' && (
           <section id="nearby-controls" className="mt-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3 shadow-sm sm:mt-5 sm:p-4">
-            {/*
-              PC で同じ数字を2か所に出さない。ただし隠してよいのは
-              **レールが統計を出しているログイン時だけ** で、未ログインの
-              レールは勧誘カードなので、隠すと数字がどこにも出なくなる。
-            */}
+            {/* ログイン時は「未訪問」の数も並べる（範囲内の近くの蓋のうち、行っていないもの） */}
             <div
-              className={`grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] ${
-                isLoggedIn ? 'lg:hidden' : ''
-              }`}
+              className={`grid gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] ${isLoggedIn ? 'grid-cols-4' : 'grid-cols-3'}`}
             >
               {([
                 ['発見', displayManholes.length, '#2c2a26'],
+                ...(isLoggedIn ? [['未訪問', nearbyManholes.filter(isUnvisited).length, '#bf5640']] : []),
                 ['範囲', `${radius}km`, '#6f6657'],
                 /*
                   最寄りも並んでいる一覧に合わせる。nearbyManholes[0] だと
-                  「未訪問」タブで、一覧に出ていない訪問済みの蓋までの距離を
+                  「未訪問だけ」のとき、一覧に出ていない訪問済みの蓋までの距離を
                   出してしまう（近傍結果は距離順なので絞り込んでも先頭が最寄り）。
                 */
                 ['最寄り', displayManholes.length > 0 ? formatDistance(displayManholes[0].distance) : '-', '#6f6657'],
@@ -714,6 +789,29 @@ export default function NearbyPage() {
                   </button>
                 );
               })}
+              {/* 未訪問は近くの結果の絞り込み（別タブにしない）。押すたびに切り替わり、押されているかは色と aria-pressed で示す */}
+              {activeTab === 'nearby' && isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => setUnvisitedOnly((v) => !v)}
+                  aria-pressed={unvisitedOnly}
+                  className={`ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] border px-3 text-sm font-bold transition sm:px-4 ${
+                    unvisitedOnly
+                      ? 'border-[#bf5640] bg-[#bf5640] text-white'
+                      : 'border-[#e9dfc7] bg-white text-[#bf5640] hover:bg-[#fdeae2]'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                      unvisitedOnly ? 'border-white bg-white text-[#bf5640]' : 'border-[#bf5640]'
+                    }`}
+                  >
+                    {unvisitedOnly ? '✓' : ''}
+                  </span>
+                  未訪問だけ
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -731,12 +829,7 @@ export default function NearbyPage() {
                   placeholder="地域名・ポケモン名で検索"
                 />
               </label>
-              {/* PC はレールが「発見 / 総数」を出す。未ログインのレールは勧誘カードなので隠さない */}
-              <div
-                className={`grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] sm:min-w-[15rem] ${
-                  isLoggedIn ? 'lg:hidden' : ''
-                }`}
-              >
+              <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7] sm:min-w-[15rem]">
                 {([
                   ['総数', allManholes.length, '#6f6657'],
                   ['表示中', filteredAllManholes.length, '#2c2a26'],
@@ -751,7 +844,7 @@ export default function NearbyPage() {
           </section>
         )}
 
-        {(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
+        {((activeTab === 'nearby' && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
           <div className="flex items-center justify-center py-7 sm:py-10">
             <div className="text-center">
               <div className="font-bold text-[#6f6657]">
@@ -761,21 +854,30 @@ export default function NearbyPage() {
           </div>
         )}
 
-        {!(((activeTab === 'nearby' || activeTab === 'unvisited') && loading) || (activeTab === 'all' && allLoading)) && (
+        {!((activeTab === 'nearby' && (loading || recentLoading)) || (activeTab === 'all' && allLoading)) && (
           <section className="mt-3 sm:mt-5">
+            {showingRecent && displayManholes.length > 0 && (
+              <h2 className="mb-2 text-sm font-extrabold text-[#2c2a26]">
+                最近写真が投稿されたポケふた<span className="ml-1 text-xs font-bold text-[#9b917e]">新しい順</span>
+              </h2>
+            )}
             {(() => {
               return displayManholes.length === 0 ? (
                 <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-7 text-center shadow-sm sm:px-5 sm:py-10">
                   <MapPin className="mx-auto mb-2 h-9 w-9 text-[#c9bda4] sm:mb-3 sm:h-10 sm:w-10" />
                   <p className="text-sm font-bold text-[#2c2a26]">
-                    {activeTab === 'unvisited'
+                    {showingRecent
+                      ? unvisitedOnly && recentManholes.length > 0
+                        ? '最近写真が投稿されたポケふたは、すべて訪問済みです'
+                        : '最近写真が投稿されたポケふたを読み込めませんでした'
+                      : activeTab === 'nearby' && unvisitedOnly
                       ? '近くに未訪問のポケふたが見つかりませんでした'
                       : activeTab === 'all'
                       ? 'ポケふたが見つかりませんでした'
                       : '近くにポケふたが見つかりませんでした'}
                   </p>
                   <p className="mt-1 text-xs font-bold text-[#9b917e]">
-                    {activeTab === 'nearby' && '検索範囲を広げてみてください'}
+                    {activeTab === 'nearby' && !showingRecent && '検索範囲を広げてみてください'}
                   </p>
                 </div>
               ) : (
@@ -798,6 +900,8 @@ export default function NearbyPage() {
                         // 施設名は見出しに入ったので、ここは訪問日だけ。VisitPhotoCard 側で省略記号付きに切り詰まる。
                         posterName={visitedAt ? `訪問 ${formatDate(visitedAt)}` : undefined}
                         tags={(manhole.pokemons || []).slice(0, 2)}
+                        // ログイン時は行ったかどうかを全カードに出す（未ログインは自分の訪問が無いので出さない）
+                        visitStatus={isLoggedIn ? (isUnvisited(manhole) ? 'unvisited' : 'visited') : undefined}
                         cornerLabel={
                           activeTab !== 'all' && manhole.distance !== undefined
                             ? formatDistance(manhole.distance)
@@ -825,6 +929,79 @@ export default function NearbyPage() {
         写真を投稿
       </Link>
 
+    </div>
+  );
+}
+
+/**
+ * 現在地が取れなかったときの案内。理由ごとに直し方を出し、「もう一度試す」を置く。
+ * 一度「許可しない」を選ぶと、ブラウザはページから許可を求め直せない（ボタンを押しても即座に失敗する）。
+ * なので denied は「設定で許可してから押す」手順を、端末に合わせて具体的に書く。
+ */
+function LocationHelp({ failure, onRetry }: { failure: LocationFailure; onRetry: () => void }) {
+  const [platform, setPlatform] = useState<Platform>('other');
+  useEffect(() => setPlatform(detectPlatform()), []);
+
+  const title = {
+    denied: '位置情報の使用が許可されていません',
+    unavailable: '現在地がわかりませんでした',
+    timeout: '現在地の取得に時間がかかっています',
+    unsupported: 'このブラウザでは現在地を使えません',
+  }[failure];
+
+  const steps: Array<{ label: string; text: string }> = [];
+  // other は PC（UA で iPhone・iPad・Android と判定できなかったもの）。PC で拒否したままの人が一番多いので、PC の手順を出す
+  if (failure === 'denied') {
+    if (platform === 'ios-other') {
+      steps.push({ label: 'iPhone', text: '設定アプリ →（アプリ →）お使いのブラウザ（Chrome など）→「位置情報」を「このAppの使用中」に' });
+    } else if (platform === 'ios-safari') {
+      steps.push({ label: 'iPhone（Safari）', text: 'アドレスバーの「ぁあ」→「Webサイトの設定」→「位置情報」を「許可」。出てこないときは 設定アプリ →（アプリ →）Safari →「位置情報」を「確認」か「許可」に' });
+    } else if (platform === 'android') {
+      steps.push({ label: 'Android', text: 'アドレスバー左のアイコン →「権限」→「位置情報」を許可' });
+    } else {
+      steps.push({ label: 'Chrome・Edge', text: 'アドレスバー左のアイコン →「位置情報」を「許可」' });
+      steps.push({ label: 'Mac の Safari', text: 'メニューの Safari →「設定」→「Webサイト」→「位置情報」でこのサイトを「許可」' });
+    }
+  } else if (failure === 'unavailable') {
+    if (platform === 'ios-safari' || platform === 'ios-other') {
+      steps.push({ label: 'iPhone', text: '設定アプリ →「プライバシーとセキュリティ」→「位置情報サービス」をオン' });
+    } else if (platform === 'android') {
+      steps.push({ label: 'Android', text: '画面上から下にスワイプして「位置情報」をオン' });
+    } else {
+      steps.push({ label: 'Mac', text: 'システム設定 →「プライバシーとセキュリティ」→「位置情報サービス」でお使いのブラウザをオン' });
+      steps.push({ label: 'Windows', text: '設定 →「プライバシーとセキュリティ」→「位置情報」をオン' });
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-[14px] border border-[#e2a015]/40 bg-[#fff8e6] px-4 py-3 shadow-sm">
+      <p className="flex items-center gap-1.5 text-sm font-extrabold text-[#8a5a00]">
+        <MapPin className="h-4 w-4 shrink-0" />
+        {title}
+      </p>
+      {steps.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {steps.map((step) => (
+            <li key={step.label} className="text-xs leading-relaxed text-[#5c4a2a]">
+              <span className="mr-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-[#8a5a00]">{step.label}</span>
+              {step.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {failure !== 'unsupported' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] bg-[#bf5640] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#a8462f]"
+          >
+            <RefreshCw className="h-4 w-4" />
+            {failure === 'denied' ? '許可したら、もう一度試す' : 'もう一度試す'}
+          </button>
+        )}
+        <p className="text-xs text-[#6f6657]">それまでは、最近写真が投稿されたポケふたを新しい順に出しています</p>
+      </div>
     </div>
   );
 }
