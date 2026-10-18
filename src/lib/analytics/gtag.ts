@@ -410,7 +410,7 @@ export interface BulkCompleteParams extends GAEventParams {
   photo_succeeded: number;
   photo_failed: number;
   new_manhole_count: number;
-  /** 中止ボタンで止めたか */
+  /** 中止ボタンで止めたか、送信の途中でページを離れたか（離れた場合は pagehide / アンマウントで送る） */
   is_aborted: boolean;
   /**
    * この回の失敗で一番多かった原因。API が返す code（`src/lib/api-error-code.ts`）を優先し、

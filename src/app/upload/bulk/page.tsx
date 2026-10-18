@@ -122,6 +122,36 @@ export default function BulkUploadPage() {
   // 写真の取り込み中に、もう一度選ばれた分を受け付けない（フォルダの読み込みは時間がかかり、
   // 遅い方が先の取り込み結果を上書きする）
   const ingestingRef = useRef(false);
+  // 送信中の回の結果。p_bulk_complete を、送り終えたとき・ページを離れたときのどちらか1回だけ送る
+  const runRef = useRef<{
+    runResults: Record<string, 'done' | 'failed'>;
+    errorCodes: string[];
+    succeededBefore: Set<string>;
+    groups: BulkVisitGroup<Manhole>[];
+    newManholeIds: Set<number>;
+    flushed: boolean;
+  } | null>(null);
+
+  /** この回の p_bulk_complete を送る。二度目以降は何もしない */
+  const flushBulkComplete = useCallback((isAborted: boolean) => {
+    const run = runRef.current;
+    if (!run || run.flushed) return;
+    run.flushed = true;
+    const runSucceededKeys = new Set(
+      run.groups
+        .filter((g) => !run.succeededBefore.has(g.key) && g.photoIds.some((id) => run.runResults[id] === 'done'))
+        .map((g) => g.key)
+    );
+    const newManholesBefore = countNewManholes(run.groups, run.newManholeIds, run.succeededBefore);
+    const newManholesNow = countNewManholes(run.groups, run.newManholeIds, new Set([...run.succeededBefore, ...runSucceededKeys]));
+    pokefutaEvents.bulkComplete({
+      photo_succeeded: Object.values(run.runResults).filter((r) => r === 'done').length,
+      photo_failed: Object.values(run.runResults).filter((r) => r === 'failed').length,
+      new_manhole_count: newManholesNow - newManholesBefore,
+      is_aborted: isAborted,
+      ...(run.errorCodes.length > 0 ? { error_code: topErrorCode(run.errorCodes) } : {}),
+    });
+  }, []);
 
   useEffect(() => {
     document.title = pageTitle('まとめて投稿');
@@ -175,10 +205,18 @@ export default function BulkUploadPage() {
     };
   }, [phase]);
 
-  // ページを離れたら、まだ送っていない写真は送らない（送信中の1枚は終わるまで待たない）
-  useEffect(() => () => {
-    abortRef.current = true;
-  }, []);
+  // ページを離れたら、まだ送っていない写真は送らず、ここまでの結果を計測に残す。
+  // 経路は2つ（useSubmissionFunnel と同じ）: pagehide（タブを閉じる・再読み込み）と、
+  // アンマウント（Next.js の Link によるクライアント遷移。pagehide は出ない）
+  useEffect(() => {
+    const onPageHide = () => flushBulkComplete(true);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      abortRef.current = true;
+      flushBulkComplete(true);
+    };
+  }, [flushBulkComplete]);
 
   const ready = manholes !== null && ownVisits !== null;
 
@@ -365,6 +403,14 @@ export default function BulkUploadPage() {
     const runResults: Record<string, 'done' | 'failed'> = {};
     const errorCodes: string[] = [];
     const succeededBefore = new Set(groups.filter((g) => g.photoIds.some((id) => photoResult[id] === 'done')).map((g) => g.key));
+    runRef.current = {
+      runResults,
+      errorCodes,
+      succeededBefore,
+      groups,
+      newManholeIds: classification?.newManholeIds ?? new Set(),
+      flushed: false,
+    };
     setSendState((prev) => ({ ...prev, ...Object.fromEntries(targets.map((g) => [g.key, 'waiting' as SendState])) }));
     const queue = [...targets];
     const worker = async () => {
@@ -375,24 +421,7 @@ export default function BulkUploadPage() {
     await Promise.all(Array.from({ length: SEND_CONCURRENCY }, worker));
     wakeLock?.release().catch(() => {});
 
-    const runSucceededKeys = new Set(
-      groups
-        .filter((g) => !succeededBefore.has(g.key) && g.photoIds.some((id) => runResults[id] === 'done'))
-        .map((g) => g.key)
-    );
-    const newManholesBefore = countNewManholes(groups, classification?.newManholeIds ?? new Set(), succeededBefore);
-    const newManholesNow = countNewManholes(
-      groups,
-      classification?.newManholeIds ?? new Set(),
-      new Set([...succeededBefore, ...runSucceededKeys])
-    );
-    pokefutaEvents.bulkComplete({
-      photo_succeeded: Object.values(runResults).filter((r) => r === 'done').length,
-      photo_failed: Object.values(runResults).filter((r) => r === 'failed').length,
-      new_manhole_count: newManholesNow - newManholesBefore,
-      is_aborted: abortRef.current,
-      ...(errorCodes.length > 0 ? { error_code: topErrorCode(errorCodes) } : {}),
-    });
+    flushBulkComplete(abortRef.current);
 
     // この回で作った訪問を自分の訪問に足しておく。「続けて投稿する」で同じ蓋・同じ日の写真を選んだとき、
     // 投稿済みとして判定され、新しい訪問を作らずにそこへ足せるように
