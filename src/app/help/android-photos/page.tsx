@@ -10,7 +10,7 @@ import { HelpShell, Section, Steps } from '../HelpParts';
 export const metadata: Metadata = {
   title: `Android の写真を PC に移して投稿する | ${SITE_NAME}`,
   description:
-    'Android のスマホで撮ったポケふたの写真を、位置情報を残したまま PC に移し、まとめて投稿する方法です。Google フォトのウェブ版と USB ケーブルの2通りを説明します。',
+    'Android のスマホで撮ったポケふたの写真を、位置情報を残したまま PC に移し、まとめて投稿する方法です。Google フォトのウェブ版からダウンロードする方法を説明します。',
   alternates: { canonical: `${SITE_URL}/help/android-photos` },
   robots: { index: true, follow: true },
 };
@@ -28,7 +28,7 @@ export default function AndroidPhotosHelpPage() {
             <li>
               蓋の前にいるなら、<Link href="/upload" className="font-bold underline">投稿画面</Link>の「カメラで撮影」でその場で撮って投稿できます
             </li>
-            <li>撮ってある写真は、このページの方法で PC に移して、PC の「まとめて投稿」から投稿してください</li>
+            <li>撮ってある写真は、Google フォトのウェブ版から PC にダウンロードして、PC の「まとめて投稿」から投稿してください</li>
           </ul>
         </div>
 
@@ -43,7 +43,7 @@ export default function AndroidPhotosHelpPage() {
           </p>
         </Section>
 
-        <Section title="方法1: Google フォトのウェブ版からダウンロードする（Windows・Mac）">
+        <Section title="Google フォトのウェブ版からダウンロードする（Windows・Mac）">
           <Steps>
             <li>スマホの Google フォトでバックアップを ON にし、写真がバックアップされるのを待ちます</li>
             <li>
@@ -55,19 +55,6 @@ export default function AndroidPhotosHelpPage() {
               PC で <Link href="/upload/bulk" className="font-bold underline">まとめて投稿</Link> を開き、写真かフォルダごとドラッグ＆ドロップします
             </li>
           </Steps>
-        </Section>
-
-        <Section title="方法2: USB ケーブルでコピーする（Windows）">
-          <Steps>
-            <li>スマホと PC を USB ケーブルでつなぎます</li>
-            <li>スマホに出る「USB の設定」などの通知を開き、「ファイル転送」を選びます</li>
-            <li>PC のエクスプローラーでスマホを開き、「内部ストレージ」→「DCIM」→「Camera」に進みます</li>
-            <li>投稿したい写真を、PC のフォルダにコピーします</li>
-            <li>
-              PC で <Link href="/upload/bulk" className="font-bold underline">まとめて投稿</Link> を開き、コピーした写真かフォルダをドラッグ＆ドロップします
-            </li>
-          </Steps>
-          <p>Mac は Android をケーブルでつないでもそのままでは開けないことが多いので、方法1を使ってください。</p>
         </Section>
 
         <Section title="この送り方では位置情報が消えます">

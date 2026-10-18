@@ -594,7 +594,7 @@ export default function BulkUploadPage() {
             写真を PC に移して、PC でこのページを開いてください。
           </p>
           <p className="mt-2">
-            PC へは Google フォトのウェブ版（photos.google.com）からダウンロードするか、USB ケーブルでコピーしてください。
+            PC へは Google フォトのウェブ版（photos.google.com）からダウンロードしてください。
             LINE で送った写真は位置情報が消えています。
           </p>
           <p className="mt-2">
