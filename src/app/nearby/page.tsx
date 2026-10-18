@@ -521,12 +521,17 @@ export default function NearbyPage() {
     <div className="space-y-3">
       <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm">
         <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-          {activeTab === 'nearby' ? '近くのポケふた' : activeTab === 'unvisited' ? '未訪問' : '一覧'}
+          {showingRecent
+            ? activeTab === 'unvisited' ? '未訪問（最近の投稿）' : '最近の投稿'
+            : activeTab === 'nearby' ? '近くのポケふた' : activeTab === 'unvisited' ? '未訪問' : '一覧'}
         </p>
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-[#e9dfc7]">
           {([
             ['発見', displayManholes.length, '#2c2a26'],
-            activeTab === 'nearby' || activeTab === 'unvisited'
+            // 位置情報が取れずに新しい順の一覧を出しているときは、範囲の数字を出さない（全国の蓋が「30km 以内」に見える）
+            showingRecent
+              ? ['並び', '新しい順', '#6f6657']
+              : activeTab === 'nearby' || activeTab === 'unvisited'
               ? ['範囲', `${radius}km`, '#6f6657']
               : ['総数', allManholes.length, '#6f6657'],
           ] as [string, string | number, string][]).map(([label, value, color]) => (
