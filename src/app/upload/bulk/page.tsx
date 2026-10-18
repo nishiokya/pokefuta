@@ -205,16 +205,16 @@ export default function BulkUploadPage() {
     };
   }, [phase]);
 
-  // ページを離れたら、まだ送っていない写真は送らず、ここまでの結果を計測に残す。
-  // 経路は2つ（useSubmissionFunnel と同じ）: pagehide（タブを閉じる・再読み込み）と、
-  // アンマウント（Next.js の Link によるクライアント遷移。pagehide は出ない）
+  // ページを離れたら、まだ送っていない写真は送らず、ここまでの結果を計測に残す。経路は2つ:
+  // - pagehide（タブを閉じる・再読み込み）: ドキュメントごと消えるので、その場で送る（できる範囲で）
+  // - アンマウント（Next.js の Link によるクライアント遷移。pagehide は出ない）: 次の写真は送らないが、
+  //   送信中の1枚は終わるまで待ち、runSend の最後でその結果も含めて送る（先に送ると成功を取りこぼす）
   useEffect(() => {
     const onPageHide = () => flushBulkComplete(true);
     window.addEventListener('pagehide', onPageHide);
     return () => {
       window.removeEventListener('pagehide', onPageHide);
       abortRef.current = true;
-      flushBulkComplete(true);
     };
   }, [flushBulkComplete]);
 
