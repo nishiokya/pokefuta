@@ -61,6 +61,9 @@ const CHIP_CLASS = FEED_CHIP_CLASS;
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
+  // 最初の投稿の取得が終わったか。loading はページ送りのたびに true に戻るので、
+  // 一覧より下の節を出すかどうかはこちらで決める（ページ送りで節を消さない）
+  const [feedSettled, setFeedSettled] = useState(false);
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
@@ -140,6 +143,7 @@ export default function HomePage() {
       setFeed([]);
     } finally {
       setLoading(false);
+      setFeedSettled(true);
     }
   };
 
@@ -645,7 +649,13 @@ export default function HomePage() {
           </>
         )}
 
-        {currentPage === 1 && isSp === true && <RecentComments />}
+        {/*
+          最新の投稿より下の節（スマホの口コミ・特集・写真がまだないポケふた）は、最初の投稿が出るまで描かない。
+          どれも投稿より先にデータが届くことがあり、背の低い「読み込み中」の直下に一度描かれてから、
+          投稿の一覧が入った分だけまとめて押し下げられていた。モバイルの CLS が 0.18（Search Console）、
+          Lighthouse で 0.57 になっていた原因（2026-10-18）。ページ送りでは消さない（feedSettled）
+        */}
+        {feedSettled && currentPage === 1 && isSp === true && <RecentComments />}
 
         {/*
           特集（ぬいぐるみ・デザインふた）。以前はヒーローの末尾に置いていたが、ヒーローは行動のカード
@@ -654,7 +664,7 @@ export default function HomePage() {
           PC は写真3枚と説明の横長カード、スマホは同じ2枚を横に並べた縦長の小さなカード（写真は2枚。360px 幅で収まるように）。
           どちらも取れたものだけ出し、両方取れなければ節ごと出さない
         */}
-        {((plushFeature && plushFeature.count > 0) || (designFeature && designFeature.length > 0)) && (
+        {feedSettled && ((plushFeature && plushFeature.count > 0) || (designFeature && designFeature.length > 0)) && (
           <section className="mt-8">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
@@ -729,7 +739,7 @@ export default function HomePage() {
         )}
 
         {/* 写真がまだないポケふた（募集枠なので、最新の投稿を見終わった一番下に置く） */}
-        {!rareLoading && rareManholes.length > 0 && (
+        {feedSettled && !rareLoading && rareManholes.length > 0 && (
           <section className="mt-8">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-extrabold">
