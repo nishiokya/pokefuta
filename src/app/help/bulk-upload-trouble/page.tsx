@@ -65,7 +65,7 @@ export default function BulkUploadTroublePage() {
         <ul className="ml-4 list-disc space-y-1">
           <li>Mac なら Safari でまとめて投稿を開く</li>
           <li>iPhone から直接まとめて投稿する</li>
-          <li>JPEG で PC に移す（<Link href="/help/iphone-photos#heic" className="underline">iPhone の写真を投稿する</Link>）</li>
+          <li>これから撮る写真を JPEG にする（<Link href="/help/iphone-photos#heic" className="underline">iPhone の写真を投稿する</Link>）</li>
         </ul>
       </Qa>
 
