@@ -9,7 +9,7 @@ frontend:
         - npm ci --cache .npm --prefer-offline
     build:
       commands:
-        - env | grep -e NEXT_PUBLIC_ -e SUPABASE_ -e R2_ >> .env.production
+        - env | grep -e NEXT_PUBLIC_ -e SUPABASE_ -e R2_ -e POKEFUTA_DEBUG_ >> .env.production
         - npm run build
         - node tools/prune-amplify-artifact.js
   artifacts:
@@ -33,4 +33,5 @@ frontend:
 # - NEXT_PUBLIC_APP_URL (e.g., https://pokefuta.com)
 # - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT
 # - NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG
+# - POKEFUTA_DEBUG_USER_IDS (auth UIDs allowed to open /upload/gps-test; comma separated, unset = nobody)
 # Note: Images are served via signed URLs, so public URL is not needed
