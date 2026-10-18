@@ -122,6 +122,7 @@ async function main() {
   pass('next.config.js does not reference the deleted OGP background asset');
 
   const CARD_ROUTES = [
+    '/opengraph-image',
     '/manhole/[id]/opengraph-image',
     '/share/photo/[photoId]/opengraph-image',
     '/p/[photoId]/opengraph-image',

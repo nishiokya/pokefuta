@@ -21,8 +21,9 @@ export const SITE_URL = 'https://pokefuta.com';
  * OGP 画像のキャッシュキー。**画像の中身を変えたら必ず更新すること。**
  * URL が変わらないと SNS のクローラが古い画像を配り続ける。
  * 20260808: 画像に焼いていたサイト名を「ポケふた写真館」に変更したため更新
+ * 20261018: 共通 OG 画像が 500 を返していたのを、ブランドのカードで描き直したため更新
  */
-export const OGP_IMAGE_VERSION = '20260906-mosaic-card';
+export const OGP_IMAGE_VERSION = '20261018-fallback-card';
 export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
 
 /**
