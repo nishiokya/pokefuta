@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, ChevronDown, FolderOpen, Loader2, MapPin } from 'lucide-react';
+import { AlertCircle, CheckCircle, ChevronDown, FolderOpen, Loader2, MapPin, MessageCircle } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import type { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
@@ -31,6 +31,8 @@ import { filesFromDataTransfer, isImageFile, makeThumbnail } from './browser-fil
 const IS_PUBLIC_SESSION_KEY = 'pokefuta:is_public';
 /** 同時に送る訪問の数 */
 const SEND_CONCURRENCY = 2;
+// ベータ。不具合は X の @pokemonmanhole で受ける（/photos/plush と同じ形）
+const FEEDBACK_URL = `https://x.com/intent/post?text=${encodeURIComponent('@pokemonmanhole まとめて投稿（ベータ）の不具合: ')}&url=${encodeURIComponent('https://pokefuta.com/upload/bulk')}`;
 
 type Phase = 'select' | 'reading' | 'review' | 'sending' | 'done';
 type SendState = 'waiting' | 'sending' | 'done' | 'failed';
@@ -499,7 +501,10 @@ export default function BulkUploadPage() {
   if (isAndroid) {
     return (
       <Shell>
-        <h1 className="text-xl font-extrabold">まとめて投稿</h1>
+        <h1 className="text-xl font-extrabold">
+          まとめて投稿
+          <BetaBadge />
+        </h1>
         <div className="mt-4 rounded-xl border border-[#B07818]/30 bg-[#FAF0DC] p-4 text-sm leading-relaxed text-[#5C4410]">
           <p className="font-bold">Android のスマホでは使えません</p>
           <p className="mt-1">
@@ -507,8 +512,13 @@ export default function BulkUploadPage() {
             写真を PC に移して、PC でこのページを開いてください。
           </p>
           <p className="mt-2">
-            PC へは USB ケーブルでコピーするか、Google フォトのウェブ版（photos.google.com）からダウンロードしてください。
-            LINE やメールで送った写真は位置情報が消えています。
+            PC へは Google フォトのウェブ版（photos.google.com）からダウンロードするか、USB ケーブルでコピーしてください。
+            LINE で送った写真は位置情報が消えています。
+          </p>
+          <p className="mt-2">
+            <Link href="/help/android-photos" className="font-bold underline">
+              Android の写真を PC に移す方法（手順）
+            </Link>
           </p>
           <CopyLinkButton />
         </div>
@@ -522,13 +532,17 @@ export default function BulkUploadPage() {
   return (
     <Shell>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-extrabold">まとめて投稿</h1>
+        <h1 className="text-xl font-extrabold">
+          まとめて投稿
+          <BetaBadge />
+        </h1>
         <Link href="/upload" className="text-sm underline hover:opacity-80">1枚ずつ投稿する</Link>
       </div>
       <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/70">
         旅行の写真をまとめて選ぶと、写真の位置情報から蓋を見つけて、ポケふたの写真だけを投稿します。
         確認するまで何も送りません。
       </p>
+      <FeedbackNote />
 
       {loadError && (
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-[#B5483C]/40 bg-[#FBEAE8] p-3 text-sm text-[#B5483C]">
@@ -588,7 +602,7 @@ export default function BulkUploadPage() {
           />
           <ul className="mt-3 space-y-1 text-xs leading-relaxed text-[#2A2A2A]/60">
             <li>・iPhone で選ぶときは、写真選択の「オプション」で位置情報を ON のままにしてください</li>
-            <li>・Google フォトで場所が「推定」と出ている写真や、LINE・メールで受け取った写真は位置情報が無く、投稿できません</li>
+            <li>・Google フォトで場所が「推定」と出ている写真や、LINE で受け取った写真は位置情報が無く、投稿できません</li>
           </ul>
         </section>
       )}
@@ -682,7 +696,7 @@ export default function BulkUploadPage() {
               <details className="rounded-xl bg-white/50 p-4 text-sm">
                 <summary className="cursor-pointer font-bold">位置情報が無い {classification.noGps.length} 枚</summary>
                 <p className="mt-2 text-xs leading-relaxed text-[#2A2A2A]/60">
-                  撮影時にカメラの位置情報が OFF だった写真、Google フォトで場所が「推定」の写真、LINE・メールで受け取った写真、
+                  撮影時にカメラの位置情報が OFF だった写真、Google フォトで場所が「推定」の写真、LINE で受け取った写真、
                   iPhone の写真選択の「オプション」で位置情報を外した写真には位置情報がありません。
                 </p>
                 <ul className="mt-2 grid gap-1 text-xs text-[#2A2A2A]/70">
@@ -764,6 +778,29 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
       <main className="mx-auto max-w-page px-4 pb-8 pt-5 sm:pt-8">{children}</main>
     </div>
+  );
+}
+
+function BetaBadge() {
+  return (
+    <span className="ml-2 rounded-full bg-[#7B63A8] px-2 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
+  );
+}
+
+function FeedbackNote() {
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-relaxed text-[#2A2A2A]/70">
+      <span>試験中の機能です。うまく動かないときは、X で教えてください。</span>
+      <a
+        href={FEEDBACK_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-extrabold text-[#5B4688] ring-1 ring-[#7B63A8]/40 hover:bg-[#F3EEFA]"
+      >
+        <MessageCircle className="h-3.5 w-3.5" />
+        不具合を知らせる
+      </a>
+    </p>
   );
 }
 
@@ -954,6 +991,13 @@ function DoneSummary({
           <button type="button" onClick={onRetry} className="mt-2 rounded-lg bg-[#2A2A2A] px-3 py-1.5 text-xs font-bold text-white">
             残りをもう一度送る
           </button>
+          <p className="mt-2 text-xs text-[#2A2A2A]/70">
+            何度送っても失敗するときは、
+            <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className="font-bold underline">
+              X で教えてください
+            </a>
+            。
+          </p>
         </div>
       )}
       <p className="mt-3 text-xs text-[#2A2A2A]/70">次に来る人へのひとことは、下の蓋の名前から蓋のページで書けます。</p>

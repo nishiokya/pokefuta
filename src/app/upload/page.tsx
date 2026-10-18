@@ -1045,8 +1045,20 @@ function UploadPageInner() {
           )}
         </section>
 
-        {/* 撮ってある写真をまとめて投稿する入口。Android のスマホはブラウザで選ぶと GPS が消えるので出さない */}
-        {!isAndroid && (
+        {/* 撮ってある写真をまとめて投稿する入口。Android のスマホはブラウザで選ぶと GPS が消えるので、
+            まとめて投稿は PC から、と伝えて写真の移し方へ案内する */}
+        {isAndroid ? (
+          <p className="mt-3 text-sm leading-relaxed text-[#2A2A2A]/75">
+            撮ってある写真のまとめて投稿は PC からできます。{' '}
+            <Link
+              href="/help/android-photos"
+              onClick={() => trackNavClick('投稿:Androidの写真をPCへ')}
+              className="font-bold text-[#7B63A8] underline hover:opacity-80"
+            >
+              Android の写真を PC に移す方法
+            </Link>
+          </p>
+        ) : (
           <p className="mt-3 text-sm">
             <Link
               href="/upload/bulk"
@@ -1055,6 +1067,7 @@ function UploadPageInner() {
             >
               旅行の写真をまとめて投稿する（PC・iPhone）
             </Link>
+            <span className="ml-2 rounded-full bg-[#7B63A8] px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
           </p>
         )}
 

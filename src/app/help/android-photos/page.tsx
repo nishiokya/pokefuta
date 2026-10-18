@@ -1,0 +1,119 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { SITE_NAME, SITE_URL } from '@/lib/constants';
+
+// Android のスマホでは、撮ってある写真をブラウザで選ぶと位置情報（EXIF の GPS）が消える。
+// 2026-10 に実機で、accept の書き方・選ぶアプリ（標準の写真選択・Google フォト・ファイル）を変えても
+// 全部消え、カメラで撮る形だけ届くと確かめた。なので撮ってある写真は PC に移して /upload/bulk から投稿してもらう。
+
+export const metadata: Metadata = {
+  title: `Android の写真を PC に移して投稿する | ${SITE_NAME}`,
+  description:
+    'Android のスマホで撮ったポケふたの写真を、位置情報を残したまま PC に移し、まとめて投稿する方法です。Google フォトのウェブ版と USB ケーブルの2通りを説明します。',
+  alternates: { canonical: `${SITE_URL}/help/android-photos` },
+  robots: { index: true, follow: true },
+};
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-8">
+      <h2 className="mb-2 font-pixelJp text-base font-bold text-[#4F3828]">{title}</h2>
+      <div className="flex flex-col gap-2 text-sm leading-relaxed text-[#6A4D36]">{children}</div>
+    </section>
+  );
+}
+
+function Steps({ children }: { children: ReactNode }) {
+  return <ol className="ml-5 list-decimal space-y-1.5">{children}</ol>;
+}
+
+export default function AndroidPhotosHelpPage() {
+  return (
+    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
+      <main className="mx-auto max-w-read px-4 pb-12 pt-5 sm:pt-8">
+        <h1 className="font-pixelJp text-2xl font-extrabold text-[#4F3828]">Android の写真を PC に移して投稿する</h1>
+
+        <div className="mt-6 rounded-xl border border-[#B07818]/30 bg-[#FAF0DC] p-4 text-sm leading-relaxed text-[#5C4410]">
+          <p>
+            Android のスマホでは、撮ってある写真をブラウザで選ぶと<strong>位置情報が消えてしまい</strong>、
+            どの蓋の写真か分からないため投稿できません。
+          </p>
+          <ul className="mt-2 ml-4 list-disc space-y-1">
+            <li>
+              蓋の前にいるなら、<Link href="/upload" className="font-bold underline">投稿画面</Link>の「カメラで撮影」でその場で撮って投稿できます
+            </li>
+            <li>撮ってある写真は、このページの方法で PC に移して、PC の「まとめて投稿」から投稿してください</li>
+          </ul>
+        </div>
+
+        <Section title="撮る前に: カメラの位置情報を ON にする">
+          <p>
+            写真に位置情報が入っていないと、PC に移しても投稿できません。カメラアプリの設定で、位置情報を写真に記録する設定を ON にしてください。
+            名前は機種によって違い、「位置タグ」「位置情報を保存」などと書かれています。
+          </p>
+          <p>
+            撮った写真に位置情報が入っているかは、Google フォトで写真を開き「情報」で確かめられます。
+            場所の下に<strong>「推定」</strong>と出ている写真は、Google が後から推定した場所で、写真そのものには位置情報が入っていません。
+          </p>
+        </Section>
+
+        <Section title="方法1: Google フォトのウェブ版からダウンロードする（Windows・Mac）">
+          <Steps>
+            <li>スマホの Google フォトでバックアップを ON にし、写真がバックアップされるのを待ちます</li>
+            <li>
+              PC のブラウザで <span className="font-bold">photos.google.com</span> を開き、スマホと同じ Google アカウントでログインします
+            </li>
+            <li>投稿したい写真を選びます（写真の左上の丸をクリック。Shift キーを押しながらで範囲を選べます）</li>
+            <li>右上の「︙」から「ダウンロード」を選びます（Shift + D でも同じ）。複数枚は zip ファイルで保存されるので、展開します</li>
+            <li>
+              PC で <Link href="/upload/bulk" className="font-bold underline">まとめて投稿</Link> を開き、写真かフォルダごとドラッグ＆ドロップします
+            </li>
+          </Steps>
+        </Section>
+
+        <Section title="方法2: USB ケーブルでコピーする（Windows）">
+          <Steps>
+            <li>スマホと PC を USB ケーブルでつなぎます</li>
+            <li>スマホに出る「USB の設定」などの通知を開き、「ファイル転送」を選びます</li>
+            <li>PC のエクスプローラーでスマホを開き、「内部ストレージ」→「DCIM」→「Camera」に進みます</li>
+            <li>投稿したい写真を、PC のフォルダにコピーします</li>
+            <li>
+              PC で <Link href="/upload/bulk" className="font-bold underline">まとめて投稿</Link> を開き、コピーした写真かフォルダをドラッグ＆ドロップします
+            </li>
+          </Steps>
+          <p>Mac は Android をケーブルでつないでもそのままでは開けないことが多いので、方法1を使ってください。</p>
+        </Section>
+
+        <Section title="この送り方では位置情報が消えます">
+          <ul className="ml-4 list-disc space-y-1">
+            <li>LINE で送った写真</li>
+            <li>X・Instagram などの SNS に載せた写真を保存したもの</li>
+            <li>写真を写したスクリーンショット</li>
+          </ul>
+          <p>位置情報の無い写真は、まとめて投稿の画面で「位置情報が無い」に分けられ、投稿されません。</p>
+        </Section>
+
+        <Section title="うまくいかないとき">
+          <ul className="ml-4 list-disc space-y-1">
+            <li>
+              <span className="font-bold">「位置情報が無い」と出る</span>: 撮ったときにカメラの位置情報が OFF だったか、上の消える送り方で移した写真です
+            </li>
+            <li>
+              <span className="font-bold">「近くにポケふたが無い」と出る</span>: 蓋から 50m 以内で撮った写真だけを投稿できます。画面に一番近い蓋までの距離が出ます
+            </li>
+          </ul>
+        </Section>
+
+        <div className="mt-10 flex flex-wrap gap-2">
+          <Link href="/upload/bulk" className="rounded-lg bg-[#BF5640] px-4 py-2 text-sm font-bold text-white">
+            まとめて投稿を開く
+          </Link>
+          <Link href="/upload" className="rounded-lg border border-[#2A2A2A]/20 bg-white px-4 py-2 text-sm font-bold">
+            1枚ずつ投稿する
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
