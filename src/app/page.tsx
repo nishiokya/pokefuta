@@ -215,6 +215,8 @@ export default function HomePage() {
   };
 
   // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
+  // ヒーローにぬいぐるみの枠（取得中を含む）があるか。無いときはスマホの「募集中」を2行目でなく「近くを探す」の右に入れる
+  const plushInHero = plushFeature === undefined || (plushFeature != null && plushFeature.count > 0);
   const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
   const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
 
@@ -323,9 +325,9 @@ export default function HomePage() {
           </div>
 
           {/*
-            行動のカード2枚。「近くを探す」は常連が一番使う機能（/nearby）で、待たずに出せるので左に置く。
+            行動のカード（＋ぬいぐるみの特集）。「近くを探す」は常連が一番使う機能（/nearby）で、待たずに出せるので左に置く。
             「◯◯で募集中」は見出しの「写真で埋めよう」の残りを、写真の無い蓋が一番多い県で具体的に見せる。
-            completion の応答を待って右に現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
+            completion の応答を待って PC は右、スマホは次の行に横いっぱいで現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
           */}
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
             <Link
@@ -343,10 +345,70 @@ export default function HomePage() {
                 </span>
               </span>
             </Link>
+            {/*
+              ぬいぐるみの特集。最新の投稿の下へ一度下げた（2026-10-18）が、ヒーローに戻した（2026-10-22）。
+              スマホは「近くを探す」の右に半分の幅で並べ、PC は2枚の下に横いっぱいで置く（sm:order-last）。
+              DOM の順はスマホの見た目に合わせてあり、PC だけ読み上げ・Tab の順が見た目と食い違う。
+              取得を待って後から差し込むとヒーローより下がまとめて押し下げられる（CLS、#338）ので、
+              取得中は同じ場所に枠を置いておく（スマホは行の高さに伸びる）。取れなかったときだけ枠ごと消す
+            */}
+            {plushFeature === undefined && (
+              <div className="rounded-[8px] border border-[#7B63A8]/10 bg-white/60 sm:order-last sm:col-span-2 sm:h-[76px]" aria-hidden="true" />
+            )}
+            {plushFeature && plushFeature.count > 0 && (
+              <Link
+                href="/photos/plush"
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0"
+              >
+                {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは半分の幅なので1枚だけ、他のカードの丸と同じ 40px に縮める */}
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {plushFeature.photos.map((photo, index) => {
+                    const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                    const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                    const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                    const src = `/api/photo/${photo.id}?size=small`;
+                    return (
+                      <div key={photo.id} className={`relative h-14 w-14 ${index > 0 ? 'max-sm:hidden' : ''}`}>
+                        <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                          <img src={src} alt="" width={56} height={56} loading="lazy"
+                            className={lidClip ? undefined : 'h-full w-full object-cover'}
+                            style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                        </div>
+                        {plushClip && (
+                          <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                            <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A4A4A] sm:text-base">
+                    <span className="truncate">ぬいぐるみ<span className="max-sm:hidden">と旅するポケふた</span><span className="sm:hidden">特集</span></span>
+                    <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                  </p>
+                  <p className="whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className="hidden sm:inline">ぬいぐるみと一緒に撮られた</span>写真 {plushFeature.count}枚
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline"><span className="max-sm:hidden">見る </span>›</span>
+                  </p>
+                </div>
+              </Link>
+            )}
+            {/*
+              スマホでは「募集中」が2行目に1枚で現れ、行ごと増える。取得中は同じ高さ（丸の分）の枠で行を取っておく。
+              PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない。
+              ぬいぐるみが取れなかったときは右半分が空くので、そこへ入れる（横いっぱいにしない）
+            */}
+            {!completionLoaded && (
+              <div className={`rounded-[8px] border border-transparent p-2.5 sm:hidden ${plushInHero ? 'max-sm:col-span-2' : ''}`} aria-hidden="true">
+                <span className="block h-10 w-10" />
+              </div>
+            )}
             {wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
-                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4"
+                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
               >
                 {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">
@@ -363,55 +425,6 @@ export default function HomePage() {
               </a>
             )}
           </div>
-
-          {/*
-            ぬいぐるみの特集。最新の投稿の下へ一度下げた（2026-10-18）が、ヒーローに戻した（2026-10-22）。
-            取得を待って後から差し込むとヒーローより下がまとめて押し下げられる（CLS、#338）ので、
-            取得中は同じ高さの枠を置いておく。取れなかったときだけ枠ごと消す
-          */}
-          {plushFeature === undefined && (
-            <div className="relative mt-2 h-[60px] rounded-[8px] border border-[#7B63A8]/10 bg-white/60 sm:mt-3 sm:h-[76px]" aria-hidden="true" />
-          )}
-          {plushFeature && plushFeature.count > 0 && (
-            <Link
-              href="/photos/plush"
-              className="group relative mt-2 flex h-[60px] min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white px-2.5 shadow-sm transition hover:shadow sm:mt-3 sm:h-[76px] sm:gap-3 sm:px-4"
-            >
-              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは縮める */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {plushFeature.photos.map((photo) => {
-                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                  const src = `/api/photo/${photo.id}?size=small`;
-                  return (
-                    <div key={photo.id} className="relative h-14 w-14">
-                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy"
-                          className={lidClip ? undefined : 'h-full w-full object-cover'}
-                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                      </div>
-                      {plushClip && (
-                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A4A4A] sm:text-base">
-                  <span className="truncate">ぬいぐるみと旅するポケふた</span>
-                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                </p>
-                <p className="whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
-                  <span className="hidden sm:inline">ぬいぐるみと一緒に撮られた</span>写真 {plushFeature.count}枚
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-          )}
 
         </section>
 
