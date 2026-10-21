@@ -431,11 +431,11 @@ export default function HomePage() {
             )}
             {/*
               全部そろった後も投稿は集め続けているので、お礼で終わらせず「別の季節・2枚目」へつなぐ
-              （北極星は初回投稿→2回目）。行き先は投稿。未ログインは募集の一覧と同じくログインへ
+              （北極星は初回投稿→2回目）。行き先は投稿。未ログインはログインを挟んで投稿へ戻す
             */}
             {allCollected && (
               <Link
-                href={isLoggedIn ? '/upload' : '/login'}
+                href={isLoggedIn ? '/upload' : '/login?redirect=/upload'}
                 className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#E8A33D]/35 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1D6] text-[#E8A33D] sm:h-12 sm:w-12">
