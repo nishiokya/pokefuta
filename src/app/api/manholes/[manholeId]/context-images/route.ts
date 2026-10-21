@@ -133,6 +133,11 @@ function metadataConfidence(metadata: unknown, key: string, fieldName: string) {
 }
 
 async function getImageDimensions(buffer: Buffer) {
+  // iOS の HEIC/HEIF も受けるので拒否はしないが、JPEG/PNG/WebP 以外（中身で判定）は sharp に渡さず寸法を取らない
+  // （src/lib/image-sniff.ts）。寸法は任意の項目
+  if (!sniffImageFormat(buffer)) {
+    return { width: null, height: null };
+  }
   try {
     const metadata = await sharp(buffer).metadata();
     return {
@@ -324,14 +329,6 @@ export async function POST(
 
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
-
-    // 申告の file.type だけでなく中身でも確かめる。違う形式を sharp に渡さない（src/lib/image-sniff.ts）
-    if (!sniffImageFormat(arrayBuffer)) {
-      return NextResponse.json({
-        success: false,
-        error: 'Unsupported image content type',
-      }, { status: 400 });
-    }
 
     const shotContextLabel = parseShotContextLabel(formData.get('shot_context_label'));
     const shotContextConfidence = parseConfidence(
