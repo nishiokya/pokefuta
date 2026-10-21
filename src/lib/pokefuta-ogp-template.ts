@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -408,6 +409,10 @@ async function toHeroPhotoUri(photoBuffer: Buffer): Promise<string> {
   // 正方形に切ったあと、周囲へ台紙の色で余白を足してから円に入れる。
   // 余白なしだと蓋が正方形いっぱいに写っている写真で、円の上下左右が
   // 蓋を削ってしまう（内接円は正方形の辺の中点にしか触れないため）。
+  // 投稿写真は利用者が送った画像なので、JPEG/PNG/WebP 以外は sharp に渡さない（呼び出し側が catch して代替画像を出す）
+  if (!sniffImageFormat(photoBuffer)) {
+    throw new Error('hero photo is not JPEG/PNG/WebP by content');
+  }
   const inset = 34;
   const inner = 620 - inset * 2;
   const resized = await sharp(photoBuffer)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
@@ -213,6 +214,13 @@ export async function POST(request: NextRequest) {
 
     // 6. R2 アップロード + サムネイル生成
     const arrayBuffer = await file.arrayBuffer();
+    // 申告の file.type だけでなく中身でも確かめる。違う形式を sharp に渡さない（src/lib/image-sniff.ts）
+    if (!sniffImageFormat(arrayBuffer)) {
+      return NextResponse.json(
+        { success: false, error: 'JPEG/PNG/WebP形式の画像のみ投稿できます' },
+        { status: 400 }
+      );
+    }
     const buffer = Buffer.from(arrayBuffer);
     const storageKey = generateDesignManholeStorageKey(file.type);
     uploadedStorageKey = storageKey;

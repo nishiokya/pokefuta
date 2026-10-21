@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import {
   Database,
   ManholeClassifierLabel,
@@ -323,6 +324,14 @@ export async function POST(
 
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
+
+    // 申告の file.type だけでなく中身でも確かめる。違う形式を sharp に渡さない（src/lib/image-sniff.ts）
+    if (!sniffImageFormat(arrayBuffer)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Unsupported image content type',
+      }, { status: 400 });
+    }
 
     const shotContextLabel = parseShotContextLabel(formData.get('shot_context_label'));
     const shotContextConfidence = parseConfidence(
