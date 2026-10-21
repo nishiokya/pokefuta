@@ -78,18 +78,11 @@ const nextConfig = {
       ],
     },
   },
+  // 画像最適化（/_next/image）は止める。next/image はどこでも使っておらず、写真は /api/photo と R2 から配る。
+  // 生かしておくと、sharp（libheif）の RCE（GHSA-2xp9-vwfh-vxw4）や巨大画像の DoS を未認証で受ける入口になる。
+  // 以前の remotePatterns は *.supabase.co のワイルドカードで、他人の Supabase プロジェクトの画像も取り込めた（2026-10-22）
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.r2.cloudflarestorage.com',
-      },
-    ],
-    formats: ['image/webp', 'image/avif'],
+    unoptimized: true,
   },
   redirects: async () => [
     // www 付きは apex へまとめる。www でも 200 を返していて、Search Console で重複の扱いになっていた。
