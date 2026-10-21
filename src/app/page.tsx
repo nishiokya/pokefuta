@@ -6,6 +6,7 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Heart,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -214,11 +215,15 @@ export default function HomePage() {
     }
   };
 
-  // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
   // ヒーローにぬいぐるみの枠（取得中を含む）があるか。無いときはスマホの「募集中」を2行目でなく「近くを探す」の右に入れる
   const plushInHero = plushFeature === undefined || (plushFeature != null && plushFeature.count > 0);
+  // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
   const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
   const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
+  // 全部の蓋に写真が届いたら、募集カードの場所にお礼を出す。新しい蓋が設置されれば incomplete に戻り、募集カードに入れ替わる
+  const allCollected = completion != null && completion.completeCount > 0 && completion.incompleteCount === 0;
+  // お礼カードはスマホでぬいぐるみが無いと半分の幅になるので、文の一部を削る
+  const thanksLong = plushInHero ? undefined : 'max-sm:hidden';
 
   const sortedFeed = [...feed].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -423,6 +428,29 @@ export default function HomePage() {
                   </span>
                 </span>
               </a>
+            )}
+            {/*
+              全部そろった後も投稿は集め続けているので、お礼で終わらせず「別の季節・2枚目」へつなぐ
+              （北極星は初回投稿→2回目）。行き先は投稿。未ログインはログインを挟んで投稿へ戻す
+            */}
+            {allCollected && (
+              <Link
+                href={isLoggedIn ? '/upload' : '/login?redirect=/upload'}
+                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#E8A33D]/35 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1D6] text-[#E8A33D] sm:h-12 sm:w-12">
+                  <Heart className="h-5 w-5 fill-current sm:h-6 sm:w-6" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">
+                    <span className={thanksLong}>全国のポケふたに</span>写真がそろいました<span className="max-sm:hidden">。ありがとう！</span>
+                  </span>
+                  <span className="block whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className={thanksLong}>別の季節や</span>2枚目<span className={thanksLong}>の写真</span>も<span className={thanksLong}>、まだまだ</span>募集中
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                  </span>
+                </span>
+              </Link>
             )}
           </div>
 
