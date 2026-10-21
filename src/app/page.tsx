@@ -215,6 +215,8 @@ export default function HomePage() {
   };
 
   // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
+  // ヒーローにぬいぐるみの枠（取得中を含む）があるか。無いときはスマホの「募集中」を2行目でなく「近くを探す」の右に入れる
+  const plushInHero = plushFeature === undefined || (plushFeature != null && plushFeature.count > 0);
   const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
   const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
 
@@ -395,17 +397,18 @@ export default function HomePage() {
             )}
             {/*
               スマホでは「募集中」が2行目に1枚で現れ、行ごと増える。取得中は同じ高さ（丸の分）の枠で行を取っておく。
-              PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない
+              PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない。
+              ぬいぐるみが取れなかったときは右半分が空くので、そこへ入れる（横いっぱいにしない）
             */}
             {!completionLoaded && (
-              <div className="rounded-[8px] border border-transparent p-2.5 max-sm:col-span-2 sm:hidden" aria-hidden="true">
+              <div className={`rounded-[8px] border border-transparent p-2.5 sm:hidden ${plushInHero ? 'max-sm:col-span-2' : ''}`} aria-hidden="true">
                 <span className="block h-10 w-10" />
               </div>
             )}
             {wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
-                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:col-span-2 sm:gap-3 sm:p-4"
+                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
               >
                 {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">
