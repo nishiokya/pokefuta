@@ -18,8 +18,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-// 判定は毎朝書かれる。数分古くてよいので都度の読み込みは避ける
-export const revalidate = 600;
+// 毎回サーバーで描く。revalidate だけだと、supabase-js の PostgREST GET が Next の Data Cache に乗り、
+// 採点した写真が一覧に出たり消えたりした（/design-manholes と同じ理由）
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 // 感想は公式 X へ（/about の「フィードバック」と同じ宛先）。本文にページの URL を入れておく
 const FEEDBACK_URL = `https://x.com/intent/post?text=${encodeURIComponent('@pokemonmanhole ぬいぐるみと旅するポケふた（ベータ）の感想: ')}&url=${encodeURIComponent('https://pokefuta.com/photos/plush')}`;

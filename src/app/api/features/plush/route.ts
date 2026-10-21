@@ -3,8 +3,10 @@ import { hasPlushClip } from '@/lib/photo-ai-tags';
 import { loadPlushPhotos } from '@/lib/plush-photos';
 
 // トップの特集カード用。ぬいぐるみの写真の新しい数枚と、特集ページにある枚数を返す。
-// 判定は毎朝書かれるので、CDN に数分置いてよい
-export const revalidate = 600;
+// 判定は毎朝書かれるので、CDN に数分置いてよい（下の s-maxage）。
+// Next の Data Cache には置かない（古い PostgREST の応答で新着が出ない。/photos/plush と同じ）
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
   // 枚数は特集ページと同じ集合（蓋とぬいぐるみを切り抜ける写真だけ）、カードの3枚は新着
