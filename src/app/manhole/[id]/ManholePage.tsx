@@ -1115,7 +1115,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       @{userLabel}
                     </span>
                   )}
-                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} />
+                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
                 </div>
                 {dateLabel && (
                   // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは

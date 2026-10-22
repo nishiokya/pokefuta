@@ -1,4 +1,10 @@
-import { LEGEND_DESCRIPTION, REGULAR_BADGE_LABEL, type RegularTier } from '@/lib/regular-badges';
+import {
+  LEGEND_DESCRIPTION,
+  REGULAR_BADGE_ICON,
+  REGULAR_BADGE_LABEL,
+  REGULAR_BADGE_NAME,
+  type RegularTier,
+} from '@/lib/regular-badges';
 
 /** 投稿者名の横に付ける 🏆 LEGEND（虹）/ 👑 MASTER（金）/ EXPLORER（シルバー）/ 🌱 ROOKIE（若葉）。条件を書くのは LEGEND だけ */
 const TIER_CLASS: Record<RegularTier, string> = {
@@ -9,11 +15,30 @@ const TIER_CLASS: Record<RegularTier, string> = {
 };
 
 const SIZE_CLASS = {
+  // 写真カードのような狭い場所用。ラベルの代わりにアイコン1つを丸に入れる
+  icon: 'inline-flex h-[18px] w-[18px] items-center justify-center text-[11px]',
   sm: 'px-1.5 py-0.5 text-[10px]',
   md: 'px-3 py-1 text-xs',
 } as const;
 
-export default function RegularBadge({ tier, size = 'sm' }: { tier: RegularTier; size?: keyof typeof SIZE_CLASS }) {
+export type RegularBadgeSize = keyof typeof SIZE_CLASS;
+
+export default function RegularBadge({ tier, size = 'sm' }: { tier: RegularTier; size?: RegularBadgeSize }) {
+  if (size === 'icon') {
+    const name = REGULAR_BADGE_NAME[tier];
+    const title = tier === 'legend' ? `${name}（${LEGEND_DESCRIPTION}）` : name;
+    return (
+      <span
+        role="img"
+        aria-label={name}
+        title={title}
+        className={`shrink-0 rounded-full ${SIZE_CLASS.icon} leading-none shadow-sm ${TIER_CLASS[tier]}`}
+      >
+        {REGULAR_BADGE_ICON[tier]}
+      </span>
+    );
+  }
+
   return (
     <span
       title={tier === 'legend' ? LEGEND_DESCRIPTION : undefined}
