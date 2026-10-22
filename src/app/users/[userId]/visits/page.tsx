@@ -171,17 +171,29 @@ export default async function UserVisitsPage({ params }: PageProps) {
       />
       <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
         <Breadcrumb href="/" label="ホームへ" />
-        <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-5 py-6 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-8">
+        <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-4 py-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-6">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
+            {/*
+              共有はアイコンだけにして見出しの上の行に置く。以前はヒーローの下に横いっぱいの3ボタンが
+              あり、本体（バッジと写真）を押し下げていた
+            */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
                 <Stamp className="h-3.5 w-3.5" />
                 公開スタンプ帳
               </div>
               <UserRegularBadge userId={data.userId} />
+              <ShareButtons
+                compact
+                className="ml-auto"
+                label="自慢する"
+                shareText={shareText}
+                shareUrl={pageUrl}
+                hashtags={['ポケふたスタンプ帳']}
+              />
             </div>
-            <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl">
+            <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
               {data.displayName}のスタンプ帳
             </h1>
             {data.bio && (
@@ -214,12 +226,10 @@ export default async function UserVisitsPage({ params }: PageProps) {
               </div>
             )}
 
-            <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+            {/* 全国達成率は下の進捗バーと同じことを言うので、数字の欄は置かずバーの説明に入れる */}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:mt-5">
               <HeroStat label="訪問スタンプ" value={`${data.totalVisits}`} />
               <HeroStat label="都道府県" value={`${data.prefectureCount}/${totalPrefectures}`} />
-              {completionRate !== null && (
-                <HeroStat label="全国達成率" value={`${completionRate.toFixed(1)}%`} />
-              )}
             </div>
 
             {completionRate !== null && (
@@ -231,19 +241,11 @@ export default async function UserVisitsPage({ params }: PageProps) {
                   />
                 </div>
                 <p className="mt-1.5 text-[11px] font-bold text-[#6A4D36]">
-                  全国のポケふた制覇まであと{remainingCount}枚
+                  全国達成率 <span className="text-[#B5483C]">{completionRate.toFixed(1)}%</span>・制覇まであと{remainingCount}枚
                 </p>
               </div>
             )}
 
-            <div className="mt-6">
-              <ShareButtons
-                label="このスタンプ帳を自慢する"
-                shareText={shareText}
-                shareUrl={pageUrl}
-                hashtags={['ポケふたスタンプ帳']}
-              />
-            </div>
           </div>
         </section>
 
@@ -263,13 +265,14 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </p>
         )}
 
+        {/* 県へ飛ぶナビ。中身は下の県見出し（県名・枚数）と同じなので、見渡せる PC では出さない。スマホは横スクロールの1行に収める（40県を超えると折り返しで10行になった） */}
         {prefectureGroups.length > 1 && (
-          <nav aria-label="都道府県で移動" className="mt-6 flex flex-wrap gap-2">
+          <nav aria-label="都道府県で移動" className="-mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
             {prefectureGroups.map((group) => (
               <a
                 key={group.name}
                 href={`#pref-${group.name}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#8C6A4A]/25 bg-white/70 px-3 py-1.5 text-xs font-bold text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
+                className="inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap rounded-full border border-[#8C6A4A]/25 bg-white/70 px-3 py-1.5 text-xs font-bold text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
               >
                 <MapPin className="h-3 w-3" />
                 {group.name}
@@ -287,7 +290,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </section>
         ) : (
           prefectureGroups.map((group) => (
-            <section key={group.name} id={`pref-${group.name}`} className="mt-8 scroll-mt-20">
+            <section key={group.name} id={`pref-${group.name}`} className="mt-6 scroll-mt-20 sm:mt-8">
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
                   <MapPin className="h-5 w-5 text-[#B5483C]" />
@@ -295,7 +298,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 </h2>
                 <p className="text-xs font-bold text-[#6A4D36]">{group.visits.length}枚</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6">
                 {group.visits.map((visit) => (
                   <VisitCard key={visit.id} visit={visit} />
                 ))}
@@ -406,11 +409,15 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
   const title = visit.manhole?.title
     || [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ')
     || 'ポケふた';
-  const locationLabel = [visit.manhole?.prefecture, visit.manhole?.municipality].filter(Boolean).join(' ');
+  // タイトルはたいてい「愛知県/豊橋市」で、場所の行と同じことを2回言う。そのときは場所の行を出さない
+  const municipality = visit.manhole?.municipality;
+  const locationLabel = municipality && title.includes(municipality)
+    ? ''
+    : [visit.manhole?.prefecture, municipality].filter(Boolean).join(' ');
 
   const card = (
-    <div className="group relative flex aspect-[4/5] flex-col overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="relative flex-1 overflow-hidden bg-[#E9DEC9]">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative aspect-square overflow-hidden bg-[#E9DEC9] sm:aspect-[4/3]">
         {photoUrl ? (
           <img
             src={photoUrl}
@@ -425,7 +432,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
           </div>
         )}
       </div>
-      <div className="p-2.5">
+      <div className="p-1.5 sm:p-2.5">
         <div className="flex flex-wrap gap-1">
           <LandscapePhotoBadge isLandscape={visit.isLandscape} />
           <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} />
@@ -445,7 +452,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
           </p>
         )}
         {visit.comment && (
-          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#6A4D36]">
+          <p className="mt-1 line-clamp-1 text-[11px] leading-snug text-[#6A4D36] sm:line-clamp-2">
             {visit.comment}
           </p>
         )}
@@ -458,7 +465,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
   }
 
   return (
-    <Link href={`/manhole/${visit.manholeId}`} className="block">
+    <Link href={`/manhole/${visit.manholeId}`} className="block h-full">
       {card}
     </Link>
   );

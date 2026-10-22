@@ -14,6 +14,9 @@ type PrefectureBadgeShelfProps = {
 const NEAR_COMPLETE_THRESHOLD = 3;
 const NEAR_COMPLETE_LIMIT = 6;
 
+// 「2026年5月15日」→「2026/5/15」
+const shortDate = (label: string) => label.replace(/[年月]/g, '/').replace('日', '');
+
 const badgeUrl = (userId: string, prefectureName: string) =>
   `/users/${encodeURIComponent(userId)}/prefectures/${encodeURIComponent(prefectureName)}`;
 
@@ -45,6 +48,7 @@ export default function PrefectureBadgeShelf({
     (prefecture) => !prefecture.earnedAt && prefecture.visited > 0
   );
 
+  // バッジが大きいと棚が縦に長くなりすぎる（35県で PC 約1500px、スマホはその倍）ので、小さくして列を増やす
   return (
     <section className="mt-8">
       <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -59,7 +63,7 @@ export default function PrefectureBadgeShelf({
       </div>
 
       {earned.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
           {earned.map((prefecture) => (
             <EarnedBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
           ))}
@@ -75,7 +79,7 @@ export default function PrefectureBadgeShelf({
             <RotateCcw className="h-4 w-4 text-[#B5483C]" />
             新しいポケふたが増えました
           </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {rechallenge.map((prefecture) => (
               <RechallengeBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
             ))}
@@ -88,7 +92,7 @@ export default function PrefectureBadgeShelf({
           <h3 className="mb-2 mt-6 font-pixelJp text-sm font-bold text-[#4F3828]">
             あと少しでバッジ
           </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {nearComplete.map((prefecture) => (
               <NearCompleteBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
             ))}
@@ -112,19 +116,20 @@ function EarnedBadge({
   return (
     <Link
       href={badgeUrl(userId, prefecture.name)}
-      className="group relative flex flex-col items-center rounded-[10px] border-2 border-[#C9992F] bg-gradient-to-b from-[#FFF3D0] to-[#F7E2AE] px-3 py-4 text-center shadow-[0_6px_16px_rgba(160,120,40,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(160,120,40,0.3)]"
+      className="group relative flex flex-col items-center rounded-[10px] border-2 border-[#C9992F] bg-gradient-to-b from-[#FFF3D0] to-[#F7E2AE] px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(160,120,40,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(160,120,40,0.3)]"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
-        <Award className="h-6 w-6" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
+        <Award className="h-4 w-4" />
       </div>
-      <p className="mt-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+      <p className="mt-1 font-pixelJp text-xs font-bold leading-tight text-[#4F3828] sm:text-sm">
         {prefecture.name}
       </p>
       <p className="mt-1 font-pixel text-base leading-none text-[#B5483C]">
         {prefecture.earnedTotal}/{prefecture.earnedTotal}
       </p>
-      <p className="mt-2 rounded-full bg-[#C9992F]/15 px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#8A6A1E]">
-        {prefecture.earnedAt ? `${formatDateJaJst(prefecture.earnedAt)} 制覇` : '制覇済み'}
+      <p className="mt-1.5 whitespace-nowrap rounded-full bg-[#C9992F]/15 px-1.5 sm:px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#8A6A1E]">
+        {/* スマホの4列でも1行に収まるよう数字だけの日付にする。制覇の意味は棚の見出しが持つ */}
+        {prefecture.earnedAt ? shortDate(formatDateJaJst(prefecture.earnedAt)) : '制覇済み'}
       </p>
       {newUnvisited > 0 && (
         <span className="absolute -right-1.5 -top-2 rotate-6 rounded-full bg-[#B5483C] px-2 py-0.5 font-pixel text-[11px] font-bold leading-none text-white shadow-md">
@@ -145,19 +150,20 @@ function RechallengeBadge({
   return (
     <Link
       href={badgeUrl(userId, prefecture.name)}
-      className="group flex flex-col items-center rounded-[10px] border-2 border-[#B5483C]/60 bg-gradient-to-b from-[#FFF3D0] to-[#F8D9C4] px-3 py-4 text-center shadow-[0_6px_16px_rgba(181,72,60,0.18)] transition hover:-translate-y-0.5"
+      className="group flex flex-col items-center rounded-[10px] border-2 border-[#B5483C]/60 bg-gradient-to-b from-[#FFF3D0] to-[#F8D9C4] px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(181,72,60,0.18)] transition hover:-translate-y-0.5"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
-        <Award className="h-6 w-6" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
+        <Award className="h-4 w-4" />
       </div>
-      <p className="mt-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+      <p className="mt-1 font-pixelJp text-xs font-bold leading-tight text-[#4F3828] sm:text-sm">
         {prefecture.name}
       </p>
       <p className="mt-1 font-pixel text-base leading-none text-[#B5483C]">
         {prefecture.visited}/{prefecture.total}
       </p>
-      <p className="mt-2 rounded-full bg-[#B5483C] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">
-        新しいふた あと{newUnvisitedSinceEarned(prefecture)}枚
+      <p className="mt-1.5 whitespace-nowrap rounded-full bg-[#B5483C] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">
+        {/* 4列に収まるよう「新しいふた」は段の見出しに任せる */}
+        あと{newUnvisitedSinceEarned(prefecture)}枚
       </p>
     </Link>
   );
@@ -173,18 +179,18 @@ function NearCompleteBadge({
   return (
     <Link
       href={badgeUrl(userId, prefecture.name)}
-      className="group flex flex-col items-center rounded-[10px] border-2 border-dashed border-[#8C6A4A]/45 bg-white/60 px-3 py-4 text-center transition hover:border-[#B5483C]/50 hover:bg-[#F8D9C4]/50"
+      className="group flex flex-col items-center rounded-[10px] border-2 border-dashed border-[#8C6A4A]/45 bg-white/60 px-2 py-2.5 text-center transition hover:border-[#B5483C]/50 hover:bg-[#F8D9C4]/50"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-[#8C6A4A]/45 text-[#8C6A4A]">
-        <Lock className="h-5 w-5" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-[#8C6A4A]/45 text-[#8C6A4A]">
+        <Lock className="h-4 w-4" />
       </div>
-      <p className="mt-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+      <p className="mt-1 font-pixelJp text-xs font-bold leading-tight text-[#4F3828] sm:text-sm">
         {prefecture.name}
       </p>
       <p className="mt-1 font-pixel text-base leading-none text-[#8C6A4A]">
         {prefecture.visited}/{prefecture.total}
       </p>
-      <p className="mt-2 rounded-full bg-[#B5483C]/10 px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">
+      <p className="mt-1.5 whitespace-nowrap rounded-full bg-[#B5483C]/10 px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#B5483C]">
         あと{prefecture.remaining}枚
       </p>
     </Link>
@@ -199,7 +205,7 @@ function EmptyShelf({ target }: { target: PublicPrefectureProgress | null }) {
         {[0, 1, 2].map((slot) => (
           <div
             key={slot}
-            className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-[#8C6A4A]/30 text-[#8C6A4A]/50"
+            className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-[#8C6A4A]/30 text-[#8C6A4A]/50"
           >
             <Award className="h-5 w-5" />
           </div>
