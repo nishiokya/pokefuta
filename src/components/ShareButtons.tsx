@@ -13,6 +13,8 @@ interface ShareButtonsProps {
   hashtags?: string[];
   analyticsParams?: PokefutaEventParams;
   className?: string;
+  // 小さな丸いアイコンだけで横に並べる（ページの主役が別にあり、共有は脇に置きたいとき）
+  compact?: boolean;
 }
 
 function showCopyToast(success: boolean) {
@@ -30,6 +32,7 @@ export default function ShareButtons({
   hashtags = [],
   analyticsParams,
   className,
+  compact = false,
 }: ShareButtonsProps) {
   const { trackShareClick, trackShareX, trackShareLine, trackCopyLink } = useAnalytics();
 
@@ -58,6 +61,24 @@ export default function ShareButtons({
       showCopyToast(false);
     }
   };
+
+  if (compact) {
+    const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition';
+    return (
+      <div className={`flex items-center gap-1.5 ${className ?? ''}`}>
+        {label && <span className="mr-0.5 font-pixelJp text-[10px] text-[#6A4D36]">{label}</span>}
+        <button onClick={handleShareX} aria-label="Xで共有" title="Xで共有" className={`${iconButton} bg-[#2A2A2A] text-white hover:bg-black`}>
+          <span className="font-pixel text-sm">X</span>
+        </button>
+        <button onClick={handleShareLine} aria-label="LINEで共有" title="LINEで共有" className={`${iconButton} bg-[#06C755] text-white hover:bg-[#05B34C]`}>
+          <MessageCircle className="h-4 w-4" />
+        </button>
+        <button onClick={handleShare} aria-label="共有" title="共有" className={`${iconButton} border border-[#7B63A8]/25 bg-white text-[#7B63A8] hover:bg-[#7B63A8]/5`}>
+          <Share2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
