@@ -314,20 +314,23 @@ export default async function UserVisitsPage({ params }: PageProps) {
             group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }).length > 0))}
         />
 
-        <GuestOnly>
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
             <Sparkles className="h-5 w-5 text-[#B5483C]" />
-            あなたもポケふた旅へ
+            <GuestOnly fallback="次のポケふた旅へ">あなたもポケふた旅へ</GuestOnly>
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <CtaCard
-              href="/visits"
-              icon={<Stamp className="h-5 w-5" />}
-              title="自分のスタンプ帳を作る"
-              description="無料ではじめて訪問を記録・公開しよう"
-              highlight
-            />
+          {/* 枚数はログイン状態で2〜3枚に変わるので、列数を決め打ちせず並んだ枚数で等分する */}
+          <div className="grid gap-3 sm:auto-cols-fr sm:grid-flow-col">
+            {/* ログイン中の人（持ち主本人を含む）はもうスタンプ帳を持っている */}
+            <GuestOnly>
+              <CtaCard
+                href="/visits"
+                icon={<Stamp className="h-5 w-5" />}
+                title="自分のスタンプ帳を作る"
+                description="無料ではじめて訪問を記録・公開しよう"
+                highlight
+              />
+            </GuestOnly>
             <CtaCard
               href="/nearby"
               icon={<Search className="h-5 w-5" />}
@@ -342,7 +345,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
             />
           </div>
         </section>
-        </GuestOnly>
       </main>
 
     </div>
