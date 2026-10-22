@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Award, Lock, RotateCcw, Trophy } from 'lucide-react';
 import { formatDateJaJst } from '@/lib/date';
+import { newUnvisitedSinceEarned } from '@/lib/prefecture-new-manholes';
 import type { PublicPrefectureProgress } from '@/lib/user-prefecture-progress';
 
 type PrefectureBadgeShelfProps = {
@@ -36,8 +37,8 @@ export default function PrefectureBadgeShelf({
   // 制覇したあとに新しいポケふたが増え、まだ訪問していない県。バッジは残したまま
   // 「また行く理由」として別の段に出す。新設はニュースになるので、ここが一番動きのある段になる
   const rechallenge = earned
-    .filter((prefecture) => prefecture.remaining > 0)
-    .sort((a, b) => a.remaining - b.remaining);
+    .filter((prefecture) => newUnvisitedSinceEarned(prefecture) > 0)
+    .sort((a, b) => newUnvisitedSinceEarned(a) - newUnvisitedSinceEarned(b));
 
   // リーチ候補が無いときだけ、一番進んでいる県を「次の目標」に使う
   const nextTarget = prefectures.find(
@@ -106,7 +107,7 @@ function EarnedBadge({
   prefecture: PublicPrefectureProgress;
 }) {
   // 制覇後に増えて、まだ訪問していない枚数。バッジは残し、角のリボンで「また行ける」を知らせる
-  const newUnvisited = prefecture.remaining;
+  const newUnvisited = newUnvisitedSinceEarned(prefecture);
 
   return (
     <Link
@@ -156,7 +157,7 @@ function RechallengeBadge({
         {prefecture.visited}/{prefecture.total}
       </p>
       <p className="mt-2 rounded-full bg-[#B5483C] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">
-        新しいふた あと{prefecture.remaining}枚
+        新しいふた あと{newUnvisitedSinceEarned(prefecture)}枚
       </p>
     </Link>
   );
