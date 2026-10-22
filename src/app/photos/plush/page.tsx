@@ -135,7 +135,7 @@ export default async function PlushPhotosPage() {
                       <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-semibold text-[#6A4D36]">
                         <UserRound className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{photo.posterName}</span>
-                        <PosterRegularBadge publicUserId={photo.posterPublicId} />
+                        <PosterRegularBadge publicUserId={photo.posterPublicId} size="icon" />
                         <span className="ml-auto shrink-0 text-[#8b816f]">{formatDateJaJst(shotAt)}</span>
                       </div>
                     </div>

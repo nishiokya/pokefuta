@@ -217,7 +217,7 @@ export default function VisitPhotoCard({
                   >
                     {visiblePosterName}
                   </span>
-                  <PosterRegularBadge publicUserId={posterPublicId} />
+                  <PosterRegularBadge publicUserId={posterPublicId} size="icon" />
                 </>
               )}
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import RegularBadge from '@/components/RegularBadge';
+import RegularBadge, { type RegularBadgeSize } from '@/components/RegularBadge';
 import { fetchRegularBadges, type RegularBadges } from '@/lib/regular-badges';
 
 /**
@@ -19,7 +19,7 @@ export default function PosterRegularBadge({
   size = 'sm',
 }: {
   publicUserId: string | null | undefined;
-  size?: 'sm' | 'md';
+  size?: RegularBadgeSize;
 }) {
   const [badges, setBadges] = useState<RegularBadges | null>(null);
 

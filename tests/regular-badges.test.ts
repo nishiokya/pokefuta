@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   LEGEND_DESCRIPTION,
+  REGULAR_BADGE_ICON,
+  REGULAR_BADGE_NAME,
   REGULAR_BADGE_LABEL,
   STATIC_REGULARS_URL,
   fetchRegularBadges,
@@ -61,4 +63,12 @@ test('文言に判定の条件を入れない', () => {
 
 test('条件を見せるのは LEGEND の説明だけ', () => {
   assert.match(LEGEND_DESCRIPTION, /100枚以上/);
+});
+
+test('どの段階にもアイコンと名前があり、名前に条件を入れない', () => {
+  for (const tier of Object.keys(REGULAR_BADGE_LABEL) as Array<keyof typeof REGULAR_BADGE_LABEL>) {
+    assert.ok(REGULAR_BADGE_ICON[tier]);
+    assert.ok(REGULAR_BADGE_LABEL[tier].includes(REGULAR_BADGE_NAME[tier]));
+    assert.doesNotMatch(REGULAR_BADGE_NAME[tier], /[0-9０-９]|週|投稿/);
+  }
 });

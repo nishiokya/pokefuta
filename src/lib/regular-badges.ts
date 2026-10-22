@@ -33,6 +33,22 @@ export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
   rookie: '🌱 ROOKIE',
 };
 
+/** カードのような狭い場所で、ラベルの代わりに出すアイコン。名前は title / aria-label で伝える */
+export const REGULAR_BADGE_ICON: Record<RegularTier, string> = {
+  legend: '🏆',
+  crown: '👑',
+  regular: '🧭',
+  rookie: '🌱',
+};
+
+/** アイコンを抜いた名前（読み上げ・ツールチップ用） */
+export const REGULAR_BADGE_NAME: Record<RegularTier, string> = {
+  legend: 'LEGEND',
+  crown: 'MASTER',
+  regular: 'EXPLORER',
+  rookie: 'ROOKIE',
+};
+
 /** LEGEND の線。tracker の export_app_snapshot.py の LEGEND_MIN_MANHOLES と同じ値にする */
 export const LEGEND_MIN_MANHOLES = 100;
 
