@@ -22,6 +22,7 @@
     "test:manhole-stats": "tsx --test tests/manhole-stats.test.ts",
     "test:lid-spin": "tsx --test tests/lid-spin.test.ts",
     "test:prefecture-completion": "tsx --test tests/prefecture-completion.test.ts",
+    "test:share-text": "tsx --test tests/share-text.test.ts",
     "test:dex-url": "tsx --test tests/dex-url.test.ts tests/nearby-area.test.ts tests/prefecture-param.test.ts tests/pokemon-dex-url.test.ts",
     "test:manhole-detail": "tsx --test tests/manhole-detail.test.ts",
     "test:manhole-list": "tsx --test tests/manhole-list-client.test.ts",

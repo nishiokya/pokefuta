@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Award, Lock, Trophy } from 'lucide-react';
+import { Award, Lock, RotateCcw, Trophy } from 'lucide-react';
 import { formatDateJaJst } from '@/lib/date';
 import type { PublicPrefectureProgress } from '@/lib/user-prefecture-progress';
 
@@ -33,6 +33,12 @@ export default function PrefectureBadgeShelf({
     .sort((a, b) => a.remaining - b.remaining)
     .slice(0, NEAR_COMPLETE_LIMIT);
 
+  // 制覇したあとに新しいポケふたが増え、まだ訪問していない県。バッジは残したまま
+  // 「また行く理由」として別の段に出す。新設はニュースになるので、ここが一番動きのある段になる
+  const rechallenge = earned
+    .filter((prefecture) => prefecture.remaining > 0)
+    .sort((a, b) => a.remaining - b.remaining);
+
   // リーチ候補が無いときだけ、一番進んでいる県を「次の目標」に使う
   const nextTarget = prefectures.find(
     (prefecture) => !prefecture.earnedAt && prefecture.visited > 0
@@ -62,6 +68,20 @@ export default function PrefectureBadgeShelf({
         <EmptyShelf target={nearComplete[0] ?? nextTarget ?? null} />
       )}
 
+      {rechallenge.length > 0 && (
+        <>
+          <h3 className="mb-2 mt-6 flex items-center gap-1.5 font-pixelJp text-sm font-bold text-[#4F3828]">
+            <RotateCcw className="h-4 w-4 text-[#B5483C]" />
+            新しいポケふたが増えました
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {rechallenge.map((prefecture) => (
+              <RechallengeBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
+            ))}
+          </div>
+        </>
+      )}
+
       {nearComplete.length > 0 && (
         <>
           <h3 className="mb-2 mt-6 font-pixelJp text-sm font-bold text-[#4F3828]">
@@ -85,8 +105,8 @@ function EarnedBadge({
   userId: string;
   prefecture: PublicPrefectureProgress;
 }) {
-  // 制覇後に増えた枚数。バッジは残したうえで、増えた事実だけ静かに伝える
-  const addedSinceEarned = Math.max(prefecture.total - prefecture.earnedTotal, 0);
+  // 制覇後に増えて、まだ訪問していない枚数。バッジは残し、角のリボンで「また行ける」を知らせる
+  const newUnvisited = prefecture.remaining;
 
   return (
     <Link
@@ -105,11 +125,39 @@ function EarnedBadge({
       <p className="mt-2 rounded-full bg-[#C9992F]/15 px-2 py-0.5 font-pixelJp text-[10px] font-bold text-[#8A6A1E]">
         {prefecture.earnedAt ? `${formatDateJaJst(prefecture.earnedAt)} 制覇` : '制覇済み'}
       </p>
-      {addedSinceEarned > 0 && (
-        <p className="mt-1 font-pixelJp text-[10px] font-bold text-[#8C6A4A]">
-          その後{addedSinceEarned}枚 追加
-        </p>
+      {newUnvisited > 0 && (
+        <span className="absolute -right-1.5 -top-2 rotate-6 rounded-full bg-[#B5483C] px-2 py-0.5 font-pixel text-[11px] font-bold leading-none text-white shadow-md">
+          +{newUnvisited} NEW
+        </span>
       )}
+    </Link>
+  );
+}
+
+function RechallengeBadge({
+  userId,
+  prefecture,
+}: {
+  userId: string;
+  prefecture: PublicPrefectureProgress;
+}) {
+  return (
+    <Link
+      href={badgeUrl(userId, prefecture.name)}
+      className="group flex flex-col items-center rounded-[10px] border-2 border-[#B5483C]/60 bg-gradient-to-b from-[#FFF3D0] to-[#F8D9C4] px-3 py-4 text-center shadow-[0_6px_16px_rgba(181,72,60,0.18)] transition hover:-translate-y-0.5"
+    >
+      <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#C9992F] bg-[#FFFBEE] text-[#B5483C] shadow-inner">
+        <Award className="h-6 w-6" />
+      </div>
+      <p className="mt-2 font-pixelJp text-sm font-bold leading-tight text-[#4F3828]">
+        {prefecture.name}
+      </p>
+      <p className="mt-1 font-pixel text-base leading-none text-[#B5483C]">
+        {prefecture.visited}/{prefecture.total}
+      </p>
+      <p className="mt-2 rounded-full bg-[#B5483C] px-2 py-0.5 font-pixelJp text-[10px] font-bold text-white">
+        新しいふた あと{prefecture.remaining}枚
+      </p>
     </Link>
   );
 }

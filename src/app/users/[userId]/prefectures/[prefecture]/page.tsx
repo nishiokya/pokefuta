@@ -104,7 +104,8 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
     prefecture.name,
     prefecture.visited,
     earned ? prefecture.earnedTotal : prefecture.total,
-    earned
+    earned,
+    earned ? prefecture.remaining : 0
   );
   const visitedManholes = prefecture.manholes.filter((manhole) => manhole.visited);
   const remainingManholes = prefecture.manholes.filter((manhole) => !manhole.visited);
@@ -143,7 +144,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
           <section className="mt-8">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
               <Lock className="h-5 w-5 text-[#8C6A4A]" />
-              未訪問
+              {earned ? '新しく増えたポケふた' : '未訪問'}
               <span className="font-pixel text-sm text-[#8C6A4A]">{remainingManholes.length}</span>
             </h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -194,9 +195,9 @@ function BadgeHero({
         <p className="mt-2 font-pixel text-3xl leading-none text-[#B5483C]">
           {prefecture.earnedTotal}/{prefecture.earnedTotal}
         </p>
-        {prefecture.total > prefecture.earnedTotal && (
-          <p className="mt-1 font-pixelJp text-xs font-bold text-[#8C6A4A]">
-            制覇後に{prefecture.total - prefecture.earnedTotal}枚 追加されました
+        {prefecture.remaining > 0 && (
+          <p className="mt-2 inline-flex rounded-full bg-[#B5483C] px-3 py-1 font-pixelJp text-xs font-bold text-white">
+            新しいポケふたが増えました ・ あと{prefecture.remaining}枚
           </p>
         )}
         <p className="mt-3 font-pixelJp text-sm font-bold text-[#6A4D36]">
