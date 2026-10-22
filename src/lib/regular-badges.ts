@@ -1,9 +1,11 @@
 /**
- * 投稿者名に付ける 👑 MASTER（金）/ EXPLORER（シルバー）/ 🌱 ROOKIE（若葉）バッジ。
+ * 投稿者名に付ける 🏆 LEGEND / 👑 MASTER（金）/ EXPLORER（シルバー）/ 🌱 ROOKIE（若葉）バッジ。
  *
  * 人を順位で並べるランキングは置かず、続けて来ている人に印を付けるだけにしている。
- * 判定の線は公開しない（pokefuta-tracker の secret）ので、画面にも条件は書かない。
+ * MASTER / EXPLORER の判定の線は公開しない（pokefuta-tracker の secret）ので、画面にも条件は書かない。
  * ROOKIE は初めて投稿してから1か月の人。来たばかりの人に気づいてもらうための印。
+ * LEGEND は訪問したポケふたの枚数で決まる実績で、ほかのどの段階より優先する。
+ * 枚数の線は目標として見せるため公開している（LEGEND_DESCRIPTION）。
  *
  * 判定は pokefuta-tracker の export_app_snapshot.py が日次で焼き、
  * data.pokefuta.com（GitHub Pages）の `/api/regulars.json` から直接読む。
@@ -17,7 +19,7 @@ export const STATIC_REGULARS_URL = `${STATIC_BASE}/api/regulars.json`;
 
 const STATIC_TIMEOUT_MS = 3000;
 
-export type RegularTier = 'crown' | 'regular' | 'rookie';
+export type RegularTier = 'legend' | 'crown' | 'regular' | 'rookie';
 
 /** 公開ID（app_user.id）→ 段階 */
 export type RegularBadges = ReadonlyMap<string, RegularTier>;
@@ -25,10 +27,17 @@ export type RegularBadges = ReadonlyMap<string, RegularTier>;
 export const EMPTY_REGULAR_BADGES: RegularBadges = new Map();
 
 export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
+  legend: '🏆 LEGEND',
   crown: '👑 MASTER',
   regular: 'EXPLORER',
   rookie: '🌱 ROOKIE',
 };
+
+/** LEGEND の線。tracker の export_app_snapshot.py の LEGEND_MIN_MANHOLES と同じ値にする */
+export const LEGEND_MIN_MANHOLES = 100;
+
+/** 判定の条件を見せてよいのは LEGEND だけ。ほかの段階は線が秘密なので説明を出さない */
+export const LEGEND_DESCRIPTION = `ポケふたを${LEGEND_MIN_MANHOLES}枚以上訪問した人`;
 
 const isTier = (v: unknown): v is RegularTier => typeof v === 'string' && Object.prototype.hasOwnProperty.call(REGULAR_BADGE_LABEL, v);
 
