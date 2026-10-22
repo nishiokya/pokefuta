@@ -71,11 +71,11 @@ export function prefectureBadgeShareText(
   visited: number,
   total: number,
   complete: boolean,
-  /** 制覇したあとに増えて、まだ行っていない枚数 */
+  /** 制覇したあとに増えて、まだ行っていない枚数（増えた枚数ではない） */
   newSinceComplete = 0
 ): string {
   if (complete && newSinceComplete > 0) {
-    return `${prefectureName}のポケふた${total}枚を制覇済み。新しいポケふたが${newSinceComplete}枚増えたので、また行きます！`;
+    return `${prefectureName}のポケふた${total}枚を制覇済み。新しく増えたポケふたも、あと${newSinceComplete}枚まわりに行きます！`;
   }
   return complete
     ? `${prefectureName}のポケふた${total}枚、全部まわりました！`

@@ -5,8 +5,10 @@ import { prefectureBadgeShareText } from '../src/lib/share';
 test('制覇後に新しいポケふたが増えたら「また行く」文面にする', () => {
   assert.equal(
     prefectureBadgeShareText('高知県', 18, 18, true, 5),
-    '高知県のポケふた18枚を制覇済み。新しいポケふたが5枚増えたので、また行きます！'
+    '高知県のポケふた18枚を制覇済み。新しく増えたポケふたも、あと5枚まわりに行きます！'
   );
+  // 増えた5枚のうち2枚まわったあと。「3枚増えた」と言わない
+  assert.match(prefectureBadgeShareText('高知県', 20, 18, true, 3), /あと3枚まわりに行きます/);
 });
 
 test('増えていなければ今までどおり', () => {
