@@ -21,10 +21,26 @@ export default function GuestOnly({
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
-    createBrowserClient()
-      .auth.getSession()
-      .then(({ data: { session } }) => setLoggedIn(Boolean(session?.user)))
-      .catch(() => setLoggedIn(false));
+    const supabase = createBrowserClient();
+    let cancelled = false;
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!cancelled) setLoggedIn(Boolean(session?.user));
+      })
+      .catch(() => {
+        if (!cancelled) setLoggedIn(false);
+      });
+
+    // 別タブでのログイン・ログアウトやセッション切れにも、ヘッダー（SiteChrome）と同じく追従する
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(Boolean(session?.user));
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return <>{loggedIn ? fallback : children}</>;
