@@ -11,12 +11,12 @@ import {
   Sparkles,
   Stamp,
 } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import ShareButtons from '@/components/ShareButtons';
+import GuestOnly from '@/components/users/GuestOnly';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -170,7 +170,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
       <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
-        <Breadcrumb href="/" label="ホームへ" />
+        {/* 「ホームへ」は置かない。ヘッダーのロゴ・ナビと同じ行き先で、ヒーローを押し下げるだけだった */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-4 py-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-6">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
@@ -312,6 +312,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
             group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }).length > 0))}
         />
 
+        <GuestOnly>
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
             <Sparkles className="h-5 w-5 text-[#B5483C]" />
@@ -339,6 +340,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
             />
           </div>
         </section>
+        </GuestOnly>
       </main>
 
     </div>
