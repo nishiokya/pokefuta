@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  LEGEND_DESCRIPTION,
   REGULAR_BADGE_LABEL,
   STATIC_REGULARS_URL,
   fetchRegularBadges,
@@ -13,7 +14,7 @@ const ok = (body: unknown) =>
 const snapshot = {
   success: true,
   generated_at: '2026-10-06T20:30:00+00:00',
-  users: { 'pub-a': 'crown', 'pub-b': 'regular', 'pub-d': 'rookie' },
+  users: { 'pub-a': 'crown', 'pub-b': 'regular', 'pub-d': 'rookie', 'pub-e': 'legend' },
 };
 
 test('判定を公開ID → 段階の Map にする', () => {
@@ -21,6 +22,7 @@ test('判定を公開ID → 段階の Map にする', () => {
   assert.equal(badges.get('pub-a'), 'crown');
   assert.equal(badges.get('pub-b'), 'regular');
   assert.equal(badges.get('pub-d'), 'rookie');
+  assert.equal(badges.get('pub-e'), 'legend');
   assert.equal(badges.get('pub-c'), undefined);
 });
 
@@ -43,7 +45,7 @@ test('data.pokefuta.com を直接読み、/api を通らない', async () => {
   assert.deepEqual(urls, [STATIC_REGULARS_URL]);
   assert.ok(STATIC_REGULARS_URL.endsWith('/api/regulars.json'));
   assert.ok(!STATIC_REGULARS_URL.startsWith('/'));
-  assert.equal(badges.size, 3);
+  assert.equal(badges.size, 4);
 });
 
 test('取れなかったら空にする（飾りなので画面は壊さない）', async () => {
@@ -55,4 +57,8 @@ test('文言に判定の条件を入れない', () => {
   for (const label of Object.values(REGULAR_BADGE_LABEL)) {
     assert.doesNotMatch(label, /[0-9０-９]|週|投稿/);
   }
+});
+
+test('条件を見せるのは LEGEND の説明だけ', () => {
+  assert.match(LEGEND_DESCRIPTION, /100枚以上/);
 });
