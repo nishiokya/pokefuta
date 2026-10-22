@@ -332,10 +332,10 @@ export default function HomePage() {
             「◯◯で募集中」は見出しの「写真で埋めよう」の残りを、写真の無い蓋が一番多い県で具体的に見せる。
             completion の応答を待って PC は右、スマホは次の行に横いっぱいで現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
           */}
-          <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+          <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
               href="/nearby"
-              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
                 <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -350,18 +350,19 @@ export default function HomePage() {
             </Link>
             {/*
               ぬいぐるみの特集。最新の投稿の下へ一度下げた（2026-10-18）が、ヒーローに戻した（2026-10-22）。
-              スマホは「近くを探す」の右に半分の幅で並べ、PC は2枚の下に横いっぱいで置く（sm:order-last）。
+              スマホは「近くを探す」の右に半分の幅で並べ、タブレットは2枚の下に横いっぱいで置く（sm:order-last）。
+              PC（lg）は3枚を横1列に並べ（2段だと「近くを探す」の右が空いて見えた）、幅の要るこのカードだけ広めに取り、丸は2枚に減らす。
               DOM の順はスマホの見た目に合わせてあり、PC だけ読み上げ・Tab の順が見た目と食い違う。
               取得を待って後から差し込むとヒーローより下がまとめて押し下げられる（CLS、#338）ので、
               取得中は同じ場所に枠を置いておく（スマホは行の高さに伸びる）。取れなかったときだけ枠ごと消す
             */}
             {plushFeature === undefined && (
-              <div className="rounded-[8px] border border-[#7B63A8]/10 bg-white/60 sm:order-last sm:col-span-2 sm:h-[76px]" aria-hidden="true" />
+              <div className="rounded-[8px] border border-[#7B63A8]/10 bg-white/60 sm:order-last sm:col-span-2 sm:h-[76px] lg:h-auto lg:flex-[1.5]" aria-hidden="true" />
             )}
             {plushFeature && plushFeature.count > 0 && (
               <Link
                 href="/photos/plush"
-                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0"
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
               >
                 {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは半分の幅なので1枚だけ、他のカードの丸と同じ 40px に縮める */}
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
@@ -371,7 +372,7 @@ export default function HomePage() {
                     const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
                     const src = `/api/photo/${photo.id}?size=small`;
                     return (
-                      <div key={photo.id} className={`relative h-14 w-14 ${index > 0 ? 'max-sm:hidden' : ''}`}>
+                      <div key={photo.id} className={`relative h-14 w-14 ${index > 0 ? 'max-sm:hidden' : ''} ${index > 1 ? 'lg:hidden' : ''}`}>
                         <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
                           <img src={src} alt="" width={56} height={56} loading="lazy"
                             className={lidClip ? undefined : 'h-full w-full object-cover'}
@@ -411,7 +412,7 @@ export default function HomePage() {
             {wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
-                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
+                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
               >
                 {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">
