@@ -894,7 +894,7 @@ export default function VisitsPage() {
 
           {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
           {isLoggedIn && (
-            <ProfileCard shareStats={{ stamps: visitedManholesCount, prefectures: visitedPrefectureCount }} />
+            <ProfileCard showShare />
           )}
 
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}

@@ -5,6 +5,7 @@ import {
   getPublicLiveClient,
   type PublicProfileRow,
 } from '@/lib/user-prefecture-progress';
+import { loadPublicVisitStats } from '@/lib/public-visit-stats';
 
 export type PublicVisitManhole = {
   id: number;
@@ -59,13 +60,6 @@ type VisitPublicRow = {
 };
 
 const VISIT_LIMIT = 500;
-// prefectureCount 集計用: カード一覧よりゆるい上限で全件に近い形を見る（写真joinなし・軽量）
-const PREFECTURE_SCAN_LIMIT = 2000;
-
-type PrefectureScanRow = {
-  manhole_prefecture: string | null;
-};
-
 async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
   // プロフィールも訪問も常に取り直す。非公開に戻した訪問の comment・写真ID・日時が
   // キャッシュで生き残ると、「もう見せたくない」という操作が効かなくなる。
@@ -97,17 +91,10 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
   // 公開IDで直接引く。auth_uid は使わない。
   // note / shot_location はビューの列に無いので、うっかり選ぶこと自体ができない。
   //
-  // カード一覧(500件上限)・正確な総数(head count)・都道府県数集計を並列取得。
+  // カード一覧(500件上限)と、正確な総数・都道府県数の集計を並列取得。
   // 500件上限だけで totalVisits/prefectureCount を計算すると、公開訪問が500件を超える
-  // ユーザーで数値が実態より小さく出てしまうため、別クエリで正確な値を出す。
-  //
-  // 集計2本が base（写真を含まないビュー）なのは性能ではなく保証のため。
-  // 最新写真の相関サブクエリが列として存在しなければ、集計時に実行されようがない。
-  const [
-    { data: visits, error: visitsError },
-    { count: totalCount, error: totalCountError },
-    { data: prefectureRows, error: prefectureScanError },
-  ] = await Promise.all([
+  // ユーザーで数値が実態より小さく出てしまうため、集計は別に出す（本人の共有文と同じ関数）。
+  const [{ data: visits, error: visitsError }, stats] = await Promise.all([
     liveClient
       .from('public_user_visit_card')
       .select(
@@ -118,35 +105,14 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
       .eq('public_user_id', trimmedUserId)
       .order('shot_at', { ascending: false })
       .limit(VISIT_LIMIT),
-    liveClient
-      .from('public_user_visit_base')
-      .select('id', { count: 'exact', head: true })
-      .eq('public_user_id', trimmedUserId),
-    liveClient
-      .from('public_user_visit_base')
-      .select('manhole_prefecture')
-      .eq('public_user_id', trimmedUserId)
-      .limit(PREFECTURE_SCAN_LIMIT),
+    loadPublicVisitStats(liveClient, trimmedUserId),
   ]);
 
   if (visitsError) {
     throw new Error(visitsError.message);
   }
-  if (totalCountError) {
-    throw new Error(totalCountError.message);
-  }
-  if (prefectureScanError) {
-    throw new Error(prefectureScanError.message);
-  }
 
   const visitRows = ((visits || []) as unknown as VisitPublicRow[]);
-
-  const prefectureSet = new Set<string>();
-  ((prefectureRows || []) as unknown as PrefectureScanRow[]).forEach((row) => {
-    if (row.manhole_prefecture) {
-      prefectureSet.add(row.manhole_prefecture);
-    }
-  });
 
   const publicVisits: PublicVisit[] = visitRows.map((visit) => ({
     id: visit.id,
@@ -169,7 +135,8 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     aiTags: visit.latest_photo_ai_tags ?? null,
   }));
 
-  const totalVisits = totalCount ?? publicVisits.length;
+  // 件数が取れなかったとき（null → 0）でも、一覧に出している枚数より小さくはしない
+  const totalVisits = Math.max(stats.totalVisits, publicVisits.length);
 
   return {
     userId: trimmedUserId,
@@ -180,7 +147,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     pokemonGoFriendCode: appUserRow.pokemon_go_friend_code || null,
     pokemonGoFriendNote: appUserRow.pokemon_go_friend_note || null,
     totalVisits,
-    prefectureCount: prefectureSet.size,
+    prefectureCount: stats.prefectureCount,
     visits: publicVisits,
     isTruncated: totalVisits > publicVisits.length,
   };
