@@ -11,7 +11,7 @@ import { loadPublicVisitStats, type PublicVisitStats } from '@/lib/public-visit-
 import { userVisitsShareText } from '@/lib/share';
 import { createBrowserClient } from '@/lib/supabase/client';
 
-// スタンプ帳(/visits)とマイ旅(/my-trip)で同じUXのユーザ情報カードを出すための共通コンポーネント。
+// スタンプ帳(/visits)のユーザ情報カード。
 // 表示専用。編集は /profile（ヘッダーの名前クリックでも到達できる唯一の編集場所）に集約する。
 
 type Profile = {

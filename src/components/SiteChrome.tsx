@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { BookOpen, Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
+import { Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { AUTH_NAV_ITEMS, GUEST_NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNav';
+import { NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNav';
 
 /**
  * サイト共通クロム（SPヘッダー／PCトップナビ／SP下タブ）。
@@ -331,7 +331,6 @@ function pcNavLinkStyle(isActive: boolean): React.CSSProperties {
 function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
   const { trackXLinkClick, trackSubmissionEntry } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
-  const navItems = isLoggedIn ? AUTH_NAV_ITEMS : GUEST_NAV_ITEMS;
   const isUploading = isActivePath(pathname, '/upload');
 
   return (
@@ -358,10 +357,10 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         ナビ項目は認証の解決を待たずに出す。
         待つとセッション取得が遅い/失敗したときに nav が空のままになり、
         今回直した「PC なのにナビが無い」状態に逆戻りするため。
-        ログイン後に増えるのは「マイ旅」だけなので、項目が消えるちらつきは起きない。
+        項目はログインの有無で変わらないので、ちらつきも起きない。
       */}
       <div style={{ display: 'flex', gap: 4, marginLeft: 18 }}>
-        {navItems.map(({ key, label, href }) => (
+        {NAV_ITEMS.map(({ key, label, href }) => (
           <Link key={key} href={href} style={pcNavLinkStyle(activeNav ? activeNav === key : isActivePath(pathname, href))}>
             {label}
           </Link>
@@ -494,8 +493,8 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
 /**
  * SP ヘッダーから外した導線の受け皿。下タブの上、本文の末尾に置く。
  *
- * 「図鑑」「デザインふた」は下タブに入れる枠が無い（4枠は 探す/スタンプ帳/マイ旅＋投稿FAB で
- * 埋まっている）が、SP から到達できなくなると PC にしかない導線になってしまうので、
+ * 「図鑑」「デザインふた」は下タブに入れていない（探す/スタンプ帳＋投稿FAB の3つに絞っている）が、
+ * SP から到達できなくなると PC にしかない導線になってしまうので、
  * Info・X と同じくここで必ず出す。**この2つを消さないこと。**
  */
 const footerLinkStyle: React.CSSProperties = {
@@ -558,7 +557,6 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
 const BOTTOM_TAB_ICONS: Record<string, React.ReactNode> = {
   search: <Search className="mb-1 h-6 w-6" />,
   stamp: <CircleDot className="mb-1 h-6 w-6" />,
-  mytrip: <BookOpen className="mb-1 h-6 w-6" />,
 };
 
 function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
@@ -578,12 +576,12 @@ function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
     </Link>
   );
 
-  // 未ログインは投稿 FAB を出さないので、3タブを均等割りするだけ
+  // 未ログインは投稿 FAB を出さないので、2タブを均等割りするだけ
   if (!isLoggedIn) {
     return (
       <nav className="nav-rpg lg:hidden">
         <div className="mx-auto flex max-w-md items-center justify-around py-2">
-          {AUTH_NAV_ITEMS.map(tab)}
+          {NAV_ITEMS.map(tab)}
         </div>
       </nav>
     );
@@ -592,7 +590,7 @@ function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
   return (
     <nav className="nav-rpg lg:hidden">
       <div className="mx-auto flex max-w-md items-stretch" style={{ paddingBottom: 10, paddingTop: 8 }}>
-        <div className="flex flex-1 justify-around">{AUTH_NAV_ITEMS.slice(0, 2).map(tab)}</div>
+        <div className="flex flex-1 justify-around">{NAV_ITEMS.slice(0, 1).map(tab)}</div>
 
         {/* 中央の投稿 FAB */}
         <div style={{ width: 72, flexShrink: 0, position: 'relative' }}>
@@ -629,7 +627,7 @@ function BottomNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
           )}
         </div>
 
-        <div className="flex flex-1 justify-around">{AUTH_NAV_ITEMS.slice(2).map(tab)}</div>
+        <div className="flex flex-1 justify-around">{NAV_ITEMS.slice(1).map(tab)}</div>
       </div>
     </nav>
   );

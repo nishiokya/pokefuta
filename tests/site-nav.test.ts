@@ -7,7 +7,6 @@ test('前方一致でアクティブなタブを決める', () => {
   assert.equal(resolveChrome('/nearby').activeNav, 'search');
   assert.equal(resolveChrome('/manhole/235').activeNav, 'search');
   assert.equal(resolveChrome('/visits').activeNav, 'stamp');
-  assert.equal(resolveChrome('/my-trip').activeNav, 'mytrip');
   assert.equal(resolveChrome('/design-manholes/new').activeNav, 'design');
 });
 

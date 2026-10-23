@@ -10,7 +10,7 @@
  * 追加漏れを構造的に起こさないためにこの表を唯一の入口にしている。
  */
 
-export type NavKey = 'search' | 'stamp' | 'mytrip' | 'design';
+export type NavKey = 'search' | 'stamp' | 'design';
 
 export type RouteChrome = {
   /** ナビでアクティブ表示にするタブ */
@@ -28,7 +28,6 @@ const ROUTES: Record<string, RouteChrome> = {
   '/nearby': { activeNav: 'search' },
   '/manhole': { activeNav: 'search' },
   '/visits': { activeNav: 'stamp' },
-  '/my-trip': { activeNav: 'mytrip' },
   '/design-manholes': { activeNav: 'design' },
 
   // クロムを出さないページ
@@ -77,13 +76,9 @@ export function isSubmissionPage(pathname: string): boolean {
  */
 export type NavItem = { key: NavKey; label: string; href: string };
 
-export const GUEST_NAV_ITEMS: NavItem[] = [
+// ログインの有無で項目は変わらない。以前はログイン後に「マイ旅」が増えていたが、
+// スタンプ帳の「旅の記録」タブにまとめた（/my-trip は /visits?tab=trip へ転送）
+export const NAV_ITEMS: NavItem[] = [
   { key: 'search', label: '探す', href: '/nearby' },
   { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
-];
-
-export const AUTH_NAV_ITEMS: NavItem[] = [
-  { key: 'search', label: '探す', href: '/nearby' },
-  { key: 'stamp', label: 'スタンプ帳', href: '/visits' },
-  { key: 'mytrip', label: 'マイ旅', href: '/my-trip' },
 ];

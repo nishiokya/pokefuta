@@ -29,6 +29,7 @@ import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
+import TripDiary from '@/components/visits/TripDiary';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -55,7 +56,8 @@ interface Visit {
   is_bookmarked: boolean;
 }
 
-type SegmentTab = 'all' | 'prefectures' | 'pokemons' | 'features';
+// trip は旧マイ旅（/my-trip）。月別の記録と公開/非公開の切り替えをここに置く
+type SegmentTab = 'all' | 'prefectures' | 'pokemons' | 'features' | 'trip';
 
 type VisitSummary = {
   count: number;
@@ -111,6 +113,7 @@ const segments: { id: SegmentTab; label: string }[] = [
   { id: 'prefectures', label: '都道府県' },
   { id: 'pokemons', label: 'ポケモン' },
   { id: 'features', label: '特徴' },
+  { id: 'trip', label: '旅の記録' },
 ];
 
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
@@ -139,8 +142,19 @@ export default function VisitsPage() {
   useEffect(() => {
     document.title = pageTitle('スタンプ帳');
     trackPassportOpen();
+    // /my-trip からの転送と、旅の記録から詳細へ行って戻ったときに同じタブを開く
+    if (new URLSearchParams(window.location.search).get('tab') === 'trip') setSegmentTab('trip');
     checkAuth();
   }, []);
+
+  // 旅の記録だけ URL に残す（ほかのタブは今までどおり /visits のまま）
+  const selectSegment = (tab: SegmentTab) => {
+    setSegmentTab(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'trip') url.searchParams.set('tab', 'trip');
+    else url.searchParams.delete('tab');
+    window.history.replaceState(window.history.state, '', url);
+  };
 
   const checkAuth = async () => {
     try {
@@ -892,7 +906,7 @@ export default function VisitsPage() {
       <PCShell rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
+          {/* トレーナー情報 — プロフィール編集はここに置き、公開ページには置かない */}
           {isLoggedIn && (
             <ProfileCard showShare />
           )}
@@ -915,7 +929,7 @@ export default function VisitsPage() {
               <button
                 key={seg.id}
                 type="button"
-                onClick={() => setSegmentTab(seg.id)}
+                onClick={() => selectSegment(seg.id)}
                 className={`flex-1 min-h-[36px] rounded-[9px] font-pixelJp text-xs font-bold transition-colors ${
                   segmentTab === seg.id
                     ? 'bg-[#4F3828] text-white'
@@ -927,7 +941,9 @@ export default function VisitsPage() {
             ))}
           </nav>
 
-          {sortedVisits.length === 0 && segmentTab === 'all' ? (
+          {segmentTab === 'trip' ? (
+            <TripDiary />
+          ) : sortedVisits.length === 0 && segmentTab === 'all' ? (
             <EmptyPassport />
           ) : (
             <>
