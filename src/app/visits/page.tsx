@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Bookmark,
   Calendar,
@@ -125,7 +126,7 @@ const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
 const getManholeName = (manhole: Manhole) => manhole.name || manhole.title || 'ポケふた';
 const getMunicipality = (manhole: Manhole) => manhole.city || manhole.municipality || '場所未設定';
 
-export default function VisitsPage() {
+function VisitsPageInner() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
@@ -142,10 +143,16 @@ export default function VisitsPage() {
   useEffect(() => {
     document.title = pageTitle('スタンプ帳');
     trackPassportOpen();
-    // /my-trip からの転送と、旅の記録から詳細へ行って戻ったときに同じタブを開く
-    if (new URLSearchParams(window.location.search).get('tab') === 'trip') setSegmentTab('trip');
     checkAuth();
   }, []);
+
+  // URL の ?tab=trip と表示タブを合わせる。/my-trip からの転送や詳細から戻ったときに旅の記録を開き、
+  // 下タブ・PC ナビの「スタンプ帳」（/visits）を押して tab が外れたら旅の記録を閉じる
+  // （同じページへの遷移なのでコンポーネントは作り直されず、初回に読むだけではずれる）
+  const tabParam = useSearchParams().get('tab');
+  useEffect(() => {
+    setSegmentTab((prev) => (tabParam === 'trip' ? 'trip' : prev === 'trip' ? 'all' : prev));
+  }, [tabParam]);
 
   // 旅の記録だけ URL に残す（ほかのタブは今までどおり /visits のまま）
   const selectSegment = (tab: SegmentTab) => {
@@ -695,11 +702,14 @@ export default function VisitsPage() {
       ? new Set(manholes.flatMap((m) => m.pokemons ?? [])).size
       : null;
 
+    // /my-trip（旧マイ旅）から転送されてきた人は、ログイン後に旅の記録へ戻す
+    const loginHref = segmentTab === 'trip' ? `/login?redirect=${encodeURIComponent('/visits?tab=trip')}` : '/login';
+
     const unAuthRail = (
       <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm space-y-3">
         <p className="font-bold text-sm text-[#7B63A8]">あなた専用のスタンプ帳を無料で作れます</p>
         <Link
-          href="/login"
+          href={loginHref}
           className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
         >
           <Stamp className="h-4 w-4" /> 無料でスタンプ帳を作る
@@ -751,7 +761,7 @@ export default function VisitsPage() {
                 {/* CTA Buttons */}
                 <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
                   <Link
-                    href="/login"
+                    href={loginHref}
                     className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:py-2.5"
                   >
                     <Stamp className="h-4 w-4" />
@@ -1622,5 +1632,20 @@ function NearCompleteCard({ item, variant = 'card' }: { item: NearCompleteItem; 
         次を撮る
       </Link>
     </div>
+  );
+}
+
+export default function VisitsPage() {
+  // useSearchParams を使うので Suspense で包む（無いと静的生成時にページ全体がクライアント描画に落ちる）
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-content items-center justify-center bg-[#efe6cf]">
+          <div className="font-pixelJp text-[#6A4D36]">読み込み中<span className="rpg-loading" /></div>
+        </div>
+      }
+    >
+      <VisitsPageInner />
+    </Suspense>
   );
 }

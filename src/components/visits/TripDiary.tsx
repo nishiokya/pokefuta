@@ -55,9 +55,11 @@ export default function TripDiary() {
   // （望ましい操作なので即時）とは分けて、取り消せる余地を1タップぶん残す。
   const [bulkPublishConfirming, setBulkPublishConfirming] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
-  const { trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
+  const { trackVisitVisibilityChange, trackPrivateVisitsBannerClick, trackCollectionOpen } = useAnalytics();
 
   useEffect(() => {
+    // タブの切り替えでは page_view が出ないので、旧 /my-trip の閲覧のかわりに開いたことを送る
+    trackCollectionOpen({ surface: 'visits_trip' });
     (async () => {
       try {
         const res = await fetch('/api/visits?limit=1000&include_manhole_tags=true');
