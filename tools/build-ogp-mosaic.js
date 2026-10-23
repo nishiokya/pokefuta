@@ -94,11 +94,12 @@ async function bootstrap() {
   const picked = [];
   const seen = new Set();
   // 蓋が偏らないよう一定間隔で拾う。その位置の写真が使えなければ（重複・JPEG/PNG/WebP 以外）、
-  // 間隔を飛ばさずすぐ後ろから代わりを探す。飛ばすと外した数だけ足りなくなる
+  // 間隔を飛ばさずすぐ後ろから代わりを探す。飛ばすと外した数だけ足りなくなる。
+  // 末尾まで使えなければ先頭へ回る（後ろの方に使えない写真が固まっていても、前の残りを使う）
   const stride = Math.max(1, Math.floor(rows.length / LIDS.length));
   for (let slot = 0; slot < LIDS.length; slot += 1) {
-    for (let i = slot * stride; i < rows.length; i += 1) {
-      const row = rows[i];
+    for (let offset = 0; offset < rows.length; offset += 1) {
+      const row = rows[(slot * stride + offset) % rows.length];
       if (seen.has(row.photo_id)) continue;
       seen.add(row.photo_id);
       // 焼くときに止まらないよう、選ぶ時点で JPEG / PNG / WebP 以外は外す
