@@ -17,6 +17,36 @@ const NEAR_COMPLETE_LIMIT = 6;
 // 小さいカードにしても35県だとスマホで9段になり、写真までが遠いため
 const COMPACT_EARNED_THRESHOLD = 10;
 
+/**
+ * チップのメダルの色。県のポケふたの枚数（制覇したときの枚数）で金・銀・銅に分ける。
+ * 同じ色のチップが40個並ぶと単調で、大きな県を制覇した重みも見えなかった。
+ * 20枚以上は6県・5〜19枚は約20県で、残りの小さな県が銅になる
+ */
+export type MedalTier = 'gold' | 'silver' | 'bronze';
+export function medalTier(earnedTotal: number): MedalTier {
+  if (earnedTotal >= 20) return 'gold';
+  if (earnedTotal >= 5) return 'silver';
+  return 'bronze';
+}
+
+const MEDAL_STYLES: Record<MedalTier, { chip: string; medal: string; count: string }> = {
+  gold: {
+    chip: 'border-[#C9992F] from-[#FFF3D0] to-[#F2D891] shadow-[0_2px_6px_rgba(160,120,40,0.35)]',
+    medal: 'from-[#FBE38E] via-[#E5B83E] to-[#B8862A]',
+    count: 'bg-[#B8862A] text-white',
+  },
+  silver: {
+    chip: 'border-[#A9B4BF] from-[#FBFCFD] to-[#E1E7ED] shadow-[0_2px_5px_rgba(90,105,120,0.25)]',
+    medal: 'from-[#F4F7FA] via-[#C3CCD5] to-[#8C98A4]',
+    count: 'bg-[#7F8B97] text-white',
+  },
+  bronze: {
+    chip: 'border-[#C88A5E] from-[#FFF4EA] to-[#F0D3BC] shadow-[0_2px_5px_rgba(150,90,50,0.25)]',
+    medal: 'from-[#F6CDA8] via-[#D08E5C] to-[#A5643A]',
+    count: 'bg-[#A5643A] text-white',
+  },
+};
+
 // 「2026年5月15日」→「2026/5/15」
 const shortDate = (label: string) => label.replace(/[年月]/g, '/').replace('日', '');
 
@@ -51,6 +81,8 @@ export default function PrefectureBadgeShelf({
     (prefecture) => !prefecture.earnedAt && prefecture.visited > 0
   );
 
+  const compact = earned.length >= COMPACT_EARNED_THRESHOLD;
+
   // バッジが大きいと棚が縦に長くなりすぎる（35県で PC 約1500px、スマホはその倍）ので、小さくして列を増やす
   return (
     <section className="mt-8">
@@ -65,7 +97,7 @@ export default function PrefectureBadgeShelf({
         </p>
       </div>
 
-      {earned.length >= COMPACT_EARNED_THRESHOLD ? (
+      {compact ? (
         <CompactEarnedList userId={userId} earned={earned} />
       ) : earned.length > 0 ? (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
@@ -78,17 +110,26 @@ export default function PrefectureBadgeShelf({
         <EmptyShelf target={nearComplete[0] ?? nextTarget ?? null} />
       )}
 
+      {/* 制覇がチップのときは下の段もチップにする。カードのままだと、まだ取っていないリーチの方が大きく見えて主役が逆になる */}
       {rechallenge.length > 0 && (
         <>
           <h3 className="mb-2 mt-6 flex items-center gap-1.5 font-pixelJp text-sm font-bold text-[#4F3828]">
             <RotateCcw className="h-4 w-4 text-[#B5483C]" />
             新しいポケふたが増えました
           </h3>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
-            {rechallenge.map((prefecture) => (
-              <RechallengeBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
-            ))}
-          </div>
+          {compact ? (
+            <div className="flex flex-wrap gap-1.5">
+              {rechallenge.map((prefecture) => (
+                <ProgressChip key={prefecture.name} userId={userId} prefecture={prefecture} kind="rechallenge" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              {rechallenge.map((prefecture) => (
+                <RechallengeBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -97,11 +138,19 @@ export default function PrefectureBadgeShelf({
           <h3 className="mb-2 mt-6 font-pixelJp text-sm font-bold text-[#4F3828]">
             あと少しでバッジ
           </h3>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
-            {nearComplete.map((prefecture) => (
-              <NearCompleteBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
-            ))}
-          </div>
+          {compact ? (
+            <div className="flex flex-wrap gap-1.5">
+              {nearComplete.map((prefecture) => (
+                <ProgressChip key={prefecture.name} userId={userId} prefecture={prefecture} kind="near" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              {nearComplete.map((prefecture) => (
+                <NearCompleteBadge key={prefecture.name} userId={userId} prefecture={prefecture} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>
@@ -156,16 +205,63 @@ export function sortEarnedForChips<T extends Pick<PublicPrefectureProgress, 'nam
 // チップなら40県あっても数行に収まるので、全部出す
 function CompactEarnedList({ userId, earned }: { userId: string; earned: PublicPrefectureProgress[] }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {sortEarnedForChips(earned).map((prefecture) => (
-        <EarnedChip key={prefecture.name} userId={userId} prefecture={prefecture} />
-      ))}
-    </div>
+    <>
+      <div className="flex flex-wrap gap-2">
+        {sortEarnedForChips(earned).map((prefecture) => (
+          <EarnedChip key={prefecture.name} userId={userId} prefecture={prefecture} />
+        ))}
+      </div>
+      <p className="mt-2 font-pixelJp text-[10px] text-[#8C6A4A]">
+        メダルの色は県のポケふたの枚数（金 20枚以上・銀 5枚以上・銅 4枚以下）
+      </p>
+    </>
+  );
+}
+
+// リーチ・再挑戦のチップ。まだ取っていないので、メダルではなく点線の鍵（リーチ）か赤い札（再挑戦）
+function ProgressChip({
+  userId,
+  prefecture,
+  kind,
+}: {
+  userId: string;
+  prefecture: PublicPrefectureProgress;
+  kind: 'near' | 'rechallenge';
+}) {
+  const remaining = kind === 'near' ? prefecture.remaining : newUnvisitedSinceEarned(prefecture);
+  return (
+    <Link
+      href={badgeUrl(userId, prefecture.name)}
+      aria-label={`${prefecture.name} ${prefecture.visited}/${prefecture.total}、あと${remaining}枚`}
+      className={`inline-flex items-center gap-1.5 rounded-full border-2 py-0.5 pl-0.5 pr-1 font-pixelJp text-[13px] font-bold text-[#4F3828] transition hover:-translate-y-px ${
+        kind === 'near'
+          ? 'border-dashed border-[#8C6A4A]/45 bg-white/60'
+          : 'border-[#B5483C]/60 bg-gradient-to-b from-[#FFF3D0] to-[#F8D9C4]'
+      }`}
+    >
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+          kind === 'near'
+            ? 'border-2 border-dashed border-[#8C6A4A]/45 text-[#8C6A4A]'
+            : 'bg-[#B5483C] text-white'
+        }`}
+      >
+        {kind === 'near' ? <Lock className="h-3 w-3" /> : <RotateCcw className="h-3 w-3" />}
+      </span>
+      {prefecture.name.replace(/[都府県]$/, '')}
+      <span className="font-pixel text-[11px] text-[#8C6A4A]">
+        {prefecture.visited}/{prefecture.total}
+      </span>
+      <span className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none ${kind === 'near' ? 'bg-[#B5483C]/10 text-[#B5483C]' : 'bg-[#B5483C] text-white'}`}>
+        あと{remaining}
+      </span>
+    </Link>
   );
 }
 
 function EarnedChip({ userId, prefecture }: { userId: string; prefecture: PublicPrefectureProgress }) {
   const newUnvisited = newUnvisitedSinceEarned(prefecture);
+  const style = MEDAL_STYLES[medalTier(prefecture.earnedTotal)];
   const label = `${prefecture.name} ${prefecture.earnedTotal}枚 制覇${
     prefecture.earnedAt ? `（${formatDateJaJst(prefecture.earnedAt)}）` : ''
   }`;
@@ -174,11 +270,13 @@ function EarnedChip({ userId, prefecture }: { userId: string; prefecture: Public
       href={badgeUrl(userId, prefecture.name)}
       title={label}
       aria-label={newUnvisited > 0 ? `${label}、新しいポケふた あと${newUnvisited}枚` : label}
-      className="inline-flex items-center gap-1 rounded-full border border-[#C9992F] bg-gradient-to-b from-[#FFF3D0] to-[#F7E2AE] py-1 pl-1.5 pr-2.5 font-pixelJp text-xs font-bold text-[#4F3828] shadow-[0_1px_3px_rgba(160,120,40,0.2)] transition hover:-translate-y-px"
+      className={`inline-flex items-center gap-1.5 rounded-full border-2 bg-gradient-to-b py-0.5 pl-0.5 pr-1 font-pixelJp text-[13px] font-bold text-[#4F3828] transition hover:-translate-y-px ${style.chip}`}
     >
-      <Award className="h-3.5 w-3.5 text-[#B5483C]" />
+      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-[inset_0_-1px_2px_rgba(0,0,0,0.25),0_1px_1px_rgba(0,0,0,0.15)] ring-1 ring-white/80 ${style.medal}`}>
+        <Award className="h-3.5 w-3.5 drop-shadow-[0_1px_0_rgba(0,0,0,0.25)]" />
+      </span>
       {prefecture.name.replace(/[都府県]$/, '')}
-      <span className="font-pixel text-[11px] text-[#B5483C]">{prefecture.earnedTotal}</span>
+      <span className={`rounded-full px-1.5 py-0.5 font-pixel text-[11px] leading-none ${style.count}`}>{prefecture.earnedTotal}</span>
       {newUnvisited > 0 && (
         <span className="rounded-full bg-[#B5483C] px-1.5 py-px font-pixel text-[10px] leading-none text-white">
           +{newUnvisited}
