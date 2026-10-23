@@ -17,6 +17,7 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import ShareButtons from '@/components/ShareButtons';
+import GuestOnly from '@/components/users/GuestOnly';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -170,6 +171,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
       <main className="mx-auto max-w-page px-4 lg:px-8 pb-8 pt-3 sm:pt-6">
+        {/* ヘッダーのロゴはサイト切り替えのボタンで、ナビにもホームが無い。共有リンクから着いた人がトップへ戻る見える道はこれだけなので残す */}
         <Breadcrumb href="/" label="ホームへ" />
         <section className="relative overflow-hidden rounded-[8px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-4 py-4 shadow-[0_12px_30px_rgba(95,68,42,0.13)] sm:px-8 sm:py-6">
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
@@ -315,16 +317,20 @@ export default async function UserVisitsPage({ params }: PageProps) {
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
             <Sparkles className="h-5 w-5 text-[#B5483C]" />
-            あなたもポケふた旅へ
+            <GuestOnly fallback="次のポケふた旅へ">あなたもポケふた旅へ</GuestOnly>
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <CtaCard
-              href="/visits"
-              icon={<Stamp className="h-5 w-5" />}
-              title="自分のスタンプ帳を作る"
-              description="無料ではじめて訪問を記録・公開しよう"
-              highlight
-            />
+          {/* 枚数はログイン状態で2〜3枚に変わるので、列数を決め打ちせず並んだ枚数で等分する */}
+          <div className="grid gap-3 sm:auto-cols-fr sm:grid-flow-col">
+            {/* ログイン中の人（持ち主本人を含む）はもうスタンプ帳を持っている */}
+            <GuestOnly>
+              <CtaCard
+                href="/visits"
+                icon={<Stamp className="h-5 w-5" />}
+                title="自分のスタンプ帳を作る"
+                description="無料ではじめて訪問を記録・公開しよう"
+                highlight
+              />
+            </GuestOnly>
             <CtaCard
               href="/nearby"
               icon={<Search className="h-5 w-5" />}
