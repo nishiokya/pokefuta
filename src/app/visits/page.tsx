@@ -893,7 +893,9 @@ export default function VisitsPage() {
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
           {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
-          {isLoggedIn && <ProfileCard />}
+          {isLoggedIn && (
+            <ProfileCard showShare />
+          )}
 
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}
           <DexSummaryCard
