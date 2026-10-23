@@ -93,18 +93,22 @@ async function bootstrap() {
 
   const picked = [];
   const seen = new Set();
-  // 蓋が偏らないよう一定間隔で拾う
+  // 蓋が偏らないよう一定間隔で拾う。その位置の写真が使えなければ（重複・JPEG/PNG/WebP 以外）、
+  // 間隔を飛ばさずすぐ後ろから代わりを探す。飛ばすと外した数だけ足りなくなる
   const stride = Math.max(1, Math.floor(rows.length / LIDS.length));
-  for (let i = 0; picked.length < LIDS.length && i < rows.length; i += stride) {
-    const row = rows[i];
-    if (seen.has(row.photo_id)) continue;
-    seen.add(row.photo_id);
-    // 焼くときに止まらないよう、選ぶ時点で JPEG / PNG / WebP 以外は外す
-    if (!isSupportedImage(await fetchBuffer(PHOTO_URL(row.photo_id)))) {
-      console.warn(`[mosaic] skip photo=${row.photo_id}: JPEG/PNG/WebP ではない`);
-      continue;
+  for (let slot = 0; slot < LIDS.length; slot += 1) {
+    for (let i = slot * stride; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (seen.has(row.photo_id)) continue;
+      seen.add(row.photo_id);
+      // 焼くときに止まらないよう、選ぶ時点で JPEG / PNG / WebP 以外は外す
+      if (!isSupportedImage(await fetchBuffer(PHOTO_URL(row.photo_id)))) {
+        console.warn(`[mosaic] skip photo=${row.photo_id}: JPEG/PNG/WebP ではない`);
+        continue;
+      }
+      picked.push({ manhole_id: row.manhole_id, photo_id: row.photo_id });
+      break;
     }
-    picked.push({ manhole_id: row.manhole_id, photo_id: row.photo_id });
   }
 
   if (picked.length < LIDS.length) {
