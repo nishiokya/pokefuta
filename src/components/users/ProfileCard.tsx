@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { ExternalLink, Instagram, Pencil, UserRound } from 'lucide-react';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import ShareButtons from '@/components/ShareButtons';
+import { SITE_URL } from '@/lib/constants';
+import { userVisitsShareText } from '@/lib/share';
 
 // スタンプ帳(/visits)とマイ旅(/my-trip)で同じUXのユーザ情報カードを出すための共通コンポーネント。
 // 表示専用。編集は /profile（ヘッダーの名前クリックでも到達できる唯一の編集場所）に集約する。
@@ -19,7 +22,15 @@ type Profile = {
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 
-export default function ProfileCard({ className = '' }: { className?: string }) {
+// shareStats を渡すと、公開スタンプ帳を共有するボタンを出す（スタンプ帳から）。
+// 公開ページ側には置かない: 押すのはほぼ持ち主本人なので、本人が見るここに置く
+export default function ProfileCard({
+  className = '',
+  shareStats,
+}: {
+  className?: string;
+  shareStats?: { stamps: number; prefectures: number };
+}) {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -94,6 +105,16 @@ export default function ProfileCard({ className = '' }: { className?: string }) 
               <ExternalLink className="h-3 w-3" />
               公開スタンプ帳を見る
             </Link>
+          )}
+          {profile.publicUserId && shareStats && (
+            <ShareButtons
+              compact
+              className="ml-auto"
+              label="自慢する"
+              shareText={userVisitsShareText(profile.displayName, shareStats.stamps, shareStats.prefectures)}
+              shareUrl={`${SITE_URL}/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+              hashtags={['ポケふたスタンプ帳']}
+            />
           )}
         </div>
       )}

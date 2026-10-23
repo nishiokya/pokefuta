@@ -16,13 +16,11 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
-import ShareButtons from '@/components/ShareButtons';
 import GuestOnly from '@/components/users/GuestOnly';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
-import { userVisitsShareText } from '@/lib/share';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
 import UserRegularBadge from '@/components/users/UserRegularBadge';
@@ -142,7 +140,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
   const instagramUrl = safeSocialUrl(data.instagramUrl, INSTAGRAM_HOSTS);
 
   const pageUrl = getPageUrl(data.userId);
-  const shareText = userVisitsShareText(data.displayName, data.totalVisits, data.prefectureCount);
   const totalPrefectures = progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
   const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
   // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
@@ -177,8 +174,9 @@ export default async function UserVisitsPage({ params }: PageProps) {
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(90deg,#8C6A4A_1px,transparent_1px),linear-gradient(#8C6A4A_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
             {/*
-              共有はアイコンだけにして見出しの上の行に置く。以前はヒーローの下に横いっぱいの3ボタンが
-              あり、本体（バッジと写真）を押し下げていた
+              共有ボタンは置かない。押すのはほぼ持ち主本人（他人のページはまず共有しない）で、
+              本人用はスタンプ帳(/visits)のトレーナー情報にある。ここに置くと持ち主の X へのリンクと
+              黒い「X」が2つ並んで紛らわしかった
             */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
@@ -186,18 +184,23 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 公開スタンプ帳
               </div>
               <UserRegularBadge userId={data.userId} />
-              <ShareButtons
-                compact
-                className="ml-auto"
-                label="自慢する"
-                shareText={shareText}
-                shareUrl={pageUrl}
-                hashtags={['ポケふたスタンプ帳']}
-              />
             </div>
-            <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
-              {data.displayName}のスタンプ帳
-            </h1>
+            {/* 本人の X・Instagram は名前の横に置く（以前は説明文の下に1行使っていた）。名前が長くて入らなければ下へ回る */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
+                {data.displayName}のスタンプ帳
+              </h1>
+              {(xUrl || instagramUrl) && (
+                <div className="flex flex-wrap gap-2">
+                  {xUrl && (
+                    <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />
+                  )}
+                  {instagramUrl && (
+                    <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
+                  )}
+                </div>
+              )}
+            </div>
             {data.bio && (
               <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
                 {data.bio}
@@ -206,17 +209,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <p className={`${data.bio ? 'mt-1' : 'mt-3'} max-w-2xl text-xs font-medium leading-5 text-[#6A4D36]/80 sm:text-sm`}>
               公開設定の訪問記録のみを表示しています。
             </p>
-
-            {(xUrl || instagramUrl) && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {xUrl && (
-                  <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />
-                )}
-                {instagramUrl && (
-                  <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
-                )}
-              </div>
-            )}
 
             {data.pokemonGoFriendCode && (
               <div className="mt-4 max-w-md">
