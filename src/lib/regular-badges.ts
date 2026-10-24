@@ -100,16 +100,42 @@ export function parseRegularBadges(data: unknown): RegularBadges {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-export async function fetchRegularBadges(fetchImpl: FetchLike = fetch): Promise<RegularBadges> {
+/** LEGEND の人（写真館のトップの「LEGEND を目指そう」と /badges に出す）。名前順、枚数は持たない */
+export type RegularLegend = { id: string; name: string };
+
+export type RegularSnapshot = {
+  badges: RegularBadges;
+  legends: readonly RegularLegend[];
+};
+
+const EMPTY_SNAPSHOT: RegularSnapshot = { badges: EMPTY_REGULAR_BADGES, legends: [] };
+
+export function parseRegularLegends(data: unknown): RegularLegend[] {
+  if (!data || typeof data !== 'object') return [];
+  const body = data as Record<string, unknown>;
+  if (body.success !== true || !Array.isArray(body.legends)) return [];
+  return body.legends.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const { id, name } = entry as Record<string, unknown>;
+    return typeof id === 'string' && id && typeof name === 'string' && name ? [{ id, name }] : [];
+  });
+}
+
+export async function fetchRegularSnapshot(fetchImpl: FetchLike = fetch): Promise<RegularSnapshot> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), STATIC_TIMEOUT_MS);
   try {
     const res = await fetchImpl(STATIC_REGULARS_URL, { signal: controller.signal });
-    if (!res.ok) return EMPTY_REGULAR_BADGES;
-    return parseRegularBadges(await res.json());
+    if (!res.ok) return EMPTY_SNAPSHOT;
+    const body = await res.json();
+    return { badges: parseRegularBadges(body), legends: parseRegularLegends(body) };
   } catch {
-    return EMPTY_REGULAR_BADGES;
+    return EMPTY_SNAPSHOT;
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchRegularBadges(fetchImpl: FetchLike = fetch): Promise<RegularBadges> {
+  return (await fetchRegularSnapshot(fetchImpl)).badges;
 }
