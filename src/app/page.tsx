@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Heart,
+  Award,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -328,23 +329,25 @@ export default function HomePage() {
           </div>
 
           {/*
-            行動のカード（＋ぬいぐるみの特集）。「近くを探す」は常連が一番使う機能（/nearby）で、待たずに出せるので左に置く。
+            行動のカード（＋ぬいぐるみの特集）。左は「写真を登録してバッジを集める」（/badges）。
+            2026-10-24 に「近くを探す」（/nearby）から差し替えた。写真が集まったので、最初からやりたかった
+            スタンプ（バッジ集め）を入口にする。「近くを探す」は下タブの「探す」と同じ先なので、最新の投稿の下へ下げた。
             「◯◯で募集中」は見出しの「写真で埋めよう」の残りを、写真の無い蓋が一番多い県で具体的に見せる。
             completion の応答を待って PC は右、スマホは次の行に横いっぱいで現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
           */}
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
-              href="/nearby"
+              href="/badges"
               className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
-                <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+                <Award className="h-5 w-5 sm:h-6 sm:w-6" />
               </span>
               <span className="min-w-0">
-                {/* スマホは幅が半分なので短くする（「探す」が次の行に落ちないように） */}
-                <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">近くのポケふた<span className="max-sm:hidden">を探す</span></span>
+                {/* スマホは幅が半分なので短くする */}
+                <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">バッジを集めよう</span>
                 <span className="block whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
-                  現在地から<span className="max-sm:hidden">近い順</span><span className="sm:hidden">探す</span><span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                  <span className="max-sm:hidden">ポケふたの</span>写真を登録して<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
                 </span>
               </span>
             </Link>
@@ -685,6 +688,24 @@ export default function HomePage() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* 近くを探す。ヒーローの左のカードを /badges に譲り、ここへ下げた（2026-10-24）。下タブの「探す」と同じ先 */}
+            {sortedFeed.length > 0 && (
+              <Link
+                href="/nearby"
+                className="group mt-6 flex items-center gap-3 rounded-[8px] border border-[#7B63A8]/20 bg-white p-3 shadow-sm transition hover:shadow sm:p-4"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
+                  <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-extrabold text-[#4A4A4A] sm:text-base">近くのポケふたを探す</span>
+                  <span className="block text-xs text-[#6A4D36]">
+                    現在地から近い順<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                  </span>
+                </span>
+              </Link>
             )}
 
             {/* Login CTA - shown after scrolling through some photos */}
