@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { ensureAppUser } from '@/lib/auth/ensureAppUser';
@@ -213,6 +214,14 @@ export async function POST(request: NextRequest) {
 
     // 6. R2 アップロード + サムネイル生成
     const arrayBuffer = await file.arrayBuffer();
+    // 申告の file.type だけでなく中身でも確かめる。違う形式を sharp に渡さない（src/lib/image-sniff.ts）
+    if (!sniffImageFormat(arrayBuffer)) {
+      // 申告と中身の食い違いを GA4 で他の 400 と分けて数えたいので code を付ける（AGENTS.md・api-error-code.ts）
+      return NextResponse.json(
+        { success: false, error: 'JPEG/PNG/WebP形式の画像のみ投稿できます', code: 'IMAGE_CONTENT_MISMATCH' },
+        { status: 400 }
+      );
+    }
     const buffer = Buffer.from(arrayBuffer);
     const storageKey = generateDesignManholeStorageKey(file.type);
     uploadedStorageKey = storageKey;

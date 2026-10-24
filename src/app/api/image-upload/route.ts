@@ -7,6 +7,7 @@ import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import { loadOwnVisitNotes } from '@/lib/own-visit-notes';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
@@ -344,8 +345,11 @@ export async function POST(request: NextRequest) {
 
     // Generate the small variant used by feed thumbnails (/api/photo?size=small).
     // 失敗しても読み側がオリジナルへフォールバックするため、アップロード自体は成功させる。
+    // JPEG / PNG / WebP 以外（中身で判定）は sharp に渡さない（src/lib/image-sniff.ts）。投稿は受ける
     const smallKey = deriveSmallKey(storageKey);
-    if (smallKey) {
+    if (smallKey && !sniffImageFormat(arrayBuffer)) {
+      console.warn(`Thumbnail skipped for ${storageKey}: not JPEG/PNG/WebP by content (declared ${file.type})`);
+    } else if (smallKey) {
       try {
         const smallBuffer = await sharp(Buffer.from(arrayBuffer))
           .rotate()

@@ -60,6 +60,30 @@ async function fetchBuffer(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+/**
+ * 写真が JPEG / PNG / WebP か、中身（先頭のバイト列）で確かめる。src/lib/image-sniff.ts と同じ判定
+ * （このツールは素の Node で動くので TS を読めず、写している）。
+ *
+ * 公開写真は利用者が投稿したもので、中身が AVIF・SVG・GIF などでも原本は保存される（サムネイルを作らないだけ）。
+ * sharp 0.32.6 のそれらのローダには RCE に至りうる穴がある。ここで sharp に渡す前に止める。
+ * sharp.block() は使えない: 丸い切り抜きを SVG で描いているため
+ */
+function isSupportedImage(b) {
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true; // JPEG
+  if (
+    b.length >= 8 &&
+    b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+    b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a
+  ) {
+    return true; // PNG
+  }
+  return (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ); // WebP
+}
+
 async function bootstrap() {
   const raw = JSON.parse((await fetchBuffer(LATEST_PHOTOS_URL)).toString('utf8'));
   // manhole_id 昇順で決め打ちする。実行日によって並びが変わらないようにするため
@@ -69,13 +93,23 @@ async function bootstrap() {
 
   const picked = [];
   const seen = new Set();
-  // 蓋が偏らないよう一定間隔で拾う
+  // 蓋が偏らないよう一定間隔で拾う。その位置の写真が使えなければ（重複・JPEG/PNG/WebP 以外）、
+  // 間隔を飛ばさずすぐ後ろから代わりを探す。飛ばすと外した数だけ足りなくなる。
+  // 末尾まで使えなければ先頭へ回る（後ろの方に使えない写真が固まっていても、前の残りを使う）
   const stride = Math.max(1, Math.floor(rows.length / LIDS.length));
-  for (let i = 0; picked.length < LIDS.length && i < rows.length; i += stride) {
-    const row = rows[i];
-    if (seen.has(row.photo_id)) continue;
-    seen.add(row.photo_id);
-    picked.push({ manhole_id: row.manhole_id, photo_id: row.photo_id });
+  for (let slot = 0; slot < LIDS.length; slot += 1) {
+    for (let offset = 0; offset < rows.length; offset += 1) {
+      const row = rows[(slot * stride + offset) % rows.length];
+      if (seen.has(row.photo_id)) continue;
+      seen.add(row.photo_id);
+      // 焼くときに止まらないよう、選ぶ時点で JPEG / PNG / WebP 以外は外す
+      if (!isSupportedImage(await fetchBuffer(PHOTO_URL(row.photo_id)))) {
+        console.warn(`[mosaic] skip photo=${row.photo_id}: JPEG/PNG/WebP ではない`);
+        continue;
+      }
+      picked.push({ manhole_id: row.manhole_id, photo_id: row.photo_id });
+      break;
+    }
   }
 
   if (picked.length < LIDS.length) {
@@ -114,6 +148,13 @@ async function main() {
     const source = sources[i % sources.length];
     const size = lid.r * 2;
     const photo = await fetchBuffer(PHOTO_URL(source.photo_id));
+    // マニフェストの写真は黙って差し替えない（焼くたびに絵が変わる）。止めて --bootstrap で選び直してもらう
+    if (!isSupportedImage(photo)) {
+      throw new Error(
+        `photo=${source.photo_id} が JPEG/PNG/WebP ではない。sharp に渡さず止めた。` +
+        '--bootstrap で選び直すこと。'
+      );
+    }
 
     // 円形に切り抜く。紫を上からかぶせるので、ここでは彩度だけ少し落とす
     const circle = Buffer.from(

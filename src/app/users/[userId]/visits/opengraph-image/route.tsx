@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
 import { deriveSmallKey, storage } from '@/lib/storage';
 import {
@@ -104,6 +105,8 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[]): Promise<string[]>
         if (!response) return null;
 
         const input = Buffer.from(await response.arrayBuffer());
+        // 保存済みの写真も利用者が送った画像。JPEG/PNG/WebP 以外は sharp に渡さず、その枠を飛ばす
+        if (!sniffImageFormat(input)) return null;
         const jpeg = await sharp(input)
           .rotate()
           .resize(PHOTO_RENDER_SIZE, PHOTO_RENDER_SIZE, { fit: 'cover' })

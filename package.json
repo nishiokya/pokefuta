@@ -31,6 +31,7 @@
     "test:japanese-phrases": "tsx --test tests/japanese-phrases.test.ts",
     "test:site-nav": "tsx --test tests/site-nav.test.ts",
     "test:bulk-upload": "tsx --test tests/bulk-upload.test.ts",
+    "test:image-sniff": "tsx --test tests/image-sniff.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",
     "db:drift": "node tools/check-migration-drift.js",
     "verify:design-manhole-trigger": "node tools/verify-design-manhole-trigger.js",

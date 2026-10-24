@@ -22,6 +22,12 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+// 投稿写真は利用者が送った画像。RCE の advisory が出ているローダ（AVIF/HEIF・SVG・GIF・TIFF・VIPS）を止める
+// （GHSA-rgj7-g3m4-5g8c / GHSA-wq5f-xc86-pv6w / GHSA-f88m-g3jw-g9cj の回避策）。このスクリプトは単独のプロセスで
+// SVG を描かないので、アプリ（OGP が SVG を使う）と違ってプロセス全体で止めてよい。止めた形式は failed に数える
+sharp.block({
+  operation: ['VipsForeignLoadHeif', 'VipsForeignLoadSvg', 'VipsForeignLoadNsgif', 'VipsForeignLoadTiff', 'VipsForeignLoadVips'],
+});
 const {
   S3Client,
   GetObjectCommand,

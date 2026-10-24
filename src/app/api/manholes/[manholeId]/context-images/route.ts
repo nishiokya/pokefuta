@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
+import { sniffImageFormat } from '@/lib/image-sniff';
 import {
   Database,
   ManholeClassifierLabel,
@@ -132,6 +133,11 @@ function metadataConfidence(metadata: unknown, key: string, fieldName: string) {
 }
 
 async function getImageDimensions(buffer: Buffer) {
+  // iOS の HEIC/HEIF も受けるので拒否はしないが、JPEG/PNG/WebP 以外（中身で判定）は sharp に渡さず寸法を取らない
+  // （src/lib/image-sniff.ts）。寸法は任意の項目
+  if (!sniffImageFormat(buffer)) {
+    return { width: null, height: null };
+  }
   try {
     const metadata = await sharp(buffer).metadata();
     return {
