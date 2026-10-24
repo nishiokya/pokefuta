@@ -942,14 +942,13 @@ export default function VisitsPage() {
               <div>
                 <div className="mb-2 flex items-baseline justify-between gap-3">
                   <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
-                  <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">バッジ一覧 ›</Link>
+                  <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">バッジとは ›</Link>
                 </div>
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                  <div className="flex gap-3" style={{ width: 'max-content' }}>
-                    {nearCompleteAll.map((item) => (
-                      <NearCompleteCard key={`${item.kind}-${item.label}`} item={item} />
-                    ))}
-                  </div>
+                {/* 横スクロールだと右端のカードに気づかないので、折り返して縦に流す */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                  {nearCompleteAll.map((item) => (
+                    <NearCompleteCard key={`${item.kind}-${item.label}`} item={item} />
+                  ))}
                 </div>
               </div>
             )}
@@ -1168,26 +1167,10 @@ function DexSummaryCard({
   );
 }
 
-function NearCompleteCard({ item, variant = 'card' }: { item: NearCompleteItem; variant?: 'compact' | 'card' }) {
+function NearCompleteCard({ item }: { item: NearCompleteItem }) {
   const color = KIND_COLOR[item.kind];
-  if (variant === 'compact') {
-    return (
-      <div className="overflow-hidden rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
-        <span style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 11, fontWeight: 800, color: color.badge }}>
-          🏆 あと{item.remaining}でコンプ
-        </span>
-        <p className="font-pixelJp text-sm font-bold text-[#4F3828] mt-0.5 truncate">{item.label}</p>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
-          <div className="h-full rounded-full" style={{ width: `${item.rate.toFixed(0)}%`, background: color.bar }} />
-        </div>
-        <p style={{ fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif', fontSize: 10, color: '#9b917e', marginTop: 3 }}>
-          {item.visited}/{item.total}
-        </p>
-      </div>
-    );
-  }
   return (
-    <div className="w-40 shrink-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
+    <div className="min-w-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
       <div className="flex items-center gap-1 mb-1">
         <span
           style={{
