@@ -4,8 +4,8 @@
  * sharp は Content-Type や拡張子ではなく中身を見て形式を判別し、AVIF/HEIF なら libheif、
  * SVG なら librsvg、GIF/TIFF なら libvips の各ローダでデコードする。これらのローダには
  * 細工した画像で RCE に至りうる穴が見つかっている（GHSA-rgj7-g3m4-5g8c / GHSA-wq5f-xc86-pv6w /
- * GHSA-f88m-g3jw-g9cj、2026-10-22 時点で sharp 0.32.6）。アップロードの検査は
- * ブラウザ申告の file.type だけなので、`image/jpeg` と名乗った AVIF や SVG がそのまま届く。
+ * GHSA-f88m-g3jw-g9cj。sharp 0.35.5 で修正済みだが、同じローダで次の穴が出る前提で残す）。
+ * アップロードの検査はブラウザ申告の file.type だけなので、`image/jpeg` と名乗った AVIF や SVG がそのまま届く。
  *
  * sharp.block() はプロセス全体に効き、OGP 画像の生成が SVG を sharp で描いているため使えない。
  * なので入口ごとに、投稿で実際に使う JPEG / PNG / WebP 以外を sharp に渡さない。

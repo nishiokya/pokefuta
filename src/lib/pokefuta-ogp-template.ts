@@ -2,7 +2,7 @@ import 'server-only';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import { sniffImageFormat } from '@/lib/image-sniff';
 
 const WIDTH = 1200;
@@ -144,7 +144,7 @@ function fitFontSizeToWidth(input: TextLayerInput): number {
   return Math.max(minFontSize, Math.floor((input.fontSize * input.width) / estimatedWidth));
 }
 
-async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOptions> {
+async function renderTextLayer(input: TextLayerInput): Promise<OverlayOptions> {
   assertOgpFontExists();
 
   const fontSize = fitFontSizeToWidth(input);
@@ -170,7 +170,7 @@ async function renderTextLayer(input: TextLayerInput): Promise<sharp.OverlayOpti
   };
 }
 
-async function buildTextLayers(layers: TextLayerInput[]): Promise<sharp.OverlayOptions[]> {
+async function buildTextLayers(layers: TextLayerInput[]): Promise<OverlayOptions[]> {
   return Promise.all(layers.map((layer) => renderTextLayer(layer)));
 }
 
