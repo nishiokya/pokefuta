@@ -73,8 +73,9 @@ export default function VisitsTripPage() {
           <div className="min-w-0 max-w-2xl space-y-5 lg:max-w-none">
             {/* 共有ボタンは出さない（旧マイ旅も無し）。ここで公開設定を変えても ProfileCard の共有件数は
                 取り直されず、古い件数で共有してしまう。共有はコレクション（/visits）から */}
-            <ProfileCard />
+            {/* タブはスマホで一番上（スタンプ / 旅の記録 / バッジ） */}
             <VisitsSwitcher current="trip" />
+            <ProfileCard />
             <TripActivity visits={visits} className="lg:hidden" />
             <TripDiary initialVisits={visits} />
           </div>
