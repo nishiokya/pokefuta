@@ -52,7 +52,9 @@ export default function VisitsTripPage() {
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
       <PCShell className="pb-32 pt-4 lg:pt-6">
         <div className="mx-auto max-w-2xl space-y-6">
-          <ProfileCard showShare />
+          {/* 共有ボタンは出さない（旧マイ旅も無し）。ここで公開設定を変えても ProfileCard の共有件数は
+              取り直されず、古い件数で共有してしまう。共有はコレクション（/visits）から */}
+          <ProfileCard />
           <VisitsSwitcher current="trip" />
           <TripDiary />
         </div>
