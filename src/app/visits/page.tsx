@@ -989,7 +989,10 @@ export default function VisitsPage() {
                   {/* コンプリート目前（都道府県・ポケモン・特徴 混在） */}
                   {nearCompleteAll.length > 0 && (
                     <div>
-                      <h2 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
+                      <div className="mb-2 flex items-baseline justify-between gap-3">
+                        <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
+                        <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">バッジ一覧 ›</Link>
+                      </div>
                       <div className="-mx-1 overflow-x-auto px-1 pb-1">
                         <div className="flex gap-3" style={{ width: 'max-content' }}>
                           {nearCompleteAll.map((item) => (

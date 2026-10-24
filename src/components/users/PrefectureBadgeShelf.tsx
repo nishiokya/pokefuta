@@ -91,9 +91,12 @@ export default function PrefectureBadgeShelf({
           <Trophy className="h-5 w-5 text-[#B5483C]" />
           制覇した都道府県
         </h2>
-        <p className="font-pixel text-sm text-[#B5483C]">
-          {earned.length}
-          <span className="text-[#8C6A4A]">/{totalPrefectureCount}</span>
+        <p className="flex items-baseline gap-3 font-pixel text-sm text-[#B5483C]">
+          <span>
+            {earned.length}
+            <span className="text-[#8C6A4A]">/{totalPrefectureCount}</span>
+          </span>
+          <Link href="/badges" className="font-pixelJp text-xs font-bold">バッジ一覧 ›</Link>
         </p>
       </div>
 
