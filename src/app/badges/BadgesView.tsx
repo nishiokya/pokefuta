@@ -22,6 +22,9 @@ import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 
 const X_URL = 'https://x.com/pokemonmanhole';
+const VISITS_PAGE_SIZE = 1000;
+
+type VisitRow = { is_public?: boolean; manhole?: { id?: number } | null; manhole_id?: number | null };
 
 type Mine = {
   /** 訪問した蓋（非公開も含む）。県・ポケモンのバッジに使う */
@@ -39,18 +42,22 @@ function useMine(): Mine | null {
       try {
         const { data: { session } } = await createBrowserClient().auth.getSession();
         if (!session?.user) return;
-        const res = await fetch('/api/visits?limit=1000');
-        if (!res.ok) return;
-        const body = await res.json();
-        const visits: Array<{ is_public?: boolean; manhole?: { id?: number } | null; manhole_id?: number | null }> =
-          body?.success && Array.isArray(body.visits) ? body.visits : [];
         const visited = new Set<number>();
         const publicIds = new Set<number>();
-        for (const visit of visits) {
-          const id = visit.manhole?.id ?? visit.manhole_id;
-          if (typeof id !== 'number') continue;
-          visited.add(id);
-          if (visit.is_public) publicIds.add(id);
+        // /api/visits は新しい順に limit 件ずつ返す。同じ蓋の再訪も1件に数えられるので、
+        // 1回で切ると古い訪問の蓋が抜ける。短いページが返るまで読む
+        for (let offset = 0; ; offset += VISITS_PAGE_SIZE) {
+          const res = await fetch(`/api/visits?limit=${VISITS_PAGE_SIZE}&offset=${offset}`);
+          if (!res.ok) return;
+          const body = await res.json();
+          const visits: VisitRow[] = body?.success && Array.isArray(body.visits) ? body.visits : [];
+          for (const visit of visits) {
+            const id = visit.manhole?.id ?? visit.manhole_id;
+            if (typeof id !== 'number') continue;
+            visited.add(id);
+            if (visit.is_public) publicIds.add(id);
+          }
+          if (visits.length < VISITS_PAGE_SIZE) break;
         }
         if (!cancelled) setMine({ visited, publicCount: publicIds.size });
       } catch {
