@@ -1,9 +1,8 @@
-import 'server-only';
-
 /**
  * ポケモンごとの代表マンホール（pokefuta-tracker の dataset/pokemon_representatives.json）。
  * manhole-ai の Tools/pokemon-rep で手で選んだもの。図鑑の Pages には出していないので
- * GitHub の raw から読み、1時間キャッシュする。取れなければ空（呼び出し側が最初の蓋で代える）。
+ * GitHub の raw から読む（サーバでは1時間キャッシュ。raw は CORS が開いているのでブラウザからも読める）。
+ * 取れなければ空（呼び出し側が最初の蓋で代える）。
  */
 const REPRESENTATIVES_URL =
   'https://raw.githubusercontent.com/nishiokya/pokefuta-tracker/main/dataset/pokemon_representatives.json';
