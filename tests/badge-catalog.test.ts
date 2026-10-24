@@ -4,7 +4,9 @@ import {
   BADGE_REGIONS,
   POKEMON_BADGE_MIN_MANHOLES,
   buildPokemonBadges,
+  THEME_BADGES,
   buildThemeBadges,
+  pokemonBadgeManholeIds,
   buildPrefectureBadges,
 } from '../src/lib/badge-catalog';
 import { PREFECTURE_SLUGS } from '../src/lib/prefectureSlug';
@@ -28,7 +30,7 @@ test('都道府県バッジは設置のある県だけを地方ごとに北か�
   assert.deepEqual(groups[1].prefectures, [{ name: '沖縄県', total: 1, visited: 0 }]);
 });
 
-test('ポケモンバッジは設置が多いポケモンだけ、多い順。1枚に同じ名前が2回あっても1枚', () => {
+test('ポケモンバッジは3枚以上のポケモンだけ、多い順。1枚に同じ名前が2回あっても1枚', () => {
   const manholes = [
     ...Array.from({ length: POKEMON_BADGE_MIN_MANHOLES }, (_, i) => lid(i + 1, '北海道', ['ラッキー', 'ラッキー'])),
     ...Array.from({ length: POKEMON_BADGE_MIN_MANHOLES + 1 }, (_, i) => lid(i + 100, '北海道', ['ラプラス'])),
@@ -41,14 +43,24 @@ test('ポケモンバッジは設置が多いポケモンだけ、多い順。1�
   ]);
 });
 
-test('テーマは蓋のハッシュタグごとに多い順。1枚に同じタグが2回あっても1枚', () => {
+test('ステッカーは対象の蓋を1枚でも訪問すればもらえる。蓋の無いステッカーは出さない', () => {
+  const gundam = THEME_BADGES.find((b) => b.key === 'gundam')!.tag;
+  const north = THEME_BADGES.find((b) => b.key === 'north')!.tag;
   const manholes = [
-    { id: 1, prefecture: '北海道', pokemons: [], hashtags: ['#道の駅ポケふた', '#道の駅ポケふた'] },
-    { id: 2, prefecture: '北海道', pokemons: [], hashtags: ['#道の駅ポケふた', '#離島ポケふた'] },
+    { id: 1, prefecture: '北海道', pokemons: [], hashtags: [gundam] },
+    { id: 2, prefecture: '北海道', pokemons: [], hashtags: [gundam, north] },
     { id: 3, prefecture: '北海道', pokemons: [], hashtags: null },
   ];
-  assert.deepEqual(buildThemeBadges(manholes, new Set([2])), [
-    { name: '#道の駅ポケふた', total: 2, visited: 1 },
-    { name: '#離島ポケふた', total: 1, visited: 1 },
-  ]);
+  const stickers = buildThemeBadges(manholes, new Set([1]));
+  assert.deepEqual(
+    stickers.map((s) => [s.key, s.total, s.visited, s.earned]),
+    [['gundam', 2, 1, true], ['north', 1, 0, false]],
+  );
+});
+
+test('ポケモンバッジのメダルは代表マンホール、代表がそのポケモンの蓋でなければ id の小さい蓋', () => {
+  const manholes = [lid(5, '北海道', ['ラッキー']), lid(9, '北海道', ['ラッキー']), lid(7, '北海道', ['ラプラス'])];
+  const ids = pokemonBadgeManholeIds(manholes, new Map([['ラッキー', 9], ['ラプラス', 99]]));
+  assert.equal(ids.get('ラッキー'), 9);
+  assert.equal(ids.get('ラプラス'), 7);
 });

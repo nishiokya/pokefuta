@@ -19,6 +19,10 @@ import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
 import PokedexPanel from '@/components/users/PokedexPanel';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
+import PokemonBadgeShelf from '@/components/users/PokemonBadgeShelf';
+import { buildPokemonBadges, buildThemeBadges, pokemonBadgeManholeIds, type BadgeManhole } from '@/lib/badge-catalog';
+import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
+import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
@@ -128,12 +132,34 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress] = await Promise.all([
+  const [data, progress, snapshot, representatives] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
+    // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
+    fetchManholeSnapshot().catch(() => null),
+    fetchPokemonRepresentatives(),
   ]);
 
   if (!data) notFound();
+
+  // ポケモンバッジとステッカー。進み具合の蓋（公開の訪問で visited）から数える
+  const pokemonShelf = (() => {
+    if (!progress) return null;
+    const hashtagsById = new Map((snapshot?.manholes ?? []).map((m) => [m.id, Array.isArray(m.hashtags) ? m.hashtags : null]));
+    const catalog = progress.prefectures.flatMap((p) => p.manholes);
+    const manholes: BadgeManhole[] = catalog.map((m) => ({
+      id: m.id,
+      prefecture: m.prefecture,
+      pokemons: m.pokemons,
+      hashtags: hashtagsById.get(m.id) ?? null,
+    }));
+    const visited = new Set(catalog.filter((m) => m.visited).map((m) => m.id));
+    return {
+      pokemon: buildPokemonBadges(manholes, visited),
+      medalIds: Object.fromEntries(pokemonBadgeManholeIds(manholes, representatives)),
+      stickers: buildThemeBadges(manholes, visited),
+    };
+  })();
 
   // プロフィール編集は/profile にあり（自分のスタンプ帳 /visits からも行ける）、この公開ページは表示専用
   const xUrl = safeSocialUrl(data.xUrl, X_HOSTS);
@@ -254,6 +280,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
             totalPrefectureCount={progress.totalPrefectureCount}
           />
         )}
+
+        {pokemonShelf && <PokemonBadgeShelf {...pokemonShelf} />}
 
         {progress && <PokedexPanel pokedex={progress.pokedex} />}
 
