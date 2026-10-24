@@ -105,6 +105,10 @@ export function buildPokemonBadges(
  * テーマ（蓋のハッシュタグ）は37種類あるが、ほとんどの蓋に付く大きなテーマは印にならないので、
  * 2026-10-24 にガンダムと東西南北の端だけに絞った。最南と最西は同じ1枚。
  */
+/** バッジの並び。訪問した枚数の多い順、同じなら全部の枚数の多い順（大きい県・ポケモンを先に） */
+export const byCollected = <T extends { name: string; visited: number; total: number }>(a: T, b: T) =>
+  b.visited - a.visited || b.total - a.total || a.name.localeCompare(b.name, 'ja');
+
 export type ThemeBadgeDef = {
   key: string;
   icon: string;

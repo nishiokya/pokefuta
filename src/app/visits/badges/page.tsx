@@ -21,7 +21,7 @@ type Loaded = {
   publicCount: number;
 };
 
-// スタンプ帳の「カード」タブ（スマホ）。トレーナーカード（称号・バッジ・ステッカー）。PC はスタンプ（/visits）の右レールに同じものが出る。
+// スタンプ帳の「カード」タブ（スマホ）。トレーナーカード（称号・バッジの数）。PC はスタンプ（/visits）の右レールに同じものが出る。ステッカーはスタンプの下。
 // 旅の記録と同じく、未ログインの紹介画面は持たずにログインへ送る。
 export default function VisitsBadgesPage() {
   const router = useRouter();

@@ -31,8 +31,9 @@ import ProfileCard from '@/components/users/ProfileCard';
 import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
-import { pokemonBadgeManholeIds } from '@/lib/badge-catalog';
+import { buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -280,7 +281,7 @@ export default function VisitsPage() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
-  // バッジ（PC の右レール）用。都道府県・ポケモン・ステッカーは非公開も含めた訪問、称号は公開の訪問で数える
+  // バッジ（PC の右レール）用。都道府県・ポケモン（とスタンプの下のステッカー）は非公開も含めた訪問、称号は公開の訪問で数える
   const visitedManholeIds = useMemo(() => new Set(visitSummaryByManholeId.keys()), [visitSummaryByManholeId]);
   const publicVisitedManholeCount = useMemo(
     () => new Set(visits.filter((v) => v.is_public).map((v) => v.manhole.id)).size,
@@ -459,6 +460,7 @@ export default function VisitsPage() {
   }, [passportManholes, visitSummaryByManholeId]);
 
   // ポケモンのメダルの絵は右のポケモンバッジと同じ蓋にそろえる
+  const stickers = useMemo(() => buildThemeBadges(passportManholes, visitedManholeIds), [passportManholes, visitedManholeIds]);
   const pokemonMedalIds = useMemo(
     () => pokemonBadgeManholeIds(passportManholes, representatives),
     [passportManholes, representatives]
@@ -805,7 +807,7 @@ export default function VisitsPage() {
   );
 
   // 左（スマホは「スタンプ」タブ）は集めたスタンプと、都道府県・ポケモンのメダル一覧。
-  // PC の右レールはバッジとステッカー（スマホは「バッジ」タブ = /visits/badges）。
+  // PC の右レールは称号とバッジの数（スマホは「バッジ」タブ = /visits/badges）。
   // PCShell の rail はスマホで本文より上に出るので使わず、旅の記録（/visits/trip）と同じ組み方にする
   return (
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
@@ -880,6 +882,10 @@ export default function VisitsPage() {
                   </Link>
                 ))}
               </div>
+              {/* ステッカーはスタンプの下に貼る（右レールのカードはやめた） */}
+              <div className="mt-3">
+                <StickerStrip stickers={stickers} showLocked />
+              </div>
             </div>
 
             {/* 都道府県・ポケモンのバッジ（金・銀・銅）。都道府県は多くても47件なので先に出し、100種を超えるポケモンは最初の2段だけにする */}
@@ -892,20 +898,21 @@ export default function VisitsPage() {
                   label: p.name === '北海道' ? p.name : p.name.replace(/[都府県]$/, ''),
                   visited: p.visited,
                   total: p.total,
-                }))}
+                }))
+                .sort(byCollected)}
             />
             <CollectionStampShelf
               title="ポケモンバッジ"
               initialCount={16}
               items={pokemonProgress.filter((p) => p.visitedManholes > 0)
-                .sort((a, b) => a.pokemonName.localeCompare(b.pokemonName, 'ja'))
                 .map((p) => ({
                   name: p.pokemonName,
                   visited: p.visitedManholes,
                   total: p.totalManholes,
                   manholeId: pokemonMedalIds.get(p.pokemonName),
                   href: pokemonDexUrl(p.pokemonName),
-                }))}
+                }))
+                .sort(byCollected)}
             />
             </div>
             </div>

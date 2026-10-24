@@ -5,7 +5,6 @@ import {
   badgeRank,
   buildPokemonBadges,
   buildPrefectureBadges,
-  buildThemeBadges,
   type BadgeManhole,
   type BadgeProgress,
   type BadgeRank,
@@ -37,7 +36,7 @@ function RankSummary({ items }: { items: readonly BadgeProgress[] }) {
 
 type MyBadgesPanelProps = {
   manholes: readonly BadgeManhole[];
-  /** 訪問した蓋（非公開も含む）。都道府県・ポケモン・ステッカーに使う */
+  /** 訪問した蓋（非公開も含む）。都道府県・ポケモンに使う */
   visited: ReadonlySet<number>;
   /** 公開で訪問した蓋の枚数。称号はこれで決まる（tracker の日次判定と同じ数え方） */
   publicCount: number;
@@ -56,14 +55,13 @@ function Card({ title, right, children }: { title: string; right?: React.ReactNo
 }
 
 /**
- * 自分のスタンプ帳の称号・バッジ・ステッカー。PC は右レール、スマホは「バッジ」タブ（/visits/badges）に出す。
+ * 自分のスタンプ帳の称号・バッジ（ステッカーはスタンプの下）。PC は右レール、スマホは「バッジ」タブ（/visits/badges）に出す。
  * 都道府県バッジはここでは今の訪問から数える（公開スタンプ帳は「取った日」を持っていて、新設で金が消えない）。
  */
 export default function MyBadgesPanel({ manholes, visited, publicCount }: MyBadgesPanelProps) {
   const tier = regularTierForCount(publicCount);
   const prefectures = buildPrefectureBadges(manholes, visited).flatMap((region) => region.prefectures).filter((p) => p.visited > 0);
   const pokemon = buildPokemonBadges(manholes, visited).filter((p) => p.visited > 0);
-  const stickers = buildThemeBadges(manholes, visited);
 
   const nextRate = tier.next
     ? Math.max(
@@ -106,25 +104,6 @@ export default function MyBadgesPanel({ manholes, visited, publicCount }: MyBadg
 
       <Card title="ポケモンバッジ" right={<Link href="/visits#badges" className="font-pixelJp text-[10px] font-bold text-[#B5483C]">一覧 ›</Link>}>
         <RankSummary items={pokemon} />
-      </Card>
-
-      <Card title="ステッカー" right={<span className="font-pixel text-xs text-[#1f9d63]">{stickers.filter((s) => s.earned).length}/{stickers.length}</span>}>
-        <ul className="flex flex-wrap gap-1.5">
-          {stickers.map((sticker) => (
-            <li
-              key={sticker.key}
-              title={sticker.description}
-              className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-dashed px-2 py-0.5 font-pixelJp text-[10px] font-extrabold ${
-                sticker.earned
-                  ? '-rotate-1 border-[#1f9d63]/40 bg-[#F3FBF6] text-[#1f7a4f] shadow-sm'
-                  : 'border-[#8C6A4A]/20 bg-white/60 text-[#B9A88C] grayscale'
-              }`}
-            >
-              <span aria-hidden="true">{sticker.icon}</span>
-              {sticker.name}
-            </li>
-          ))}
-        </ul>
       </Card>
     </div>
   );

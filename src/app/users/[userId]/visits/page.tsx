@@ -18,14 +18,15 @@ import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import {
   badgeRank,
+  byCollected,
   buildPokemonBadges,
   buildThemeBadges,
   pokemonBadgeManholeIds,
   type BadgeManhole,
-  type BadgeRank,
 } from '@/lib/badge-catalog';
 import { newUnvisitedSinceEarned } from '@/lib/prefecture-new-manholes';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
@@ -139,9 +140,6 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
   }));
 }
 
-// バッジの並び。金から順に、同じ段は回った枚数の多い順
-const RANK_ORDER = { gold: 0, silver: 1, bronze: 2, none: 3 } as const;
-
 export default async function UserVisitsPage({ params }: PageProps) {
   const [data, progress, snapshot, representatives] = await Promise.all([
     loadPublicUserVisits(params.userId),
@@ -166,7 +164,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
     }));
     const visited = new Set(catalog.filter((m) => m.visited).map((m) => m.id));
     const medalIds = pokemonBadgeManholeIds(manholes, representatives);
-    const rankOrder = (rank: BadgeRank | null) => (rank ? RANK_ORDER[rank] : RANK_ORDER.none);
     return {
       // 一度制覇した県は、あとでポケふたが増えても金のまま（増えた分は +N、回り直すと🥇×2）
       prefectures: progress.prefectures
@@ -181,10 +178,10 @@ export default async function UserVisitsPage({ params }: PageProps) {
           newCount: newUnvisitedSinceEarned(p),
           href: `/users/${encodeURIComponent(data.userId)}/prefectures/${encodeURIComponent(p.name)}`,
         }))
-        .sort((a, b) => rankOrder(a.rank) - rankOrder(b.rank) || b.visited - a.visited),
+        .sort(byCollected),
       pokemon: buildPokemonBadges(manholes, visited)
         .filter((p) => p.visited > 0)
-        .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+        .sort(byCollected)
         .map((p) => ({ ...p, manholeId: medalIds.get(p.name), href: pokemonDexUrl(p.name) })),
       stickers: buildThemeBadges(manholes, visited).filter((s) => s.earned),
     };
@@ -315,23 +312,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <div className="flex flex-col gap-6 rounded-[10px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-3 py-5 shadow-sm sm:px-5">
               {badges.prefectures.length > 0 && <CollectionStampShelf title="都道府県バッジ" items={badges.prefectures} />}
               {badges.pokemon.length > 0 && <CollectionStampShelf title="ポケモンバッジ" initialCount={16} items={badges.pokemon} />}
-              {badges.stickers.length > 0 && (
-                <div>
-                  <h3 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">ステッカー</h3>
-                  <ul className="flex flex-wrap gap-2">
-                    {badges.stickers.map((sticker) => (
-                      <li
-                        key={sticker.key}
-                        className="inline-flex -rotate-1 items-center gap-1.5 rounded-[8px] border-2 border-dashed border-[#1f9d63]/40 bg-[#F3FBF6] px-2.5 py-1 text-xs font-extrabold text-[#1f7a4f] shadow-sm"
-                        title={sticker.description}
-                      >
-                        <span aria-hidden="true">{sticker.icon}</span>
-                        {sticker.name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <StickerStrip stickers={badges.stickers} />
             </div>
           </section>
         )}

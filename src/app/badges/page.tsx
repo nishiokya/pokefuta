@@ -3,6 +3,7 @@ import Link from 'next/link';
 import PCShell from '@/components/PCShell';
 import PokemonMedal from '@/components/PokemonMedal';
 import RegularBadge from '@/components/RegularBadge';
+import RankSimulator from '@/components/badges/RankSimulator';
 import { PrefectureMedal, RANK_ICON, RANK_LABEL } from '@/components/RankMedal';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
@@ -245,6 +246,7 @@ export default async function BadgesPage() {
             ]}
           />
           <RankTable />
+          <RankSimulator />
         </section>
 
         {/* 都道府県 */}
