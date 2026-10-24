@@ -80,21 +80,12 @@ export default function MyBadgesPanel({ manholes, visited, publicCount }: MyBadg
     };
   }, []);
   const tier = regularTierForCount(publicCount, awarded);
-  // 据え置きの段のときは今の段の枚数に届いていないので、0 から測る
-  const base = tier.current && publicCount >= REGULAR_TIER_MIN_MANHOLES[tier.current] ? REGULAR_TIER_MIN_MANHOLES[tier.current] : 0;
   const prefectures = buildPrefectureBadges(manholes, visited).flatMap((region) => region.prefectures).filter((p) => p.visited > 0);
   const pokemon = buildPokemonBadges(manholes, visited).filter((p) => p.visited > 0);
 
-  const nextRate = tier.next
-    ? Math.max(
-        0,
-        Math.min(
-          100,
-          ((publicCount - base) / (REGULAR_TIER_MIN_MANHOLES[tier.next] - base)) *
-            100,
-        ),
-      )
-    : 100;
+  // 進み具合は次の段の枚数に対して 0 から測る。据え置きの段（今の段の枚数に届いていない）でも、
+  // 1枚増えて今の段の枚数に届いたときに輪が戻らないようにするため
+  const nextRate = tier.next ? Math.min(100, (publicCount / REGULAR_TIER_MIN_MANHOLES[tier.next]) * 100) : 100;
 
   return (
     <div className="space-y-3">
