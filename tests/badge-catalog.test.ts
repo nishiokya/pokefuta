@@ -4,6 +4,7 @@ import {
   BADGE_REGIONS,
   POKEMON_BADGE_MIN_MANHOLES,
   buildPokemonBadges,
+  buildThemeBadges,
   buildPrefectureBadges,
 } from '../src/lib/badge-catalog';
 import { PREFECTURE_SLUGS } from '../src/lib/prefectureSlug';
@@ -37,5 +38,17 @@ test('ポケモンバッジは設置が多いポケモンだけ、多い順。1�
   assert.deepEqual(badges, [
     { name: 'ラプラス', total: POKEMON_BADGE_MIN_MANHOLES + 1, visited: 2 },
     { name: 'ラッキー', total: POKEMON_BADGE_MIN_MANHOLES, visited: 1 },
+  ]);
+});
+
+test('テーマは蓋のハッシュタグごとに多い順。1枚に同じタグが2回あっても1枚', () => {
+  const manholes = [
+    { id: 1, prefecture: '北海道', pokemons: [], hashtags: ['#道の駅ポケふた', '#道の駅ポケふた'] },
+    { id: 2, prefecture: '北海道', pokemons: [], hashtags: ['#道の駅ポケふた', '#離島ポケふた'] },
+    { id: 3, prefecture: '北海道', pokemons: [], hashtags: null },
+  ];
+  assert.deepEqual(buildThemeBadges(manholes, new Set([2])), [
+    { name: '#道の駅ポケふた', total: 2, visited: 1 },
+    { name: '#離島ポケふた', total: 1, visited: 1 },
   ]);
 });
