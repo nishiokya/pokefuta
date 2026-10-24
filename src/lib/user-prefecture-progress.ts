@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
+import { findEarnedCompletion } from '@/lib/prefecture-earned';
 
 export type PublicPrefectureProgress = {
   name: string;
@@ -19,6 +20,8 @@ export type PublicPrefectureProgress = {
   earnedAt: string | null;
   /** 制覇成立時点でのその県の設置枚数。成立後に増えた分は含まない */
   earnedTotal: number;
+  /** 制覇が成立した回数。新設で崩れたあと、増えた分まで回ってもう一度そろうと2以上 */
+  earnedCount: number;
   manholes: PublicPrefectureManhole[];
 };
 
@@ -117,76 +120,6 @@ const toRate = (visited: number, total: number) => (total > 0 ? (visited / total
 
 const getVisitSortTime = (visit: Pick<VisitProgressRow, 'shot_at' | 'created_at'>) =>
   new Date(visit.shot_at || visit.created_at || 0).getTime();
-
-/**
- * 「その時点で存在していたポケふたを全て訪問済みだった瞬間」があったかを判定し、
- * 最初に成立した日時と、最後に成立していた時点の設置枚数を返す。
- *
- * 現在の枚数と訪問数を比べるだけだと、制覇後にポケふたが新設された県で
- * 制覇の事実そのものが消えてしまう(実際に初回一括投入422件のあと60件が追加されている)。
- * 制覇は履歴上の出来事なので、カタログへの登場時刻とユーザーの初回訪問時刻を
- * 時系列に並べ、両方をイベントとして走査して復元する。
- *
- * 候補を訪問時刻だけに絞ると、カタログ登録より先に現地訪問していたポケふた
- * (v < created_at)で成立時刻を取りこぼすため、登場時刻もイベントに含める。
- *
- * earnedAt は最初の成立時刻(=実績としての制覇日)、earnedTotal は最後に成立して
- * いた時点の枚数を返す。後から増えた分を訪問済みなら現在の枚数に追いつき、
- * 未訪問なら制覇時の枚数のまま残るので「その後N枚 追加」の判定に使える。
- */
-function findEarnedCompletion(
-  manholes: ManholeProgressRow[],
-  firstVisitTimeByManhole: Map<number, number>,
-  catalogBaselineCutoff: number
-): { earnedAt: string | null; earnedTotal: number } {
-  if (manholes.length === 0) return { earnedAt: null, earnedTotal: 0 };
-
-  // 各ポケふたが「存在するようになった時刻」。0 は最初から存在していた扱い
-  const existsFrom = manholes.map((manhole) => {
-    const time = new Date(manhole.created_at || 0).getTime();
-    // created_at が欠けている行は最初から存在していたとみなす
-    if (Number.isNaN(time) || time <= 0) return 0;
-    // 一括投入分の created_at は「DBに入れた日」であって設置日ではない。
-    // これを設置時刻として扱うと、投入日より前に訪問していたユーザーが
-    // 「当時0枚」と判定されて制覇を失うため、投入バッチ内は常在扱いにする
-    return time <= catalogBaselineCutoff ? 0 : time;
-  });
-  const visitedAt = manholes.map((manhole) => firstVisitTimeByManhole.get(manhole.id) ?? null);
-
-  if (visitedAt.every((time) => time === null)) return { earnedAt: null, earnedTotal: 0 };
-
-  const candidates = Array.from(
-    new Set([
-      ...existsFrom.filter((time) => time > 0),
-      ...visitedAt.filter((time): time is number => typeof time === 'number' && time > 0),
-    ])
-  ).sort((a, b) => a - b);
-
-  let earnedAt: number | null = null;
-  let earnedTotal = 0;
-
-  for (const candidate of candidates) {
-    let existing = 0;
-    let visitedExisting = 0;
-    for (let index = 0; index < manholes.length; index++) {
-      if (existsFrom[index] > candidate) continue;
-      existing++;
-      const visited = visitedAt[index];
-      if (visited !== null && visited <= candidate) visitedExisting++;
-    }
-
-    if (existing > 0 && visitedExisting >= existing) {
-      if (earnedAt === null) earnedAt = candidate;
-      // 成立していた最後の時点の枚数を残す
-      earnedTotal = existing;
-    }
-  }
-
-  return {
-    earnedAt: earnedAt === null ? null : new Date(earnedAt).toISOString(),
-    earnedTotal,
-  };
-}
 
 export function createPublicReadClient(): SupabaseClient<Database> | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -426,7 +359,7 @@ async function loadPublicUserPrefectureProgressImpl(
       const rate = toRate(visited, total);
       const complete = total > 0 && visited >= total;
 
-      const { earnedAt, earnedTotal } = findEarnedCompletion(
+      const { earnedAt, earnedTotal, earnedCount } = findEarnedCompletion(
         manholesByPrefecture.get(name) || [],
         firstVisitTimeByManhole,
         catalogBaselineCutoff
@@ -441,6 +374,7 @@ async function loadPublicUserPrefectureProgressImpl(
         complete,
         earnedAt,
         earnedTotal,
+        earnedCount,
         manholes: (manholesByPrefecture.get(name) || [])
           .map((manhole) => ({
             id: manhole.id,

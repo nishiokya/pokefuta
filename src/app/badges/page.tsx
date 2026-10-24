@@ -3,11 +3,12 @@ import Link from 'next/link';
 import PCShell from '@/components/PCShell';
 import PokemonMedal from '@/components/PokemonMedal';
 import RegularBadge from '@/components/RegularBadge';
-import { MEDAL_STYLES, medalTier, type MedalTier } from '@/components/users/PrefectureBadgeShelf';
+import RankSimulator from '@/components/badges/RankSimulator';
+import { PrefectureMedal, RANK_ICON, RANK_LABEL } from '@/components/RankMedal';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import {
-  POKEMON_BADGE_MIN_MANHOLES,
+  badgeRankThresholds,
   buildPokemonBadges,
   buildPrefectureBadges,
   buildThemeBadges,
@@ -36,12 +37,10 @@ export const metadata: Metadata = {
 
 const X_URL = 'https://x.com/pokemonmanhole';
 
-const MEDAL_LABEL: Record<MedalTier, string> = { gold: '金', silver: '銀', bronze: '銅' };
-const MEDAL_RULE: Record<MedalTier, string> = {
-  gold: 'ポケふたが20枚以上の県',
-  silver: '5〜19枚の県',
-  bronze: '4枚以下の県',
-};
+// 説明ページに並べるポケモンの数。全種類にバッジがあるが、全部並べると数百になるのでポケふたの多い順に先頭だけ
+const POKEMON_SAMPLE = 22;
+// 段の決まり方の例に出す枚数
+const RANK_EXAMPLES = [1, 2, 5, 9, 50];
 
 const shortPrefecture = (name: string) => (name === '北海道' ? name : name.replace(/[都府県]$/, ''));
 
@@ -74,24 +73,54 @@ function Rules({ items }: { items: string[] }) {
   );
 }
 
-function PrefectureMedal({ name, total }: { name: string; total: number }) {
-  const style = MEDAL_STYLES[medalTier(total)];
-  const label = shortPrefecture(name);
+/** 県のメダルと、その県の銅・銀・金に要る枚数 */
+function CatalogPrefecture({ name, total }: { name: string; total: number }) {
+  const t = badgeRankThresholds(total);
   const href = prefectureDexUrl(name);
   const body = (
     <>
-      <span className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br p-[3px] shadow-sm transition group-hover:scale-105 ${style.medal}`}>
-        <span className={`flex h-full w-full items-center justify-center rounded-full bg-white/90 px-0.5 text-center font-pixelJp font-extrabold leading-tight text-[#4F3828] ${label.length >= 4 ? 'text-[10px]' : 'text-xs'}`}>
-          {label}
-        </span>
+      <span className="transition group-hover:scale-105">
+        {/* 説明なので段の色は付けず、ポケモンのメダルの説明と同じ紫の輪にする */}
+        <PrefectureMedal label={shortPrefecture(name)} rank={null} rate={100} size={56} />
       </span>
       <span className="mt-1 font-pixel text-[10px] text-[#8C6A4A]">{total}枚</span>
     </>
   );
+  const title = `${name} 全${total}枚（銅${t.bronze}・銀${t.silver}・金${t.gold}枚）`;
   return href ? (
-    <a href={href} className="group flex flex-col items-center" title={`${name} 全${total}枚`}>{body}</a>
+    <a href={href} className="group flex flex-col items-center" title={title}>{body}</a>
   ) : (
-    <span className="flex flex-col items-center">{body}</span>
+    <span className="flex flex-col items-center" title={title}>{body}</span>
+  );
+}
+
+/** 全部の枚数ごとに、銅・銀・金に要る枚数 */
+function RankTable() {
+  return (
+    <table className="w-full max-w-md border-collapse text-center text-xs text-[#4F3828]">
+      <thead>
+        <tr className="border-b border-[#e9dfc7] font-pixelJp text-[#8C6A4A]">
+          <th className="py-1.5 font-bold">全部の枚数</th>
+          {(['bronze', 'silver', 'gold'] as const).map((rank) => (
+            <th key={rank} className="py-1.5 font-bold">{RANK_ICON[rank]} {RANK_LABEL[rank]}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="font-pixel">
+        {RANK_EXAMPLES.map((total) => {
+          const t = badgeRankThresholds(total);
+          return (
+            <tr key={total} className="border-b border-[#e9dfc7]/60">
+              <td className="py-1.5">{total}枚</td>
+              {/* 銅と銀が同じ枚数になるとき（2枚以下）は、上の段だけ出す */}
+              <td className="py-1.5">{t.bronze < t.silver ? `${t.bronze}枚` : '—'}</td>
+              <td className="py-1.5">{t.silver < t.gold ? `${t.silver}枚` : '—'}</td>
+              <td className="py-1.5">{t.gold}枚</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -109,12 +138,6 @@ export default async function BadgesPage() {
   }));
   const regions = buildPrefectureBadges(manholes);
   const prefectureCount = regions.reduce((sum, region) => sum + region.prefectures.length, 0);
-  const medalCounts = regions
-    .flatMap((region) => region.prefectures)
-    .reduce<Record<MedalTier, number>>(
-      (acc, p) => ({ ...acc, [medalTier(p.total)]: acc[medalTier(p.total)] + 1 }),
-      { gold: 0, silver: 0, bronze: 0 },
-    );
   const pokemon = buildPokemonBadges(manholes);
   const medalIds = pokemonBadgeManholeIds(manholes, representatives);
   const stickers = buildThemeBadges(manholes);
@@ -133,6 +156,7 @@ export default async function BadgesPage() {
           <nav aria-label="トレーナーカードの中身" className="mt-3 flex flex-wrap gap-1.5">
             {[
               ['#badges-tiers', '🏆 称号'],
+              ['#badges-rank', '🥇 金・銀・銅'],
               ['#badges-prefectures', '🗾 都道府県バッジ'],
               ['#badges-pokemon', '⚡ ポケモンバッジ'],
               ['#badges-stickers', '🏷 ステッカー'],
@@ -211,33 +235,36 @@ export default async function BadgesPage() {
           </div>
         </section>
 
-        {/* 都道府県制覇 */}
-        <section aria-labelledby="badges-prefectures" className={CARD}>
-          <SectionHeading id="badges-prefectures" icon="🗾" title="都道府県バッジ" where="公開スタンプ帳の「制覇した都道府県」" />
+        {/* 都道府県・ポケモンのバッジは同じ決まり（何割回ったかで銅・銀・金） */}
+        <section aria-labelledby="badges-rank" className={CARD}>
+          <SectionHeading id="badges-rank" icon="🥇" title="バッジの段（金・銀・銅）" where="スタンプ帳・公開スタンプ帳の「バッジ」" />
           <Rules
             items={[
-              `その県のポケふたを全部訪問すると制覇です。ポケふたのある${prefectureCount}都道府県にあります。`,
-              '制覇したあとで新しいポケふたが増えても、バッジは消えません。「新しいポケふたが増えました」の段に並び、また行く理由になります。',
-              'あと3枚以内の県は「リーチ」として棚に出ます。',
+              'バッジは都道府県ごと・ポケモンごとにあります。そのポケふたを何枚訪問したかで、銅・銀・金の3段に上がります。',
+              '全部の1/3で銅、2/3で銀、全部訪問すると金です（端数は切り捨て、少なくとも1枚）。',
+              '銅に届くまでは白黒で、外側の輪が進み具合です。同じポケふたに何度行っても1枚です。',
             ]}
           />
-          <div className="grid grid-cols-3 gap-2">
-            {(['gold', 'silver', 'bronze'] as const).map((tier) => (
-              <div key={tier} className={`rounded-[10px] border bg-gradient-to-br px-2 py-3 text-center ${MEDAL_STYLES[tier].chip}`}>
-                <span className={`mx-auto block h-8 w-8 rounded-full bg-gradient-to-br shadow-inner ${MEDAL_STYLES[tier].medal}`} aria-hidden="true" />
-                <p className="mt-1.5 font-pixelJp text-sm font-extrabold text-[#4F3828]">{MEDAL_LABEL[tier]}メダル</p>
-                <p className="text-[10px] leading-snug text-[#6A4D36]">{MEDAL_RULE[tier]}</p>
-                <p className="mt-0.5 font-pixel text-[10px] text-[#8C6A4A]">{medalCounts[tier]}県</p>
-              </div>
-            ))}
-          </div>
+          <RankTable />
+          <RankSimulator />
+        </section>
+
+        {/* 都道府県 */}
+        <section aria-labelledby="badges-prefectures" className={CARD}>
+          <SectionHeading id="badges-prefectures" icon="🗾" title="都道府県バッジ" where="スタンプ帳・公開スタンプ帳の「都道府県バッジ」" />
+          <Rules
+            items={[
+              `ポケふたのある${prefectureCount}都道府県にあります。`,
+              '公開スタンプ帳では、一度金になった県は、あとで新しいポケふたが増えても金のままです。増えた枚数が「+N」で付き、また全部訪問すると金が2つ（🥇×2）になります。',
+            ]}
+          />
           <div className="space-y-3">
             {regions.map((region) => (
               <div key={region.region} className="border-t border-[#e9dfc7] pt-3">
                 <h3 className="mb-2.5 font-pixelJp text-sm font-bold text-[#8C6A4A]">{region.region}</h3>
                 <div className="grid grid-cols-4 gap-y-3 sm:grid-cols-6 lg:grid-cols-9">
                   {region.prefectures.map((p) => (
-                    <PrefectureMedal key={p.name} name={p.name} total={p.total} />
+                    <CatalogPrefecture key={p.name} name={p.name} total={p.total} />
                   ))}
                 </div>
               </div>
@@ -247,20 +274,20 @@ export default async function BadgesPage() {
 
         {/* ポケモン */}
         <section aria-labelledby="badges-pokemon" className={CARD}>
-          <SectionHeading id="badges-pokemon" icon="⚡" title="ポケモンバッジ" where="公開スタンプ帳の「ポケモンバッジ」" />
+          <SectionHeading id="badges-pokemon" icon="⚡" title="ポケモンバッジ" where="スタンプ帳・公開スタンプ帳の「ポケモンバッジ」" />
           <Rules
             items={[
-              `ポケふたに${POKEMON_BADGE_MIN_MANHOLES}枚以上描かれている${pokemon.length}種類のポケモンにあります。そのポケモンのポケふたを全部訪問するとバッジになります。`,
-              'メダルの写真は、そのポケモンの代表のポケふたです。まだ集めていないバッジは白黒で、外側の輪が進み具合です。',
-              '1〜2枚しかないポケモンは、公開スタンプ帳の「ポケモン図鑑」で会えた種類として数えます。',
+              `ポケふたに描かれている${pokemon.length}種類のポケモン全部にあります。1枚しかないポケモンは、その1枚で金です。`,
+              'メダルの写真は、そのポケモンの代表のポケふたです。',
             ]}
           />
+          <p className="font-pixelJp text-xs font-bold text-[#8C6A4A]">ポケふたが多いポケモン</p>
           <ul className="grid grid-cols-4 gap-y-4 pt-1 sm:grid-cols-6 lg:grid-cols-11">
-            {pokemon.map((p) => (
+            {pokemon.slice(0, POKEMON_SAMPLE).map((p) => (
               <li key={p.name}>
                 <a href={pokemonDexUrl(p.name)} className="group flex flex-col items-center text-center" title={`${p.name} 全${p.total}枚`}>
                   <span className="transition group-hover:scale-105">
-                    <PokemonMedal name={p.name} manholeId={medalIds.get(p.name)!} state="catalog" total={p.total} size={60} />
+                    <PokemonMedal name={p.name} manholeId={medalIds.get(p.name)!} rank={null} catalog size={60} />
                   </span>
                   <span className="mt-1 max-w-full truncate px-0.5 font-pixelJp text-[10px] font-bold text-[#4F3828]">{p.name}</span>
                   <span className="font-pixel text-[10px] text-[#8C6A4A]">{p.total}枚</span>
@@ -275,7 +302,7 @@ export default async function BadgesPage() {
           <SectionHeading id="badges-stickers" icon="🏷" title="ステッカー" where="公開スタンプ帳の「ステッカー」" />
           <Rules
             items={[
-              'バッジは全部そろえるともらえますが、ステッカーは対象のポケふたを1枚でも訪問すればもらえます。',
+              'バッジは訪問した割合で銅・銀・金に上がりますが、ステッカーは対象のポケふたを1枚でも訪問すればもらえます。',
               '日本最南と日本最西は同じポケふたなので、1回の訪問で2枚もらえます。',
             ]}
           />
@@ -300,7 +327,7 @@ export default async function BadgesPage() {
 
         <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-5 py-5 text-center shadow-sm">
           <p className="font-pixelJp text-sm font-bold text-[#4F3828]">自分のトレーナーカードを見る</p>
-          <p className="mt-1 text-xs text-[#6A4D36]">スタンプ帳で、いまの称号と、あと少しのバッジが見られます。</p>
+          <p className="mt-1 text-xs text-[#6A4D36]">スタンプ帳で、いまの称号と、都道府県・ポケモンのバッジが見られます。</p>
           <Link
             href="/visits"
             className="mt-3 inline-flex items-center gap-2 rounded-[10px] bg-[#7B63A8] px-5 py-2.5 font-pixelJp text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]"

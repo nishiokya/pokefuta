@@ -17,10 +17,18 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
-import PokedexPanel from '@/components/users/PokedexPanel';
-import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
-import PokemonBadgeShelf from '@/components/users/PokemonBadgeShelf';
-import { buildPokemonBadges, buildThemeBadges, pokemonBadgeManholeIds, type BadgeManhole } from '@/lib/badge-catalog';
+import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import StickerStrip from '@/components/visits/StickerStrip';
+import { pokemonDexUrl } from '@/lib/pokemonSlug';
+import {
+  badgeRank,
+  byCollected,
+  buildPokemonBadges,
+  buildThemeBadges,
+  pokemonBadgeManholeIds,
+  type BadgeManhole,
+} from '@/lib/badge-catalog';
+import { newUnvisitedSinceEarned } from '@/lib/prefecture-new-manholes';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -143,8 +151,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
   if (!data) notFound();
 
-  // ポケモンバッジとステッカー。進み具合の蓋（公開の訪問で visited）から数える
-  const pokemonShelf = (() => {
+  // 都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。数えるのは公開の訪問の蓋だけ（再訪は1枚）
+  const badges = (() => {
     if (!progress) return null;
     const hashtagsById = new Map((snapshot?.manholes ?? []).map((m) => [m.id, Array.isArray(m.hashtags) ? m.hashtags : null]));
     const catalog = progress.prefectures.flatMap((p) => p.manholes);
@@ -155,10 +163,27 @@ export default async function UserVisitsPage({ params }: PageProps) {
       hashtags: hashtagsById.get(m.id) ?? null,
     }));
     const visited = new Set(catalog.filter((m) => m.visited).map((m) => m.id));
+    const medalIds = pokemonBadgeManholeIds(manholes, representatives);
     return {
-      pokemon: buildPokemonBadges(manholes, visited),
-      medalIds: Object.fromEntries(pokemonBadgeManholeIds(manholes, representatives)),
-      stickers: buildThemeBadges(manholes, visited),
+      // 一度制覇した県は、あとでポケふたが増えても金のまま（増えた分は +N、回り直すと🥇×2）
+      prefectures: progress.prefectures
+        .filter((p) => p.visited > 0 || p.earnedAt)
+        .map((p) => ({
+          name: p.name,
+          label: p.name === '北海道' ? p.name : p.name.replace(/[都府県]$/, ''),
+          visited: p.visited,
+          total: p.total,
+          rank: p.earnedAt ? ('gold' as const) : badgeRank(p.visited, p.total),
+          goldCount: p.earnedCount,
+          newCount: newUnvisitedSinceEarned(p),
+          href: `/users/${encodeURIComponent(data.userId)}/prefectures/${encodeURIComponent(p.name)}`,
+        }))
+        .sort(byCollected),
+      pokemon: buildPokemonBadges(manholes, visited)
+        .filter((p) => p.visited > 0)
+        .sort(byCollected)
+        .map((p) => ({ ...p, manholeId: medalIds.get(p.name), href: pokemonDexUrl(p.name) })),
+      stickers: buildThemeBadges(manholes, visited).filter((s) => s.earned),
     };
   })();
 
@@ -274,17 +299,23 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </div>
         </section>
 
-        {progress && (
-          <PrefectureBadgeShelf
-            userId={data.userId}
-            prefectures={progress.prefectures}
-            totalPrefectureCount={progress.totalPrefectureCount}
-          />
+        {/* 都道府県・ポケモンのバッジ（金・銀・銅のメダル）とステッカー */}
+        {badges && (badges.prefectures.length > 0 || badges.pokemon.length > 0 || badges.stickers.length > 0) && (
+          <section className="mt-8">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+                <Sparkles className="h-5 w-5 text-[#7B63A8]" />
+                バッジ
+              </h2>
+              <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">トレーナーカードとは ›</Link>
+            </div>
+            <div className="flex flex-col gap-6 rounded-[10px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-3 py-5 shadow-sm sm:px-5">
+              {badges.prefectures.length > 0 && <CollectionStampShelf title="都道府県バッジ" items={badges.prefectures} />}
+              {badges.pokemon.length > 0 && <CollectionStampShelf title="ポケモンバッジ" initialCount={16} items={badges.pokemon} />}
+              <StickerStrip stickers={badges.stickers} />
+            </div>
+          </section>
         )}
-
-        {pokemonShelf && <PokemonBadgeShelf {...pokemonShelf} />}
-
-        {progress && <PokedexPanel pokedex={progress.pokedex} />}
 
         {data.isTruncated && (
           <p className="mt-4 text-xs font-bold text-[#6A4D36]">

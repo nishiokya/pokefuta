@@ -22,10 +22,29 @@ export type RegionBadges = {
 };
 
 /**
- * ポケモンバッジにする最少の設置枚数。ポケふたのポケモンの多くは1〜2枚しかなく、
- * 1回の訪問で取れてしまう。3枚以上は44種類（2026-10-24）で、都道府県バッジ（42）と同じくらいの数になる。
+ * バッジのメダルの段。2026-10-25 に、都道府県・ポケモンとも「その中で何割回ったか」の3段にした
+ * （それまでは都道府県が県の枚数で金銀銅、ポケモンは3枚以上の種類だけで、スタンプの一覧と見分けがつかなかった）。
+ * 全部で金、2/3 で銀、1/3 で銅。端数は切り捨て、少なくとも1枚。
  */
-export const POKEMON_BADGE_MIN_MANHOLES = 3;
+export type BadgeRank = 'gold' | 'silver' | 'bronze';
+
+export function badgeRankThresholds(total: number): Record<BadgeRank, number> {
+  return {
+    bronze: Math.max(1, Math.floor(total / 3)),
+    silver: Math.max(1, Math.floor((total * 2) / 3)),
+    gold: total,
+  };
+}
+
+/** まだ銅に届かなければ null */
+export function badgeRank(visited: number, total: number): BadgeRank | null {
+  if (total <= 0 || visited <= 0) return null;
+  const t = badgeRankThresholds(total);
+  if (visited >= t.gold) return 'gold';
+  if (visited >= t.silver) return 'silver';
+  if (visited >= t.bronze) return 'bronze';
+  return null;
+}
 
 /** 図鑑の地方の分け方と同じ6地方 */
 export const BADGE_REGIONS: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -69,14 +88,13 @@ export function buildPrefectureBadges(
   })).filter((group) => group.prefectures.length > 0);
 }
 
-/** 設置枚数が POKEMON_BADGE_MIN_MANHOLES 以上のポケモンを、枚数の多い順に並べる */
+/** ポケふたに描かれている全ポケモンを、枚数の多い順に並べる */
 export function buildPokemonBadges(
   manholes: readonly BadgeManhole[],
   visited: ReadonlySet<number> = new Set(),
 ): BadgeProgress[] {
   const counts = tally(manholes, visited, (m) => m.pokemons ?? []);
   return Array.from(counts.entries())
-    .filter(([, count]) => count.total >= POKEMON_BADGE_MIN_MANHOLES)
     .map(([name, count]) => ({ name, ...count }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ja'));
 }
@@ -87,6 +105,10 @@ export function buildPokemonBadges(
  * テーマ（蓋のハッシュタグ）は37種類あるが、ほとんどの蓋に付く大きなテーマは印にならないので、
  * 2026-10-24 にガンダムと東西南北の端だけに絞った。最南と最西は同じ1枚。
  */
+/** バッジの並び。訪問した枚数の多い順、同じなら全部の枚数の多い順（大きい県・ポケモンを先に） */
+export const byCollected = <T extends { name: string; visited: number; total: number }>(a: T, b: T) =>
+  b.visited - a.visited || b.total - a.total || a.name.localeCompare(b.name, 'ja');
+
 export type ThemeBadgeDef = {
   key: string;
   icon: string;
