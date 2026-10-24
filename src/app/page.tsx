@@ -327,7 +327,7 @@ export default function HomePage() {
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
               href="/badges"
-              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:hidden sm:gap-3 sm:p-4 lg:flex-1"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
                 <Award className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -343,22 +343,27 @@ export default function HomePage() {
             {/*
               「この◯人に続け！」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
               LEGEND のトレーナーを写真と名前で見せ、押すとその人の公開スタンプ帳へ。順位にしないため枚数は出さず名前順。
-              スマホは「バッジを集めよう」の右に半分の幅で2人、タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広めに3人。
+              スマホは「バッジを集めよう」を出さず、このカード1枚を横いっぱいに（称号のお知らせのリンクで /badges へ）。
+              タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。どれも3人まで。
               名前と写真は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）。
               まだ届いていない（取れなかった）ときは「LEGEND を目指そう」として /badges の説明へ送る
             */}
             {legends.length > 0 ? (
-              <div className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm max-sm:flex-col max-sm:items-start sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3">
+              <div className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm max-sm:col-span-2 sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3">
                 <div className="min-w-0 shrink-0">
-                  <p className="text-xs font-extrabold text-[#4A4A4A] sm:text-base">この{legends.length}人に続け！</p>
-                  <p className="whitespace-nowrap text-[10px] font-bold text-[#8A6A1F] sm:text-xs">🏆 LEGEND トレーナー<span className="max-sm:hidden">のみなさん</span></p>
+                  <p className="text-sm font-extrabold text-[#4A4A4A] sm:text-base">この{legends.length}人に続け！</p>
+                  <p className="whitespace-nowrap text-[10px] font-bold text-[#8A6A1F] sm:text-xs">🏆 LEGEND トレーナーのみなさん</p>
+                  {/* 2026-10-24 に称号を枚数の5段階に変えたお知らせ。スマホはここが /badges への入口 */}
+                  <Link href="/badges" className="mt-0.5 inline-block whitespace-nowrap text-[10px] font-bold text-[#7B63A8] hover:underline sm:text-[11px]">
+                    称号をアップデートしました ›
+                  </Link>
                 </div>
-                <ul className="flex min-w-0 gap-1.5 sm:ml-auto sm:gap-2.5">
-                  {legends.slice(0, 3).map((legend, index) => (
-                    <li key={legend.id} className={index > 1 ? 'max-sm:hidden' : ''}>
+                <ul className="ml-auto flex min-w-0 shrink-0 gap-1 sm:gap-2.5">
+                  {legends.slice(0, 3).map((legend) => (
+                    <li key={legend.id}>
                       <Link
                         href={`/users/${encodeURIComponent(legend.id)}/visits`}
-                        className="group flex w-14 flex-col items-center sm:w-[4.5rem] lg:w-20"
+                        className="group flex w-12 flex-col items-center sm:w-[4.5rem] lg:w-20"
                         title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
                       >
                         <span className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-300 via-amber-200 to-sky-300 p-[2px] shadow-sm transition group-hover:scale-105 sm:h-10 sm:w-10">
@@ -384,7 +389,7 @@ export default function HomePage() {
             ) : (
               <Link
                 href="/badges#badges-legend"
-                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm transition hover:shadow max-sm:col-span-2 sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-200 via-amber-200 to-sky-200 text-xl shadow-sm sm:h-12 sm:w-12 sm:text-2xl" aria-hidden="true">
                   🏆
