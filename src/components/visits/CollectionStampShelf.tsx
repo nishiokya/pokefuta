@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Stamp } from 'lucide-react';
+import PokemonMedal from '@/components/PokemonMedal';
 
 type CollectionStamp = {
   name: string;
   visited: number;
   total: number;
-  photoUrl?: string | null;
+  /** ポケモンはバッジと同じく代表マンホールの蓋の絵を入れる。無いもの（都道府県）は丸の中に名前を書く */
+  manholeId?: number;
+  /** 丸の中に書く名前（都道府県の「県」を落とした短い形など） */
+  label?: string;
   href?: string;
 };
+
+const MEDAL_SIZE = 52;
 
 // 「アローラキュウコン」のような長い名前が途中で折れないよう、字数で文字を小さくして1行に収める
 const nameSizeClass = (name: string) => {
@@ -18,7 +23,38 @@ const nameSizeClass = (name: string) => {
   return 'text-[10px]';
 };
 
-/** 訪問した蓋を種類・都道府県ごとにまとめた小さなスタンプ。再訪回数ではなく蓋数を表示する。 */
+/** 名前入りのメダル。PokemonMedal と同じく、揃うまでは白黒で薄く外周のリングで割合を見せ、揃うと金の縁にする */
+function LabelMedal({ label, visited, total }: { label: string; visited: number; total: number }) {
+  const earned = visited >= total;
+  const rate = total > 0 ? Math.min(100, (visited / total) * 100) : 0;
+  return (
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center rounded-full p-[3px] ${
+        earned ? 'shadow-[0_0_0_2px_#F5D77A,0_4px_10px_rgba(217,162,27,0.35)]' : 'shadow-sm'
+      }`}
+      style={{
+        width: MEDAL_SIZE,
+        height: MEDAL_SIZE,
+        background: earned ? 'conic-gradient(#E5B83E 100%, transparent 0)' : `conic-gradient(#7B63A8 ${rate}%, #EADFC8 0)`,
+      }}
+    >
+      <span
+        className={`flex h-full w-full items-center justify-center rounded-full border-2 border-white text-center font-pixelJp font-extrabold leading-tight ${
+          earned ? 'bg-[#FFF3CF] text-[#4F3828]' : 'bg-[#F3EEE4] text-[#8C7F6E]'
+        } ${label.length >= 4 ? 'text-[9px]' : 'text-[11px]'}`}
+      >
+        {label}
+      </span>
+      {earned && (
+        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#FFF3CF] text-[11px] shadow" aria-hidden="true">
+          🏅
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** 訪問した蓋を種類・都道府県ごとにまとめたメダルの一覧。再訪回数ではなく蓋数を表示する。 */
 export default function CollectionStampShelf({ title, unit, items, initialCount }: {
   title: string;
   unit: string;
@@ -36,38 +72,39 @@ export default function CollectionStampShelf({ title, unit, items, initialCount 
         <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">{title}</h2>
         <span className="text-xs text-[#8C6A4A]">{items.length}{unit}</span>
       </div>
-      <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#6A4D36]">
-        <span>訪問済み / 全マンホール数</span>
-        <span className="inline-flex items-center gap-1">
-          <span aria-hidden="true" className="inline-block h-3 w-3 rounded-full border-2 border-dashed border-[#2C765E] bg-[#EDFAF5]" />
-          緑はコンプリート
-        </span>
-      </p>
+      <p className="mb-3 text-[11px] text-[#6A4D36]">訪問済み / 全マンホール数。全部回るとカラーになります</p>
       {items.length === 0 ? (
         <p className="text-xs text-[#6A4D36]">まだスタンプがありません</p>
       ) : (
         <>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-x-2 gap-y-3">
             {shown.map((item) => {
+              const earned = item.visited >= item.total;
               const content = (
                 <>
-                  <span className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-dashed p-1 ${item.visited === item.total ? 'border-[#2C765E] bg-[#EDFAF5]' : 'border-[#B5483C]/60 bg-[#FFF8EB]'}`}>
-                    {item.photoUrl ? (
-                      <img src={item.photoUrl} alt="" width={48} height={48} loading="lazy" className="h-full w-full rounded-full object-cover" />
-                    ) : (
-                      <Stamp aria-hidden="true" className="h-6 w-6 text-[#B5483C]/70" />
-                    )}
-                  </span>
+                  {item.manholeId !== undefined ? (
+                    <PokemonMedal
+                      name={item.name}
+                      manholeId={item.manholeId}
+                      state={earned ? 'earned' : 'progress'}
+                      visited={item.visited}
+                      total={item.total}
+                      size={MEDAL_SIZE}
+                    />
+                  ) : (
+                    <LabelMedal label={item.label ?? item.name} visited={item.visited} total={item.total} />
+                  )}
                   <span className={`mt-1 h-[18px] w-full whitespace-nowrap text-center font-pixelJp font-bold leading-[18px] text-[#4F3828] ${nameSizeClass(item.name)}`}>{item.name}</span>
-                  <span className="text-[11px] font-bold tabular-nums text-[#6A4D36]">{item.visited}/{item.total}</span>
+                  <span className={`text-[11px] font-bold tabular-nums ${earned ? 'text-[#B07F10]' : 'text-[#6A4D36]'}`}>{item.visited}/{item.total}</span>
                 </>
               );
+              const label = `${item.name}：${item.total}枚中${item.visited}枚訪問済み`;
               return (
                 <li key={item.name} className="min-w-0">
                   {item.href ? (
-                    <a href={item.href} aria-label={`${item.name}：${item.total}枚中${item.visited}枚訪問済み`} className="flex h-full flex-col items-center rounded-lg p-1 transition hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7B63A8]">{content}</a>
+                    <a href={item.href} aria-label={label} className="flex h-full flex-col items-center rounded-lg p-1 transition hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7B63A8]">{content}</a>
                   ) : (
-                    <div className="flex h-full flex-col items-center p-1" aria-label={`${item.name}：${item.total}枚中${item.visited}枚訪問済み`}>{content}</div>
+                    <div className="flex h-full flex-col items-center p-1" aria-label={label}>{content}</div>
                   )}
                 </li>
               );

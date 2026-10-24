@@ -32,6 +32,7 @@ import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
+import { pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -457,6 +458,12 @@ export default function VisitsPage() {
     return [items, progress.size];
   }, [passportManholes, visitSummaryByManholeId]);
 
+  // ポケモンのメダルの絵は右のポケモンバッジと同じ蓋にそろえる
+  const pokemonMedalIds = useMemo(
+    () => pokemonBadgeManholeIds(passportManholes, representatives),
+    [passportManholes, representatives]
+  );
+
   const visitedManholesForDex = useMemo(
     () => passportManholes
       .filter((m) => visitSummaryByManholeId.has(m.id))
@@ -798,7 +805,9 @@ export default function VisitsPage() {
     />
   );
 
-  // PC はコレクションとバッジを並べ、スマホではタブで切り替える。
+  // 左（スマホは「スタンプ」タブ）は集めたスタンプと、都道府県・ポケモンのメダル一覧。
+  // PC の右レールはバッジとステッカー（スマホは「バッジ」タブ = /visits/badges）。
+  // PCShell の rail はスマホで本文より上に出るので使わず、旅の記録（/visits/trip）と同じ組み方にする
   return (
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
@@ -879,7 +888,12 @@ export default function VisitsPage() {
               title="行ったことがある都道府県"
               unit="都道府県"
               items={prefectureProgress.filter((p) => p.visited > 0 && p.name !== '都道府県未設定')
-                .map((p) => ({ name: p.name, visited: p.visited, total: p.total }))}
+                .map((p) => ({
+                  name: p.name,
+                  label: p.name === '北海道' ? p.name : p.name.replace(/[都府県]$/, ''),
+                  visited: p.visited,
+                  total: p.total,
+                }))}
             />
             <CollectionStampShelf
               title="ゲットしたポケモン"
@@ -891,7 +905,7 @@ export default function VisitsPage() {
                   name: p.pokemonName,
                   visited: p.visitedManholes,
                   total: p.totalManholes,
-                  photoUrl: p.representativePhotoUrl,
+                  manholeId: pokemonMedalIds.get(p.pokemonName),
                   href: pokemonDexUrl(p.pokemonName),
                 }))}
             />
