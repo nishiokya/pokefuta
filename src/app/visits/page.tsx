@@ -874,9 +874,17 @@ export default function VisitsPage() {
               </div>
             </div>
 
+            {/* 都道府県は多くても47件なので先に出し、100種を超えるポケモンは最初の2段だけにする */}
+            <CollectionStampShelf
+              title="行ったことがある都道府県"
+              unit="都道府県"
+              items={prefectureProgress.filter((p) => p.visited > 0 && p.name !== '都道府県未設定')
+                .map((p) => ({ name: p.name, visited: p.visited, total: p.total }))}
+            />
             <CollectionStampShelf
               title="ゲットしたポケモン"
               unit="種類"
+              initialCount={16}
               items={pokemonProgress.filter((p) => p.visitedManholes > 0)
                 .sort((a, b) => a.pokemonName.localeCompare(b.pokemonName, 'ja'))
                 .map((p) => ({
@@ -886,12 +894,6 @@ export default function VisitsPage() {
                   photoUrl: p.representativePhotoUrl,
                   href: pokemonDexUrl(p.pokemonName),
                 }))}
-            />
-            <CollectionStampShelf
-              title="行ったことがある都道府県"
-              unit="都道府県"
-              items={prefectureProgress.filter((p) => p.visited > 0 && p.name !== '都道府県未設定')
-                .map((p) => ({ name: p.name, visited: p.visited, total: p.total }))}
             />
             </div>
           )}
