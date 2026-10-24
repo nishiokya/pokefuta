@@ -30,6 +30,8 @@ import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
 import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
+import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -91,22 +93,7 @@ type HashtagProgress = {
   rate: number;
 };
 
-type NearCompleteItem = {
-  kind: 'pref' | 'pokemon' | 'feature';
-  label: string;
-  remaining: number;
-  visited: number;
-  total: number;
-  rate: number;
-};
-
 const TOTAL_MANHOLES = 482;
-
-const KIND_COLOR: Record<NearCompleteItem['kind'], { badge: string; bar: string; bg: string }> = {
-  pref:    { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
-  pokemon: { badge: '#9a6d05', bar: '#e2a015', bg: '#f6e4b6' },
-  feature: { badge: '#1f9d63', bar: '#1f9d63', bg: '#e2f2e9' },
-};
 
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
   const parsed = new Date(date);
@@ -470,53 +457,6 @@ export default function VisitsPage() {
     return [items, progress.size];
   }, [passportManholes, visitSummaryByManholeId]);
 
-  const nextAchievementPrefecture = prefectureProgress
-    .filter((p) => p.visited > 0 && p.remaining > 0)
-    .reduce<PrefectureProgress | null>((best, p) => (!best || p.remaining < best.remaining) ? p : best, null);
-
-  const nearCompletePrefectures = useMemo(
-    () => prefectureProgress.filter((p) => p.visited > 0 && p.remaining > 0 && p.remaining <= 3)
-      .sort((a, b) => a.remaining - b.remaining)
-      .slice(0, 5),
-    [prefectureProgress]
-  );
-
-  const nearCompleteAll = useMemo<NearCompleteItem[]>(() => {
-    const items: NearCompleteItem[] = [
-      ...nearCompletePrefectures.map((p) => ({
-        kind: 'pref' as const,
-        label: `${p.name}完成`,
-        remaining: p.remaining,
-        visited: p.visited,
-        total: p.total,
-        rate: p.rate,
-      })),
-      ...pokemonProgress
-        .filter((p) => p.visitedManholes > 0 && p.remaining > 0 && p.remaining <= 3)
-        .slice(0, 3)
-        .map((p) => ({
-          kind: 'pokemon' as const,
-          label: `${p.pokemonName}完成`,
-          remaining: p.remaining,
-          visited: p.visitedManholes,
-          total: p.totalManholes,
-          rate: p.rate,
-        })),
-      ...hashtagProgress
-        .filter((h) => h.remaining > 0 && h.remaining <= 2)
-        .slice(0, 2)
-        .map((h) => ({
-          kind: 'feature' as const,
-          label: `${h.tag}制覇`,
-          remaining: h.remaining,
-          visited: h.visited,
-          total: h.total,
-          rate: h.rate,
-        })),
-    ];
-    return items.sort((a, b) => a.remaining - b.remaining).slice(0, 8);
-  }, [nearCompletePrefectures, pokemonProgress, hashtagProgress]);
-
   const visitedManholesForDex = useMemo(
     () => passportManholes
       .filter((m) => visitSummaryByManholeId.has(m.id))
@@ -858,10 +798,7 @@ export default function VisitsPage() {
     />
   );
 
-  // 2026-10-24 に組み替え。左（スマホは「スタンプ」タブ）は集めたスタンプとコンプリート目前、
-  // PC の右レールはバッジとステッカー（スマホは「バッジ」タブ = /visits/badges）。
-  // 都道府県・ポケモン・特徴のコレクション一覧は、バッジとスタンプに役目が移ったので外した。
-  // PCShell の rail はスマホで本文より上に出るので使わず、旅の記録（/visits/trip）と同じ組み方にする
+  // PC はコレクションとバッジを並べ、スマホではタブで切り替える。
   return (
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
@@ -907,7 +844,7 @@ export default function VisitsPage() {
             {/* 図鑑の壁（DexWall） */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">集めたスタンプ</h2>
+                <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">集めたポケモンマンホールのスタンプ</h2>
                 <span className="font-pixelJp text-xs text-[#8C6A4A]">すべて見る {visitedManholesCount} ›</span>
               </div>
               <div className="grid grid-cols-8 gap-[7px]">
@@ -937,21 +874,25 @@ export default function VisitsPage() {
               </div>
             </div>
 
-            {/* コンプリート目前（都道府県・ポケモン・特徴 混在） */}
-            {nearCompleteAll.length > 0 && (
-              <div>
-                <div className="mb-2 flex items-baseline justify-between gap-3">
-                  <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
-                  <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">トレーナーカードとは ›</Link>
-                </div>
-                {/* 横スクロールだと右端のカードに気づかないので、折り返して縦に流す */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                  {nearCompleteAll.map((item) => (
-                    <NearCompleteCard key={`${item.kind}-${item.label}`} item={item} />
-                  ))}
-                </div>
-              </div>
-            )}
+            <CollectionStampShelf
+              title="ゲットしたポケモン"
+              unit="種類"
+              items={pokemonProgress.filter((p) => p.visitedManholes > 0)
+                .sort((a, b) => a.pokemonName.localeCompare(b.pokemonName, 'ja'))
+                .map((p) => ({
+                  name: p.pokemonName,
+                  visited: p.visitedManholes,
+                  total: p.totalManholes,
+                  photoUrl: p.representativePhotoUrl,
+                  href: pokemonDexUrl(p.pokemonName),
+                }))}
+            />
+            <CollectionStampShelf
+              title="行ったことがある都道府県"
+              unit="都道府県"
+              items={prefectureProgress.filter((p) => p.visited > 0 && p.name !== '都道府県未設定')
+                .map((p) => ({ name: p.name, visited: p.visited, total: p.total }))}
+            />
             </div>
           )}
         </div>
@@ -959,10 +900,6 @@ export default function VisitsPage() {
           <div className="hidden lg:block">
             <div className="sticky top-[20px] flex flex-col gap-[14px]">
               {badgePanel}
-              <Link href="/nearby" className="flex items-center justify-center gap-2 rounded-[14px] bg-[#bf5640] px-4 py-3 font-pixelJp text-sm font-bold text-white shadow-sm">
-                <Camera className="h-4 w-4" />
-                近くのポケふたを撮りに行く
-              </Link>
             </div>
           </div>
         )}
@@ -1163,45 +1100,6 @@ function DexSummaryCard({
         <span style={{ fontFamily: '"Outfit", system-ui, sans-serif', fontSize: 11.5, color: '#9b917e', fontWeight: 700, flex: '0 0 auto' }}>あと{remain}</span>
       </div>
       <AxisStats pref={pref} poke={poke} feat={feat} />
-    </div>
-  );
-}
-
-function NearCompleteCard({ item }: { item: NearCompleteItem }) {
-  const color = KIND_COLOR[item.kind];
-  return (
-    <div className="min-w-0 rounded-[14px] border border-[#efd9a3] bg-[#fffdf7] p-3 shadow-sm">
-      <div className="flex items-center gap-1 mb-1">
-        <span
-          style={{
-            fontFamily: '"M PLUS Rounded 1c", system-ui, sans-serif',
-            fontWeight: 800,
-            fontSize: 11,
-            borderRadius: 999,
-            padding: '3px 8px',
-            background: color.bg,
-            color: color.badge,
-            whiteSpace: 'nowrap' as const,
-          }}
-        >
-          あと{item.remaining}
-        </span>
-      </div>
-      <p className="font-pixelJp text-sm font-bold text-[#4F3828] truncate">{item.label}</p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e9dfc7]">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${item.rate.toFixed(0)}%`, background: color.bar }}
-        />
-      </div>
-      <p className="mt-1 font-pixelJp text-[10px] text-[#8C6A4A]">{item.visited}/{item.total}</p>
-      <Link
-        href="/nearby"
-        className="mt-2 flex items-center justify-center gap-1 rounded-[8px] bg-[#bf5640] px-2 py-1.5 font-pixelJp text-[10px] font-bold text-white"
-      >
-        <Camera className="h-3 w-3" />
-        次を撮る
-      </Link>
     </div>
   );
 }
