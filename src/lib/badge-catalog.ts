@@ -1,14 +1,13 @@
 /**
- * /badges（バッジ一覧）に並べる都道府県バッジ・ポケモンバッジを、蓋の一覧と訪問済みの蓋から組み立てる。
- *
- * 画面に依存しない純粋な関数だけを置く。サーバでは訪問なし（条件だけ）、ブラウザでは
- * ログインしている人の訪問を重ねて同じ関数で作り直す。
+ * /badges（バッジの説明）に並べる都道府県・ポケモン・テーマの一覧を、蓋の一覧から組み立てる。
+ * 画面に依存しない純粋な関数だけを置く。訪問済みを渡すと進み具合も数える。
  */
 
 export type BadgeManhole = {
   id: number;
   prefecture: string | null;
   pokemons: string[] | null;
+  hashtags?: string[] | null;
 };
 
 export type BadgeProgress = {
@@ -23,8 +22,8 @@ export type RegionBadges = {
 };
 
 /**
- * ポケモンバッジを出す最少の設置枚数。1〜2枚のポケモンは1回訪問すると取れてしまい、
- * 「集めて取る」バッジにならない（ポケふたのポケモンの多くは1枚しかない）。
+ * 説明ページで「集めがいのあるポケモン」として並べる最少の設置枚数。
+ * ポケふたのポケモンの多くは1枚しかなく、1回の訪問でコンプリートになる。
  */
 export const POKEMON_BADGE_MIN_MANHOLES = 5;
 
@@ -82,3 +81,14 @@ export function buildPokemonBadges(
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ja'));
 }
 
+
+/** テーマ（スタンプ帳の「特徴」。蓋のハッシュタグ）ごとの枚数を、多い順に */
+export function buildThemeBadges(
+  manholes: readonly BadgeManhole[],
+  visited: ReadonlySet<number> = new Set(),
+): BadgeProgress[] {
+  const counts = tally(manholes, visited, (m) => (m.hashtags ?? []).filter(Boolean));
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, ...count }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ja'));
+}

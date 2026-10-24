@@ -41,6 +41,8 @@ export interface SnapshotManhole {
   is_visited: boolean;
   last_visit: string | null;
   photo_count: number;
+  // スタンプ帳の「特徴」（テーマ）と /badges のテーマ一覧が読む
+  hashtags?: string[] | null;
   [key: string]: unknown;
 }
 

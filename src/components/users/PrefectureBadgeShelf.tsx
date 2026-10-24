@@ -29,7 +29,7 @@ export function medalTier(earnedTotal: number): MedalTier {
   return 'bronze';
 }
 
-const MEDAL_STYLES: Record<MedalTier, { chip: string; medal: string; count: string }> = {
+export const MEDAL_STYLES: Record<MedalTier, { chip: string; medal: string; count: string }> = {
   gold: {
     chip: 'border-[#C9992F] from-[#FFF3D0] to-[#F2D891] shadow-[0_2px_6px_rgba(160,120,40,0.35)]',
     medal: 'from-[#FBE38E] via-[#E5B83E] to-[#B8862A]',
