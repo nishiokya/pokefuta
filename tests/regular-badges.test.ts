@@ -3,11 +3,15 @@ import test from 'node:test';
 import {
   LEGEND_DESCRIPTION,
   REGULAR_BADGE_ICON,
+  REGULAR_TIERS_ASCENDING,
+  REGULAR_TIER_MIN_MANHOLES,
   REGULAR_BADGE_NAME,
   REGULAR_BADGE_LABEL,
   STATIC_REGULARS_URL,
   fetchRegularBadges,
   parseRegularBadges,
+  regularTierDescription,
+  regularTierForCount,
 } from '../src/lib/regular-badges';
 
 const ok = (body: unknown) =>
@@ -16,7 +20,7 @@ const ok = (body: unknown) =>
 const snapshot = {
   success: true,
   generated_at: '2026-10-06T20:30:00+00:00',
-  users: { 'pub-a': 'crown', 'pub-b': 'regular', 'pub-d': 'rookie', 'pub-e': 'legend' },
+  users: { 'pub-a': 'crown', 'pub-b': 'regular', 'pub-d': 'rookie', 'pub-e': 'legend', 'pub-f': 'ranger' },
 };
 
 test('判定を公開ID → 段階の Map にする', () => {
@@ -25,6 +29,7 @@ test('判定を公開ID → 段階の Map にする', () => {
   assert.equal(badges.get('pub-b'), 'regular');
   assert.equal(badges.get('pub-d'), 'rookie');
   assert.equal(badges.get('pub-e'), 'legend');
+  assert.equal(badges.get('pub-f'), 'ranger');
   assert.equal(badges.get('pub-c'), undefined);
 });
 
@@ -47,7 +52,7 @@ test('data.pokefuta.com を直接読み、/api を通らない', async () => {
   assert.deepEqual(urls, [STATIC_REGULARS_URL]);
   assert.ok(STATIC_REGULARS_URL.endsWith('/api/regulars.json'));
   assert.ok(!STATIC_REGULARS_URL.startsWith('/'));
-  assert.equal(badges.size, 4);
+  assert.equal(badges.size, 5);
 });
 
 test('取れなかったら空にする（飾りなので画面は壊さない）', async () => {
@@ -55,20 +60,34 @@ test('取れなかったら空にする（飾りなので画面は壊さない�
   assert.equal((await fetchRegularBadges(async () => { throw new Error('offline'); })).size, 0);
 });
 
-test('文言に判定の条件を入れない', () => {
+test('ラベルには枚数を入れない（条件は説明と /badges に書く）', () => {
   for (const label of Object.values(REGULAR_BADGE_LABEL)) {
-    assert.doesNotMatch(label, /[0-9０-９]|週|投稿/);
+    assert.doesNotMatch(label, /[0-9０-９]/);
   }
 });
 
-test('条件を見せるのは LEGEND の説明だけ', () => {
+test('5段階の線を公開し、LEGEND は今まで通り100枚', () => {
+  assert.deepEqual(REGULAR_TIERS_ASCENDING, ['rookie', 'regular', 'ranger', 'crown', 'legend']);
+  assert.deepEqual(
+    REGULAR_TIERS_ASCENDING.map((tier) => REGULAR_TIER_MIN_MANHOLES[tier]),
+    [1, 10, 30, 50, 100],
+  );
   assert.match(LEGEND_DESCRIPTION, /100枚以上/);
+  assert.equal(regularTierDescription('ranger'), 'ポケふたを30枚以上訪問した人');
+});
+
+test('枚数から今の段階と次の段階を出す', () => {
+  assert.deepEqual(regularTierForCount(0), { current: null, next: 'rookie' });
+  assert.deepEqual(regularTierForCount(1), { current: 'rookie', next: 'regular' });
+  assert.deepEqual(regularTierForCount(29), { current: 'regular', next: 'ranger' });
+  assert.deepEqual(regularTierForCount(30), { current: 'ranger', next: 'crown' });
+  assert.deepEqual(regularTierForCount(150), { current: 'legend', next: null });
 });
 
 test('どの段階にもアイコンと名前があり、名前に条件を入れない', () => {
   for (const tier of Object.keys(REGULAR_BADGE_LABEL) as Array<keyof typeof REGULAR_BADGE_LABEL>) {
     assert.ok(REGULAR_BADGE_ICON[tier]);
     assert.ok(REGULAR_BADGE_LABEL[tier].includes(REGULAR_BADGE_NAME[tier]));
-    assert.doesNotMatch(REGULAR_BADGE_NAME[tier], /[0-9０-９]|週|投稿/);
+    assert.doesNotMatch(REGULAR_BADGE_NAME[tier], /[0-9０-９]/);
   }
 });

@@ -1,11 +1,10 @@
 /**
- * 投稿者名に付ける 🏆 LEGEND / 👑 MASTER（金）/ EXPLORER（シルバー）/ 🌱 ROOKIE（若葉）バッジ。
+ * 投稿者名に付ける称号。公開で訪問したポケふたの枚数（同じ蓋は1枚）で5段階に分ける。
  *
- * 人を順位で並べるランキングは置かず、続けて来ている人に印を付けるだけにしている。
- * MASTER / EXPLORER の判定の線は公開しない（pokefuta-tracker の secret）ので、画面にも条件は書かない。
- * ROOKIE は初めて投稿してから1か月の人。来たばかりの人に気づいてもらうための印。
- * LEGEND は訪問したポケふたの枚数で決まる実績で、ほかのどの段階より優先する。
- * 枚数の線は目標として見せるため公開している（LEGEND_DESCRIPTION）。
+ *   🌱 ROOKIE 1枚 → 🧭 EXPLORER 10枚 → ⭐ RANGER 30枚 → 👑 MASTER 50枚 → 🏆 LEGEND 100枚
+ *
+ * 2026-10-24 に「続けて来ている週の数（線は非公開）」から、目標として見せられる枚数の段に変えた。
+ * 線は /badges に全部書く。人を順位で並べるランキングは置かず、届いた段の印を付けるだけにしている。
  *
  * 判定は pokefuta-tracker の export_app_snapshot.py が日次で焼き、
  * data.pokefuta.com（GitHub Pages）の `/api/regulars.json` から直接読む。
@@ -19,7 +18,7 @@ export const STATIC_REGULARS_URL = `${STATIC_BASE}/api/regulars.json`;
 
 const STATIC_TIMEOUT_MS = 3000;
 
-export type RegularTier = 'legend' | 'crown' | 'regular' | 'rookie';
+export type RegularTier = 'legend' | 'crown' | 'ranger' | 'regular' | 'rookie';
 
 /** 公開ID（app_user.id）→ 段階 */
 export type RegularBadges = ReadonlyMap<string, RegularTier>;
@@ -29,7 +28,8 @@ export const EMPTY_REGULAR_BADGES: RegularBadges = new Map();
 export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
   legend: '🏆 LEGEND',
   crown: '👑 MASTER',
-  regular: 'EXPLORER',
+  ranger: '⭐ RANGER',
+  regular: '🧭 EXPLORER',
   rookie: '🌱 ROOKIE',
 };
 
@@ -37,6 +37,7 @@ export const REGULAR_BADGE_LABEL: Record<RegularTier, string> = {
 export const REGULAR_BADGE_ICON: Record<RegularTier, string> = {
   legend: '🏆',
   crown: '👑',
+  ranger: '⭐',
   regular: '🧭',
   rookie: '🌱',
 };
@@ -45,15 +46,42 @@ export const REGULAR_BADGE_ICON: Record<RegularTier, string> = {
 export const REGULAR_BADGE_NAME: Record<RegularTier, string> = {
   legend: 'LEGEND',
   crown: 'MASTER',
+  ranger: 'RANGER',
   regular: 'EXPLORER',
   rookie: 'ROOKIE',
 };
 
-/** LEGEND の線。tracker の export_app_snapshot.py の LEGEND_MIN_MANHOLES と同じ値にする */
-export const LEGEND_MIN_MANHOLES = 100;
+/**
+ * 各段階に届く枚数（公開で訪問したポケふた、同じ蓋は1枚）。
+ * tracker の export_app_snapshot.py の TIER_MIN_MANHOLES と同じ値にする。
+ */
+export const REGULAR_TIER_MIN_MANHOLES: Record<RegularTier, number> = {
+  rookie: 1,
+  regular: 10,
+  ranger: 30,
+  crown: 50,
+  legend: 100,
+};
 
-/** 判定の条件を見せてよいのは LEGEND だけ。ほかの段階は線が秘密なので説明を出さない */
-export const LEGEND_DESCRIPTION = `ポケふたを${LEGEND_MIN_MANHOLES}枚以上訪問した人`;
+/** 低い段から順に。/badges の梯子と「次の段まであと何枚」に使う */
+export const REGULAR_TIERS_ASCENDING: readonly RegularTier[] = ['rookie', 'regular', 'ranger', 'crown', 'legend'];
+
+export const LEGEND_MIN_MANHOLES = REGULAR_TIER_MIN_MANHOLES.legend;
+
+export const regularTierDescription = (tier: RegularTier) =>
+  `ポケふたを${REGULAR_TIER_MIN_MANHOLES[tier]}枚以上訪問した人`;
+
+export const LEGEND_DESCRIPTION = regularTierDescription('legend');
+
+/** 公開で訪問した枚数から、今の段階（無ければ null）と次の段階を返す */
+export function regularTierForCount(count: number): { current: RegularTier | null; next: RegularTier | null } {
+  let current: RegularTier | null = null;
+  for (const tier of REGULAR_TIERS_ASCENDING) {
+    if (count >= REGULAR_TIER_MIN_MANHOLES[tier]) current = tier;
+  }
+  const next = REGULAR_TIERS_ASCENDING.find((tier) => count < REGULAR_TIER_MIN_MANHOLES[tier]) ?? null;
+  return { current, next };
+}
 
 const isTier = (v: unknown): v is RegularTier => typeof v === 'string' && Object.prototype.hasOwnProperty.call(REGULAR_BADGE_LABEL, v);
 
