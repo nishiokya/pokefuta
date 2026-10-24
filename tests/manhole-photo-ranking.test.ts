@@ -51,6 +51,37 @@ test('scored photos rank ahead of unscored photos, then by score', () => {
   assert.deepEqual(ranked.map(({ id }) => id), ['higher', 'lower', 'unscored']);
 });
 
+test('rep_score ranks scored photos once every candidate has one, square-fitting first', () => {
+  const ranked = rankManholePhotos([
+    photo('best-quality', { qualityScore: 0.95, eligible: true, aiTags: { scene: 'centered_clean', lid_fits: true, rep_score: 3 } }),
+    photo('best-rep', { qualityScore: 0.7, eligible: true, aiTags: { scene: 'wide_context', lid_fits: true, rep_score: 9 } }),
+    photo('high-rep-not-fitting', { qualityScore: 0.9, eligible: true, aiTags: { scene: 'centered_clean', lid_fits: false, rep_score: 20 } }),
+    photo('unscored', { createdAt: '2026-09-26T00:00:00.000Z' }),
+    photo('ineligible', { qualityScore: 0.99, eligible: false, aiTags: { lid_fits: true, rep_score: 50 } }),
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['best-rep', 'best-quality', 'high-rep-not-fitting', 'unscored', 'ineligible']);
+});
+
+test('a manhole keeps the previous order while any scored candidate lacks rep_score', () => {
+  const ranked = rankManholePhotos([
+    photo('best-rep', { qualityScore: 0.7, eligible: true, aiTags: { scene: 'wide_context', lid_fits: true, rep_score: 9 } }),
+    photo('centered', { qualityScore: 0.6, eligible: true, aiTags: { scene: 'centered_clean', lid_fits: true } }),
+    // 未採点・候補外に rep_score が無くても、段 0 がそろっていれば切り替える条件には関係しない
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['centered', 'best-rep']);
+});
+
+test('comments still come before rep_score', () => {
+  const ranked = rankManholePhotos([
+    photo('best-rep', { qualityScore: 0.7, eligible: true, aiTags: { lid_fits: true, rep_score: 9 } }),
+    photo('commented', { qualityScore: 0.6, eligible: true, comment: '駅前の交差点にありました', aiTags: { lid_fits: true, rep_score: 1 } }),
+  ]);
+
+  assert.deepEqual(ranked.map(({ id }) => id), ['commented', 'best-rep']);
+});
+
 test('photo.quality_score from the DB ranks photos', () => {
   const ranked = rankManholePhotos([
     photo('unscored', { createdAt: '2026-09-26T00:00:00.000Z' }),

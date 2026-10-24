@@ -56,6 +56,22 @@ export const isCenteredLidPhoto = (photo: RankableManholePhoto) => {
   return t.scene === 'centered_clean' && t.lid_fits === true;
 };
 
+const aiTagsOf = (photo: RankableManholePhoto) => {
+  const tags = photo.ai_tags;
+  return typeof tags === 'object' && tags !== null && !Array.isArray(tags)
+    ? (tags as { lid_fits?: unknown; rep_score?: unknown })
+    : null;
+};
+
+/**
+ * 代表写真の点（ai_tags.rep_score。大きいほど代表に向く）。無ければ null。
+ * k11 が代表くらべの人の選びから学習した並べ方で付ける（20261025120000、quality_score/0.10.0）。
+ */
+export const getRepScore = (photo: RankableManholePhoto) => {
+  const value = aiTagsOf(photo)?.rep_score;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
 /**
  * 蓋の写真の並び。先頭が代表写真。
  *
@@ -66,9 +82,14 @@ export const isCenteredLidPhoto = (photo: RankableManholePhoto) => {
  * 3. ただし採点済みの候補（段 0）の中では、蓋が真ん中で正方形に収まる写真（isCenteredLidPhoto）を
  *    スコアより先にする。2026-10-04 の試算でスコアの差は中央値 0.03 と小さく、一覧の正方形で蓋が欠ける
  *    代表写真が減る（manhole-ai Tools/photo-check/rep_crops.py）
+ * 4. 段 0 の写真すべてに rep_score があるときは、3 の代わりに「正方形に収まる（lid_fits）→ rep_score」で並べる。
+ *    人が判定した比較（k11 manhole-score data/model_compare/2026-10-25-rep9v7）と同じ並べ方。
+ *    1枚でも無い写真が混ざると点を比べられないので、その蓋は 3 のまま（版の切り替え中・未採点の新着）
  */
-export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
-  [...items].sort((a, b) => {
+export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) => {
+  const byRepScore = items.some((p) => rankTier(p) === 0)
+    && items.every((p) => rankTier(p) !== 0 || getRepScore(p) !== null);
+  return [...items].sort((a, b) => {
     if (Boolean(a.is_landscape) !== Boolean(b.is_landscape)) return a.is_landscape ? 1 : -1;
     const aCommented = isMeaningfulVisitComment(a.visit?.comment);
     const bCommented = isMeaningfulVisitComment(b.visit?.comment);
@@ -77,7 +98,12 @@ export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
     const tier = rankTier(a) - rankTier(b);
     if (tier !== 0) return tier;
 
-    if (rankTier(a) === 0) {
+    if (rankTier(a) === 0 && byRepScore) {
+      const aFits = aiTagsOf(a)?.lid_fits === true;
+      if (aFits !== (aiTagsOf(b)?.lid_fits === true)) return aFits ? -1 : 1;
+      const rep = (getRepScore(b) ?? 0) - (getRepScore(a) ?? 0);
+      if (rep !== 0) return rep;
+    } else if (rankTier(a) === 0) {
       const aCentered = isCenteredLidPhoto(a);
       if (aCentered !== isCenteredLidPhoto(b)) return aCentered ? -1 : 1;
     }
@@ -88,6 +114,7 @@ export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) =>
 
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
+};
 
 export type PhotoChronologyDate = {
   iso: string;
