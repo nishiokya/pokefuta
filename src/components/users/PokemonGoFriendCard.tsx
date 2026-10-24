@@ -84,23 +84,27 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
 
   return (
     <section
-      className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm"
+      className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 shadow-sm"
       aria-label={`${displayName}さんのPokémon GOフレンド募集`}
     >
+      {/* スマホ・タブレットは横長（左に見出しとひとこと、右にコード）、PC は右の細いカードなので縦に積む */}
+      <div className="flex flex-row items-center justify-between gap-2 sm:gap-4 lg:flex-col lg:items-stretch lg:gap-2">
+      <div className="min-w-0">
       <p style={{ fontFamily: ROUND, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: '#c47e0f', textTransform: 'uppercase' }}>
         Pokémon GO フレンド募集中
       </p>
 
       {note && (
-        <p className="mt-1.5 text-xs leading-5 text-[#6A4D36]" style={{ fontFamily: ROUND }}>
+        <p className="mt-1 text-xs leading-5 text-[#6A4D36]" style={{ fontFamily: ROUND }}>
           {note}
         </p>
       )}
+      </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2 lg:items-center">
         {/* コピーが効かない環境では手で拾ってもらうので、選択できる状態にしておく */}
         <code
-          className="select-all rounded-[9px] border border-[#e9dfc7] bg-white px-3 py-2 font-pixelJp text-sm font-bold tracking-wider text-[#2A2A2A]"
+          className="select-all whitespace-nowrap rounded-[9px] border border-[#e9dfc7] bg-white px-2 py-1.5 font-pixelJp text-xs font-bold tracking-wider text-[#2A2A2A] sm:px-3 sm:py-2 sm:text-sm"
           translate="no"
         >
           {formatted}
@@ -108,11 +112,12 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-4 py-2 font-pixelJp text-xs font-bold text-[#bf5640] transition hover:bg-[#f8e3da]"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-3 py-1.5 font-pixelJp text-xs font-bold text-[#bf5640] transition hover:bg-[#f8e3da] sm:px-4 sm:py-2"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? 'コピーしました' : 'コードをコピー'}
+          {copied ? 'コピーしました' : <>コ<span className="max-sm:hidden">ードをコ</span>ピー</>}
         </button>
+      </div>
       </div>
 
       {copyState === 'failed' && (
@@ -125,7 +130,7 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
         </p>
       )}
 
-      <p className="mt-2.5 text-[10px] leading-4 text-[#9b917e]" style={{ fontFamily: ROUND }}>
+      <p className="mt-2 text-[10px] leading-4 text-[#9b917e]" style={{ fontFamily: ROUND }}>
         Pokémon GO の「プロフィール → フレンド → フレンド追加」に貼り付けてください。
       </p>
     </section>

@@ -27,6 +27,7 @@ import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { formatDateJa } from '@/lib/date';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
+import XLogo from '@/components/XLogo';
 import UserRegularBadge from '@/components/users/UserRegularBadge';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
@@ -204,47 +205,47 @@ export default async function UserVisitsPage({ params }: PageProps) {
               本人用はスタンプ帳(/visits)のトレーナー情報にある。ここに置くと持ち主の X へのリンクと
               黒い「X」が2つ並んで紛らわしかった
             */}
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#B5483C]/25 bg-[#F8D9C4] px-3 py-1 text-xs font-bold text-[#B5483C]">
-                <Stamp className="h-3.5 w-3.5" />
-                公開スタンプ帳
+            {/*
+              「公開スタンプ帳」の札は外した（URL と見出しで分かる）。称号（🏆 LEGEND など）は名前の前に置いて1行を節約する。
+              PC はポケモンGOのフレンド募集を右のカードに置き、スマホ・タブレットは名前の下に横長で出す
+            */}
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6">
+              <div className="min-w-0">
+                {/* 本人の X・Instagram は名前の横にロゴだけで置く。名前が長くて入らなければ下へ回る */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <UserRegularBadge userId={data.userId} />
+                  <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
+                    {data.displayName}のスタンプ帳
+                  </h1>
+                  {(xUrl || instagramUrl) && (
+                    <div className="flex gap-2">
+                      {xUrl && <SocialLink href={xUrl} label="X" icon={<XLogo className="h-4 w-4" />} />}
+                      {instagramUrl && (
+                        <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {data.bio && (
+                  <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
+                    {data.bio}
+                  </p>
+                )}
+                <p className={`${data.bio ? 'mt-1' : 'mt-3'} max-w-2xl text-xs font-medium leading-5 text-[#6A4D36]/80 sm:text-sm`}>
+                  公開設定の訪問記録のみを表示しています。
+                </p>
               </div>
-              <UserRegularBadge userId={data.userId} />
-            </div>
-            {/* 本人の X・Instagram は名前の横に置く（以前は説明文の下に1行使っていた）。名前が長くて入らなければ下へ回る */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
-                {data.displayName}のスタンプ帳
-              </h1>
-              {(xUrl || instagramUrl) && (
-                <div className="flex flex-wrap gap-2">
-                  {xUrl && (
-                    <SocialLink href={xUrl} label="X" icon={<span className="text-sm font-black">X</span>} />
-                  )}
-                  {instagramUrl && (
-                    <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
-                  )}
+
+              {data.pokemonGoFriendCode && (
+                <div className="mt-4 lg:mt-0">
+                  <PokemonGoFriendCard
+                    code={data.pokemonGoFriendCode}
+                    note={data.pokemonGoFriendNote}
+                    displayName={data.displayName}
+                  />
                 </div>
               )}
             </div>
-            {data.bio && (
-              <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
-                {data.bio}
-              </p>
-            )}
-            <p className={`${data.bio ? 'mt-1' : 'mt-3'} max-w-2xl text-xs font-medium leading-5 text-[#6A4D36]/80 sm:text-sm`}>
-              公開設定の訪問記録のみを表示しています。
-            </p>
-
-            {data.pokemonGoFriendCode && (
-              <div className="mt-4 max-w-md">
-                <PokemonGoFriendCard
-                  code={data.pokemonGoFriendCode}
-                  note={data.pokemonGoFriendNote}
-                  displayName={data.displayName}
-                />
-              </div>
-            )}
 
             {/* 全国達成率は下の進捗バーと同じことを言うので、数字の欄は置かずバーの説明に入れる */}
             {/* ポケモンの種類数は下の図鑑パネルと同じ数え方（progress.pokedex）。取れなければ2つのまま */}
@@ -375,16 +376,18 @@ export default async function UserVisitsPage({ params }: PageProps) {
   );
 }
 
+// ロゴだけの丸いボタン。以前は「X」の文字のロゴの横に「X」の名前も付けていて「X x」に見えた
 function SocialLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 rounded-full border border-[#8C6A4A]/25 bg-white/75 px-3 py-1.5 text-xs font-extrabold text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#8C6A4A]/25 bg-white/75 text-[#4F3828] transition hover:border-[#B5483C]/40 hover:bg-[#F8D9C4] hover:text-[#B5483C]"
     >
       {icon}
-      {label}
     </a>
   );
 }
