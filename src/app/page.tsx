@@ -21,7 +21,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import RegularBadge from '@/components/RegularBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
+import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
@@ -82,6 +82,8 @@ export default function HomePage() {
   const [legends, setLegends] = useState<readonly RegularLegend[]>([]);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
+  // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
+  const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
@@ -112,6 +114,7 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadDesignFeature();
+    loadPlushFeature();
     fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
       setRegularBadges(badges);
       setLegends(loaded);
@@ -165,6 +168,18 @@ export default function HomePage() {
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
     } catch {
       // ignore
+    }
+  };
+
+  const loadPlushFeature = async () => {
+    try {
+      const response = await fetch('/api/features/plush');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos)) return;
+      setPlushFeature({ count: data.count, photos: data.photos });
+    } catch {
+      // 取れなければ特集にぬいぐるみを出さないだけ
     }
   };
 
@@ -745,10 +760,11 @@ export default function HomePage() {
         {feedSettled && currentPage === 1 && isSp === true && <RecentComments />}
 
         {/*
-          特集（デザインふた）。ぬいぐるみの特集は一度ここへ下げた（2026-10-18）が、ヒーローに戻した（2026-10-22）。
-          PC は写真3枚と説明の横長カード、スマホは写真2枚。取れなければ節ごと出さない
+          特集（デザインふた・ぬいぐるみ）。ぬいぐるみは 10-18 にここへ下げ、10-22 にヒーローへ戻し、
+          10-24 にヒーローを「この3人に続け！」にしたので、またここ（デザインふたの右）に戻した。
+          PC は写真と説明の横長カード、スマホは写真を減らす。どちらも取れなければ節ごと出さない
         */}
-        {feedSettled && designFeature && designFeature.length > 0 && (
+        {feedSettled && ((designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0)) && (
           <section className="mt-8">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
@@ -773,6 +789,46 @@ export default function HomePage() {
                 <p className="text-[11px] text-[#6A4D36] sm:text-xs">
                   <span className="hidden sm:inline">投稿されたデザインマンホール </span>
                   {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            )}
+            {plushFeature && plushFeature.count > 0 && (
+            <Link
+              href="/photos/plush"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {plushFeature.photos.map((photo, index) => {
+                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                  const src = `/api/photo/${photo.id}?size=small`;
+                  return (
+                    <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''} ${index > 2 ? 'hidden' : ''}`}>
+                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                        <img src={src} alt="" width={56} height={56} loading="lazy"
+                          className={lidClip ? undefined : 'h-full w-full object-cover'}
+                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                      </div>
+                      {plushClip && (
+                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
+                  ぬいぐるみと旅するポケふた
+                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                </p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  写真 {plushFeature.count}枚
                   <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
                 </p>
               </div>
