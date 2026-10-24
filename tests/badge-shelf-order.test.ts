@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { medalTier, sortEarnedForChips } from '../src/components/users/PrefectureBadgeShelf';
+import { medalTier, sortEarnedForChips, yearMonthLabel } from '../src/components/users/PrefectureBadgeShelf';
 
 test('チップは制覇したときの枚数の多い順（新設で今の達成率が下がった県も前に来る）', () => {
   const earned = [
@@ -16,4 +16,10 @@ test('チップは制覇したときの枚数の多い順（新設で今の達�
 
 test('メダルの色は制覇したときの枚数で金（20枚以上）・銀（5枚以上）・銅', () => {
   assert.deepEqual([43, 20, 19, 5, 4, 1].map(medalTier), ['gold', 'gold', 'silver', 'silver', 'bronze', 'bronze']);
+});
+
+test('制覇した日は年月だけ（26/05）にして小さいバッジに収める', () => {
+  assert.equal(yearMonthLabel('2026年5月15日'), '26/05');
+  assert.equal(yearMonthLabel('2025年12月1日'), '25/12');
+  assert.equal(yearMonthLabel('不明'), '不明');
 });

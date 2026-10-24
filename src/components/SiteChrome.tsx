@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import XLogo from '@/components/XLogo';
 import { usePathname } from 'next/navigation';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
@@ -384,12 +385,12 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         href={X_ACCOUNT_URL}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ ...pcIconBtn, fontSize: 15, fontWeight: 900 }}
+        style={pcIconBtn}
         title="公式X @pokemonmanhole"
         aria-label="公式X @pokemonmanhole"
         onClick={() => trackXLinkClick({ surface: 'header', source_app: 'tracker', is_logged_in: isLoggedIn })}
       >
-        X
+        <XLogo className="h-[15px] w-[15px]" />
       </a>
 
       {isLoggedIn && (
@@ -541,7 +542,7 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
             style={footerLinkStyle}
             onClick={() => trackXLinkClick({ surface: 'footer', source_app: 'tracker', is_logged_in: authLoaded && user !== null })}
           >
-            <span className="font-sans text-base font-black">X</span>
+            <XLogo className="h-3.5 w-3.5" />
             @pokemonmanhole
           </a>
         </div>
