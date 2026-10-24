@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PCShell from '@/components/PCShell';
+import PokemonMedal from '@/components/PokemonMedal';
 import RegularBadge from '@/components/RegularBadge';
 import { MEDAL_STYLES, medalTier, type MedalTier } from '@/components/users/PrefectureBadgeShelf';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -10,8 +11,10 @@ import {
   buildPokemonBadges,
   buildPrefectureBadges,
   buildThemeBadges,
+  pokemonBadgeManholeIds,
   type BadgeManhole,
 } from '@/lib/badge-catalog';
+import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import {
   REGULAR_BADGE_NAME,
   REGULAR_TIERS_ASCENDING,
@@ -25,14 +28,12 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: `バッジ一覧｜すべてのバッジと条件 | ${SITE_NAME}`,
   description:
-    'ポケふた写真館にあるバッジの説明です。訪問した枚数で上がる5段階の称号（ROOKIE〜LEGEND）、都道府県制覇の金・銀・銅のメダル、ポケモンとテーマのコンプリートの条件と、どこに表示されるかをまとめています。',
+    'ポケふた写真館にあるバッジとステッカーの説明です。訪問した枚数で上がる5段階の称号（ROOKIE〜LEGEND）、都道府県制覇の金・銀・銅のメダル、ポケモンバッジ、1枚でもらえるステッカーの条件と、どこに表示されるかをまとめています。',
   alternates: { canonical: `${SITE_URL}/badges` },
   robots: { index: true, follow: true },
 };
 
 const X_URL = 'https://x.com/pokemonmanhole';
-/** テーマはこの枚数以上のものを並べる（1枚だけのテーマは最北端・最南端などの1枚もの） */
-const THEME_MIN_MANHOLES = 5;
 
 const MEDAL_LABEL: Record<MedalTier, string> = { gold: '金', silver: '銀', bronze: '銅' };
 const MEDAL_RULE: Record<MedalTier, string> = {
@@ -91,7 +92,7 @@ function PrefectureMedal({ name, total }: { name: string; total: number }) {
 }
 
 export default async function BadgesPage() {
-  const snapshot = await fetchManholeSnapshot();
+  const [snapshot, representatives] = await Promise.all([fetchManholeSnapshot(), fetchPokemonRepresentatives()]);
   const manholes: BadgeManhole[] = (snapshot?.manholes ?? []).map((m) => ({
     id: m.id,
     prefecture: m.prefecture,
@@ -107,18 +108,19 @@ export default async function BadgesPage() {
       { gold: 0, silver: 0, bronze: 0 },
     );
   const pokemon = buildPokemonBadges(manholes);
-  const themes = buildThemeBadges(manholes);
-  const shownThemes = themes.filter((t) => t.total >= THEME_MIN_MANHOLES);
+  const medalIds = pokemonBadgeManholeIds(manholes, representatives);
+  const stickers = buildThemeBadges(manholes);
 
   return (
     <PCShell className="pb-32 pt-5 lg:pt-6">
-      <main className="mx-auto max-w-3xl space-y-9">
+      {/* 幅は PCShell の枠（PC 1120・ガター32）に合わせる。ほかのページと同じく本文に別の上限は付けない */}
+      <main className="space-y-9">
         <header className="relative overflow-hidden rounded-[12px] border border-[#7B63A8]/15 bg-gradient-to-br from-[#FFF8EB] via-[#FFF3DF] to-[#F3ECFB] px-5 py-6 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8">
           <span className="pointer-events-none absolute -right-4 -top-6 select-none text-[110px] opacity-[0.08]" aria-hidden="true">🏅</span>
           <p className="font-pixelJp text-xs font-bold tracking-widest text-[#7B63A8]">BADGE GUIDE</p>
           <h1 className="mt-1 font-pixelJp text-2xl font-extrabold text-[#4F3828] sm:text-3xl">バッジ一覧</h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#6A4D36]">
-            ポケふたを訪問して写真を登録すると集まるバッジと、そのもらい方です。
+            ポケふたを訪問して写真を登録すると集まるバッジ・ステッカーと、そのもらい方です。
             集めたバッジはスタンプ帳と公開スタンプ帳に並びます。
           </p>
           {/* 目次。PokéStamps と同じく、種類ごとに飛べるようにする */}
@@ -127,7 +129,7 @@ export default async function BadgesPage() {
               ['#badges-tiers', '🏆 称号'],
               ['#badges-prefectures', '🗾 都道府県制覇'],
               ['#badges-pokemon', '⚡ ポケモン'],
-              ['#badges-themes', '🏷 テーマ'],
+              ['#badges-stickers', '🏷 ステッカー'],
             ].map(([href, label]) => (
               <a key={href} href={href} className="rounded-full border border-[#7B63A8]/25 bg-white/80 px-3 py-1 text-xs font-bold text-[#7B63A8] hover:bg-white">
                 {label}
@@ -200,7 +202,7 @@ export default async function BadgesPage() {
             {regions.map((region) => (
               <div key={region.region} className="rounded-[10px] bg-white/60 p-3 sm:p-4">
                 <h3 className="mb-2.5 font-pixelJp text-sm font-bold text-[#8C6A4A]">{region.region}</h3>
-                <div className="grid grid-cols-4 gap-y-3 sm:grid-cols-6 lg:grid-cols-7">
+                <div className="grid grid-cols-4 gap-y-3 sm:grid-cols-6 lg:grid-cols-9">
                   {region.prefectures.map((p) => (
                     <PrefectureMedal key={p.name} name={p.name} total={p.total} />
                   ))}
@@ -212,46 +214,52 @@ export default async function BadgesPage() {
 
         {/* ポケモン */}
         <section aria-labelledby="badges-pokemon" className="scroll-mt-20 space-y-4">
-          <SectionHeading id="badges-pokemon" icon="⚡" title="ポケモンコンプリート" where="スタンプ帳の「ポケモン」・公開スタンプ帳のポケモン図鑑" />
+          <SectionHeading id="badges-pokemon" icon="⚡" title="ポケモンバッジ" where="公開スタンプ帳の「ポケモンバッジ」" />
           <Rules
             items={[
-              'そのポケモンが描かれたポケふたを全部訪問するとコンプリートです。',
-              '会えたポケモンの種類の数は、公開スタンプ帳の「ポケモン図鑑」に出ます。',
-              `多くのポケモンは1枚だけなので、1回の訪問でコンプリートになります。集めがいがあるのは、${POKEMON_BADGE_MIN_MANHOLES}枚以上に描かれている次のポケモンです。`,
+              `ポケふたに${POKEMON_BADGE_MIN_MANHOLES}枚以上描かれている${pokemon.length}種類のポケモンにあります。そのポケモンのポケふたを全部訪問するとバッジになります。`,
+              'メダルの写真は、そのポケモンの代表のポケふたです。まだ集めていないバッジは白黒で、外側の輪が進み具合です。',
+              '1〜2枚しかないポケモンは、公開スタンプ帳の「ポケモン図鑑」で会えた種類として数えます。',
             ]}
           />
-          <ul className="flex flex-wrap gap-2">
+          <ul className="grid grid-cols-4 gap-y-4 rounded-[10px] bg-white/60 p-3 sm:grid-cols-6 sm:p-4 lg:grid-cols-11">
             {pokemon.map((p) => (
               <li key={p.name}>
-                <a
-                  href={pokemonDexUrl(p.name)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#7B63A8]/20 bg-white/80 px-3 py-1.5 text-xs font-bold text-[#4F3828] hover:bg-white"
-                >
-                  {p.name}
-                  <span className="rounded-full bg-[#7B63A8] px-1.5 font-pixel text-[10px] text-white">{p.total}枚</span>
+                <a href={pokemonDexUrl(p.name)} className="group flex flex-col items-center text-center" title={`${p.name} 全${p.total}枚`}>
+                  <span className="transition group-hover:scale-105">
+                    <PokemonMedal name={p.name} manholeId={medalIds.get(p.name)!} state="catalog" total={p.total} size={60} />
+                  </span>
+                  <span className="mt-1 max-w-full truncate px-0.5 font-pixelJp text-[10px] font-bold text-[#4F3828]">{p.name}</span>
+                  <span className="font-pixel text-[10px] text-[#8C6A4A]">{p.total}枚</span>
                 </a>
               </li>
             ))}
           </ul>
         </section>
 
-        {/* テーマ */}
-        <section aria-labelledby="badges-themes" className="scroll-mt-20 space-y-4">
-          <SectionHeading id="badges-themes" icon="🏷" title="テーマ制覇" where="スタンプ帳の「特徴」" />
+        {/* ステッカー */}
+        <section aria-labelledby="badges-stickers" className="scroll-mt-20 space-y-4">
+          <SectionHeading id="badges-stickers" icon="🏷" title="ステッカー" where="公開スタンプ帳の「ステッカー」" />
           <Rules
             items={[
-              '道の駅・海沿い・激レアなど、ポケふたに付いているテーマごとに、全部訪問すると制覇です。',
-              `${THEME_MIN_MANHOLES}枚以上のテーマを並べています。ほかに「日本最北のポケふた」のような1枚だけのテーマもあります（全${themes.length}種類）。`,
+              'バッジは全部集めるともらえますが、ステッカーは対象のポケふたを1枚でも訪問すればもらえます。',
+              '日本最南と日本最西は同じポケふたなので、1回の訪問で2枚もらえます。',
             ]}
           />
-          <ul className="flex flex-wrap gap-2">
-            {shownThemes.map((t) => (
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {stickers.map((sticker) => (
               <li
-                key={t.name}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#1f9d63]/25 bg-[#EEF8F2] px-3 py-1.5 text-xs font-bold text-[#1f7a4f]"
+                key={sticker.key}
+                className="flex items-center gap-3 rounded-[10px] border-2 border-dashed border-[#1f9d63]/30 bg-[#F3FBF6] px-3 py-3"
               >
-                {t.name}
-                <span className="font-pixel text-[10px] text-[#1f9d63]">{t.total}枚</span>
+                <span className="flex h-11 w-11 shrink-0 -rotate-6 items-center justify-center rounded-[10px] bg-white text-2xl shadow" aria-hidden="true">
+                  {sticker.icon}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-pixelJp text-sm font-extrabold text-[#1f7a4f]">{sticker.name}</span>
+                  <span className="block text-[10px] leading-snug text-[#4F6A58]">{sticker.description}</span>
+                  <span className="block font-pixel text-[10px] text-[#1f9d63]">対象 {sticker.total}枚</span>
+                </span>
               </li>
             ))}
           </ul>
@@ -259,7 +267,7 @@ export default async function BadgesPage() {
 
         <div className="rounded-[12px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-6 text-center">
           <p className="font-pixelJp text-base font-extrabold text-[#4F3828]">自分のバッジを確かめる</p>
-          <p className="mt-1 text-xs text-[#6A4D36]">スタンプ帳で、制覇まであと少しの県・ポケモン・テーマが見られます。</p>
+          <p className="mt-1 text-xs text-[#6A4D36]">スタンプ帳で、制覇まであと少しの県やポケモンが見られます。</p>
           <Link
             href="/visits"
             className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#7B63A8] px-5 py-2.5 text-sm font-extrabold text-white shadow-[0_4px_0_#5f55b8] transition hover:bg-[#6A5299]"

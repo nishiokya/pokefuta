@@ -22,10 +22,10 @@ export type RegionBadges = {
 };
 
 /**
- * 説明ページで「集めがいのあるポケモン」として並べる最少の設置枚数。
- * ポケふたのポケモンの多くは1枚しかなく、1回の訪問でコンプリートになる。
+ * ポケモンバッジにする最少の設置枚数。ポケふたのポケモンの多くは1〜2枚しかなく、
+ * 1回の訪問で取れてしまう。3枚以上は44種類（2026-10-24）で、都道府県バッジ（42）と同じくらいの数になる。
  */
-export const POKEMON_BADGE_MIN_MANHOLES = 5;
+export const POKEMON_BADGE_MIN_MANHOLES = 3;
 
 /** 図鑑の地方の分け方と同じ6地方 */
 export const BADGE_REGIONS: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -82,13 +82,67 @@ export function buildPokemonBadges(
 }
 
 
-/** テーマ（スタンプ帳の「特徴」。蓋のハッシュタグ）ごとの枚数を、多い順に */
+/**
+ * ステッカー。対象の蓋を1枚でも訪問すればもらえる（全部集めるバッジと分けて、難易度を下げてある）。
+ * テーマ（蓋のハッシュタグ）は37種類あるが、ほとんどの蓋に付く大きなテーマは印にならないので、
+ * 2026-10-24 にガンダムと東西南北の端だけに絞った。最南と最西は同じ1枚。
+ */
+export type ThemeBadgeDef = {
+  key: string;
+  icon: string;
+  name: string;
+  description: string;
+  tag: string;
+};
+
+export const THEME_BADGES: readonly ThemeBadgeDef[] = [
+  { key: 'gundam', icon: '🤖', name: 'ガンダムのまち', description: 'ガンダムマンホールのある町のポケふたを1枚訪問', tag: '#ガンダムマンホールのあるまち' },
+  { key: 'north', icon: '⬆️', name: '日本最北', description: '日本でいちばん北のポケふたを訪問', tag: '#日本最北のポケふた' },
+  { key: 'south', icon: '⬇️', name: '日本最南', description: '日本でいちばん南のポケふたを訪問', tag: '#日本最南のポケふた' },
+  { key: 'east', icon: '➡️', name: '日本最東', description: '日本でいちばん東のポケふたを訪問', tag: '#日本最東のポケふた' },
+  { key: 'west', icon: '⬅️', name: '日本最西', description: '日本でいちばん西のポケふたを訪問', tag: '#日本最西のポケふた' },
+];
+
+export type ThemeBadgeProgress = ThemeBadgeDef & {
+  /** そのテーマの蓋の枚数 */
+  total: number;
+  visited: number;
+  earned: boolean;
+};
+
+/** ステッカー。対象の蓋を1枚でも訪問すればもらえる */
 export function buildThemeBadges(
   manholes: readonly BadgeManhole[],
   visited: ReadonlySet<number> = new Set(),
-): BadgeProgress[] {
-  const counts = tally(manholes, visited, (m) => (m.hashtags ?? []).filter(Boolean));
-  return Array.from(counts.entries())
-    .map(([name, count]) => ({ name, ...count }))
-    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ja'));
+): ThemeBadgeProgress[] {
+  return THEME_BADGES.map((def) => {
+    const ids = manholes.filter((m) => (m.hashtags ?? []).includes(def.tag)).map((m) => m.id);
+    const visitedCount = ids.filter((id) => visited.has(id)).length;
+    return { ...def, total: ids.length, visited: visitedCount, earned: visitedCount > 0 };
+  }).filter((badge) => badge.total > 0);
 }
+
+/**
+ * ポケモンバッジのメダルに入れる蓋。代表マンホール（dataset/pokemon_representatives.json）が
+ * そのポケモンの蓋の中にあればそれ、無ければ id の小さい蓋。
+ */
+export function pokemonBadgeManholeIds(
+  manholes: readonly BadgeManhole[],
+  representatives: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const result = new Map<string, number>();
+  const idsByPokemon = new Map<string, number[]>();
+  for (const manhole of manholes) {
+    for (const name of new Set(manhole.pokemons ?? [])) {
+      idsByPokemon.set(name, [...(idsByPokemon.get(name) ?? []), manhole.id]);
+    }
+  }
+  idsByPokemon.forEach((ids, name) => {
+    const rep = representatives.get(name);
+    result.set(name, rep !== undefined && ids.includes(rep) ? rep : Math.min(...ids));
+  });
+  return result;
+}
+
+/** 図鑑が作っている蓋の切り抜き画像（投稿写真から蓋の枠で切ったもの） */
+export const lidImageUrl = (manholeId: number) => `https://data.pokefuta.com/manhole/image/${manholeId}_lid.jpeg`;
