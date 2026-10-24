@@ -18,6 +18,7 @@ import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import MonthlyActivity, { buildMonthlyActivity } from '@/components/users/MonthlyActivity';
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import {
@@ -317,15 +318,29 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </section>
         )}
 
-        {data.isTruncated && (
-          <p className="mt-4 text-xs font-bold text-[#6A4D36]">
-            最新500件を表示しています（全{data.totalVisits}件）
-          </p>
+        {/* バッジと訪問の一覧のあいだに、いつ回っていたか（直近12か月） */}
+        <MonthlyActivity
+          buckets={buildMonthlyActivity(data.visits.map((v) => v.shotAt ?? v.createdAt))}
+          truncated={data.isTruncated}
+        />
+
+        {/* 訪問の一覧。並びが分かるよう見出しと説明を置く（県ごとの塊が続くだけで、何の順か分からなかった） */}
+        {data.visits.length > 0 && (
+          <div className="mt-8">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+              <Camera className="h-5 w-5 text-[#B5483C]" />
+              訪問したポケふた
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-[#6A4D36]">
+              都道府県ごとにまとめ、最近訪問した県から並べています。県の中は撮影日の新しい順です。
+              {data.isTruncated && `（最新500件を表示しています。全${data.totalVisits}件）`}
+            </p>
+          </div>
         )}
 
         {/* 県へ飛ぶナビ。中身は下の県見出し（県名・枚数）と同じなので、見渡せる PC では出さない。スマホは横スクロールの1行に収める（40県を超えると折り返しで10行になった） */}
         {prefectureGroups.length > 1 && (
-          <nav aria-label="都道府県で移動" className="-mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+          <nav aria-label="都道府県で移動" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
             {prefectureGroups.map((group) => (
               <a
                 key={group.name}
