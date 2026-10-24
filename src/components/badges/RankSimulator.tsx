@@ -14,7 +14,8 @@ export default function RankSimulator() {
   const rank = badgeRank(v, total);
   const t = badgeRankThresholds(total);
   const next = rank === 'gold' ? null : rank === 'silver' ? t.gold : rank === 'bronze' ? t.silver : t.bronze;
-  const nextRank = rank === 'silver' ? 'gold' : rank === 'bronze' ? 'silver' : 'bronze';
+  // 2枚以下は銅と銀（や金）が同じ枚数になるので、次の枚数で実際に付く段を出す
+  const nextRank = next !== null ? badgeRank(next, total) : null;
 
   const changeTotal = (n: number) => {
     setTotal(n);
@@ -39,7 +40,7 @@ export default function RankSimulator() {
       </div>
       <p className="mt-2 font-pixelJp text-xs text-[#4F3828]" aria-live="polite">
         {rank ? `${RANK_ICON[rank]} ${RANK_LABEL[rank]}` : 'まだ白黒'}
-        {next !== null && <span className="text-[#6A4D36]">（あと{next - v}枚で{RANK_LABEL[nextRank]}）</span>}
+        {next !== null && nextRank && <span className="text-[#6A4D36]">（あと{next - v}枚で{RANK_LABEL[nextRank]}）</span>}
       </p>
     </div>
   );

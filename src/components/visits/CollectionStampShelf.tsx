@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import PokemonMedal from '@/components/PokemonMedal';
-import { PrefectureMedal, RANK_ICON } from '@/components/RankMedal';
+import { PrefectureMedal, RANK_ICON, RANK_LABEL } from '@/components/RankMedal';
 import { badgeRank, type BadgeRank } from '@/lib/badge-catalog';
 
 export type CollectionStamp = {
@@ -86,7 +86,12 @@ export default function CollectionStampShelf({ title, items, initialCount }: {
                   <span className={`text-[11px] font-bold tabular-nums ${rank === 'gold' ? 'text-[#B07F10]' : 'text-[#6A4D36]'}`}>{item.visited}/{item.total}</span>
                 </>
               );
-              const label = `${item.name}：${item.total}枚中${item.visited}枚訪問済み`;
+              // 段の印（🥇×2・+N）は aria-hidden なので、読み上げ用の名前に入れる
+              const label = [
+                `${item.name}：${item.total}枚中${item.visited}枚訪問済み`,
+                rank && `${RANK_LABEL[rank]}${rank === 'gold' && (item.goldCount ?? 1) > 1 ? `×${item.goldCount}` : ''}`,
+                (item.newCount ?? 0) > 0 && `新しいポケふた${item.newCount}枚`,
+              ].filter(Boolean).join('、');
               return (
                 <li key={item.name} className="min-w-0">
                   {item.href ? (
