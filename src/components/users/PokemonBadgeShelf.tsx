@@ -41,7 +41,7 @@ export default function PokemonBadgeShelf({ pokemon, medalIds, stickers }: Pokem
             {earned.length}
             <span className="text-[#8C6A4A]">/{pokemon.length}</span>
           </span>
-          <Link href="/badges#badges-pokemon" className="font-pixelJp text-xs font-bold">バッジとは ›</Link>
+          <Link href="/badges#badges-pokemon" className="font-pixelJp text-xs font-bold">トレーナーカードとは ›</Link>
         </p>
       </div>
 

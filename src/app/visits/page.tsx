@@ -942,7 +942,7 @@ export default function VisitsPage() {
               <div>
                 <div className="mb-2 flex items-baseline justify-between gap-3">
                   <h2 className="font-pixelJp text-sm font-bold text-[#4F3828]">🏆 コンプリート目前</h2>
-                  <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">バッジとは ›</Link>
+                  <Link href="/badges" className="font-pixelJp text-xs font-bold text-[#B5483C]">トレーナーカードとは ›</Link>
                 </div>
                 {/* 横スクロールだと右端のカードに気づかないので、折り返して縦に流す */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">

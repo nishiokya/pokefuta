@@ -23,7 +23,7 @@ type Loaded = {
   representatives: Map<string, number>;
 };
 
-// スタンプ帳の「バッジ」タブ（スマホ）。PC はスタンプ（/visits）の右レールに同じものが出る。
+// スタンプ帳の「カード」タブ（スマホ）。トレーナーカード（称号・バッジ・ステッカー）。PC はスタンプ（/visits）の右レールに同じものが出る。
 // 旅の記録と同じく、未ログインの紹介画面は持たずにログインへ送る。
 export default function VisitsBadgesPage() {
   const router = useRouter();
@@ -32,12 +32,12 @@ export default function VisitsBadgesPage() {
   const { trackView } = useAnalytics();
 
   useEffect(() => {
-    document.title = pageTitle('バッジ');
+    document.title = pageTitle('トレーナーカード');
     (async () => {
       try {
         const { data: { session } } = await createBrowserClient().auth.getSession();
         const loggedIn = Boolean(session?.user);
-        trackView('/visits/badges', 'バッジ', 'visits_badges', loggedIn);
+        trackView('/visits/badges', 'トレーナーカード', 'visits_badges', loggedIn);
         if (!loggedIn) {
           router.replace('/login?redirect=/visits/badges');
           return;

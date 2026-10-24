@@ -96,7 +96,7 @@ export default function PrefectureBadgeShelf({
             {earned.length}
             <span className="text-[#8C6A4A]">/{totalPrefectureCount}</span>
           </span>
-          <Link href="/badges" className="font-pixelJp text-xs font-bold">バッジとは ›</Link>
+          <Link href="/badges" className="font-pixelJp text-xs font-bold">トレーナーカードとは ›</Link>
         </p>
       </div>
 

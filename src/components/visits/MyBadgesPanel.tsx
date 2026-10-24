@@ -104,7 +104,7 @@ export default function MyBadgesPanel({ manholes, visited, publicCount, represen
 
   return (
     <div className="space-y-3">
-      <Card title="称号" right={<Link href="/badges" className="font-pixelJp text-[10px] font-bold text-[#B5483C]">バッジとは ›</Link>}>
+      <Card title="称号" right={<Link href="/badges" className="font-pixelJp text-[10px] font-bold text-[#B5483C]">トレーナーカードとは ›</Link>}>
         <div className="flex items-center gap-2">
           {tier.current ? <RegularBadge tier={tier.current} size="md" /> : <span className="text-xs text-[#8C6A4A]">まだありません</span>}
           <span className="font-pixelJp text-xs text-[#6A4D36]">公開 <b className="font-pixel text-sm text-[#4F3828]">{publicCount}</b>枚</span>
