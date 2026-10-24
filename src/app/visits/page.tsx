@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import {
   Bookmark,
   Calendar,
@@ -30,7 +29,7 @@ import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
-import TripDiary from '@/components/visits/TripDiary';
+import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -51,14 +50,14 @@ interface Visit {
   }[];
   notes?: string;
   comment?: string;
+  is_public: boolean;
   likes_count: number;
   is_liked: boolean;
   comments_count: number;
   is_bookmarked: boolean;
 }
 
-// trip は旧マイ旅（/my-trip）。月別の記録と公開/非公開の切り替えをここに置く
-type SegmentTab = 'all' | 'prefectures' | 'pokemons' | 'features' | 'trip';
+type SegmentTab = 'all' | 'prefectures' | 'pokemons' | 'features';
 
 type VisitSummary = {
   count: number;
@@ -114,7 +113,6 @@ const segments: { id: SegmentTab; label: string }[] = [
   { id: 'prefectures', label: '都道府県' },
   { id: 'pokemons', label: 'ポケモン' },
   { id: 'features', label: '特徴' },
-  { id: 'trip', label: '旅の記録' },
 ];
 
 const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
@@ -126,7 +124,7 @@ const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
 const getManholeName = (manhole: Manhole) => manhole.name || manhole.title || 'ポケふた';
 const getMunicipality = (manhole: Manhole) => manhole.city || manhole.municipality || '場所未設定';
 
-function VisitsPageInner() {
+export default function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
@@ -145,23 +143,6 @@ function VisitsPageInner() {
     trackPassportOpen();
     checkAuth();
   }, []);
-
-  // URL の ?tab=trip と表示タブを合わせる。/my-trip からの転送や詳細から戻ったときに旅の記録を開き、
-  // 下タブ・PC ナビの「スタンプ帳」（/visits）を押して tab が外れたら旅の記録を閉じる
-  // （同じページへの遷移なのでコンポーネントは作り直されず、初回に読むだけではずれる）
-  const tabParam = useSearchParams().get('tab');
-  useEffect(() => {
-    setSegmentTab((prev) => (tabParam === 'trip' ? 'trip' : prev === 'trip' ? 'all' : prev));
-  }, [tabParam]);
-
-  // 旅の記録だけ URL に残す（ほかのタブは今までどおり /visits のまま）
-  const selectSegment = (tab: SegmentTab) => {
-    setSegmentTab(tab);
-    const url = new URL(window.location.href);
-    if (tab === 'trip') url.searchParams.set('tab', 'trip');
-    else url.searchParams.delete('tab');
-    window.history.replaceState(window.history.state, '', url);
-  };
 
   const checkAuth = async () => {
     try {
@@ -265,6 +246,7 @@ function VisitsPageInner() {
               })) || [],
               notes: visit.note,
               comment: visit.comment,
+              is_public: visit.is_public !== false,
               likes_count: visit.likes_count || 0,
               is_liked: visit.is_liked || false,
               comments_count: visit.comments_count || 0,
@@ -318,6 +300,7 @@ function VisitsPageInner() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
+  const privateVisitCount = useMemo(() => visits.filter((v) => !v.is_public).length, [visits]);
   const completionRate = (visitedManholesCount / TOTAL_MANHOLES) * 100;
 
   const visitedMunicipalityCount = useMemo(() => {
@@ -702,14 +685,11 @@ function VisitsPageInner() {
       ? new Set(manholes.flatMap((m) => m.pokemons ?? [])).size
       : null;
 
-    // /my-trip（旧マイ旅）から転送されてきた人は、ログイン後に旅の記録へ戻す
-    const loginHref = segmentTab === 'trip' ? `/login?redirect=${encodeURIComponent('/visits?tab=trip')}` : '/login';
-
     const unAuthRail = (
       <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm space-y-3">
         <p className="font-bold text-sm text-[#7B63A8]">あなた専用のスタンプ帳を無料で作れます</p>
         <Link
-          href={loginHref}
+          href="/login"
           className="flex items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white shadow-[0_2px_0_#5f55b8] transition hover:bg-[#6A5299]"
         >
           <Stamp className="h-4 w-4" /> 無料でスタンプ帳を作る
@@ -761,7 +741,7 @@ function VisitsPageInner() {
                 {/* CTA Buttons */}
                 <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
                   <Link
-                    href={loginHref}
+                    href="/login"
                     className="inline-flex items-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299] sm:py-2.5"
                   >
                     <Stamp className="h-4 w-4" />
@@ -916,9 +896,24 @@ function VisitsPageInner() {
       <PCShell rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          {/* トレーナー情報 — プロフィール編集はここに置き、公開ページには置かない */}
+          {/* トレーナー情報 — プロフィール編集は /profile に置き、公開ページには置かない */}
           {isLoggedIn && (
             <ProfileCard showShare />
+          )}
+
+          {/* コレクション / 旅の記録（旧マイ旅）。旅の記録は /visits/trip の別ページ */}
+          {isLoggedIn && <VisitsSwitcher current="collection" />}
+
+          {/* 公開設定は旅の記録にしかないので、非公開があるときだけここで知らせる。
+              件数は取得できた範囲（limit=1000）の訪問記録の数で、重複をまとめる前のもの */}
+          {privateVisitCount > 0 && (
+            <Link
+              href="/visits/trip"
+              className="flex items-center justify-between gap-2 rounded-[12px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-2.5 font-pixelJp text-xs font-bold text-[#7B63A8]"
+            >
+              <span>非公開の記録が{privateVisitCount}件あります。公開スタンプ帳には出ません</span>
+              <span className="shrink-0">公開設定 →</span>
+            </Link>
           )}
 
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}
@@ -939,7 +934,7 @@ function VisitsPageInner() {
               <button
                 key={seg.id}
                 type="button"
-                onClick={() => selectSegment(seg.id)}
+                onClick={() => setSegmentTab(seg.id)}
                 className={`flex-1 min-h-[36px] rounded-[9px] font-pixelJp text-xs font-bold transition-colors ${
                   segmentTab === seg.id
                     ? 'bg-[#4F3828] text-white'
@@ -951,9 +946,7 @@ function VisitsPageInner() {
             ))}
           </nav>
 
-          {segmentTab === 'trip' ? (
-            <TripDiary />
-          ) : sortedVisits.length === 0 && segmentTab === 'all' ? (
+          {sortedVisits.length === 0 && segmentTab === 'all' ? (
             <EmptyPassport />
           ) : (
             <>
@@ -1632,20 +1625,5 @@ function NearCompleteCard({ item, variant = 'card' }: { item: NearCompleteItem; 
         次を撮る
       </Link>
     </div>
-  );
-}
-
-export default function VisitsPage() {
-  // useSearchParams を使うので Suspense で包む（無いと静的生成時にページ全体がクライアント描画に落ちる）
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-content items-center justify-center bg-[#efe6cf]">
-          <div className="font-pixelJp text-[#6A4D36]">読み込み中<span className="rpg-loading" /></div>
-        </div>
-      }
-    >
-      <VisitsPageInner />
-    </Suspense>
   );
 }

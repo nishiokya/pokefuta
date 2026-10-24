@@ -87,7 +87,7 @@ export default function BulkUploadHelpPage() {
         </p>
         <p>
           同じ蓋・同じ日の訪問が非公開のときは、その訪問に写真を足せません。
-          <Link href="/visits?tab=trip" className="underline">スタンプ帳の「旅の記録」</Link>でその訪問を公開にしてから、まとめて投稿を開き直して写真を選び直すと足せます。
+          <Link href="/visits/trip" className="underline">スタンプ帳の「旅の記録」</Link>でその訪問を公開にしてから、まとめて投稿を開き直して写真を選び直すと足せます。
         </p>
       </Section>
 

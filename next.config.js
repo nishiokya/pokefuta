@@ -100,10 +100,10 @@ const nextConfig = {
       destination: '/login',
       permanent: true,
     },
-    // マイ旅はスタンプ帳の「旅の記録」タブにまとめた。プロフィールと達成率がスタンプ帳と二重だった
+    // マイ旅はスタンプ帳の「旅の記録」（/visits/trip）にした。プロフィールと達成率がスタンプ帳と二重だった
     {
       source: '/my-trip',
-      destination: '/visits?tab=trip',
+      destination: '/visits/trip',
       permanent: true,
     },
     // 写真館の全国マップ・全国一覧は閉じて図鑑へ送る。どちらも図鑑に同じ役割のページがあり、

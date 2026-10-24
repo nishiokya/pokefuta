@@ -77,7 +77,7 @@ export function isSubmissionPage(pathname: string): boolean {
 export type NavItem = { key: NavKey; label: string; href: string };
 
 // ログインの有無で項目は変わらない。以前はログイン後に「マイ旅」が増えていたが、
-// スタンプ帳の「旅の記録」タブにまとめた（/my-trip は /visits?tab=trip へ転送）
+// スタンプ帳の「旅の記録」（/visits/trip）にまとめた（/my-trip はそこへ転送）
 export const NAV_ITEMS: NavItem[] = [
   { key: 'search', label: '探す', href: '/nearby' },
   { key: 'stamp', label: 'スタンプ帳', href: '/visits' },

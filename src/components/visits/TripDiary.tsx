@@ -10,14 +10,11 @@ import { EyeOff } from 'lucide-react';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
 
 /**
- * スタンプ帳（/visits）の「旅の記録」タブ。訪問を月ごとに並べ、公開/非公開をここで切り替える。
+ * スタンプ帳の「旅の記録」（/visits/trip）の本文。訪問を月ごとに並べ、公開/非公開をここで切り替える。
  *
  * 以前は単独ページのマイ旅（/my-trip）だった。プロフィールカードと達成率のヘッダーが
- * スタンプ帳と二重になっていたので、中身（非公開バナーと月別の一覧）だけをタブに移した。
- * /my-trip は /visits?tab=trip へ転送している。
- *
- * タブを開いたときにだけ読み込む。スタンプ帳本体の /api/visits とは別に取るが、
- * こちらは include_manhole_tags が要るのと、開かない人のぶんを読まずに済む。
+ * スタンプ帳と二重になっていたので、中身（非公開バナーと月別の一覧）だけをここに移した。
+ * 訪問一覧はこの部品が自分で1回だけ取る（ページ側では取らない）。
  */
 
 type JourneyVisit = {
@@ -55,11 +52,9 @@ export default function TripDiary() {
   // （望ましい操作なので即時）とは分けて、取り消せる余地を1タップぶん残す。
   const [bulkPublishConfirming, setBulkPublishConfirming] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
-  const { trackVisitVisibilityChange, trackPrivateVisitsBannerClick, trackCollectionOpen } = useAnalytics();
+  const { trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
   useEffect(() => {
-    // タブの切り替えでは page_view が出ないので、旧 /my-trip の閲覧のかわりに開いたことを送る
-    trackCollectionOpen({ surface: 'visits_trip' });
     (async () => {
       try {
         const res = await fetch('/api/visits?limit=1000&include_manhole_tags=true');
@@ -92,7 +87,8 @@ export default function TripDiary() {
     const ok = await updateVisitVisibility(visitId, nextIsPublic);
 
     if (ok) {
-      // surface はマイ旅のころの値のまま。GA4 で前後をつなげて見るため
+      // surface はマイ旅のころの値（my_trip / my_trip_bulk）のまま。同じ画面・同じ操作なので、
+      // 名前を変えずに1本の系列として前後を見る（2026-10 に /my-trip → /visits/trip へ移した）
       trackVisitVisibilityChange({ is_public: nextIsPublic, surface: 'my_trip' });
       showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
     } else {
