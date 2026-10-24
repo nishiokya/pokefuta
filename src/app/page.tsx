@@ -341,33 +341,62 @@ export default function HomePage() {
               </span>
             </Link>
             {/*
-              「LEGEND を目指そう」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
-              人を順位で並べるのではなく、100枚という目標と、そこへ届いた人がいることを見せる（名前は名前順、枚数は出さない）。
-              スマホは「バッジを集めよう」の右に半分の幅、タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。
-              名前は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）
+              「この◯人に続け！」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
+              LEGEND のトレーナーを写真と名前で見せ、押すとその人の公開スタンプ帳へ。順位にしないため枚数は出さず名前順。
+              スマホは「バッジを集めよう」の右に半分の幅で2人、タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広めに3人。
+              名前と写真は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）。
+              まだ届いていない（取れなかった）ときは「LEGEND を目指そう」として /badges の説明へ送る
             */}
-            <Link
-              href="/badges#badges-legend"
-              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-200 via-amber-200 to-sky-200 text-xl shadow-sm sm:h-12 sm:w-12 sm:text-2xl" aria-hidden="true">
-                🏆
-              </span>
-              <span className="min-w-0">
-                <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">LEGEND<span className="max-sm:hidden"> を</span>目指そう</span>
-                <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
-                  {legends.length > 0 ? (
-                    <>
-                      <span className="sm:hidden">達成 {legends.length}人</span>
-                      <span className="max-sm:hidden">100枚訪問した {legends.slice(0, 3).map((legend) => legend.name).join('・')}{legends.length > 3 ? ` ほか${legends.length - 3}人` : ''}</span>
-                    </>
-                  ) : (
-                    <>100枚訪問で🏆</>
-                  )}
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+            {legends.length > 0 ? (
+              <div className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm max-sm:flex-col max-sm:items-start sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3">
+                <div className="min-w-0 shrink-0">
+                  <p className="text-xs font-extrabold text-[#4A4A4A] sm:text-base">この{legends.length}人に続け！</p>
+                  <p className="whitespace-nowrap text-[10px] font-bold text-[#8A6A1F] sm:text-xs">🏆 LEGEND トレーナー<span className="max-sm:hidden">のみなさん</span></p>
+                </div>
+                <ul className="flex min-w-0 gap-1.5 sm:ml-auto sm:gap-2.5">
+                  {legends.slice(0, 3).map((legend, index) => (
+                    <li key={legend.id} className={index > 1 ? 'max-sm:hidden' : ''}>
+                      <Link
+                        href={`/users/${encodeURIComponent(legend.id)}/visits`}
+                        className="group flex w-14 flex-col items-center sm:w-[4.5rem] lg:w-20"
+                        title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
+                      >
+                        <span className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-300 via-amber-200 to-sky-300 p-[2px] shadow-sm transition group-hover:scale-105 sm:h-10 sm:w-10">
+                          {legend.photoId ? (
+                            <img
+                              src={`/api/photo/${legend.photoId}?size=small`}
+                              alt=""
+                              width={40}
+                              height={40}
+                              loading="lazy"
+                              className="h-full w-full rounded-full bg-[#EFE4CC] object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm">🏆</span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 w-full truncate text-center text-[10px] font-bold text-[#4A4A4A] group-hover:underline">{legend.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <Link
+                href="/badges#badges-legend"
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-200 via-amber-200 to-sky-200 text-xl shadow-sm sm:h-12 sm:w-12 sm:text-2xl" aria-hidden="true">
+                  🏆
                 </span>
-              </span>
-            </Link>
+                <span className="min-w-0">
+                  <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">LEGEND<span className="max-sm:hidden"> を</span>目指そう</span>
+                  <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
+                    100枚訪問で🏆<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                  </span>
+                </span>
+              </Link>
+            )}
             {/*
               スマホでは「募集中」が2行目に1枚で現れ、行ごと増える。取得中は同じ高さ（丸の分）の枠で行を取っておく。
               PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない。
