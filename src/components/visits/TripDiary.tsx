@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Manhole } from '@/types/database';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
@@ -8,16 +8,18 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { updateVisitVisibility, publishAllPrivateVisits, showVisibilityToast } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
+import { dedupTripVisits, tripMonthAnchor } from '@/lib/trip-activity';
 
 /**
  * スタンプ帳の「旅の記録」（/visits/trip）の本文。訪問を月ごとに並べ、公開/非公開をここで切り替える。
  *
  * 以前は単独ページのマイ旅（/my-trip）だった。プロフィールカードと達成率のヘッダーが
  * スタンプ帳と二重になっていたので、中身（非公開バナーと月別の一覧）だけをここに移した。
- * 訪問一覧はこの部品が自分で1回だけ取る（ページ側では取らない）。
+ * 訪問一覧はページが1回だけ取って渡す（月ごとの活動 TripActivity と同じものを使う）。
+ * 公開切り替えはこの部品の中で持つ。
  */
 
-type JourneyVisit = {
+export type JourneyVisit = {
   id: string;
   manhole_id: number | null;
   manhole?: Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title' | 'pokemons' | 'titles' | 'hashtags' | 'title_tags'> & { city?: string } | null;
@@ -42,9 +44,8 @@ const getManholeTags = (manhole?: JourneyVisit['manhole'], max = 2): string[] =>
   return tags.slice(0, max);
 };
 
-export default function TripDiary() {
-  const [loading, setLoading] = useState(true);
-  const [visits, setVisits] = useState<JourneyVisit[]>([]);
+export default function TripDiary({ initialVisits }: { initialVisits: JourneyVisit[] }) {
+  const [visits, setVisits] = useState<JourneyVisit[]>(initialVisits);
   const [showPrivateOnly, setShowPrivateOnly] = useState(false);
   const [unpublishModalVisitId, setUnpublishModalVisitId] = useState<string | null>(null);
   const [visibilitySavingVisitId, setVisibilitySavingVisitId] = useState<string | null>(null);
@@ -54,26 +55,28 @@ export default function TripDiary() {
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const { trackVisitVisibilityChange, trackPrivateVisitsBannerClick } = useAnalytics();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/visits?limit=1000&include_manhole_tags=true');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.success && Array.isArray(data.visits)) setVisits(data.visits);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
   // 非公開件数は dedup 前の生データから数える（dedup すると取りこぼす）
   const privateCount = useMemo(
     () => visits.filter((v) => v.is_public === false).length,
     [visits]
   );
+
+  // 月ごとの活動（TripActivity）のマスは全記録の月へリンクしている。非公開だけに絞っていて
+  // その月が一覧に無いときは、絞り込みを外してから飛ぶ（そのままだと URL の # だけ変わって何も起きない）
+  const pendingAnchorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.('a[href^="#trip-"]');
+      if (!link) return;
+      const id = link.getAttribute('href')!.slice(1);
+      if (document.getElementById(id)) return;
+      e.preventDefault();
+      pendingAnchorRef.current = id;
+      setShowPrivateOnly(false);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   // 公開/非公開の切り替え。楽観更新し、失敗したら元に戻す。
   const applyVisitVisibility = async (visitId: string, nextIsPublic: boolean) => {
@@ -134,37 +137,26 @@ export default function TripDiary() {
     }
   };
 
-  // Dedup by manholeId × date, then group by month
+  // 蓋×日で重複を除き（月ごとの活動と同じ数え方）、月ごとにまとめる
   const visitsByMonth = useMemo(() => {
-    const seen = new Set<string>();
-    const groups = new Map<string, JourneyVisit[]>();
+    const groups = new Map<string, { label: string; anchor: string; visits: JourneyVisit[] }>();
     const source = showPrivateOnly ? visits.filter((v) => v.is_public === false) : visits;
-    const sorted = [...source].sort(
-      (a, b) => new Date(b.shot_at).getTime() - new Date(a.shot_at).getTime()
-    );
-    for (const visit of sorted) {
-      const manholeId = visit.manhole?.id ?? visit.manhole_id;
-      if (!manholeId) continue;
+    for (const visit of dedupTripVisits(source)) {
       const d = new Date(visit.shot_at);
-      if (isNaN(d.getTime())) continue;
-      const key = `${manholeId}-${d.toDateString()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const monthKey = `${d.getFullYear()}年${d.getMonth() + 1}月`;
-      const group = groups.get(monthKey);
-      if (group) group.push(visit);
-      else groups.set(monthKey, [visit]);
+      const anchor = tripMonthAnchor(d.getFullYear(), d.getMonth() + 1);
+      const group = groups.get(anchor);
+      if (group) group.visits.push(visit);
+      else groups.set(anchor, { label: `${d.getFullYear()}年${d.getMonth() + 1}月`, anchor, visits: [visit] });
     }
-    return Array.from(groups.entries()).map(([label, vs]) => ({ label, visits: vs }));
+    return Array.from(groups.values());
   }, [visits, showPrivateOnly]);
 
-  if (loading) {
-    return (
-      <div className="py-16 text-center font-pixelJp text-sm text-[#6A4D36]">
-        読み込み中<span className="rpg-loading" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    const id = pendingAnchorRef.current;
+    if (!id || showPrivateOnly) return;
+    pendingAnchorRef.current = null;
+    document.getElementById(id)?.scrollIntoView();
+  }, [showPrivateOnly, visitsByMonth]);
 
   return (
     <div className="space-y-6">
@@ -242,8 +234,8 @@ export default function TripDiary() {
         </div>
       ) : (
         <div className="space-y-8">
-          {visitsByMonth.map(({ label, visits: monthVisits }) => (
-            <div key={label}>
+          {visitsByMonth.map(({ label, anchor, visits: monthVisits }) => (
+            <div key={anchor} id={anchor} className="scroll-mt-20">
               <div className="mb-3 flex items-center gap-2">
                 <span className="font-pixelJp text-sm font-bold text-[#4F3828]" style={{ whiteSpace: 'nowrap' }}>
                   {label}
@@ -253,7 +245,7 @@ export default function TripDiary() {
                 </span>
                 <hr className="flex-1 border-[#e9dfc7]" />
               </div>
-              <div className="grid grid-cols-2 gap-[14px]">
+              <div className="grid grid-cols-2 gap-[14px] sm:grid-cols-3">
                 {monthVisits.map((visit) => {
                   const manholeId = visit.manhole?.id ?? visit.manhole_id;
                   if (!manholeId) return null;
