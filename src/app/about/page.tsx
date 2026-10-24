@@ -104,7 +104,7 @@ export default function AboutPage() {
                 ポケふたを探す、記録する、振り返る
               </h1>
               <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-[#6A4D36] sm:text-base">
-                ポケふたは、全国の設置情報を調べる「ポケふた図鑑」と、写真・訪問記録を残す「ポケふた写真館」を一つにつないだ個人運営サービスです。
+                pokefuta.com は、全国のポケふたの設置情報を調べる「ポケふた図鑑」と、写真・訪問記録を残す「ポケふた写真館」を一つにつないだ、ファンによる個人運営の非公式サービスです。
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
