@@ -17,7 +17,8 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
-import PokedexPanel from '@/components/users/PokedexPanel';
+import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
+import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import PrefectureBadgeShelf from '@/components/users/PrefectureBadgeShelf';
 import PokemonBadgeShelf from '@/components/users/PokemonBadgeShelf';
 import { buildPokemonBadges, buildThemeBadges, pokemonBadgeManholeIds, type BadgeManhole } from '@/lib/badge-catalog';
@@ -162,6 +163,42 @@ export default async function UserVisitsPage({ params }: PageProps) {
     };
   })();
 
+  // 自分のスタンプ帳（/visits）と同じメダルの一覧。数えるのは公開の訪問の蓋だけ（再訪は1枚）
+  const collection = (() => {
+    if (!progress || !pokemonShelf) return null;
+    const totalIds = new Map<string, Set<number>>();
+    const visitedIds = new Map<string, Set<number>>();
+    for (const m of progress.prefectures.flatMap((p) => p.manholes)) {
+      for (const name of new Set(m.pokemons ?? [])) {
+        if (!totalIds.has(name)) totalIds.set(name, new Set());
+        totalIds.get(name)!.add(m.id);
+        if (m.visited) {
+          if (!visitedIds.has(name)) visitedIds.set(name, new Set());
+          visitedIds.get(name)!.add(m.id);
+        }
+      }
+    }
+    return {
+      prefectures: progress.prefectures
+        .filter((p) => p.visited > 0)
+        .map((p) => ({
+          name: p.name,
+          label: p.name === '北海道' ? p.name : p.name.replace(/[都府県]$/, ''),
+          visited: p.visited,
+          total: p.total,
+        })),
+      pokemon: Array.from(visitedIds.entries())
+        .sort(([a], [b]) => a.localeCompare(b, 'ja'))
+        .map(([name, ids]) => ({
+          name,
+          visited: ids.size,
+          total: totalIds.get(name)!.size,
+          manholeId: pokemonShelf.medalIds[name],
+          href: pokemonDexUrl(name),
+        })),
+    };
+  })();
+
   // プロフィール編集は/profile にあり（自分のスタンプ帳 /visits からも行ける）、この公開ページは表示専用
   const xUrl = safeSocialUrl(data.xUrl, X_HOSTS);
   const instagramUrl = safeSocialUrl(data.instagramUrl, INSTAGRAM_HOSTS);
@@ -284,7 +321,19 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
         {pokemonShelf && <PokemonBadgeShelf {...pokemonShelf} />}
 
-        {progress && <PokedexPanel pokedex={progress.pokedex} />}
+        {/* 図鑑の名前チップ（先頭24種＋他◯種）の代わりに、都道府県・ポケモンごとの進み具合をメダルで並べる */}
+        {collection && (collection.prefectures.length > 0 || collection.pokemon.length > 0) && (
+          <section className="mt-8">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+              <Stamp className="h-5 w-5 text-[#B5483C]" />
+              集めたスタンプ
+            </h2>
+            <div className="flex flex-col gap-6 rounded-[10px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-3 py-5 shadow-sm sm:px-5">
+              <CollectionStampShelf title="行ったことがある都道府県" unit="都道府県" items={collection.prefectures} />
+              <CollectionStampShelf title="ゲットしたポケモン" unit="種類" initialCount={16} items={collection.pokemon} />
+            </div>
+          </section>
+        )}
 
         {data.isTruncated && (
           <p className="mt-4 text-xs font-bold text-[#6A4D36]">
