@@ -187,6 +187,7 @@ export default async function BadgesPage() {
             items={[
               '公開で訪問したポケふたの枚数で上がります。同じポケふたに何度行っても1枚です。',
               '非公開の訪問は数えません。反映は翌朝です。',
+              '2026年10月25日に線を上げました（RANGER 30→50枚、MASTER 50→100枚、LEGEND 100→150枚）。それまでに届いた称号はそのままです。',
             ]}
           />
           <ol className="grid grid-cols-1 gap-2 sm:grid-cols-5">
@@ -214,7 +215,7 @@ export default async function BadgesPage() {
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[#6A4D36]">
               {regulars.legends.length > 0
-                ? `ポケふたを${REGULAR_TIER_MIN_MANHOLES.legend}枚訪問した LEGEND のトレーナーは、いま${regulars.legends.length}人です。`
+                ? `LEGEND のトレーナーは、いま${regulars.legends.length}人です。ポケふたを${REGULAR_TIER_MIN_MANHOLES.legend}枚訪問すると LEGEND です。`
                 : `ポケふたを${REGULAR_TIER_MIN_MANHOLES.legend}枚訪問すると LEGEND です。`}
             </p>
             {regulars.legends.length > 0 && (

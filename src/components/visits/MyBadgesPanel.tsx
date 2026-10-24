@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import RegularBadge from '@/components/RegularBadge';
 import { RANK_ICON, RANK_LABEL } from '@/components/RankMedal';
@@ -13,7 +16,9 @@ import {
   REGULAR_BADGE_ICON,
   REGULAR_BADGE_NAME,
   REGULAR_TIER_MIN_MANHOLES,
+  fetchRegularBadges,
   regularTierForCount,
+  type RegularTier,
 } from '@/lib/regular-badges';
 
 const RANKS: BadgeRank[] = ['gold', 'silver', 'bronze'];
@@ -59,21 +64,28 @@ function Card({ title, right, children }: { title: string; right?: React.ReactNo
  * 都道府県バッジはここでは今の訪問から数える（公開スタンプ帳は「取った日」を持っていて、新設で金が消えない）。
  */
 export default function MyBadgesPanel({ manholes, visited, publicCount }: MyBadgesPanelProps) {
-  const tier = regularTierForCount(publicCount);
+  // 線を上げる前（2026-10-25）に届いた段は regulars.json にだけある。枚数より高ければそちらを出す
+  const [awarded, setAwarded] = useState<RegularTier | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch('/api/user/profile').catch(() => null);
+      const publicUserId: unknown = res?.ok ? (await res.json().catch(() => null))?.profile?.publicUserId ?? null : null;
+      if (typeof publicUserId !== 'string') return;
+      const badges = await fetchRegularBadges();
+      if (!cancelled) setAwarded(badges.get(publicUserId) ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const tier = regularTierForCount(publicCount, awarded);
   const prefectures = buildPrefectureBadges(manholes, visited).flatMap((region) => region.prefectures).filter((p) => p.visited > 0);
   const pokemon = buildPokemonBadges(manholes, visited).filter((p) => p.visited > 0);
 
-  const nextRate = tier.next
-    ? Math.max(
-        0,
-        Math.min(
-          100,
-          ((publicCount - (tier.current ? REGULAR_TIER_MIN_MANHOLES[tier.current] : 0)) /
-            (REGULAR_TIER_MIN_MANHOLES[tier.next] - (tier.current ? REGULAR_TIER_MIN_MANHOLES[tier.current] : 0))) *
-            100,
-        ),
-      )
-    : 100;
+  // 進み具合は次の段の枚数に対して 0 から測る。据え置きの段（今の段の枚数に届いていない）でも、
+  // 1枚増えて今の段の枚数に届いたときに輪が戻らないようにするため
+  const nextRate = tier.next ? Math.min(100, (publicCount / REGULAR_TIER_MIN_MANHOLES[tier.next]) * 100) : 100;
 
   return (
     <div className="space-y-3">

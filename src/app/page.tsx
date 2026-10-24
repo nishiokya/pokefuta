@@ -34,7 +34,7 @@ import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { EMPTY_REGULAR_BADGES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
+import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
 
 type FeedVisit = {
   id: string;
@@ -412,7 +412,7 @@ export default function HomePage() {
                 <span className="min-w-0">
                   <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">LEGEND<span className="max-sm:hidden"> を</span>目指そう</span>
                   <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
-                    100枚訪問で🏆<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                    {LEGEND_MIN_MANHOLES}枚訪問で🏆<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
                   </span>
                 </span>
               </Link>

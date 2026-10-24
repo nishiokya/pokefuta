@@ -1,7 +1,10 @@
 /**
  * 投稿者名に付ける称号。公開で訪問したポケふたの枚数（同じ蓋は1枚）で5段階に分ける。
  *
- *   🌱 ROOKIE 1枚 → 🧭 EXPLORER 10枚 → ⭐ RANGER 30枚 → 👑 MASTER 50枚 → 🏆 LEGEND 100枚
+ *   🌱 ROOKIE 1枚 → 🧭 EXPLORER 10枚 → ⭐ RANGER 50枚 → 👑 MASTER 100枚 → 🏆 LEGEND 150枚
+ *
+ * 2026-10-25 に線を 30/50/100 から 50/100/150 へ上げた。それまでに届いていた人の段は tracker が下げない
+ * （pokefuta-tracker の dataset/regular_tier_floors.json）。なので regulars.json の段は枚数より高いことがある。
  *
  * 2026-10-24 に「続けて来ている週の数（線は非公開）」から、目標として見せられる枚数の段に変えた。
  * 線は /badges に全部書く。人を順位で並べるランキングは置かず、届いた段の印を付けるだけにしている。
@@ -58,9 +61,9 @@ export const REGULAR_BADGE_NAME: Record<RegularTier, string> = {
 export const REGULAR_TIER_MIN_MANHOLES: Record<RegularTier, number> = {
   rookie: 1,
   regular: 10,
-  ranger: 30,
-  crown: 50,
-  legend: 100,
+  ranger: 50,
+  crown: 100,
+  legend: 150,
 };
 
 /** 低い段から順に。/badges の梯子と「次の段まであと何枚」に使う */
@@ -73,13 +76,22 @@ export const regularTierDescription = (tier: RegularTier) =>
 
 export const LEGEND_DESCRIPTION = regularTierDescription('legend');
 
-/** 公開で訪問した枚数から、今の段階（無ければ null）と次の段階を返す */
-export function regularTierForCount(count: number): { current: RegularTier | null; next: RegularTier | null } {
+/**
+ * 公開で訪問した枚数から、今の段階（無ければ null）と次の段階を返す。
+ * awarded は regulars.json に付いている段（線を上げる前に届いた人は枚数より高い）。高いほうを今の段にする
+ */
+export function regularTierForCount(
+  count: number,
+  awarded?: RegularTier | null,
+): { current: RegularTier | null; next: RegularTier | null } {
   let current: RegularTier | null = null;
   for (const tier of REGULAR_TIERS_ASCENDING) {
     if (count >= REGULAR_TIER_MIN_MANHOLES[tier]) current = tier;
   }
-  const next = REGULAR_TIERS_ASCENDING.find((tier) => count < REGULAR_TIER_MIN_MANHOLES[tier]) ?? null;
+  if (awarded && (!current || REGULAR_TIERS_ASCENDING.indexOf(awarded) > REGULAR_TIERS_ASCENDING.indexOf(current))) {
+    current = awarded;
+  }
+  const next = REGULAR_TIERS_ASCENDING[current ? REGULAR_TIERS_ASCENDING.indexOf(current) + 1 : 0] ?? null;
   return { current, next };
 }
 

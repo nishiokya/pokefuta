@@ -68,22 +68,30 @@ test('ラベルには枚数を入れない（条件は説明と /badges に書�
   }
 });
 
-test('5段階の線を公開し、LEGEND は今まで通り100枚', () => {
+test('5段階の線を公開し、LEGEND は150枚', () => {
   assert.deepEqual(REGULAR_TIERS_ASCENDING, ['rookie', 'regular', 'ranger', 'crown', 'legend']);
   assert.deepEqual(
     REGULAR_TIERS_ASCENDING.map((tier) => REGULAR_TIER_MIN_MANHOLES[tier]),
-    [1, 10, 30, 50, 100],
+    [1, 10, 50, 100, 150],
   );
-  assert.match(LEGEND_DESCRIPTION, /100枚以上/);
-  assert.equal(regularTierDescription('ranger'), 'ポケふたを30枚以上訪問した人');
+  assert.match(LEGEND_DESCRIPTION, /150枚以上/);
+  assert.equal(regularTierDescription('ranger'), 'ポケふたを50枚以上訪問した人');
 });
 
 test('枚数から今の段階と次の段階を出す', () => {
   assert.deepEqual(regularTierForCount(0), { current: null, next: 'rookie' });
   assert.deepEqual(regularTierForCount(1), { current: 'rookie', next: 'regular' });
-  assert.deepEqual(regularTierForCount(29), { current: 'regular', next: 'ranger' });
-  assert.deepEqual(regularTierForCount(30), { current: 'ranger', next: 'crown' });
+  assert.deepEqual(regularTierForCount(49), { current: 'regular', next: 'ranger' });
+  assert.deepEqual(regularTierForCount(50), { current: 'ranger', next: 'crown' });
   assert.deepEqual(regularTierForCount(150), { current: 'legend', next: null });
+});
+
+test('線を上げる前に届いた段（regulars.json）が高ければそちらを今の段にする', () => {
+  assert.deepEqual(regularTierForCount(146, 'legend'), { current: 'legend', next: null });
+  assert.deepEqual(regularTierForCount(60, 'crown'), { current: 'crown', next: 'legend' });
+  // 枚数のほうが高ければ枚数どおり
+  assert.deepEqual(regularTierForCount(160, 'ranger'), { current: 'legend', next: null });
+  assert.deepEqual(regularTierForCount(5, null), { current: 'rookie', next: 'regular' });
 });
 
 test('どの段階にもアイコンと名前があり、名前に条件を入れない', () => {
