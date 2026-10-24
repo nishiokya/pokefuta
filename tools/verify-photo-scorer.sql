@@ -7,6 +7,7 @@
 --               supabase/migrations/20261004120000_photo_ai_tags_crop.sql（crop / lid_fits。[13]）
 --               supabase/migrations/20261005100000_photo_ai_tags_lid.sql（lid。[14]）
 --               supabase/migrations/20261005200000_photo_ai_tags_plush_box.sql（plush_box。[15]）
+--               supabase/migrations/20261025120000_quality_score_0_10_0.sql（rep_score。[16]）
 --
 -- このロールの要は「関数を呼べる」ことより「それ以外は何もできない」こと。
 -- 前半（[1]〜[3]）は権限の自己点検とその網が効くこと、後半（[5]〜）は関数の挙動と入力検査。
@@ -623,6 +624,39 @@ BEGIN
       'ai_tags', jsonb_build_object('model', 'm', 'plush_box', '"box"'::jsonb))));
     RAISE EXCEPTION '[15] 文字列の plush_boxが通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[15]%' THEN RAISE; END IF; END;
+  RESET ROLE;
+
+  -- 16. rep_score（20261025120000）: 書けて、範囲外・数でないものは拒否する
+  SELECT quality_score_version, quality_scored_at INTO ev, ts FROM public.photo WHERE id = pid;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now() + interval '5 seconds', jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.78, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts,
+    'ai_tags', jsonb_build_object('model', 'scene_attrs/2', 'lid_fits', true, 'rep_score', -4.3125)))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[16] rep_score 付きの更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags INTO tags FROM public.photo WHERE id = pid;
+  IF tags -> 'rep_score' IS DISTINCT FROM '-4.3125'::jsonb THEN
+    RAISE EXCEPTION '[16] rep_score が期待と違う: %', tags;
+  END IF;
+  SET LOCAL ROLE photo_scorer;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'rep_score', 1000.5))));
+    RAISE EXCEPTION '[16] 範囲外の rep_score が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[16]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'rep_score', '"12.3"'::jsonb))));
+    RAISE EXCEPTION '[16] 文字列の rep_score が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[16]%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+      'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+      'ai_tags', jsonb_build_object('model', 'm', 'rep_score', 'null'::jsonb))));
+    RAISE EXCEPTION '[16] null の rep_score が通った';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[16]%' THEN RAISE; END IF; END;
   RESET ROLE;
 
   -- 11. anon / authenticated は scoring の関数を呼べない
