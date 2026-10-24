@@ -801,7 +801,6 @@ export default function VisitsPage() {
       manholes={passportManholes}
       visited={visitedManholeIds}
       publicCount={publicVisitedManholeCount}
-      representatives={representatives}
     />
   );
 
@@ -883,10 +882,10 @@ export default function VisitsPage() {
               </div>
             </div>
 
-            {/* 都道府県は多くても47件なので先に出し、100種を超えるポケモンは最初の2段だけにする */}
+            {/* 都道府県・ポケモンのバッジ（金・銀・銅）。都道府県は多くても47件なので先に出し、100種を超えるポケモンは最初の2段だけにする */}
+            <div id="badges" className="scroll-mt-20 space-y-6">
             <CollectionStampShelf
-              title="行ったことがある都道府県"
-              unit="都道府県"
+              title="都道府県バッジ"
               items={prefectureProgress.filter((p) => p.visited > 0 && p.name !== '都道府県未設定')
                 .map((p) => ({
                   name: p.name,
@@ -896,8 +895,7 @@ export default function VisitsPage() {
                 }))}
             />
             <CollectionStampShelf
-              title="ゲットしたポケモン"
-              unit="種類"
+              title="ポケモンバッジ"
               initialCount={16}
               items={pokemonProgress.filter((p) => p.visitedManholes > 0)
                 .sort((a, b) => a.pokemonName.localeCompare(b.pokemonName, 'ja'))
@@ -909,6 +907,7 @@ export default function VisitsPage() {
                   href: pokemonDexUrl(p.pokemonName),
                 }))}
             />
+            </div>
             </div>
           )}
         </div>

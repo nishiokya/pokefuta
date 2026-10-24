@@ -7,7 +7,6 @@ import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import type { BadgeManhole } from '@/lib/badge-catalog';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
-import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pageTitle } from '@/lib/constants';
@@ -20,7 +19,6 @@ type Loaded = {
   manholes: BadgeManhole[];
   visited: Set<number>;
   publicCount: number;
-  representatives: Map<string, number>;
 };
 
 // スタンプ帳の「カード」タブ（スマホ）。トレーナーカード（称号・バッジ・ステッカー）。PC はスタンプ（/visits）の右レールに同じものが出る。
@@ -42,7 +40,7 @@ export default function VisitsBadgesPage() {
           router.replace('/login?redirect=/visits/badges');
           return;
         }
-        const [list, representatives] = await Promise.all([fetchAllManholes(), fetchPokemonRepresentatives()]);
+        const list = await fetchAllManholes();
         const visited = new Set<number>();
         const publicIds = new Set<number>();
         // 新しい順に limit 件ずつ返るので、短いページが返るまで読む（再訪も1件に数えられる）
@@ -68,11 +66,10 @@ export default function VisitsBadgesPage() {
           })),
           visited,
           publicCount: publicIds.size,
-          representatives,
         });
       } catch {
         // 取れなければ空のバッジ欄（0枚）として出す
-        setLoaded({ manholes: [], visited: new Set(), publicCount: 0, representatives: new Map() });
+        setLoaded({ manholes: [], visited: new Set(), publicCount: 0 });
       } finally {
         setLoading(false);
       }

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   BADGE_REGIONS,
-  POKEMON_BADGE_MIN_MANHOLES,
+  badgeRank,
+  badgeRankThresholds,
   buildPokemonBadges,
   THEME_BADGES,
   buildThemeBadges,
@@ -30,17 +31,31 @@ test('都道府県バッジは設置のある県だけを地方ごとに北か�
   assert.deepEqual(groups[1].prefectures, [{ name: '沖縄県', total: 1, visited: 0 }]);
 });
 
-test('ポケモンバッジは3枚以上のポケモンだけ、多い順。1枚に同じ名前が2回あっても1枚', () => {
+test('ポケモンバッジは1枚のポケモンも含めて全種類、多い順。1枚に同じ名前が2回あっても1枚', () => {
   const manholes = [
-    ...Array.from({ length: POKEMON_BADGE_MIN_MANHOLES }, (_, i) => lid(i + 1, '北海道', ['ラッキー', 'ラッキー'])),
-    ...Array.from({ length: POKEMON_BADGE_MIN_MANHOLES + 1 }, (_, i) => lid(i + 100, '北海道', ['ラプラス'])),
+    ...Array.from({ length: 3 }, (_, i) => lid(i + 1, '北海道', ['ラッキー', 'ラッキー'])),
+    ...Array.from({ length: 4 }, (_, i) => lid(i + 100, '北海道', ['ラプラス'])),
     lid(200, '北海道', ['ピカチュウ']),
   ];
   const badges = buildPokemonBadges(manholes, new Set([1, 100, 101]));
   assert.deepEqual(badges, [
-    { name: 'ラプラス', total: POKEMON_BADGE_MIN_MANHOLES + 1, visited: 2 },
-    { name: 'ラッキー', total: POKEMON_BADGE_MIN_MANHOLES, visited: 1 },
+    { name: 'ラプラス', total: 4, visited: 2 },
+    { name: 'ラッキー', total: 3, visited: 1 },
+    { name: 'ピカチュウ', total: 1, visited: 0 },
   ]);
+});
+
+test('バッジの段は 1/3 で銅・2/3 で銀・全部で金（切り捨て、少なくとも1枚）', () => {
+  // 岐阜県（5枚）は 1枚で銅・3枚で銀・5枚で金
+  assert.deepEqual(badgeRankThresholds(5), { bronze: 1, silver: 3, gold: 5 });
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((v) => badgeRank(v, 5)), [null, 'bronze', 'bronze', 'silver', 'silver', 'gold']);
+  assert.deepEqual(badgeRankThresholds(50), { bronze: 16, silver: 33, gold: 50 });
+  assert.equal(badgeRank(15, 50), null);
+  assert.equal(badgeRank(42, 50), 'silver');
+  // 1枚しかなければ1枚で金。2枚なら1枚で銀
+  assert.equal(badgeRank(1, 1), 'gold');
+  assert.equal(badgeRank(1, 2), 'silver');
+  assert.equal(badgeRank(0, 0), null);
 });
 
 test('ステッカーは対象の蓋を1枚でも訪問すればもらえる。蓋の無いステッカーは出さない', () => {
