@@ -221,9 +221,13 @@ export default async function UserVisitsPage({ params }: PageProps) {
             )}
 
             {/* 全国達成率は下の進捗バーと同じことを言うので、数字の欄は置かずバーの説明に入れる */}
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:mt-5">
+            {/* ポケモンの種類数は下の図鑑パネルと同じ数え方（progress.pokedex）。取れなければ2つのまま */}
+            <div className={`mt-4 grid gap-2 sm:gap-3 lg:mt-5 ${progress ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <HeroStat label="訪問スタンプ" value={`${data.totalVisits}`} />
               <HeroStat label="都道府県" value={`${data.prefectureCount}/${totalPrefectures}`} />
+              {progress && (
+                <HeroStat label="ポケモン" value={`${progress.pokedex.collected}/${progress.pokedex.total}`} />
+              )}
             </div>
 
             {completionRate !== null && (
@@ -359,9 +363,10 @@ function SocialLink({ href, label, icon }: { href: string; label: string; icon: 
 
 function HeroStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[7px] border border-[#8C6A4A]/15 bg-white/70 px-4 py-3">
+    <div className="min-w-0 rounded-[7px] border border-[#8C6A4A]/15 bg-white/70 px-3 py-3 sm:px-4">
       <p className="text-[11px] font-extrabold text-[#6A4D36]">{label}</p>
-      <p className="mt-1 font-pixel text-2xl leading-none text-[#B5483C]">{value}</p>
+      {/* 3つ並ぶのでスマホでは一回り小さく（「114/549」が枠からはみ出さないように） */}
+      <p className="mt-1 whitespace-nowrap font-pixel text-lg leading-none text-[#B5483C] sm:text-2xl">{value}</p>
     </div>
   );
 }
