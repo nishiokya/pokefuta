@@ -33,7 +33,7 @@ export const fetchCache = 'force-no-store';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 // HEIC はクライアント側で browser-image-compression が JPEG に変換して送る前提。
-// sharp(0.32) が HEIC をデコードできないためサーバーでは受けない。
+// sharp の同梱 libvips は HEIC（HEVC）をデコードできないためサーバーでは受けない。
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 // デザインマンホールは日本のご当地文化なので日本近辺に限定（離島含むゆるめの矩形）
