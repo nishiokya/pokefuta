@@ -21,7 +21,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import RegularBadge from '@/components/RegularBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
@@ -34,7 +34,7 @@ import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
-import { EMPTY_REGULAR_BADGES, REGULAR_BADGE_LABEL, fetchRegularBadges } from '@/lib/regular-badges';
+import { EMPTY_REGULAR_BADGES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
 
 type FeedVisit = {
   id: string;
@@ -78,7 +78,8 @@ export default function HomePage() {
   const [completionLoaded, setCompletionLoaded] = useState(false);
   // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
   // undefined は取得中（ヒーローに枠を確保しておく）、null は取れなかった・0枚
-  const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null | undefined>(undefined);
+  // LEGEND の人（ヒーローの「LEGEND を目指そう」のカード）。regulars.json と同じ取得で読む
+  const [legends, setLegends] = useState<readonly RegularLegend[]>([]);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -110,9 +111,11 @@ export default function HomePage() {
     loadSiteStats();
     loadRareManholes();
     loadCompletion();
-    loadPlushFeature();
     loadDesignFeature();
-    fetchRegularBadges().then(setRegularBadges);
+    fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
+      setRegularBadges(badges);
+      setLegends(loaded);
+    });
   }, []);
 
   useEffect(() => {
@@ -165,18 +168,6 @@ export default function HomePage() {
     }
   };
 
-  const loadPlushFeature = async () => {
-    try {
-      const response = await fetch('/api/features/plush');
-      if (!response.ok) return setPlushFeature(null);
-      const data = await response.json();
-      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos)) return setPlushFeature(null);
-      setPlushFeature({ count: data.count, photos: data.photos });
-    } catch {
-      setPlushFeature(null);
-    }
-  };
-
   const loadDesignFeature = async () => {
     try {
       const response = await fetch('/api/design-manholes?limit=3');
@@ -216,8 +207,6 @@ export default function HomePage() {
     }
   };
 
-  // ヒーローにぬいぐるみの枠（取得中を含む）があるか。無いときはスマホの「募集中」を2行目でなく「近くを探す」の右に入れる
-  const plushInHero = plushFeature === undefined || (plushFeature != null && plushFeature.count > 0);
   // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
   const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
   const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
@@ -352,70 +341,46 @@ export default function HomePage() {
               </span>
             </Link>
             {/*
-              ぬいぐるみの特集。最新の投稿の下へ一度下げた（2026-10-18）が、ヒーローに戻した（2026-10-22）。
-              スマホは「近くを探す」の右に半分の幅で並べ、タブレットは2枚の下に横いっぱいで置く（sm:order-last）。
-              PC（lg）は3枚を横1列に並べ（2段だと「近くを探す」の右が空いて見えた）、幅の要るこのカードだけ広めに取り、丸は2枚に減らす。
-              DOM の順はスマホの見た目に合わせてあり、PC だけ読み上げ・Tab の順が見た目と食い違う。
-              取得を待って後から差し込むとヒーローより下がまとめて押し下げられる（CLS、#338）ので、
-              取得中は同じ場所に枠を置いておく（スマホは行の高さに伸びる）。取れなかったときだけ枠ごと消す
+              「LEGEND を目指そう」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
+              人を順位で並べるのではなく、100枚という目標と、そこへ届いた人がいることを見せる（名前は名前順、枚数は出さない）。
+              スマホは「バッジを集めよう」の右に半分の幅、タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。
+              名前は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）
             */}
-            {plushFeature === undefined && (
-              <div className="rounded-[8px] border border-[#7B63A8]/10 bg-white/60 sm:order-last sm:col-span-2 sm:h-[76px] lg:h-auto lg:flex-[1.5]" aria-hidden="true" />
-            )}
-            {plushFeature && plushFeature.count > 0 && (
-              <Link
-                href="/photos/plush"
-                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
-              >
-                {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる。スマホは半分の幅なので1枚だけ、他のカードの丸と同じ 40px に縮める */}
-                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                  {plushFeature.photos.map((photo, index) => {
-                    const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                    const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                    const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                    const src = `/api/photo/${photo.id}?size=small`;
-                    return (
-                      <div key={photo.id} className={`relative h-14 w-14 ${index > 0 ? 'max-sm:hidden' : ''} ${index > 1 ? 'lg:hidden' : ''}`}>
-                        <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                          <img src={src} alt="" width={56} height={56} loading="lazy"
-                            className={lidClip ? undefined : 'h-full w-full object-cover'}
-                            style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                        </div>
-                        {plushClip && (
-                          <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                            <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-[#4A4A4A] sm:text-base">
-                    <span className="truncate">ぬいぐるみ<span className="max-sm:hidden">と旅するポケふた</span><span className="sm:hidden">特集</span></span>
-                    <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                  </p>
-                  <p className="whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
-                    <span className="hidden sm:inline">ぬいぐるみと一緒に撮られた</span>写真 {plushFeature.count}枚
-                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline"><span className="max-sm:hidden">見る </span>›</span>
-                  </p>
-                </div>
-              </Link>
-            )}
+            <Link
+              href="/badges#badges-legend"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-2.5 shadow-sm transition hover:shadow sm:order-last sm:col-span-2 sm:h-[76px] sm:gap-3 sm:px-4 sm:py-0 lg:h-auto lg:flex-[1.5] lg:py-3"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-200 via-amber-200 to-sky-200 text-xl shadow-sm sm:h-12 sm:w-12 sm:text-2xl" aria-hidden="true">
+                🏆
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">LEGEND<span className="max-sm:hidden"> を</span>目指そう</span>
+                <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
+                  {legends.length > 0 ? (
+                    <>
+                      <span className="sm:hidden">達成 {legends.length}人</span>
+                      <span className="max-sm:hidden">100枚訪問した {legends.slice(0, 3).map((legend) => legend.name).join('・')}{legends.length > 3 ? ` ほか${legends.length - 3}人` : ''}</span>
+                    </>
+                  ) : (
+                    <>100枚訪問で🏆</>
+                  )}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
+                </span>
+              </span>
+            </Link>
             {/*
               スマホでは「募集中」が2行目に1枚で現れ、行ごと増える。取得中は同じ高さ（丸の分）の枠で行を取っておく。
               PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない。
-              ぬいぐるみが取れなかったときは右半分が空くので、そこへ入れる（横いっぱいにしない）
             */}
             {!completionLoaded && (
-              <div className={`rounded-[8px] border border-transparent p-2.5 sm:hidden ${plushInHero ? 'max-sm:col-span-2' : ''}`} aria-hidden="true">
+              <div className={`rounded-[8px] border border-transparent p-2.5 sm:hidden max-sm:col-span-2`} aria-hidden="true">
                 <span className="block h-10 w-10" />
               </div>
             )}
             {wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
-                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 ${plushInHero ? 'max-sm:col-span-2' : ''}`}
+                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2`}
               >
                 {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">

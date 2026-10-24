@@ -19,6 +19,7 @@ import {
   REGULAR_BADGE_NAME,
   REGULAR_TIERS_ASCENDING,
   REGULAR_TIER_MIN_MANHOLES,
+  fetchRegularSnapshot,
 } from '@/lib/regular-badges';
 import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
@@ -92,7 +93,11 @@ function PrefectureMedal({ name, total }: { name: string; total: number }) {
 }
 
 export default async function BadgesPage() {
-  const [snapshot, representatives] = await Promise.all([fetchManholeSnapshot(), fetchPokemonRepresentatives()]);
+  const [snapshot, representatives, regulars] = await Promise.all([
+    fetchManholeSnapshot(),
+    fetchPokemonRepresentatives(),
+    fetchRegularSnapshot(),
+  ]);
   const manholes: BadgeManhole[] = (snapshot?.manholes ?? []).map((m) => ({
     id: m.id,
     prefecture: m.prefecture,
@@ -176,6 +181,33 @@ export default async function BadgesPage() {
               </li>
             ))}
           </ol>
+          {/* LEGEND に届いた人。順位にしないため枚数は出さず名前順（tracker の regulars.json の legends） */}
+          <div id="badges-legend" className="scroll-mt-20 rounded-[12px] border border-[#B98A2E]/30 bg-gradient-to-br from-white to-[#FFF6DC] p-4">
+            <p className="flex items-center gap-2 font-pixelJp text-sm font-extrabold text-[#4F3828]">
+              <span aria-hidden="true">🏆</span>
+              LEGEND を目指そう
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[#6A4D36]">
+              {regulars.legends.length > 0
+                ? `ポケふたを${REGULAR_TIER_MIN_MANHOLES.legend}枚訪問した LEGEND のトレーナーは、いま${regulars.legends.length}人です。`
+                : `ポケふたを${REGULAR_TIER_MIN_MANHOLES.legend}枚訪問すると LEGEND です。`}
+            </p>
+            {regulars.legends.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {regulars.legends.map((legend) => (
+                  <li key={legend.id}>
+                    <Link
+                      href={`/users/${encodeURIComponent(legend.id)}/visits`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-violet-300/60 bg-white px-3 py-1.5 text-xs font-bold text-[#4F3828] hover:bg-[#FBF6EA]"
+                    >
+                      <RegularBadge tier="legend" size="icon" />
+                      {legend.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
 
         {/* 都道府県制覇 */}

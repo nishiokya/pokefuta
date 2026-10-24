@@ -9,6 +9,8 @@ import {
   REGULAR_BADGE_LABEL,
   STATIC_REGULARS_URL,
   fetchRegularBadges,
+  fetchRegularSnapshot,
+  parseRegularLegends,
   parseRegularBadges,
   regularTierDescription,
   regularTierForCount,
@@ -90,4 +92,17 @@ test('どの段階にもアイコンと名前があり、名前に条件を入�
     assert.ok(REGULAR_BADGE_LABEL[tier].includes(REGULAR_BADGE_NAME[tier]));
     assert.doesNotMatch(REGULAR_BADGE_NAME[tier], /[0-9０-９]/);
   }
+});
+
+test('LEGEND の公開ID と名前を読む。壊れた項目は捨て、無ければ空', async () => {
+  const body = {
+    ...snapshot,
+    legends: [{ id: 'pub-e', name: 'あんず' }, { id: '', name: 'x' }, { id: 'pub-x' }, 'bad'],
+  };
+  assert.deepEqual(parseRegularLegends(body), [{ id: 'pub-e', name: 'あんず' }]);
+  assert.deepEqual(parseRegularLegends(snapshot), []);
+  const loaded = await fetchRegularSnapshot(async () => ok(body));
+  assert.equal(loaded.badges.get('pub-e'), 'legend');
+  assert.deepEqual(loaded.legends, [{ id: 'pub-e', name: 'あんず' }]);
+  assert.deepEqual((await fetchRegularSnapshot(async () => { throw new Error('offline'); })).legends, []);
 });
