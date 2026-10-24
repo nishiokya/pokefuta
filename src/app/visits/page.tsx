@@ -6,7 +6,6 @@ import {
   Bookmark,
   Calendar,
   Camera,
-  CheckCircle2,
   CircleDot,
   Heart,
   MapPin,
