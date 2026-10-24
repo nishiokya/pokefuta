@@ -737,7 +737,7 @@ export default function NearbyPage() {
                 onChange={(e) => setRadius(parseInt(e.target.value))}
                 className="h-2 w-full cursor-pointer appearance-none rounded-full"
                 style={{
-                  // 進捗の色はマイ旅の達成率バーと同じ（#e2a015 → #bf5640）
+                  // 進捗の色はスタンプ帳の達成率バーと同じ（#e2a015 → #bf5640）
                   background: `linear-gradient(to right, #e2a015 0%, #bf5640 ${radius}%, #e9dfc7 ${radius}%, #e9dfc7 100%)`
                 }}
               />
@@ -890,7 +890,7 @@ export default function NearbyPage() {
                       <VisitPhotoCard
                         key={manhole.id}
                         manholeId={manhole.id}
-                        // マイ旅と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
+                        // スタンプ帳と同じく小サイズを使う。原寸（url）は1枚1.5MB級で、
                         // 一覧に数十枚並べると読み込みが終わらない。
                         thumbnailUrl={photo?.thumbnail_url || (photo && 'url' in photo ? photo.url : undefined)}
                         isLandscape={photo?.is_landscape}

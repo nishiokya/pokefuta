@@ -964,7 +964,7 @@ function VisitCard({
             {privateVisit && (
               <span>
                 この日の訪問は非公開なので、まとめて投稿では写真を足せません。
-                <Link href="/my-trip" target="_blank" className="underline">マイ旅</Link>
+                <Link href="/visits/trip" target="_blank" className="underline">スタンプ帳の「旅の記録」</Link>
                 で公開にしてから、このページを開き直して写真を選び直すと足せます
               </span>
             )}

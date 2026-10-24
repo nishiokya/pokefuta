@@ -29,6 +29,7 @@ import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
+import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -49,6 +50,7 @@ interface Visit {
   }[];
   notes?: string;
   comment?: string;
+  is_public: boolean;
   likes_count: number;
   is_liked: boolean;
   comments_count: number;
@@ -244,6 +246,7 @@ export default function VisitsPage() {
               })) || [],
               notes: visit.note,
               comment: visit.comment,
+              is_public: visit.is_public !== false,
               likes_count: visit.likes_count || 0,
               is_liked: visit.is_liked || false,
               comments_count: visit.comments_count || 0,
@@ -297,6 +300,7 @@ export default function VisitsPage() {
   }, [sortedVisits]);
 
   const visitedManholesCount = visitSummaryByManholeId.size;
+  const privateVisitCount = useMemo(() => visits.filter((v) => !v.is_public).length, [visits]);
   const completionRate = (visitedManholesCount / TOTAL_MANHOLES) * 100;
 
   const visitedMunicipalityCount = useMemo(() => {
@@ -892,9 +896,24 @@ export default function VisitsPage() {
       <PCShell rail={isLoggedIn ? visitsRail : undefined} className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-5 max-w-2xl lg:max-w-none">
 
-          {/* トレーナー情報（マイ旅と同じUX） — プロフィール編集はここに置き、公開ページには置かない */}
+          {/* トレーナー情報 — プロフィール編集は /profile に置き、公開ページには置かない */}
           {isLoggedIn && (
             <ProfileCard showShare />
+          )}
+
+          {/* コレクション / 旅の記録（旧マイ旅）。旅の記録は /visits/trip の別ページ */}
+          {isLoggedIn && <VisitsSwitcher current="collection" />}
+
+          {/* 公開設定は旅の記録にしかないので、非公開があるときだけここで知らせる。
+              件数は取得できた範囲（limit=1000）の訪問記録の数で、重複をまとめる前のもの */}
+          {privateVisitCount > 0 && (
+            <Link
+              href="/visits/trip"
+              className="flex items-center justify-between gap-2 rounded-[12px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-2.5 font-pixelJp text-xs font-bold text-[#7B63A8]"
+            >
+              <span>非公開の記録が{privateVisitCount}件あります。公開スタンプ帳には出ません</span>
+              <span className="shrink-0">公開設定 →</span>
+            </Link>
           )}
 
           {/* PhotoDex サマリーヘッダー（v3 A案: 二極ヘッダー） SP only — PC is in rail */}

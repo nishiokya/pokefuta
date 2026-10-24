@@ -1,7 +1,7 @@
 import { photoLidZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 
 /**
- * マイ旅の「集めたスタンプ」の丸の中の写真。蓋の枠（ai_tags.lid）があれば蓋で丸をいっぱいにし、
+ * スタンプ帳の「集めたスタンプ」の丸の中の写真。蓋の枠（ai_tags.lid）があれば蓋で丸をいっぱいにし、
  * 無ければ一覧の正方形の位置（ai_tags.crop）、それも無ければ真ん中で切る。
  * 親は aspect-square・overflow-hidden・rounded-full の枠にする（この部品が relative を足す）。
  */

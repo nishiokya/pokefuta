@@ -20,10 +20,6 @@ import { ArrowLeft } from 'lucide-react';
  * （`siteNav.ts` で `bare: true` のページ（`/login`）はクロムを
  * 描画しない。ただし Breadcrumb を置くページはいずれも bare ではない。）
  *
- * `マイ旅`(/my-trip) だけは面によって違う。SP 下タブは未ログインでも
- * `AUTH_NAV_ITEMS` の3つを出す（投稿 FAB が無いぶん3タブを均等割りするため）が、
- * PC ヘッダーは未ログインだと `GUEST_NAV_ITEMS` の2つになる。
- *
  * `/manhole/[id]` は以前 `/nearby` 行きを置いていたが、下タブ「探す」と
  * 完全に同じ行き先だったので外した。
  *

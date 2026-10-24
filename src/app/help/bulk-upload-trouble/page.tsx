@@ -48,7 +48,7 @@ export default function BulkUploadTroublePage() {
         <p>
           同じ蓋・同じ日の投稿がもうあります。最初は外してあり、選ぶとその投稿に写真を足します（訪問は増えません）。
           もう投稿した写真を選ぶと同じ写真が二重になるので、足したい写真だけを選んでください。
-          その訪問が非公開のときは足せないので、<Link href="/my-trip" className="underline">マイ旅</Link>で公開にしてから、
+          その訪問が非公開のときは足せないので、<Link href="/visits/trip" className="underline">スタンプ帳の「旅の記録」</Link>で公開にしてから、
           まとめて投稿を開き直して写真を選び直してください。
         </p>
       </Qa>
@@ -77,7 +77,7 @@ export default function BulkUploadTroublePage() {
         </p>
         <p>
           ただし、通信が切れて送れたかどうか分からない写真は、再送すると二重になることがあります。
-          気になるときは、<Link href="/my-trip" className="underline">マイ旅</Link>で投稿されているかを確かめ、
+          気になるときは、<Link href="/visits/trip" className="underline">スタンプ帳の「旅の記録」</Link>で投稿されているかを確かめ、
           まとめて投稿を開き直して、まだ投稿されていない写真だけを選んでください。
         </p>
         <p>

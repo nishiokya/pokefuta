@@ -135,7 +135,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
   if (!data) notFound();
 
-  // プロフィール編集は自分のスタンプ帳(/visits)・マイ旅(/my-trip)側にあり、この公開ページは表示専用
+  // プロフィール編集は/profile にあり（自分のスタンプ帳 /visits からも行ける）、この公開ページは表示専用
   const xUrl = safeSocialUrl(data.xUrl, X_HOSTS);
   const instagramUrl = safeSocialUrl(data.instagramUrl, INSTAGRAM_HOSTS);
 

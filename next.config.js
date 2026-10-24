@@ -100,6 +100,12 @@ const nextConfig = {
       destination: '/login',
       permanent: true,
     },
+    // マイ旅はスタンプ帳の「旅の記録」（/visits/trip）にした。プロフィールと達成率がスタンプ帳と二重だった
+    {
+      source: '/my-trip',
+      destination: '/visits/trip',
+      permanent: true,
+    },
     // 写真館の全国マップ・全国一覧は閉じて図鑑へ送る。どちらも図鑑に同じ役割のページがあり、
     // 写真館側は 90 日で /map 165・/manholes 66 ビューだった。/manholes?q= の検索語は図鑑に
     // 受け口が無い。クエリは付いたまま図鑑のトップへ行くが、図鑑側は読まない

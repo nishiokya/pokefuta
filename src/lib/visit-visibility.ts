@@ -1,6 +1,6 @@
 /**
  * 訪問記録の公開/非公開切り替え。
- * マンホール詳細（ManholePage）と マイ旅（/my-trip）の両方から使う。
+ * マンホール詳細（ManholePage）と スタンプ帳の「旅の記録」（/visits/trip）の両方から使う。
  */
 
 /** PATCH /api/visits/[id] を叩く。成功したら true。 */
