@@ -100,8 +100,8 @@ export function parseRegularBadges(data: unknown): RegularBadges {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** LEGEND の人（写真館のトップの「LEGEND を目指そう」と /badges に出す）。名前順、枚数は持たない */
-export type RegularLegend = { id: string; name: string };
+/** LEGEND の人（写真館のトップの「この◯人に続け！」と /badges に出す）。名前順、枚数は持たない。写真は無いこともある */
+export type RegularLegend = { id: string; name: string; photoId?: string };
 
 export type RegularSnapshot = {
   badges: RegularBadges;
@@ -116,8 +116,9 @@ export function parseRegularLegends(data: unknown): RegularLegend[] {
   if (body.success !== true || !Array.isArray(body.legends)) return [];
   return body.legends.flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
-    const { id, name } = entry as Record<string, unknown>;
-    return typeof id === 'string' && id && typeof name === 'string' && name ? [{ id, name }] : [];
+    const { id, name, photo_id: photoId } = entry as Record<string, unknown>;
+    if (typeof id !== 'string' || !id || typeof name !== 'string' || !name) return [];
+    return [typeof photoId === 'string' && photoId ? { id, name, photoId } : { id, name }];
   });
 }
 

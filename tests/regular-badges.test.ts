@@ -97,12 +97,12 @@ test('どの段階にもアイコンと名前があり、名前に条件を入�
 test('LEGEND の公開ID と名前を読む。壊れた項目は捨て、無ければ空', async () => {
   const body = {
     ...snapshot,
-    legends: [{ id: 'pub-e', name: 'あんず' }, { id: '', name: 'x' }, { id: 'pub-x' }, 'bad'],
+    legends: [{ id: 'pub-e', name: 'あんず' }, { id: 'pub-f', name: 'いちご', photo_id: 'ph-1' }, { id: '', name: 'x' }, { id: 'pub-x' }, 'bad'],
   };
-  assert.deepEqual(parseRegularLegends(body), [{ id: 'pub-e', name: 'あんず' }]);
+  assert.deepEqual(parseRegularLegends(body), [{ id: 'pub-e', name: 'あんず' }, { id: 'pub-f', name: 'いちご', photoId: 'ph-1' }]);
   assert.deepEqual(parseRegularLegends(snapshot), []);
   const loaded = await fetchRegularSnapshot(async () => ok(body));
   assert.equal(loaded.badges.get('pub-e'), 'legend');
-  assert.deepEqual(loaded.legends, [{ id: 'pub-e', name: 'あんず' }]);
+  assert.deepEqual(loaded.legends.map((l) => l.id), ['pub-e', 'pub-f']);
   assert.deepEqual((await fetchRegularSnapshot(async () => { throw new Error('offline'); })).legends, []);
 });
