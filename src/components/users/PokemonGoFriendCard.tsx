@@ -115,7 +115,8 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
           className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-3 py-1.5 font-pixelJp text-xs font-bold text-[#bf5640] transition hover:bg-[#f8e3da] sm:px-4 sm:py-2"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? 'コピーしました' : <>コ<span className="max-sm:hidden">ードをコ</span>ピー</>}
+          {/* ボタンは flex で gap があるので、文字は1つの span にまとめる（分けると「コ ードをコ ピー」と隙間が空く） */}
+          <span>{copied ? 'コピーしました' : <>コ<span className="max-sm:hidden">ードをコ</span>ピー</>}</span>
         </button>
       </div>
       </div>
