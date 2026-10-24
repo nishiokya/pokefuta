@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Manhole } from '@/types/database';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
@@ -60,6 +60,23 @@ export default function TripDiary({ initialVisits }: { initialVisits: JourneyVis
     () => visits.filter((v) => v.is_public === false).length,
     [visits]
   );
+
+  // 月ごとの活動（TripActivity）のマスは全記録の月へリンクしている。非公開だけに絞っていて
+  // その月が一覧に無いときは、絞り込みを外してから飛ぶ（そのままだと URL の # だけ変わって何も起きない）
+  const pendingAnchorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.('a[href^="#trip-"]');
+      if (!link) return;
+      const id = link.getAttribute('href')!.slice(1);
+      if (document.getElementById(id)) return;
+      e.preventDefault();
+      pendingAnchorRef.current = id;
+      setShowPrivateOnly(false);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   // 公開/非公開の切り替え。楽観更新し、失敗したら元に戻す。
   const applyVisitVisibility = async (visitId: string, nextIsPublic: boolean) => {
@@ -133,6 +150,13 @@ export default function TripDiary({ initialVisits }: { initialVisits: JourneyVis
     }
     return Array.from(groups.values());
   }, [visits, showPrivateOnly]);
+
+  useEffect(() => {
+    const id = pendingAnchorRef.current;
+    if (!id || showPrivateOnly) return;
+    pendingAnchorRef.current = null;
+    document.getElementById(id)?.scrollIntoView();
+  }, [showPrivateOnly, visitsByMonth]);
 
   return (
     <div className="space-y-6">
