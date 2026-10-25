@@ -318,9 +318,9 @@ export default async function UserVisitsPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* バッジと訪問の一覧のあいだに、いつ回っていたか（直近12か月） */}
+        {/* バッジと訪問の一覧のあいだに、いつ回っていたか（年 × 月のマス） */}
         <MonthlyActivity
-          buckets={buildMonthlyActivity(data.visits.map((v) => v.shotAt ?? v.createdAt))}
+          years={buildMonthlyActivity(data.visits.map((v) => v.shotAt ?? v.createdAt))}
           truncated={data.isTruncated}
         />
 
