@@ -38,6 +38,8 @@ import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
 import XLogo from '@/components/XLogo';
 import UserRegularBadge from '@/components/users/UserRegularBadge';
+import HeroStat, { rankRing } from '@/components/users/HeroStat';
+import TitleProgressStat from '@/components/users/TitleProgressStat';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
   loadPublicUserPrefectureProgress,
@@ -194,10 +196,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
   const pageUrl = getPageUrl(data.userId);
   const totalPrefectures = progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
-  const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
-  const remainingCount = progress
-    ? Math.max(progress.totalManholeCount - progress.visitedManholeCount, 0)
-    : null;
   const prefectureGroups = groupVisitsByPrefecture(data.visits);
 
   const jsonLd = {
@@ -273,26 +271,34 @@ export default async function UserVisitsPage({ params }: PageProps) {
 
             {/*
               「訪問したポケふた／訪れた都道府県／出会ったポケモンたち」を、それぞれ集めた割合の輪（円グラフ）で並べる。
-              全国達成率の大きなバーは1つ目の欄と同じことを言うので置かない（割合と制覇まであと何枚は1つ目の欄に）。
-              ポケふたは別のふたの数（再訪は数えない）。progress が取れなければ訪問の件数と都道府県だけ
+              ポケふたは別のふたの数（再訪は数えない）で、輪は今の称号の色で次の称号まで（LEGEND は全国の何割か）。
+              都道府県・ポケモンは輪をバッジと同じ金・銀・銅の色にして、次の段まであと何かを下に。
+              progress が取れなければ訪問の件数と都道府県だけ
             */}
             <div className={`mt-4 grid gap-2 sm:gap-3 lg:mt-5 ${progress ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {progress ? (
-                <HeroStat
-                  label={['訪問した', 'ポケふた']}
-                  value={progress.visitedManholeCount}
-                  total={progress.totalManholeCount}
-                  note={[`${completionRate?.toFixed(1)}%`, remainingCount ? `あと${remainingCount}枚` : '制覇！']}
+                <TitleProgressStat
+                  publicUserId={data.userId}
+                  visited={progress.visitedManholeCount}
+                  totalManholes={progress.totalManholeCount}
                 />
               ) : (
-                <HeroStat label={['訪問した', 'ポケふた']} value={data.totalVisits} />
+                <HeroStat id="visits" label={['訪問した', 'ポケふた']} value={data.totalVisits} />
               )}
-              <HeroStat label={['訪れた', '都道府県']} value={data.prefectureCount} total={totalPrefectures} />
+              <HeroStat
+                id="prefectures"
+                label={['訪れた', '都道府県']}
+                value={data.prefectureCount}
+                total={totalPrefectures}
+                {...rankRing(data.prefectureCount, totalPrefectures, '県')}
+              />
               {progress && (
                 <HeroStat
+                  id="pokemon"
                   label={['出会った', 'ポケモンたち']}
                   value={progress.pokedex.collected}
                   total={progress.pokedex.total}
+                  {...rankRing(progress.pokedex.collected, progress.pokedex.total, '種')}
                 />
               )}
             </div>
@@ -436,68 +442,6 @@ function SocialLink({ href, label, icon }: { href: string; label: string; icon: 
     >
       {icon}
     </a>
-  );
-}
-
-// 集めた割合の輪（円グラフ）。中に集めた数、その下に全体の数
-const RING_R = 26;
-const RING_C = 2 * Math.PI * RING_R;
-
-// label・note は語の区切りで渡す。狭いときはその区切りでだけ折り返す（「ポケふ/た」のように切れないように）
-function HeroStat({
-  label,
-  value,
-  total,
-  note,
-}: {
-  label: readonly string[];
-  value: number;
-  total?: number;
-  note?: readonly string[];
-}) {
-  const ratio = total ? Math.min(value / total, 1) : null;
-  return (
-    <div className="flex min-w-0 flex-col items-center rounded-[7px] border border-[#8C6A4A]/15 bg-white/70 px-2 py-3 text-center sm:px-4">
-      {/* スマホは2行になる欄があるので、輪の高さがそろうよう2行ぶん取っておく */}
-      <p className="min-h-[2.5em] text-[11px] font-extrabold leading-tight text-[#6A4D36] sm:min-h-0">
-        {label.map((part) => (
-          <span key={part} className="inline-block">{part}</span>
-        ))}
-      </p>
-      {ratio === null ? (
-        <p className="my-auto whitespace-nowrap pt-2 font-pixel text-2xl leading-none text-[#B5483C]">{value}</p>
-      ) : (
-        <div className="relative mt-2 h-[68px] w-[68px] sm:h-[84px] sm:w-[84px]">
-          <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
-            <circle cx="32" cy="32" r={RING_R} fill="none" stroke="#8C6A4A" strokeOpacity="0.15" strokeWidth="7" />
-            {value > 0 && (
-              <circle
-                cx="32"
-                cy="32"
-                r={RING_R}
-                fill="none"
-                stroke="#B5483C"
-                strokeWidth="7"
-                strokeLinecap="round"
-                // 1つでもあれば点くらいは見えるように
-                strokeDasharray={`${Math.max(ratio * RING_C, 2)} ${RING_C}`}
-              />
-            )}
-          </svg>
-          <span className="absolute inset-0 flex flex-col items-center justify-center font-pixel leading-none">
-            <span className="text-base text-[#B5483C] sm:text-xl">{value}</span>
-            <span className="mt-0.5 text-[10px] text-[#8C6A4A] sm:text-xs">/{total}</span>
-          </span>
-        </div>
-      )}
-      {note && (
-        <p className="mt-1.5 flex flex-wrap justify-center gap-x-1.5 text-[10px] font-bold leading-tight text-[#6A4D36] sm:text-[11px]">
-          {note.map((part) => (
-            <span key={part}>{part}</span>
-          ))}
-        </p>
-      )}
-    </div>
   );
 }
 
