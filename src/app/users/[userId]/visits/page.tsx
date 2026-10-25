@@ -329,6 +329,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
               <Camera className="h-5 w-5 text-[#B5483C]" />
               訪問したポケふた
+              {/* 上の欄はふたの数なので、再訪も含めた訪問の件数はここに出す */}
+              <span className="text-sm font-bold text-[#8C6A4A]">{data.totalVisits}件</span>
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[#6A4D36]">
               都道府県ごとにまとめ、最近訪問した県から並べています。県の中は撮影日の新しい順です。
