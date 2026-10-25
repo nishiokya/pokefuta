@@ -12,7 +12,7 @@ import { fetchRegularBadges, type RegularBadges } from '@/lib/regular-badges';
  * 取りに行くのは1回だけにするため、読み込みはモジュールで共有する。
  */
 let shared: Promise<RegularBadges> | null = null;
-const loadShared = () => (shared ??= fetchRegularBadges());
+export const loadSharedRegularBadges = () => (shared ??= fetchRegularBadges());
 
 export default function PosterRegularBadge({
   publicUserId,
@@ -26,7 +26,7 @@ export default function PosterRegularBadge({
   useEffect(() => {
     if (!publicUserId) return;
     let cancelled = false;
-    loadShared().then((loaded) => {
+    loadSharedRegularBadges().then((loaded) => {
       if (!cancelled) setBadges(loaded);
     });
     return () => {
