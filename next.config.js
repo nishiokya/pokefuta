@@ -106,14 +106,7 @@ const nextConfig = {
       destination: '/visits/trip',
       permanent: true,
     },
-    // 写真館の全国マップ・全国一覧は閉じて図鑑へ送る。どちらも図鑑に同じ役割のページがあり、
-    // 写真館側は 90 日で /map 165・/manholes 66 ビューだった。/manholes?q= の検索語は図鑑に
-    // 受け口が無い。クエリは付いたまま図鑑のトップへ行くが、図鑑側は読まない
-    {
-      source: '/map',
-      destination: 'https://data.pokefuta.com/map',
-      permanent: true,
-    },
+    // 全国一覧は図鑑へ。/map は本人の訪問状況を表示するので写真館に残す。
     {
       source: '/manholes',
       destination: 'https://data.pokefuta.com/',
