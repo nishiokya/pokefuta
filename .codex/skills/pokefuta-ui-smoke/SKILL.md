@@ -7,7 +7,7 @@ description: Verify this pokefuta repository's core logged-out UI/business behav
 
 ## Overview
 
-Use this repository-specific skill to check the two most important public screens: the top page (`/`) and the redirects for retired pages (`/map` and friends). The nationwide map now lives on the dex site (data.pokefuta.com). Keep the scenario small, but run it carefully enough to catch obvious business logic and visual regressions without logging in.
+Use this repository-specific skill to check the top page (`/`), the visit map (`/visits/map` and `/map`), and redirects for retired pages. The photo site's visit map was restored in 2026-10 because the dex map does not replace personal visited/unvisited status.
 
 ## Test Mode
 
@@ -66,14 +66,21 @@ Visual checks:
 - The RPG window styling remains readable against the dark background.
 - Bottom navigation does not cover the main content at the end of the page.
 
-## Scenario 2: Retired Pages Redirect
+## Scenario 2: Visit Map
 
-The photo site's `/map`, `/manholes`, `/prefectures/*`, `/popular`, and `/api-docs` were retired in 2026-10.
+Open `/visits/map` and `/map` while logged out. Both must render locally without redirecting to the dex.
+Confirm a nonzero map height, visible pins, prefecture navigation, and a login link explaining personal visit status.
+Logged-out pins must not claim that every lid is unvisited. Data failures must display an error rather than a false visit status.
+The logged-in stamp book links to `/visits/map`, avoiding cached permanent redirects from the retired `/map`.
+Never log in to test personal records; report that boundary.
+
+## Scenario 3: Retired Pages Redirect
+
+The photo site's `/manholes`, `/prefectures/*`, `/popular`, and `/api-docs` were retired in 2026-10.
 Do not open them in the browser; check the redirect with `curl -s -o /dev/null -w '%{http_code} %{redirect_url}'`.
 
 Expected:
 
-- `/map` → `308 https://data.pokefuta.com/map`
 - `/manholes` → `308 https://data.pokefuta.com/`
 - `/prefectures/tokyo` and `/prefectures/東京都` (percent-encoded) → `308 https://data.pokefuta.com/prefectures/tokyo/`
 - `/prefectures/foo` → `404`
@@ -107,5 +114,6 @@ Verified logged-out smoke:
 - Commands: type-check passed, lint passed.
 - Viewports: 390x844 and 1280x800.
 - /: public feed shell and bottom nav rendered without visible layout break.
-- retired pages: `/map`, `/manholes`, `/prefectures/*`, `/popular`, `/api-docs` redirect as expected.
+- visit map: `/visits/map` and `/map` render while logged out.
+- retired pages: `/manholes`, `/prefectures/*`, `/popular`, `/api-docs` redirect as expected.
 ```
