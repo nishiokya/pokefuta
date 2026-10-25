@@ -1,88 +1,104 @@
 /**
- * 公開スタンプ帳の「月ごとの活動」。直近12か月に何枚訪問したか（撮影日、日本時間）を棒で見せる。
- * 数えるのは公開の訪問（再訪も1回ずつ）。棒に重ねると月と枚数が出る（title）。
+ * 公開スタンプ帳の「月ごとの活動」。年（行）× 月（列）のマスで、その月に何回訪問したか（撮影日、日本時間）を
+ * 紫の濃さで見せる。数えるのは公開の訪問（再訪も1回ずつ）。マスに重ねると年月と回数が出る（title）。
  */
 
-const MONTHS = 12;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const MONTH_NUMBERS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-type MonthBucket = { key: string; label: string; year: number; month: number; count: number };
+// 0回は地の色、1回以上は4段の紫（薄い→濃い）。まだ来ていない月はさらに薄く
+const EMPTY = 'bg-[#E8DFC8]';
+const FUTURE = 'bg-[#F3EEE4]';
+const LEVELS = ['bg-[#D6CCE6]', 'bg-[#C3B5DE]', 'bg-[#A493CC]', 'bg-[#7B63A8]'];
 
-const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
+export type ActivityYear = { year: number; months: number[]; total: number };
 
-/** 日時の文字列の並びから、now を含む直近12か月の訪問数を古い順に返す */
-export function buildMonthlyActivity(dates: readonly (string | null)[], now: Date = new Date()): MonthBucket[] {
-  const jstNow = new Date(now.getTime() + JST_OFFSET_MS);
-  const buckets: MonthBucket[] = [];
-  for (let i = MONTHS - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth() - i, 1));
-    const year = d.getUTCFullYear();
-    const month = d.getUTCMonth() + 1;
-    buckets.push({ key: monthKey(year, month), label: `${month}月`, year, month, count: 0 });
-  }
-  const byKey = new Map(buckets.map((b) => [b.key, b]));
+const toJst = (t: number) => new Date(t + JST_OFFSET_MS);
+
+/** 日時の文字列の並びから、最初の年〜今年の年ごと・月ごとの訪問数を新しい年から返す */
+export function buildMonthlyActivity(dates: readonly (string | null)[], now: Date = new Date()): ActivityYear[] {
+  const thisYear = toJst(now.getTime()).getUTCFullYear();
+  const counts = new Map<number, number[]>();
   for (const value of dates) {
     if (!value) continue;
     const t = Date.parse(value);
     if (Number.isNaN(t)) continue;
-    const jst = new Date(t + JST_OFFSET_MS);
-    const bucket = byKey.get(monthKey(jst.getUTCFullYear(), jst.getUTCMonth() + 1));
-    if (bucket) bucket.count += 1;
+    const jst = toJst(t);
+    const year = jst.getUTCFullYear();
+    if (year > thisYear) continue;
+    const months = counts.get(year) ?? Array(12).fill(0);
+    months[jst.getUTCMonth()] += 1;
+    counts.set(year, months);
   }
-  return buckets;
+  if (counts.size === 0) return [];
+  const firstYear = Math.min(...counts.keys());
+  const years: ActivityYear[] = [];
+  for (let year = thisYear; year >= firstYear; year--) {
+    const months = counts.get(year) ?? Array(12).fill(0);
+    years.push({ year, months, total: months.reduce((sum, n) => sum + n, 0) });
+  }
+  return years;
 }
 
-export default function MonthlyActivity({ buckets, truncated = false }: { buckets: readonly MonthBucket[]; truncated?: boolean }) {
-  const total = buckets.reduce((sum, b) => sum + b.count, 0);
-  if (total === 0) return null;
-  const max = Math.max(...buckets.map((b) => b.count));
-  const activeMonths = buckets.filter((b) => b.count > 0).length;
+const levelClass = (count: number, max: number) =>
+  count <= 0 ? EMPTY : LEVELS[Math.min(LEVELS.length - 1, Math.ceil((count / max) * LEVELS.length) - 1)];
+
+export default function MonthlyActivity({
+  years,
+  truncated = false,
+  now = new Date(),
+}: {
+  years: readonly ActivityYear[];
+  truncated?: boolean;
+  now?: Date;
+}) {
+  if (years.length === 0) return null;
+  const max = Math.max(1, ...years.flatMap((y) => y.months));
+  const jstNow = toJst(now.getTime());
+  const thisYear = jstNow.getUTCFullYear();
+  const thisMonth = jstNow.getUTCMonth() + 1;
 
   return (
     <section className="mt-8" aria-labelledby="monthly-activity">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 id="monthly-activity" className="text-lg font-extrabold text-[#4F3828]">月ごとの活動</h2>
-        <p className="text-xs font-bold text-[#6A4D36]">直近12か月で{total}回・{activeMonths}か月</p>
-      </div>
-      <div className="rounded-[10px] border border-[#8C6A4A]/20 bg-[#FFF7E5] px-3 pb-2 pt-4 shadow-sm sm:px-5">
-        <ol className="flex h-28 items-end gap-[2px] border-b border-[#8C6A4A]/25 sm:gap-1">
-          {buckets.map((b) => (
-            <li
-              key={b.key}
-              className="group relative flex h-full min-w-0 flex-1 items-end justify-center"
-              title={`${b.year}年${b.month}月: ${b.count}回`}
-            >
-              {b.count > 0 && (
-                <>
-                  {/* いちばん多い月だけ数字を出す。ほかは重ねると出る */}
+      <div className="rounded-[14px] border border-[#8C6A4A]/20 bg-[#FFFDF7] px-3 py-4 shadow-sm sm:w-fit sm:px-5">
+        <h2 id="monthly-activity" className="mb-3 font-pixelJp text-sm font-bold text-[#7B63A8]">月ごとの活動</h2>
+        <div className="grid grid-cols-[2.5rem_repeat(12,minmax(0,1fr))_2.75rem] items-center gap-[3px] sm:grid-cols-[3rem_repeat(12,minmax(0,1.5rem))_3.5rem] sm:gap-1">
+          <span aria-hidden="true" />
+          {MONTH_NUMBERS.map((m) => (
+            <span key={m} className="text-center font-pixel text-[10px] text-[#8C6A4A]" aria-hidden="true">{m}</span>
+          ))}
+          <span aria-hidden="true" />
+          {years.map(({ year, months, total }) => (
+            <div key={year} className="contents">
+              <span className="font-pixel text-sm font-bold text-[#4F3828]">{year}</span>
+              {months.map((count, i) => {
+                const future = year === thisYear && i + 1 > thisMonth;
+                return (
                   <span
-                    className={`absolute font-pixel text-[10px] font-bold text-[#4F3828] ${b.count === max ? '' : 'hidden group-hover:block'}`}
-                    style={{ bottom: `calc(${(b.count / max) * 100}% + 2px)` }}
+                    key={i}
+                    title={future ? undefined : `${year}年${i + 1}月: ${count}回`}
+                    className={`aspect-square rounded-[4px] ${future ? FUTURE : levelClass(count, max)}`}
                   >
-                    {b.count}
+                    <span className="sr-only">{future ? '' : `${year}年${i + 1}月 ${count}回`}</span>
                   </span>
-                  <span
-                    className="w-full max-w-[22px] rounded-t-[4px] bg-[#B5483C] transition group-hover:bg-[#8F3328]"
-                    style={{ height: `${Math.max((b.count / max) * 85, 3)}%` }}
-                  />
-                </>
-              )}
-              <span className="sr-only">{`${b.year}年${b.month}月 ${b.count}回`}</span>
-            </li>
+                );
+              })}
+              <span className="text-right text-xs text-[#6A4D36]">{total}件</span>
+            </div>
           ))}
-        </ol>
-        <ol className="mt-1 flex gap-[2px] sm:gap-1" aria-hidden="true">
-          {buckets.map((b, i) => (
-            <li key={b.key} className="min-w-0 flex-1 text-center font-pixel text-[9px] text-[#6A4D36] sm:text-[10px]">
-              {/* スマホは1か月おき（いちばん右の今月は必ず出す） */}
-              <span className={i % 2 === (MONTHS - 1) % 2 ? '' : 'max-sm:invisible'}>{b.label}</span>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-2 text-[11px] text-[#6A4D36]">
-          撮影日で数えた公開の訪問（同じポケふたに何度行っても1回ずつ）。
-          {truncated && '最新500件までで数えています。'}
-        </p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10px] text-[#8C6A4A]">
+            撮影日で数えた公開の訪問（同じポケふたへの再訪も1回）。{truncated && '最新500件までで数えています。'}
+          </p>
+          <span className="flex items-center gap-1 text-[10px] text-[#8C6A4A]" aria-hidden="true">
+            少
+            {[EMPTY, ...LEVELS].map((c) => (
+              <span key={c} className={`h-2.5 w-2.5 rounded-[3px] ${c}`} />
+            ))}
+            多
+          </span>
+        </div>
       </div>
     </section>
   );
