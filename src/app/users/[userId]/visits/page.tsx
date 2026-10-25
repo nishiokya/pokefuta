@@ -195,8 +195,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
   const pageUrl = getPageUrl(data.userId);
   const totalPrefectures = progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
   const completionRate = progress ? Math.min(progress.completionRate, 100) : null;
-  // 0% のときに 1.5% 埋まって見えないよう、進捗があるときだけ最小幅を適用
-  const barWidthPercent = completionRate ? Math.max(completionRate, 1.5) : 0;
   const remainingCount = progress
     ? Math.max(progress.totalManholeCount - progress.visitedManholeCount, 0)
     : null;
@@ -273,30 +271,31 @@ export default async function UserVisitsPage({ params }: PageProps) {
               )}
             </div>
 
-            {/* 全国達成率は下の進捗バーと同じことを言うので、数字の欄は置かずバーの説明に入れる */}
-            {/* ポケモンの種類数は下の図鑑パネルと同じ数え方（progress.pokedex）。取れなければ2つのまま */}
+            {/*
+              「訪問したポケふた／訪れた都道府県／出会ったポケモンたち」を、それぞれ集めた割合の輪（円グラフ）で並べる。
+              全国達成率の大きなバーは1つ目の欄と同じことを言うので置かない（割合と制覇まであと何枚は1つ目の欄に）。
+              ポケふたは別のふたの数（再訪は数えない）。progress が取れなければ訪問の件数と都道府県だけ
+            */}
             <div className={`mt-4 grid gap-2 sm:gap-3 lg:mt-5 ${progress ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              <HeroStat label="訪問スタンプ" value={`${data.totalVisits}`} />
-              <HeroStat label="都道府県" value={`${data.prefectureCount}/${totalPrefectures}`} />
+              {progress ? (
+                <HeroStat
+                  label={['訪問した', 'ポケふた']}
+                  value={progress.visitedManholeCount}
+                  total={progress.totalManholeCount}
+                  note={[`${completionRate?.toFixed(1)}%`, remainingCount ? `あと${remainingCount}枚` : '制覇！']}
+                />
+              ) : (
+                <HeroStat label={['訪問した', 'ポケふた']} value={data.totalVisits} />
+              )}
+              <HeroStat label={['訪れた', '都道府県']} value={data.prefectureCount} total={totalPrefectures} />
               {progress && (
-                <HeroStat label="ポケモン" value={`${progress.pokedex.collected}/${progress.pokedex.total}`} />
+                <HeroStat
+                  label={['出会った', 'ポケモンたち']}
+                  value={progress.pokedex.collected}
+                  total={progress.pokedex.total}
+                />
               )}
             </div>
-
-            {completionRate !== null && (
-              <div className="mt-4">
-                <div className="h-3 w-full overflow-hidden rounded-full bg-[#8C6A4A]/20">
-                  <div
-                    className="h-full rounded-full bg-[#B5483C] transition-all"
-                    style={{ width: `${barWidthPercent}%` }}
-                  />
-                </div>
-                <p className="mt-1.5 text-[11px] font-bold text-[#6A4D36]">
-                  全国達成率 <span className="text-[#B5483C]">{completionRate.toFixed(1)}%</span>・制覇まであと{remainingCount}枚
-                </p>
-              </div>
-            )}
-
           </div>
         </section>
 
@@ -330,6 +329,8 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
               <Camera className="h-5 w-5 text-[#B5483C]" />
               訪問したポケふた
+              {/* 上の欄はふたの数なので、再訪も含めた訪問の件数はここに出す */}
+              <span className="text-sm font-bold text-[#8C6A4A]">{data.totalVisits}件</span>
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[#6A4D36]">
               都道府県ごとにまとめ、最近訪問した県から並べています。県の中は撮影日の新しい順です。
@@ -438,12 +439,64 @@ function SocialLink({ href, label, icon }: { href: string; label: string; icon: 
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string }) {
+// 集めた割合の輪（円グラフ）。中に集めた数、その下に全体の数
+const RING_R = 26;
+const RING_C = 2 * Math.PI * RING_R;
+
+// label・note は語の区切りで渡す。狭いときはその区切りでだけ折り返す（「ポケふ/た」のように切れないように）
+function HeroStat({
+  label,
+  value,
+  total,
+  note,
+}: {
+  label: readonly string[];
+  value: number;
+  total?: number;
+  note?: readonly string[];
+}) {
+  const ratio = total ? Math.min(value / total, 1) : null;
   return (
-    <div className="min-w-0 rounded-[7px] border border-[#8C6A4A]/15 bg-white/70 px-3 py-3 sm:px-4">
-      <p className="text-[11px] font-extrabold text-[#6A4D36]">{label}</p>
-      {/* 3つ並ぶのでスマホでは一回り小さく（「114/549」が枠からはみ出さないように） */}
-      <p className="mt-1 whitespace-nowrap font-pixel text-lg leading-none text-[#B5483C] sm:text-2xl">{value}</p>
+    <div className="flex min-w-0 flex-col items-center rounded-[7px] border border-[#8C6A4A]/15 bg-white/70 px-2 py-3 text-center sm:px-4">
+      {/* スマホは2行になる欄があるので、輪の高さがそろうよう2行ぶん取っておく */}
+      <p className="min-h-[2.5em] text-[11px] font-extrabold leading-tight text-[#6A4D36] sm:min-h-0">
+        {label.map((part) => (
+          <span key={part} className="inline-block">{part}</span>
+        ))}
+      </p>
+      {ratio === null ? (
+        <p className="my-auto whitespace-nowrap pt-2 font-pixel text-2xl leading-none text-[#B5483C]">{value}</p>
+      ) : (
+        <div className="relative mt-2 h-[68px] w-[68px] sm:h-[84px] sm:w-[84px]">
+          <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden="true">
+            <circle cx="32" cy="32" r={RING_R} fill="none" stroke="#8C6A4A" strokeOpacity="0.15" strokeWidth="7" />
+            {value > 0 && (
+              <circle
+                cx="32"
+                cy="32"
+                r={RING_R}
+                fill="none"
+                stroke="#B5483C"
+                strokeWidth="7"
+                strokeLinecap="round"
+                // 1つでもあれば点くらいは見えるように
+                strokeDasharray={`${Math.max(ratio * RING_C, 2)} ${RING_C}`}
+              />
+            )}
+          </svg>
+          <span className="absolute inset-0 flex flex-col items-center justify-center font-pixel leading-none">
+            <span className="text-base text-[#B5483C] sm:text-xl">{value}</span>
+            <span className="mt-0.5 text-[10px] text-[#8C6A4A] sm:text-xs">/{total}</span>
+          </span>
+        </div>
+      )}
+      {note && (
+        <p className="mt-1.5 flex flex-wrap justify-center gap-x-1.5 text-[10px] font-bold leading-tight text-[#6A4D36] sm:text-[11px]">
+          {note.map((part) => (
+            <span key={part}>{part}</span>
+          ))}
+        </p>
+      )}
     </div>
   );
 }
