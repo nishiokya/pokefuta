@@ -599,13 +599,26 @@ export default function HomePage() {
                           <div className="mt-1 text-sm font-semibold text-white/90">
                             {formatDateJaJst(visit.shot_at)}撮影
                           </div>
-                          {posterLabel && (
+                          {/* 投稿者は押すとその人の公開スタンプ帳へ（蓋のページを経由しない）。
+                              カード全体のリンクより上に重ねる（z-[2]）。公開ID が無い投稿者は文字だけ */}
+                          {posterLabel && (visit.public_user_id ? (
+                            <Link
+                              href={`/users/${encodeURIComponent(visit.public_user_id)}/visits`}
+                              aria-label={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
+                              className="relative z-[2] mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
+                            >
+                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{posterLabel}</span>
+                              {regularTier && <RegularBadge tier={regularTier} />}
+                              <ChevronRight className="h-3 w-3 shrink-0 opacity-80" />
+                            </Link>
+                          ) : (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                             </div>
-                          )}
+                          ))}
                         </div>
 
                         {/*
@@ -616,7 +629,7 @@ export default function HomePage() {
                         {latestComment && (
                           <div
                             aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-[#2E2346]/90 p-4 text-white opacity-0 transition-opacity duration-200 [@media(hover:hover)]:group-hover:opacity-100 group-focus-visible:opacity-100 sm:p-5"
+                            className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-[#2E2346]/90 p-4 text-white opacity-0 transition-opacity duration-200 [@media(hover:hover)]:group-hover:opacity-100 group-[:has(a:focus-visible)]:opacity-100 sm:p-5"
                           >
                             <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#FFB347]">
                               <MessageCircle className="h-4 w-4" />
@@ -654,15 +667,20 @@ export default function HomePage() {
                       );
                     }
 
+                    // 投稿者を別のリンク（その人の公開スタンプ帳）にするため、カードはリンクを入れ子にせず、
+                    // 蓋のページへのリンクをカード全面に重ね（z-[1]）、投稿者のリンクをさらに上に置く
                     return (
-                      <Link
+                      <div
                         key={visit.id}
-                        href={to}
-                        className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
-                        aria-label={commonAriaLabel}
+                        className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-[#FFB347]"
                       >
                         {cardContent}
-                      </Link>
+                        <Link
+                          href={to}
+                          className="absolute inset-0 z-[1] focus:outline-none"
+                          aria-label={commonAriaLabel}
+                        />
+                      </div>
                     );
                   })}
                 </div>
