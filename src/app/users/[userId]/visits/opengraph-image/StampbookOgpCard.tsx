@@ -104,6 +104,24 @@ const stampbookTitle = (name: string) => {
   return `${chars.join('')}…${STAMPBOOK_SUFFIX}`;
 };
 
+// ステッカーは折り返すと下にはみ出すので、左の欄の1行に収まる分だけ並べて残りは +N（全5種だと入らない）
+const STICKER = { fontSize: 19, padX: 14, border: 4, gap: 12, icon: 22, iconGap: 6 } as const;
+const STICKER_MORE_WIDTH = 50;
+const stickerWidth = (name: string) =>
+  textWidth(name) * STICKER.fontSize + STICKER.icon + STICKER.iconGap + STICKER.padX * 2 + STICKER.border * 2;
+function fitStickers<T extends { name: string }>(stickers: readonly T[]): T[] {
+  const shown: T[] = [];
+  let used = 0;
+  for (const [i, sticker] of stickers.entries()) {
+    const next = used + (shown.length > 0 ? STICKER.gap : 0) + stickerWidth(sticker.name);
+    const reserve = i < stickers.length - 1 ? STICKER.gap + STICKER_MORE_WIDTH : 0;
+    if (next + reserve > LEFT_WIDTH) break;
+    shown.push(sticker);
+    used = next;
+  }
+  return shown;
+}
+
 export default function StampbookOgpCard({
   displayName,
   tier,
@@ -114,6 +132,8 @@ export default function StampbookOgpCard({
   photos,
 }: StampbookOgpProps) {
   const title = stampbookTitle(displayName);
+  const shownStickers = fitStickers(stickers);
+  const moreStickers = stickers.length - shownStickers.length;
   return (
     <div
       style={{
@@ -203,9 +223,9 @@ export default function StampbookOgpCard({
             </div>
           )}
 
-          {stickers.length > 0 && (
-            <div style={{ display: 'flex', gap: 14, marginTop: 16 }}>
-              {stickers.map((sticker, i) => (
+          {shownStickers.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: STICKER.gap, marginTop: 16 }}>
+              {shownStickers.map((sticker, i) => (
                 <div
                   key={sticker.key}
                   style={{
@@ -213,9 +233,9 @@ export default function StampbookOgpCard({
                     alignItems: 'center',
                     gap: 6,
                     borderRadius: 999,
-                    border: '4px solid #FFFFFF',
-                    padding: '4px 16px',
-                    fontSize: 20,
+                    border: `${STICKER.border}px solid #FFFFFF`,
+                    padding: `4px ${STICKER.padX}px`,
+                    fontSize: STICKER.fontSize,
                     fontWeight: 800,
                     boxShadow: '0 3px 6px rgba(79,56,40,0.25)',
                     transform: `rotate(${STICKER_TILTS[i % STICKER_TILTS.length]})`,
@@ -226,6 +246,9 @@ export default function StampbookOgpCard({
                   <span>{sticker.name}</span>
                 </div>
               ))}
+              {moreStickers > 0 && (
+                <div style={{ display: 'flex', fontSize: 22, fontWeight: 900, color: '#8C6A4A' }}>{`+${moreStickers}`}</div>
+              )}
             </div>
           )}
         </div>
