@@ -211,8 +211,16 @@ export default function MapPage() {
 
       <PCShell className="pb-32 pt-4 lg:pt-6">
         <div className="space-y-4">
-        {/* ログイン中は スタンプ帳のタブ（/visits/map はその一つ）。未ログインの公開マップには出さない */}
-        {isLoggedIn && <VisitsSwitcher current="map" />}
+        {/* ログイン中は スタンプ帳のタブ（/visits/map はその一つ）。未ログインの公開マップには出さない。
+            PC はスタンプ・旅の記録と同じ「本文1fr＋レール360」の左カラム幅に置き、切り替えでタブの幅と位置が跳ばないようにする。
+            地図は幅が要るので、その下で全幅に広げる */}
+        {isLoggedIn && (
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
+            <div className="min-w-0 max-w-2xl lg:max-w-none">
+              <VisitsSwitcher current="map" />
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
