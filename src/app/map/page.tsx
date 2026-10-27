@@ -9,6 +9,8 @@ import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { pageTitle } from '@/lib/constants';
+import PCShell from '@/components/PCShell';
+import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -205,9 +207,12 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-content safe-area-body pb-nav-safe bg-[#F6EEDC]">
+    <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
-      <div className="mx-auto max-w-page p-4 lg:px-8 space-y-4">
+      <PCShell className="pb-32 pt-4 lg:pt-6">
+        <div className="space-y-4">
+        {/* ログイン中は スタンプ帳のタブ（/visits/map はその一つ）。未ログインの公開マップには出さない */}
+        {isLoggedIn && <VisitsSwitcher current="map" />}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -222,8 +227,8 @@ export default function MapPage() {
             <button onClick={() => window.location.reload()} className="rounded border px-4 py-2">再読み込み</button>
           </div>
         ) : (
-          <div className="rpg-window">
-            <h2 className="text-sm font-bold font-pixelJp text-rpg-textDark mb-4">
+          <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
+            <h2 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">
               {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
             </h2>
 
@@ -232,7 +237,7 @@ export default function MapPage() {
               スマホ幅(390px)では2行が3行に増える。地図が本体の画面で説明文が
               1行伸びるほうが、PCで「ます。」が孤立するより損。
             */}
-            <p className="font-pixelJp text-xs text-rpg-textDark opacity-70 mb-4">
+            <p className="font-pixelJp text-xs text-[#6A4D36] mb-4">
               {isLoggedIn
                 ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
                 : '全国のポケふたを表示します。ログインすると自分の訪問済み・未訪問を確認できます。'
@@ -366,8 +371,8 @@ export default function MapPage() {
             </div>
           </div>
         )}
-      </div>
-
+        </div>
+      </PCShell>
     </div>
   );
 }
