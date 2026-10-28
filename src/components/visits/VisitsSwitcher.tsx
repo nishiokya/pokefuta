@@ -1,21 +1,23 @@
 import Link from 'next/link';
 
 /**
- * 自分のスタンプ帳の「スタンプ（/visits）/ 旅の記録（/visits/trip）/ カード（/visits/badges、トレーナーカード）」の切り替え。
+ * 自分のスタンプ帳の「スタンプ（/visits）/ 旅の記録（/visits/trip）/ マップ（/visits/map）/ カード（/visits/badges、トレーナーカード）」の切り替え。
  *
  * 旅の記録は以前の マイ旅（/my-trip）。同じページ内のタブにせずルートを分けているのは、
  * URL・戻る/進む・GA4 の page_view をルーターに任せるため（タブにすると ?tab と表示の
  * 同期を自前で持つことになり、PR #356 の途中で実際にずれた）。
  *
  * カードはスマホだけのタブ。PC はスタンプの右レールにトレーナーカード（称号・バッジ・ステッカー）が出ているので、タブは出さない。
+ * マップは訪問済み・未訪問のピン地図。スタンプの上に地図は置かず（置くと崩れるため）、タブで別ルートにした。
  * 「コレクション」は 2026-10-24 に「スタンプ」へ改名した（都道府県・ポケモンのコレクション一覧を外したため）。
  *
  * 表示だけの部品。データは各ページが自分で取る。
  */
-export default function VisitsSwitcher({ current }: { current: 'collection' | 'trip' | 'badges' }) {
+export default function VisitsSwitcher({ current }: { current: 'collection' | 'trip' | 'map' | 'badges' }) {
   const items = [
     { key: 'collection', label: 'スタンプ', href: '/visits', className: '' },
     { key: 'trip', label: '旅の記録', href: '/visits/trip', className: '' },
+    { key: 'map', label: 'マップ', href: '/visits/map', className: '' },
     { key: 'badges', label: 'カード', href: '/visits/badges', className: 'lg:hidden' },
   ] as const;
 

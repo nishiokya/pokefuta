@@ -818,11 +818,6 @@ export default function VisitsPage() {
 
           {/* スタンプ / 旅の記録 / バッジ。スマホは一番上に置く（旅の記録は /visits/trip、バッジは /visits/badges） */}
           {isLoggedIn && <VisitsSwitcher current="collection" />}
-          {isLoggedIn && (
-            <Link href="/visits/map" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-[#e9dfc7] bg-[#fffdf7] px-4 py-2 font-pixelJp text-xs font-bold text-[#7B63A8]">
-              <MapPin className="h-4 w-4" /> 訪問マップ（訪問済み・未訪問）
-            </Link>
-          )}
 
           {/* トレーナー情報 — プロフィール編集は /profile に置き、公開ページには置かない */}
           {isLoggedIn && (
