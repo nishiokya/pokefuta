@@ -18,6 +18,7 @@ import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
+import PosterLink from '@/components/PosterLink';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
@@ -1104,12 +1105,14 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 <AiPhotoTags photo={photo} linkFeatures />
                 <div className="flex min-w-0 items-center gap-1">
                   {profileHref ? (
-                    <Link
+                    // 帯は狭く、上にタグのリンクが並ぶので、当たり判定は余白（py-1.5）で広げる
+                    <PosterLink
                       href={profileHref}
-                      className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
+                      extendHit={false}
+                      className="flex min-w-0 py-1.5 font-pixelJp text-[10.5px] font-bold text-[#6f6657] hover:text-[#bf5640]"
                     >
-                      @{userLabel}
-                    </Link>
+                      <span className="truncate underline decoration-[#c9bfa8] underline-offset-2">@{userLabel}</span>
+                    </PosterLink>
                   ) : (
                     <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
                       @{userLabel}
