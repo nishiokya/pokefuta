@@ -24,14 +24,23 @@ const RANK_RING: Record<BadgeRank, RingColors> = {
 const NO_RANK_RING: RingColors = ['#7B63A8'];
 const NEXT_RANK: Record<BadgeRank, BadgeRank | null> = { bronze: 'silver', silver: 'gold', gold: null };
 
-/** 都道府県・ポケモンの欄: 金・銀・銅（バッジと同じ 1/3・2/3・全部）の色と、次の段まであと何か */
-export function rankRing(value: number, total: number, unit: string): { colors: RingColors; note: NotePart[] } {
+/**
+ * 都道府県・ポケモンの欄: 金・銀・銅（バッジと同じ 1/3・2/3・全部）の色と、次の段まであと何か。
+ * 輪は「次の段の件数」に対する進み具合（訪問したポケふたと同じ）。全体の数は下の一言に添える。
+ * 金に届いたら次が無いので、輪は全体に対して満タンのまま。
+ */
+export function rankRing(value: number, total: number, unit: string): { total: number; colors: RingColors; note: NotePart[] } {
   const rank = badgeRank(value, total);
   const t = badgeRankThresholds(total);
   const next = rank ? NEXT_RANK[rank] : 'bronze';
   const now = rank ? `${RANK_ICON[rank]}${RANK_LABEL[rank]}` : null;
   const toNext: NotePart = next ? [`${RANK_LABEL[next]}まで`, `あと${Math.max(t[next] - value, 0)}${unit}`] : '制覇！';
-  return { colors: rank ? RANK_RING[rank] : NO_RANK_RING, note: now ? [now, toNext] : [toNext] };
+  const ofAll: NotePart = `全${total}${unit}中`;
+  return {
+    total: next ? t[next] : total,
+    colors: rank ? RANK_RING[rank] : NO_RANK_RING,
+    note: [ofAll, ...(now ? [now] : []), toNext],
+  };
 }
 
 // label・note は語の区切りで渡す。狭いときはその区切りでだけ折り返す（「ポケふ/た」のように切れないように）

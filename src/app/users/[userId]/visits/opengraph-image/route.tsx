@@ -229,14 +229,12 @@ export async function GET(_request: Request, { params }: RouteContext) {
       {
         label: '訪れた都道府県',
         value: visitsData.prefectureCount,
-        total: totalPrefectures,
         ...rankRing(visitsData.prefectureCount, totalPrefectures, '県'),
       },
       ...(progress
         ? [{
             label: '出会ったポケモン',
             value: progress.pokedex.collected,
-            total: progress.pokedex.total,
             ...rankRing(progress.pokedex.collected, progress.pokedex.total, '種'),
           }]
         : []),
