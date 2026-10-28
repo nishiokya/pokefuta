@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { Camera, LocateFixed, MapPin, X } from 'lucide-react';
+import { LocateFixed, MapPin, X } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -431,6 +431,8 @@ export default function MapPage() {
                         onClick={() => {
                           const m = nearestUnvisited.manhole;
                           if (m.latitude == null || m.longitude == null) return;
+                          // 「訪問済み」で絞っていると、行き先のピンが地図に無い
+                          if (visitFilter === 'visited') setVisitFilter('all');
                           setSelectedId(m.id);
                           setMapCenter({ lat: m.latitude, lng: m.longitude });
                           setMapZoom(15);
@@ -440,8 +442,9 @@ export default function MapPage() {
                       >
                         <MapPin className="h-4 w-4" /> 地図で見る
                       </button>
-                      <Link href="/nearby" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-[#bf5640] px-3 font-pixelJp text-xs font-bold text-white">
-                        <Camera className="h-4 w-4" /> 撮りに行く
+                      {/* /nearby は30km圏の検索で、この蓋が圏外だと出ない。行き先を確実に開けるよう詳細へ */}
+                      <Link href={`/manhole/${nearestUnvisited.manhole.id}`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#bf5640] px-3 font-pixelJp text-xs font-bold text-white">
+                        詳細を見る
                       </Link>
                     </div>
                   </div>
