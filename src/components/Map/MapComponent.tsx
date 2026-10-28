@@ -63,6 +63,11 @@ interface MapComponentProps {
    * どの蓋も「?（未訪問）」で描かれ、意味のない疑問符が出る。
    */
   plainMarker?: boolean;
+  /**
+   * Leaflet の吹き出しを使うか。既定は使う。押したときの見せ方を呼び出し側が持つ地図
+   * （訪問マップは地図の下にカードを出す）では false にして、吹き出しと二重にしない。
+   */
+  popup?: boolean;
 }
 
 export default function MapComponent({
@@ -74,6 +79,7 @@ export default function MapComponent({
   minHeight = 400,
   markerStatus = DEFAULT_MARKER_STATUS,
   plainMarker = false,
+  popup = true,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -265,7 +271,7 @@ export default function MapComponent({
         `;
 
         // ポップアップ（タップ/クリック時）
-        marker.bindPopup(popupContent, {
+        if (popup) marker.bindPopup(popupContent, {
           maxWidth: 300,
           className: 'pokemon-popup',
           closeButton: true,
@@ -282,7 +288,7 @@ export default function MapComponent({
               ? `<div class="mt-1 text-blue-600">${manhole.pokemons.slice(0, 2).join(', ')}${manhole.pokemons.length > 2 ? '...' : ''}</div>`
               : ''}
             ${plainMarker ? '' : `<div class="mt-1 ${isVisited ? 'text-green-600' : 'text-gray-500'}">${isVisited ? '✓ 訪問済み' : '未訪問'}</div>`}
-            <div class="text-gray-400 mt-1 text-[10px]">クリックで詳細表示</div>
+            ${popup ? '<div class="text-gray-400 mt-1 text-[10px]">クリックで詳細表示</div>' : ''}
           </div>
         `;
 
@@ -304,7 +310,7 @@ export default function MapComponent({
         }
       }
     });
-  }, [manholes, plainMarker]);
+  }, [manholes, plainMarker, popup]);
 
   return (
     <div
