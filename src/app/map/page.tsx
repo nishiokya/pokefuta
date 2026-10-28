@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { LocateFixed, MapPin, X } from 'lucide-react';
@@ -116,9 +116,42 @@ export default function MapPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [prefSheetOpen, setPrefSheetOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
   const { trackFilterApply } = useAnalytics();
+
+  // シートを開いたら中へフォーカスを移し、Tab はシート内で回し、Escape で閉じ、閉じたらボタンへ戻す
+  useEffect(() => {
+    if (!prefSheetOpen) return;
+    const trigger = sheetTriggerRef.current;
+    const focusables = () =>
+      Array.from(sheetRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])') ?? []);
+    focusables()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPrefSheetOpen(false);
+      } else if (e.key === 'Tab') {
+        const items = focusables();
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      trigger?.focus();
+    };
+  }, [prefSheetOpen]);
 
   useEffect(() => {
     // ページタイトル設定
@@ -319,8 +352,8 @@ export default function MapPage() {
                     )}
                   </div>
 
-                  {/* 地図の上は最小限（現在地と、スマホの県ボタン）。z は Leaflet のペイン(〜1000)より上 */}
-                  <div className="absolute left-2 top-2 z-[1000] flex flex-col gap-2">
+                  {/* 地図の上は最小限（現在地と、スマホの県ボタン）。左上は Leaflet のズームなので右上に置く。z は Leaflet のペイン(〜1000)より上 */}
+                  <div className="absolute right-2 top-2 z-[1000] flex flex-col items-end gap-2">
                     <button
                       onClick={handleLocate}
                       disabled={locating}
@@ -329,6 +362,7 @@ export default function MapPage() {
                       <LocateFixed className="h-4 w-4" /> {locating ? '取得中…' : '現在地'}
                     </button>
                     <button
+                      ref={sheetTriggerRef}
                       onClick={() => setPrefSheetOpen(true)}
                       className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#7B63A8]/20 bg-white/95 px-3 font-pixelJp text-xs font-bold text-[#7B63A8] shadow lg:hidden"
                     >
@@ -389,8 +423,8 @@ export default function MapPage() {
       {/* スマホ: 県で絞るシート */}
       {prefSheetOpen && (
         <div className="fixed inset-0 z-[2000] lg:hidden" role="dialog" aria-modal="true" aria-label="都道府県で絞る">
-          <button aria-label="閉じる" className="absolute inset-0 bg-black/40" onClick={() => setPrefSheetOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-[18px] bg-[#fffdf7] p-4 pb-8">
+          <button aria-label="閉じる" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={() => setPrefSheetOpen(false)} />
+          <div ref={sheetRef} className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-[18px] bg-[#fffdf7] p-4 pb-8">
             <div className="mb-2 flex justify-end">
               <button onClick={() => setPrefSheetOpen(false)} aria-label="閉じる" className="inline-flex h-10 w-10 items-center justify-center text-[#6A4D36]">
                 <X className="h-4 w-4" />
