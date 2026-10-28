@@ -244,7 +244,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
             <div className={`mt-4 grid gap-2 sm:gap-3 lg:mt-5 ${progress ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {progress ? (
                 <TitleProgressStat
-                  publicUserId={data.userId}
                   visited={progress.visitedManholeCount}
                   totalManholes={progress.totalManholeCount}
                 />

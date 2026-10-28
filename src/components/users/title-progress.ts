@@ -19,11 +19,10 @@ export const TIER_RING: Record<RegularTier, RingColors> = {
 /**
  * 「訪問したポケふた」の欄の中身。輪は今の称号の色で、次の称号までどこまで来たか（中は 枚数/次の線）。
  * LEGEND は上が無いので、全国のポケふたのうち何割かを LEGEND の色で。
- * awarded は regulars.json の段（線を上げる前に届いた段は据え置くので、枚数より高いことがある）。
  * 画面（TitleProgressStat）と OGP 画像で共用する。
  */
-export function titleProgress(visited: number, totalManholes: number, awarded: RegularTier | null) {
-  const { current, next } = regularTierForCount(visited, awarded);
+export function titleProgress(visited: number, totalManholes: number) {
+  const { current, next } = regularTierForCount(visited);
   const colors = current ? TIER_RING[current] : undefined;
   const nowLabel = current ? `${REGULAR_BADGE_ICON[current]}${REGULAR_BADGE_NAME[current]}` : null;
 
