@@ -68,6 +68,11 @@ interface MapComponentProps {
    * （訪問マップは地図の下にカードを出す）では false にして、吹き出しと二重にしない。
    */
   popup?: boolean;
+  /**
+   * 値が変わるたびに center / zoom へ戻す。位置とズームが同じ値のままでも、手で動かした地図を
+   * 呼び出し側の「現在地」ボタンなどで戻せるようにする（既定は変えない）。
+   */
+  recenterKey?: number;
 }
 
 export default function MapComponent({
@@ -80,6 +85,7 @@ export default function MapComponent({
   markerStatus = DEFAULT_MARKER_STATUS,
   plainMarker = false,
   popup = true,
+  recenterKey = 0,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -134,7 +140,7 @@ export default function MapComponent({
         duration: 0.5
       });
     }
-  }, [center.lat, center.lng, zoom]);
+  }, [center.lat, center.lng, zoom, recenterKey]);
 
   // Update user location marker
   useEffect(() => {

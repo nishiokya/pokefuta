@@ -116,6 +116,7 @@ export default function MapPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [prefSheetOpen, setPrefSheetOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [recenterKey, setRecenterKey] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -242,6 +243,7 @@ export default function MapPage() {
         setUserLocation(location);
         setMapCenter(location);
         setMapZoom(12);
+        setRecenterKey((k) => k + 1);
         setLocating(false);
       },
       () => {
@@ -348,6 +350,8 @@ export default function MapPage() {
                         zoom={mapZoom}
                         plainMarker={!isLoggedIn}
                         popup={false}
+                        recenterKey={recenterKey}
+                        minHeight={0}
                       />
                     )}
                   </div>
