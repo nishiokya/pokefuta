@@ -254,7 +254,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 id="prefectures"
                 label={['訪れた', '都道府県']}
                 value={data.prefectureCount}
-                total={totalPrefectures}
                 {...rankRing(data.prefectureCount, totalPrefectures, '県')}
               />
               {progress && (
@@ -262,7 +261,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
                   id="pokemon"
                   label={['出会った', 'ポケモンたち']}
                   value={progress.pokedex.collected}
-                  total={progress.pokedex.total}
                   {...rankRing(progress.pokedex.collected, progress.pokedex.total, '種')}
                 />
               )}
