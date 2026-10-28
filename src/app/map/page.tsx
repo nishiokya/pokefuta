@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { LocateFixed, MapPin, X } from 'lucide-react';
+import { Camera, LocateFixed, MapPin, X } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -117,6 +117,7 @@ export default function MapPage() {
   const [prefSheetOpen, setPrefSheetOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [recenterKey, setRecenterKey] = useState(0);
+  const [visitFilter, setVisitFilter] = useState<'all' | 'unvisited' | 'visited'>('all');
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -209,6 +210,28 @@ export default function MapPage() {
       is_visited: visitedIds.has(manhole.id),
     }));
   }, [allManholes, visits]);
+
+  // 絞り込みはログイン中だけ（未ログインは訪問状況が無い）
+  const shownManholes = useMemo(() => {
+    if (!isLoggedIn || visitFilter === 'all') return visitedManholes;
+    return visitedManholes.filter((m) => (visitFilter === 'visited' ? m.is_visited : !m.is_visited));
+  }, [isLoggedIn, visitFilter, visitedManholes]);
+
+  // 現在地が分かったら、いちばん近い未訪問（絞り込みに関係なく）
+  const nearestUnvisited = useMemo(() => {
+    if (!isLoggedIn || !userLocation) return null;
+    const rad = Math.PI / 180;
+    let best: { manhole: (typeof visitedManholes)[number]; km: number } | null = null;
+    for (const m of visitedManholes) {
+      if (m.is_visited || m.latitude == null || m.longitude == null) continue;
+      const dLat = (m.latitude - userLocation.lat) * rad;
+      const dLng = (m.longitude - userLocation.lng) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(userLocation.lat * rad) * Math.cos(m.latitude * rad) * Math.sin(dLng / 2) ** 2;
+      const km = 12742 * Math.asin(Math.sqrt(h));
+      if (!best || km < best.km) best = { manhole: m, km };
+    }
+    return best;
+  }, [isLoggedIn, userLocation, visitedManholes]);
 
   const selected = useMemo(
     () => (selectedId == null ? null : visitedManholes.find((m) => m.id === selectedId) ?? null),
@@ -339,12 +362,29 @@ export default function MapPage() {
 
                 {!isLoggedIn && <Link href="/login?redirect=/visits/map" className="mb-3 inline-block underline">ログインして訪問状況を見る</Link>}
 
+                {isLoggedIn && (
+                  <div role="group" aria-label="表示する蓋" className="mb-3 flex gap-1 rounded-[10px] bg-[#efe6cf] p-1">
+                    {([['all', 'すべて'], ['unvisited', '未訪問'], ['visited', '訪問済み']] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setVisitFilter(key)}
+                        aria-pressed={visitFilter === key}
+                        className={`min-h-[36px] flex-1 rounded-[8px] font-pixelJp text-xs font-bold ${
+                          visitFilter === key ? 'bg-[#7B63A8] text-white' : 'text-[#6A4D36]'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="relative">
                   <div className="h-[60vh] overflow-hidden rounded-lg border border-[#7B63A8]/15 lg:h-[70vh]">
                     {mapCenter && (
                       <MapComponent
                         center={mapCenter}
-                        manholes={visitedManholes}
+                        manholes={shownManholes}
                         onManholeClick={handleManholeClick}
                         userLocation={userLocation}
                         zoom={mapZoom}
@@ -377,6 +417,36 @@ export default function MapPage() {
 
                 {locationNote && <p role="status" className="mt-2 font-pixelJp text-xs text-[#bf5640]">{locationNote}</p>}
 
+                {nearestUnvisited && (
+                  <div className="mt-3 rounded-[12px] border border-[#bf5640]/30 bg-[#bf5640]/5 p-3">
+                    <p className="font-pixelJp text-[11px] font-bold text-[#bf5640]">いちばん近い未訪問</p>
+                    <p className="mt-0.5 truncate font-pixelJp text-sm font-bold text-[#4F3828]">
+                      {nearestUnvisited.manhole.name || nearestUnvisited.manhole.title || 'ポケふた'}
+                      <span className="ml-2 text-xs font-normal text-[#6A4D36]">
+                        {nearestUnvisited.km < 1 ? `${Math.round(nearestUnvisited.km * 1000)}m` : `${nearestUnvisited.km.toFixed(1)}km`}
+                      </span>
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => {
+                          const m = nearestUnvisited.manhole;
+                          if (m.latitude == null || m.longitude == null) return;
+                          setSelectedId(m.id);
+                          setMapCenter({ lat: m.latitude, lng: m.longitude });
+                          setMapZoom(15);
+                          setRecenterKey((k) => k + 1);
+                        }}
+                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#7B63A8]/30 bg-white px-3 font-pixelJp text-xs font-bold text-[#7B63A8]"
+                      >
+                        <MapPin className="h-4 w-4" /> 地図で見る
+                      </button>
+                      <Link href="/nearby" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-[#bf5640] px-3 font-pixelJp text-xs font-bold text-white">
+                        <Camera className="h-4 w-4" /> 撮りに行く
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
                 {/* 押したピンのカード。地図の位置は動かさない。詳細へは「詳細を見る」から */}
                 {selected && (
                   <div className="mt-3 flex items-start justify-between gap-3 rounded-[12px] border border-[#e9dfc7] bg-white p-3">
@@ -407,7 +477,7 @@ export default function MapPage() {
                 <div className="mt-3 text-center">
                   <p className="font-pixelJp text-xs text-[#6A4D36]">
                     {isLoggedIn
-                      ? `全${visitedManholes.length}件（訪問済み: ${visitedManholes.filter((m) => m.is_visited).length}件）`
+                      ? `全${visitedManholes.length}件（訪問済み: ${visitedManholes.filter((m) => m.is_visited).length}件）${visitFilter === 'all' ? '' : ` ／ 地図に${shownManholes.length}件`}`
                       : `全${visitedManholes.length}件のポケふたを表示中`}
                   </p>
                 </div>
