@@ -220,7 +220,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       progress?.totalPrefectureCount || FALLBACK_INSTALLED_PREFECTURE_COUNT;
     const awarded = regularBadges.get(visitsData.userId) ?? null;
     const title = progress
-      ? titleProgress(progress.visitedManholeCount, progress.totalManholeCount, awarded)
+      ? titleProgress(progress.visitedManholeCount, progress.totalManholeCount)
       : null;
     const stats: OgpStat[] = [
       title && progress

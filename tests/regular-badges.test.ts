@@ -86,14 +86,6 @@ test('枚数から今の段階と次の段階を出す', () => {
   assert.deepEqual(regularTierForCount(150), { current: 'legend', next: null });
 });
 
-test('線を上げる前に届いた段（regulars.json）が高ければそちらを今の段にする', () => {
-  assert.deepEqual(regularTierForCount(146, 'legend'), { current: 'legend', next: null });
-  assert.deepEqual(regularTierForCount(60, 'crown'), { current: 'crown', next: 'legend' });
-  // 枚数のほうが高ければ枚数どおり
-  assert.deepEqual(regularTierForCount(160, 'ranger'), { current: 'legend', next: null });
-  assert.deepEqual(regularTierForCount(5, null), { current: 'rookie', next: 'regular' });
-});
-
 test('どの段階にもアイコンと名前があり、名前に条件を入れない', () => {
   for (const tier of Object.keys(REGULAR_BADGE_LABEL) as Array<keyof typeof REGULAR_BADGE_LABEL>) {
     assert.ok(REGULAR_BADGE_ICON[tier]);

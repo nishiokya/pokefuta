@@ -78,18 +78,11 @@ export const LEGEND_DESCRIPTION = regularTierDescription('legend');
 
 /**
  * 公開で訪問した枚数から、今の段階（無ければ null）と次の段階を返す。
- * awarded は regulars.json に付いている段（線を上げる前に届いた人は枚数より高い）。高いほうを今の段にする
  */
-export function regularTierForCount(
-  count: number,
-  awarded?: RegularTier | null,
-): { current: RegularTier | null; next: RegularTier | null } {
+export function regularTierForCount(count: number): { current: RegularTier | null; next: RegularTier | null } {
   let current: RegularTier | null = null;
   for (const tier of REGULAR_TIERS_ASCENDING) {
     if (count >= REGULAR_TIER_MIN_MANHOLES[tier]) current = tier;
-  }
-  if (awarded && (!current || REGULAR_TIERS_ASCENDING.indexOf(awarded) > REGULAR_TIERS_ASCENDING.indexOf(current))) {
-    current = awarded;
   }
   const next = REGULAR_TIERS_ASCENDING[current ? REGULAR_TIERS_ASCENDING.indexOf(current) + 1 : 0] ?? null;
   return { current, next };
