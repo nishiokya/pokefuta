@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { LocateFixed, MapPin, X } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -112,35 +112,51 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState<number>(6);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showPrefectureList, setShowPrefectureList] = useState(true);
+  // 押したピン（地図の下にカードで出す）と、県で絞るシート（スマホ）
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [prefSheetOpen, setPrefSheetOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [recenterKey, setRecenterKey] = useState(0);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetTriggerRef = useRef<HTMLButtonElement>(null);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
   const { trackFilterApply } = useAnalytics();
+
+  // シートを開いたら中へフォーカスを移し、Tab はシート内で回し、Escape で閉じ、閉じたらボタンへ戻す
+  useEffect(() => {
+    if (!prefSheetOpen) return;
+    const trigger = sheetTriggerRef.current;
+    const focusables = () =>
+      Array.from(sheetRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])') ?? []);
+    focusables()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPrefSheetOpen(false);
+      } else if (e.key === 'Tab') {
+        const items = focusables();
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      trigger?.focus();
+    };
+  }, [prefSheetOpen]);
 
   useEffect(() => {
     // ページタイトル設定
     document.title = pageTitle('ポケふたマップ');
-
-    // Get user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(location);
-          setMapCenter(location);
-        },
-        (error) => {
-          console.warn('Location access denied:', error);
-          const defaultLocation = {
-            lat: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LAT || '36.0'),
-            lng: parseFloat(process.env.NEXT_PUBLIC_MAP_DEFAULT_CENTER_LNG || '138.0')
-          };
-          setMapCenter(defaultLocation);
-        }
-      );
-    }
 
     loadVisits();
   }, []);
@@ -194,193 +210,234 @@ export default function MapPage() {
     }));
   }, [allManholes, visits]);
 
+  const selected = useMemo(
+    () => (selectedId == null ? null : visitedManholes.find((m) => m.id === selectedId) ?? null),
+    [selectedId, visitedManholes],
+  );
+
   const handlePrefectureClick = (prefecture: PrefectureCount) => {
     setMapCenter({ lat: prefecture.lat, lng: prefecture.lng });
     setMapZoom(prefecture.zoom);
+    setPrefSheetOpen(false);
 
     // ✅ GA: 都道府県フィルタリングイベント追跡
     trackFilterApply('prefecture', prefecture.name, prefecture.count);
   };
 
+  // ピンは押しても移動しない。地図の位置とズームを残したまま、下のカードで見せる
   const handleManholeClick = (manhole: { id: number }) => {
-    window.location.href = `/manhole/${manhole.id}`;
+    setSelectedId(manhole.id);
   };
+
+  // 許可の確認はこのボタンを押したときだけ出す（開いた瞬間には出さない）
+  const handleLocate = () => {
+    if (!navigator.geolocation) {
+      setLocationNote('この端末では現在地を取得できません');
+      return;
+    }
+    setLocating(true);
+    setLocationNote(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setUserLocation(location);
+        setMapCenter(location);
+        setMapZoom(12);
+        setRecenterKey((k) => k + 1);
+        setLocating(false);
+      },
+      () => {
+        setLocationNote('現在地を取得できませんでした。ブラウザの位置情報の許可を確認してください');
+        setLocating(false);
+      },
+    );
+  };
+
+  const prefectureList = (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-pixelJp text-xs font-bold text-[#4F3828]">
+          都道府県（{prefectureCounts.filter((p) => p.count > 0).length}/47）
+        </h3>
+        <div className="flex gap-1">
+          {([['code', 'コード順'], ['count', '数順']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setPrefectureSortOrder(key)}
+              aria-pressed={prefectureSortOrder === key}
+              className={`min-h-[32px] rounded-md px-2.5 font-pixelJp text-[11px] font-bold ${
+                prefectureSortOrder === key ? 'bg-[#7B63A8] text-white' : 'bg-[#efe6cf] text-[#6A4D36]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {[...prefectureCounts]
+          .sort((a, b) => (prefectureSortOrder === 'code' ? parseInt(a.code) - parseInt(b.code) : b.count - a.count))
+          .map((pref) => {
+            const hasManhole = pref.count > 0;
+            return (
+              <button
+                key={pref.code}
+                onClick={() => hasManhole && handlePrefectureClick(pref)}
+                disabled={!hasManhole}
+                className={`flex min-h-[40px] items-center justify-between gap-1 rounded-lg border px-2 font-pixelJp text-xs ${
+                  hasManhole ? 'border-[#e9dfc7] bg-white text-[#4F3828] active:bg-[#efe6cf]' : 'border-transparent bg-[#efe6cf]/50 text-[#6A4D36]/40'
+                }`}
+              >
+                <span className="truncate font-bold">{pref.name.replace(/[県府都]$/, '')}</span>
+                <span className="shrink-0 text-[#7B63A8]">{hasManhole ? pref.count : '-'}</span>
+              </button>
+            );
+          })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-content safe-area-body bg-[#efe6cf]">
 
       <PCShell className="pb-32 pt-4 lg:pt-6">
-        <div className="space-y-4">
-        {/* ログイン中は スタンプ帳のタブ（/visits/map はその一つ）。未ログインの公開マップには出さない。
-            PC はスタンプ・旅の記録と同じ「本文1fr＋レール360」の左カラム幅に置き、切り替えでタブの幅と位置が跳ばないようにする。
-            地図は幅が要るので、その下で全幅に広げる */}
-        {isLoggedIn && (
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
-            <div className="min-w-0 max-w-2xl lg:max-w-none">
-              <VisitsSwitcher current="map" />
-            </div>
-          </div>
-        )}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="font-pixelJp text-[#7B63A8]">
+        {/* PC は スタンプ・旅の記録と同じ「本文1fr＋右レール360」。県のリストは地図に重ねず右レールへ。
+            スマホは地図が主役なので、県のリストはボタンで開くシートにする */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
+          <div className="min-w-0 space-y-4">
+            {/* ログイン中は スタンプ帳のタブ（/visits/map はその一つ）。未ログインの公開マップには出さない */}
+            {isLoggedIn && (
+              <div className="max-w-2xl lg:max-w-none">
+                <VisitsSwitcher current="map" />
+              </div>
+            )}
+
+            {loading ? (
+              <div className="py-12 text-center font-pixelJp text-[#7B63A8]">
                 読み込み中<span className="rpg-loading"></span>
               </div>
-            </div>
-          </div>
-        ) : error ? (
-          <div role="alert" className="rpg-window space-y-3">
-            <p>{error}</p>
-            <button onClick={() => window.location.reload()} className="rounded border px-4 py-2">再読み込み</button>
-          </div>
-        ) : (
-          <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
-            <h2 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">
-              {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
-            </h2>
-
-            {/*
-              ここだけ PhraseText を使わない。3文とも長く、句を割らない代わりに
-              スマホ幅(390px)では2行が3行に増える。地図が本体の画面で説明文が
-              1行伸びるほうが、PCで「ます。」が孤立するより損。
-            */}
-            <p className="font-pixelJp text-xs text-[#6A4D36] mb-4">
-              {isLoggedIn
-                ? '訪問済み/未訪問を色で表示します。ピンをタップすると詳細へ移動します。右上の都道府県リストからジャンプできます。'
-                : '全国のポケふたを表示します。ログインすると自分の訪問済み・未訪問を確認できます。'
-              }
-            </p>
-
-            {!isLoggedIn && <Link href="/login?redirect=/visits/map" className="mb-4 inline-block underline">ログインして訪問状況を見る</Link>}
-
-            {/* マップとリストのコンテナ */}
-            <div className="relative">
-              {/* マップ */}
-              <div className="h-[70vh] border border-[#7B63A8]/15 overflow-hidden">
-                {mapCenter && (
-                  <>
-                    <MapComponent
-                      center={mapCenter}
-                      manholes={visitedManholes}
-                      onManholeClick={handleManholeClick}
-                      userLocation={userLocation}
-                      zoom={mapZoom}
-                      plainMarker={!isLoggedIn}
-                    />
-                  </>
-                )}
+            ) : error ? (
+              <div role="alert" className="space-y-3 rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
+                <p>{error}</p>
+                <button onClick={() => window.location.reload()} className="rounded border px-4 py-2">再読み込み</button>
               </div>
+            ) : (
+              <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">
+                <h2 className="mb-2 font-pixelJp text-sm font-bold text-[#4F3828]">
+                  {isLoggedIn ? '訪問マップ' : 'ポケふたマップ'}
+                </h2>
 
-              {/* 都道府県リスト（フロート） */}
-              {prefectureCounts.length > 0 && (
-                <div className="absolute top-2 right-2 z-[1000]">
-                  {showPrefectureList ? (
-                    <div className="w-32 max-h-[calc(70vh-2rem)] bg-white/70 border border-[#7B63A8]/15 shadow-lg overflow-hidden">
-                      <div className="sticky top-0 bg-white/70 border-b border-[#7B63A8]/15 px-1.5 py-1">
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <h3 className="font-pixelJp text-[10px] text-rpg-textDark font-bold truncate">
-                            都道府県 ({prefectureCounts.filter(p => p.count > 0).length}/47)
-                          </h3>
-                          <button
-                            onClick={() => setShowPrefectureList(false)}
-                            className="p-0.5 bg-white/80 hover:bg-rpg-yellow border border-rpg-border rounded transition-colors flex-shrink-0"
-                            title="都道府県リストを隠す"
-                          >
-                            <ChevronRight className="w-3 h-3 text-rpg-textDark" />
-                          </button>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => setPrefectureSortOrder('code')}
-                            className={`flex-1 px-1 py-0.5 text-[9px] font-pixelJp rounded transition-colors ${
-                              prefectureSortOrder === 'code'
-                                ? 'bg-rpg-blue text-white'
-                                : 'bg-white/80 text-rpg-textDark hover:bg-rpg-yellow'
-                            }`}
-                            title="都道府県コード順"
-                          >
-                            コード順
-                          </button>
-                          <button
-                            onClick={() => setPrefectureSortOrder('count')}
-                            className={`flex-1 px-1 py-0.5 text-[9px] font-pixelJp rounded transition-colors ${
-                              prefectureSortOrder === 'count'
-                                ? 'bg-rpg-blue text-white'
-                                : 'bg-white/80 text-rpg-textDark hover:bg-rpg-yellow'
-                            }`}
-                            title="マンホール数順"
-                          >
-                            数順
-                          </button>
-                        </div>
-                      </div>
-                      <div className="overflow-y-auto max-h-[calc(70vh-4rem)] p-1 space-y-0.5">
-                        {[...prefectureCounts]
-                          .sort((a, b) => {
-                            if (prefectureSortOrder === 'code') {
-                              // 都道府県コード順（コードは文字列なので数値化して比較）
-                              return parseInt(a.code) - parseInt(b.code);
-                            } else {
-                              // マンホール数順（降順）
-                              return b.count - a.count;
-                            }
-                          })
-                          .map((pref) => {
-                            const hasManhole = pref.count > 0;
-                            return (
-                              <button
-                                key={pref.code}
-                                onClick={() => hasManhole && handlePrefectureClick(pref)}
-                                disabled={!hasManhole}
-                                className={`w-full text-left px-1.5 py-1 border border-rpg-border rounded transition-colors ${
-                                  hasManhole
-                                    ? 'bg-white/90 hover:bg-rpg-yellow cursor-pointer'
-                                    : 'bg-gray-100/50 cursor-not-allowed opacity-50'
-                                }`}
-                              >
-                                <div className="flex justify-between items-center gap-1">
-                                  <span className={`font-pixelJp text-[10px] font-bold truncate ${
-                                    hasManhole ? 'text-rpg-textDark' : 'text-gray-400'
-                                  }`}>
-                                    {pref.name.replace('県', '').replace('府', '').replace('都', '')}
-                                  </span>
-                                  <span className={`font-pixel text-[10px] flex-shrink-0 ${
-                                    hasManhole ? 'text-rpg-blue' : 'text-gray-400'
-                                  }`}>
-                                    {hasManhole ? pref.count : '-'}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  ) : (
+                {/*
+                  ここだけ PhraseText を使わない。長い文を句で割らない代わりに、スマホ幅(390px)では
+                  2行が3行に増える。地図が本体の画面で説明文が1行伸びるほうが、PCで「ます。」が孤立するより損。
+                */}
+                <p className="mb-3 font-pixelJp text-xs text-[#6A4D36]">
+                  {isLoggedIn
+                    ? '訪問済み/未訪問を色で表示します。ピンをタップすると下にカードが出ます。'
+                    : '全国のポケふたを表示します。ログインすると自分の訪問済み・未訪問を確認できます。'}
+                </p>
+
+                {!isLoggedIn && <Link href="/login?redirect=/visits/map" className="mb-3 inline-block underline">ログインして訪問状況を見る</Link>}
+
+                <div className="relative">
+                  <div className="h-[60vh] overflow-hidden rounded-lg border border-[#7B63A8]/15 lg:h-[70vh]">
+                    {mapCenter && (
+                      <MapComponent
+                        center={mapCenter}
+                        manholes={visitedManholes}
+                        onManholeClick={handleManholeClick}
+                        userLocation={userLocation}
+                        zoom={mapZoom}
+                        plainMarker={!isLoggedIn}
+                        popup={false}
+                        recenterKey={recenterKey}
+                        minHeight={0}
+                      />
+                    )}
+                  </div>
+
+                  {/* 地図の上は最小限（現在地と、スマホの県ボタン）。左上は Leaflet のズームなので右上に置く。z は Leaflet のペイン(〜1000)より上 */}
+                  <div className="absolute right-2 top-2 z-[1000] flex flex-col items-end gap-2">
                     <button
-                      onClick={() => setShowPrefectureList(true)}
-                      className="p-1.5 bg-white/90 border border-[#7B63A8]/15 shadow-lg hover:bg-rpg-yellow transition-colors rounded"
-                      title="都道府県リストを表示"
+                      onClick={handleLocate}
+                      disabled={locating}
+                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#7B63A8]/20 bg-white/95 px-3 font-pixelJp text-xs font-bold text-[#7B63A8] shadow disabled:opacity-60"
                     >
-                      <ChevronLeft className="w-3 h-3 text-rpg-textDark" />
+                      <LocateFixed className="h-4 w-4" /> {locating ? '取得中…' : '現在地'}
                     </button>
-                  )}
+                    <button
+                      ref={sheetTriggerRef}
+                      onClick={() => setPrefSheetOpen(true)}
+                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#7B63A8]/20 bg-white/95 px-3 font-pixelJp text-xs font-bold text-[#7B63A8] shadow lg:hidden"
+                    >
+                      <MapPin className="h-4 w-4" /> 県で絞る
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="mt-3 text-center">
-              <p className="font-pixelJp text-xs text-rpg-textDark opacity-70">
-                {isLoggedIn
-                  ? `全${visitedManholes.length}件（訪問済み: ${visitedManholes.filter(m => m.is_visited).length}件）`
-                  : `全${visitedManholes.length}件のポケふたを表示中`
-                }
-              </p>
-            </div>
+                {locationNote && <p role="status" className="mt-2 font-pixelJp text-xs text-[#bf5640]">{locationNote}</p>}
+
+                {/* 押したピンのカード。地図の位置は動かさない。詳細へは「詳細を見る」から */}
+                {selected && (
+                  <div className="mt-3 flex items-start justify-between gap-3 rounded-[12px] border border-[#e9dfc7] bg-white p-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-pixelJp text-sm font-bold text-[#4F3828]">{selected.name || selected.title || 'ポケふた'}</p>
+                      <p className="mt-0.5 font-pixelJp text-xs text-[#6A4D36]">
+                        {selected.prefecture} {selected.city || selected.municipality || ''}
+                      </p>
+                      {isLoggedIn && (
+                        <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 font-pixelJp text-[11px] font-bold ${
+                          selected.is_visited ? 'bg-[#4ecdc4]/20 text-[#1f7a73]' : 'bg-[#ff6b6b]/15 text-[#b43c3c]'
+                        }`}>
+                          {selected.is_visited ? '✓ 訪問済み' : '? 未訪問'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Link href={`/manhole/${selected.id}`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#7B63A8] px-3 font-pixelJp text-xs font-bold text-white">
+                        詳細を見る
+                      </Link>
+                      <button onClick={() => setSelectedId(null)} aria-label="カードを閉じる" className="inline-flex h-10 w-10 items-center justify-center text-[#6A4D36]">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 text-center">
+                  <p className="font-pixelJp text-xs text-[#6A4D36]">
+                    {isLoggedIn
+                      ? `全${visitedManholes.length}件（訪問済み: ${visitedManholes.filter((m) => m.is_visited).length}件）`
+                      : `全${visitedManholes.length}件のポケふたを表示中`}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* PC: 県のリストは右レール */}
+          {!loading && !error && prefectureCounts.length > 0 && (
+            <div className="hidden lg:block">
+              <div className="sticky top-[20px] rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4">{prefectureList}</div>
+            </div>
+          )}
         </div>
       </PCShell>
+
+      {/* スマホ: 県で絞るシート */}
+      {prefSheetOpen && (
+        <div className="fixed inset-0 z-[2000] lg:hidden" role="dialog" aria-modal="true" aria-label="都道府県で絞る">
+          <button aria-label="閉じる" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={() => setPrefSheetOpen(false)} />
+          <div ref={sheetRef} className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-[18px] bg-[#fffdf7] p-4 pb-8">
+            <div className="mb-2 flex justify-end">
+              <button onClick={() => setPrefSheetOpen(false)} aria-label="閉じる" className="inline-flex h-10 w-10 items-center justify-center text-[#6A4D36]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {prefectureList}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
