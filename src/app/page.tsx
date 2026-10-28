@@ -34,6 +34,7 @@ import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
+import PosterLink from '@/components/PosterLink';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
 
 type FeedVisit = {
@@ -602,16 +603,16 @@ export default function HomePage() {
                           {/* 投稿者は押すとその人の公開スタンプ帳へ（蓋のページを経由しない）。
                               カード全体のリンクより上に重ねる（z-[2]）。公開ID が無い投稿者は文字だけ */}
                           {posterLabel && (visit.public_user_id ? (
-                            <Link
+                            <PosterLink
                               href={`/users/${encodeURIComponent(visit.public_user_id)}/visits`}
-                              aria-label={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
-                              className="relative z-[2] mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
+                              ariaLabel={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
+                              className="mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
                             >
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                               <ChevronRight className="h-3 w-3 shrink-0 opacity-80" />
-                            </Link>
+                            </PosterLink>
                           ) : (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
                               <UserRound className="h-3.5 w-3.5 shrink-0" />
