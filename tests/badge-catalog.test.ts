@@ -5,6 +5,7 @@ import {
   badgeRank,
   badgeRankThresholds,
   buildDesignManholeSticker,
+  buildPlushSticker,
   buildPokemonBadges,
   THEME_BADGES,
   buildThemeBadges,
@@ -91,4 +92,12 @@ test('デザインふたステッカーは公開した投稿が1枚以上でも�
   // 壊れた値はまだ扱い
   assert.equal(buildDesignManholeSticker(Number.NaN).earned, false);
   assert.equal(buildDesignManholeSticker(-2).earned, false);
+});
+
+test('ぬいぐるみステッカーはぬいぐるみが写った訪問が1回でもあればもらえ、2回目から回数を添える', () => {
+  assert.equal(buildPlushSticker(0).earned, false);
+  assert.equal(buildPlushSticker(1).earned, true);
+  assert.equal(buildPlushSticker(1).name, 'ぬいぐるみと一緒');
+  assert.equal(buildPlushSticker(4).name, 'ぬいぐるみと一緒 ×4');
+  assert.equal(buildPlushSticker(Number.NaN).earned, false);
 });

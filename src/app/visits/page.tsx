@@ -33,7 +33,7 @@ import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
-import { buildDesignManholeSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
+import { buildDesignManholeSticker, buildPlushSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -112,6 +112,8 @@ export default function VisitsPage() {
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
   // 自分が公開したデザインマンホールの枚数（ステッカー用）。取れなければ 0＝まだ
   const [designManholeCount, setDesignManholeCount] = useState(0);
+  // 自分の訪問のうちぬいぐるみが写ったものの数。一覧は1000件で切れているのでDBで全件を数える
+  const [plushVisitCount, setPlushVisitCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -199,8 +201,18 @@ export default function VisitsPage() {
       }, () => {});
   };
 
+  const loadPlushVisitCount = () => {
+    createBrowserClient()
+      .rpc('get_own_plush_visit_count' as never)
+      .then((result: any) => {
+        const count = result?.data;
+        if (!result?.error && typeof count === 'number') setPlushVisitCount(count);
+      }, () => {});
+  };
+
   const loadPassport = async () => {
     loadDesignManholeCount();
+    loadPlushVisitCount();
     try {
       const [visitsResponse, data] = await Promise.all([
         fetch('/api/visits?limit=1000'),
@@ -474,8 +486,12 @@ export default function VisitsPage() {
 
   // ポケモンのメダルの絵は右のポケモンバッジと同じ蓋にそろえる
   const stickers = useMemo(
-    () => [...buildThemeBadges(passportManholes, visitedManholeIds), buildDesignManholeSticker(designManholeCount)],
-    [passportManholes, visitedManholeIds, designManholeCount]
+    () => [
+      ...buildThemeBadges(passportManholes, visitedManholeIds),
+      buildPlushSticker(plushVisitCount),
+      buildDesignManholeSticker(designManholeCount),
+    ],
+    [passportManholes, visitedManholeIds, designManholeCount, plushVisitCount]
   );
   const pokemonMedalIds = useMemo(
     () => pokemonBadgeManholeIds(passportManholes, representatives),
