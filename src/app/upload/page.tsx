@@ -811,10 +811,13 @@ function UploadPageInner() {
   const pickerHits = pickerQuery.trim() ? manholes.filter(m => matchesManholeQuery(m, pickerQuery)) : [];
   const pickerShown = pickerHits.slice(0, 30);
   const coverIds = [
-    ...(hintManholeId && Number.isInteger(hintManholeId) && hintManholeId > 0 ? [hintManholeId] : []),
+    ...(hintManholeId && Number.isSafeInteger(hintManholeId) && hintManholeId > 0 ? [hintManholeId] : []),
     ...pickerShown.map(m => m.id),
   ];
   const coverMissingIds = coverIds.filter(id => !(String(id) in lidCovers)).join(',');
+  // 撮影対象マンホールの絵柄。風景しか無い蓋は蓋が写っていないので見比べに使えない
+  const hintCover = hintManhole ? lidCovers[String(hintManhole.id)] : null;
+  const hintLidCover = hintCover && !hintCover.is_landscape ? hintCover : null;
   useEffect(() => {
     if (!coverMissingIds) return;
     // 打っている途中の候補まで取らないよう、手が止まってから取る。失敗したら写真なしの丸のまま
@@ -988,7 +991,7 @@ function UploadPageInner() {
                 {hintManhole.name}（{hintManhole.prefecture} {hintManhole.city}）
               </p>
               {/* 位置情報なしの写真は蓋の確認ができないので、絵柄で見比べてもらう */}
-              {lidCovers[String(hintManhole.id)] && (
+              {hintLidCover && (
                 <p className="mt-1 text-xs font-bold text-[#7B63A8]">
                   右の絵柄と、投稿する写真の蓋が同じか確かめてください
                 </p>
@@ -997,12 +1000,9 @@ function UploadPageInner() {
                 位置情報のある写真はGPS位置でマンホールを確認します。位置情報の無い写真は、このマンホールの写真として投稿できます
               </p>
             </div>
-            {lidCovers[String(hintManhole.id)] && (
+            {hintLidCover && (
               <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-[#7B63A8]/30 bg-[#7B63A8]/10">
-                <StampPhoto
-                  src={lidCovers[String(hintManhole.id)]!.thumbnail_url}
-                  aiTags={lidCovers[String(hintManhole.id)]!.lid_crop}
-                />
+                <StampPhoto src={hintLidCover.thumbnail_url} aiTags={hintLidCover.lid_crop} />
               </span>
             )}
           </section>
