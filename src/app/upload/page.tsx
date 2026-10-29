@@ -108,8 +108,9 @@ function UploadPageInner() {
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
   // Android で撮ってある写真を投稿するときの蓋選び（manhole_id 無しで来たとき）
   const [pickerQuery, setPickerQuery] = useState('');
-  // 候補の左に出す蓋の丸い写真（/api/manholes/cover-photos）。null は「写真が無い蓋」。取った分は覚えておく
-  const [pickerCovers, setPickerCovers] = useState<Record<string, CoverPhoto | null>>({});
+  // 蓋の丸い写真（/api/manholes/cover-photos）。蓋選びの候補の左と、撮影対象マンホールの右に出す。
+  // null は「写真が無い蓋」。取った分は覚えておく
+  const [lidCovers, setLidCovers] = useState<Record<string, CoverPhoto | null>>({});
   const [loading, setLoading] = useState(false);
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント（次に来る人へひとこと）
@@ -809,31 +810,36 @@ function UploadPageInner() {
   // Android の蓋選びの候補（全件でも約480枚なので毎回絞ってよい）
   const pickerHits = pickerQuery.trim() ? manholes.filter(m => matchesManholeQuery(m, pickerQuery)) : [];
   const pickerShown = pickerHits.slice(0, 30);
-  const pickerMissingIds = pickerShown.filter(m => !(String(m.id) in pickerCovers)).map(m => m.id).join(',');
+  const coverIds = [
+    ...(hintManholeId && Number.isInteger(hintManholeId) && hintManholeId > 0 ? [hintManholeId] : []),
+    ...pickerShown.map(m => m.id),
+  ];
+  const coverMissingIds = coverIds.filter(id => !(String(id) in lidCovers)).join(',');
   useEffect(() => {
-    if (!pickerMissingIds) return;
+    if (!coverMissingIds) return;
     // 打っている途中の候補まで取らないよう、手が止まってから取る。失敗したら写真なしの丸のまま
+    // （撮影対象マンホールの1枚も同じ取り方でよい。0.3 秒遅れるだけ）
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/manholes/cover-photos?ids=${pickerMissingIds}`, { signal: controller.signal });
+        const response = await fetch(`/api/manholes/cover-photos?ids=${coverMissingIds}`, { signal: controller.signal });
         if (!response.ok) return;
         const data = await response.json();
         const photos = (data.photos ?? {}) as Record<string, CoverPhoto>;
-        setPickerCovers(prev => {
+        setLidCovers(prev => {
           const next = { ...prev };
-          for (const id of pickerMissingIds.split(',')) next[id] = photos[id] ?? null;
+          for (const id of coverMissingIds.split(',')) next[id] = photos[id] ?? null;
           return next;
         });
       } catch (error) {
-        if (!controller.signal.aborted) console.error('Failed to load picker cover photos:', error);
+        if (!controller.signal.aborted) console.error('Failed to load lid cover photos:', error);
       }
     }, 300);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [pickerMissingIds]);
+  }, [coverMissingIds]);
 
   // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
   const matchedManholeId = selectedPhoto?.matchedManhole?.id;
@@ -972,17 +978,33 @@ function UploadPageInner() {
 
         {/* Hint Manhole Card */}
         {hintManhole && (
-          <section className="mt-4 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
-            <div className="flex items-center gap-1.5 text-sm font-bold">
-              <MapPin className="h-4 w-4 flex-shrink-0 text-[#7B63A8]" />
-              撮影対象マンホール
+          <section className="mt-4 flex items-start gap-3 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-bold">
+                <MapPin className="h-4 w-4 flex-shrink-0 text-[#7B63A8]" />
+                撮影対象マンホール
+              </div>
+              <p className="mt-1 text-sm">
+                {hintManhole.name}（{hintManhole.prefecture} {hintManhole.city}）
+              </p>
+              {/* 位置情報なしの写真は蓋の確認ができないので、絵柄で見比べてもらう */}
+              {lidCovers[String(hintManhole.id)] && (
+                <p className="mt-1 text-xs font-bold text-[#7B63A8]">
+                  右の絵柄と、投稿する写真の蓋が同じか確かめてください
+                </p>
+              )}
+              <p className="mt-1 text-xs text-[#2A2A2A]/60">
+                位置情報のある写真はGPS位置でマンホールを確認します。位置情報の無い写真は、このマンホールの写真として投稿できます
+              </p>
             </div>
-            <p className="mt-1 text-sm">
-              {hintManhole.name}（{hintManhole.prefecture} {hintManhole.city}）
-            </p>
-            <p className="mt-1 text-xs text-[#2A2A2A]/60">
-              位置情報のある写真はGPS位置でマンホールを確認します。位置情報の無い写真は、このマンホールの写真として投稿できます
-            </p>
+            {lidCovers[String(hintManhole.id)] && (
+              <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-[#7B63A8]/30 bg-[#7B63A8]/10">
+                <StampPhoto
+                  src={lidCovers[String(hintManhole.id)]!.thumbnail_url}
+                  aiTags={lidCovers[String(hintManhole.id)]!.lid_crop}
+                />
+              </span>
+            )}
           </section>
         )}
 
@@ -1026,10 +1048,10 @@ function UploadPageInner() {
                         className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
                       >
                         <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#7B63A8]/10">
-                          {pickerCovers[String(m.id)] && (
+                          {lidCovers[String(m.id)] && (
                             <StampPhoto
-                              src={pickerCovers[String(m.id)]!.thumbnail_url}
-                              aiTags={pickerCovers[String(m.id)]!.lid_crop}
+                              src={lidCovers[String(m.id)]!.thumbnail_url}
+                              aiTags={lidCovers[String(m.id)]!.lid_crop}
                             />
                           )}
                         </span>
