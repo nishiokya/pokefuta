@@ -21,7 +21,7 @@ const MAX_PAGES = 10;
  * 選び方は詳細ページの代表写真と同じ rankManholePhotos。
  *
  * GET /api/manholes/cover-photos?ids=404,405,407
- * → { success, photos: { "404": { photo_id, thumbnail_url, is_landscape } } }
+ * → { success, photos: { "404": { photo_id, thumbnail_url, is_landscape, lid_crop } } }
  *
  * 誰の写真かは返さない（photo の id だけ）。
  */

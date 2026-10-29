@@ -24,6 +24,8 @@ import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
+import StampPhoto from '@/components/StampPhoto';
+import type { CoverPhoto } from '@/lib/manhole-cover-photos';
 
 /**
  * 蓋一覧の問題をこのタブで既に通知したか。
@@ -106,6 +108,8 @@ function UploadPageInner() {
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
   // Android で撮ってある写真を投稿するときの蓋選び（manhole_id 無しで来たとき）
   const [pickerQuery, setPickerQuery] = useState('');
+  // 候補の左に出す蓋の丸い写真（/api/manholes/cover-photos）。null は「写真が無い蓋」。取った分は覚えておく
+  const [pickerCovers, setPickerCovers] = useState<Record<string, CoverPhoto | null>>({});
   const [loading, setLoading] = useState(false);
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント（次に来る人へひとこと）
@@ -804,6 +808,32 @@ function UploadPageInner() {
 
   // Android の蓋選びの候補（全件でも約480枚なので毎回絞ってよい）
   const pickerHits = pickerQuery.trim() ? manholes.filter(m => matchesManholeQuery(m, pickerQuery)) : [];
+  const pickerShown = pickerHits.slice(0, 30);
+  const pickerMissingIds = pickerShown.filter(m => !(String(m.id) in pickerCovers)).map(m => m.id).join(',');
+  useEffect(() => {
+    if (!pickerMissingIds) return;
+    // 打っている途中の候補まで取らないよう、手が止まってから取る。失敗したら写真なしの丸のまま
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/manholes/cover-photos?ids=${pickerMissingIds}`, { signal: controller.signal });
+        if (!response.ok) return;
+        const data = await response.json();
+        const photos = (data.photos ?? {}) as Record<string, CoverPhoto>;
+        setPickerCovers(prev => {
+          const next = { ...prev };
+          for (const id of pickerMissingIds.split(',')) next[id] = photos[id] ?? null;
+          return next;
+        });
+      } catch (error) {
+        if (!controller.signal.aborted) console.error('Failed to load picker cover photos:', error);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [pickerMissingIds]);
 
   // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
   const matchedManholeId = selectedPhoto?.matchedManhole?.id;
@@ -985,7 +1015,7 @@ function UploadPageInner() {
               }
               return (
                 <ul className="mt-2 max-h-72 divide-y divide-[#7B63A8]/10 overflow-y-auto rounded-lg border border-[#7B63A8]/15">
-                  {hits.slice(0, 30).map(m => (
+                  {pickerShown.map(m => (
                     <li key={m.id}>
                       <button
                         type="button"
@@ -993,11 +1023,21 @@ function UploadPageInner() {
                           trackNavClick('投稿:Androidの写真の蓋を選ぶ');
                           router.replace(`/upload?manhole_id=${m.id}`);
                         }}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
                       >
-                        <span className="font-bold">{manholeHeadingPlace(m)}</span>
-                        <span className="block text-xs text-[#2A2A2A]/60">
-                          {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
+                        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#7B63A8]/10">
+                          {pickerCovers[String(m.id)] && (
+                            <StampPhoto
+                              src={pickerCovers[String(m.id)]!.thumbnail_url}
+                              aiTags={pickerCovers[String(m.id)]!.lid_crop}
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-bold">{manholeHeadingPlace(m)}</span>
+                          <span className="block text-xs text-[#2A2A2A]/60">
+                            {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
+                          </span>
                         </span>
                       </button>
                     </li>
