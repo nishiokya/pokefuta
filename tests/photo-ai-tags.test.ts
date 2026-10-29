@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, LID_ZOOM_MAX, hasPlushClip, isPlushPhoto, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, hasPlushClip, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -115,13 +115,4 @@ test('ぬいぐるみの特集: 蓋とぬいぐるみの枠と crop がそろっ
   assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
   assert.equal(hasPlushClip({ lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
   assert.equal(hasPlushClip(null), false);
-});
-
-test('isPlushPhoto は plush が真のときだけ真（壊れた値・無いタグは偽）', () => {
-  assert.equal(isPlushPhoto({ plush: true }), true);
-  assert.equal(isPlushPhoto({ plush: false }), false);
-  assert.equal(isPlushPhoto({ plush: 'true' }), false);
-  assert.equal(isPlushPhoto(null), false);
-  assert.equal(isPlushPhoto(undefined), false);
-  assert.equal(isPlushPhoto([]), false);
 });

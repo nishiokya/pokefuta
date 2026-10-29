@@ -15,7 +15,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { isPlushPhoto, photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import MonthlyActivity, { buildMonthlyActivity } from '@/components/users/MonthlyActivity';
@@ -23,6 +23,7 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
+import { loadPublicPlushVisitCount } from '@/lib/sticker-counts';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -140,13 +141,14 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives, designManholeCount] = await Promise.all([
+  const [data, progress, snapshot, representatives, designManholeCount, plushCount] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
     fetchManholeSnapshot().catch(() => null),
     fetchPokemonRepresentatives(),
     loadPublicDesignManholeCount(params.userId),
+    loadPublicPlushVisitCount(params.userId),
   ]);
 
   if (!data) notFound();
@@ -154,7 +156,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
   // 都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。OGP 画像と同じ組み立て
   const badges = (() => {
     if (!progress) return null;
-    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives, designManholeCount, plushCount: data.visits.filter((v) => isPlushPhoto(v.aiTags)).length });
+    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives, designManholeCount, plushCount });
     return { ...built, pokemon: built.pokemon.map((p) => ({ ...p, href: pokemonDexUrl(p.name) })) };
   })();
 

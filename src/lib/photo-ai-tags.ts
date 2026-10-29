@@ -52,9 +52,6 @@ export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean |
   return out;
 }
 
-/** 写真にぬいぐるみが写っているか（ai_tags.plush が真）。ステッカーの数え上げに使う */
-export const isPlushPhoto = (aiTags: unknown): boolean => isRecord(aiTags) && aiTags.plush === true;
-
 /**
  * 正方形に切って見せるとき（object-fit: cover）の object-position。ai_tags.crop の正方形が見えるようにする。
  *
