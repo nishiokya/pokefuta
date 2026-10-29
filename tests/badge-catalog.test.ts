@@ -4,6 +4,7 @@ import {
   BADGE_REGIONS,
   badgeRank,
   badgeRankThresholds,
+  buildDesignManholeSticker,
   buildPokemonBadges,
   THEME_BADGES,
   buildThemeBadges,
@@ -78,4 +79,16 @@ test('ポケモンバッジのメダルは代表マンホール、代表がそ�
   const ids = pokemonBadgeManholeIds(manholes, new Map([['ラッキー', 9], ['ラプラス', 99]]));
   assert.equal(ids.get('ラッキー'), 9);
   assert.equal(ids.get('ラプラス'), 7);
+});
+
+test('デザインふたステッカーは公開した投稿が1枚以上でもらえ、2枚目からは枚数を添える', () => {
+  const none = buildDesignManholeSticker(0);
+  assert.equal(none.earned, false);
+  assert.equal(none.name, 'デザインふた投稿');
+  assert.equal(buildDesignManholeSticker(1).earned, true);
+  assert.equal(buildDesignManholeSticker(1).name, 'デザインふた投稿');
+  assert.equal(buildDesignManholeSticker(3).name, 'デザインふた投稿 ×3');
+  // 壊れた値はまだ扱い
+  assert.equal(buildDesignManholeSticker(Number.NaN).earned, false);
+  assert.equal(buildDesignManholeSticker(-2).earned, false);
 });

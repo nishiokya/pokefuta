@@ -22,6 +22,7 @@ import MonthlyActivity, { buildMonthlyActivity } from '@/components/users/Monthl
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
+import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -139,12 +140,13 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives] = await Promise.all([
+  const [data, progress, snapshot, representatives, designManholeCount] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
     fetchManholeSnapshot().catch(() => null),
     fetchPokemonRepresentatives(),
+    loadPublicDesignManholeCount(params.userId),
   ]);
 
   if (!data) notFound();
@@ -152,7 +154,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
   // 都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。OGP 画像と同じ組み立て
   const badges = (() => {
     if (!progress) return null;
-    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives });
+    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives, designManholeCount });
     return { ...built, pokemon: built.pokemon.map((p) => ({ ...p, href: pokemonDexUrl(p.name) })) };
   })();
 

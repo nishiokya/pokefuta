@@ -33,7 +33,7 @@ import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
-import { buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
+import { buildDesignManholeSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -110,6 +110,8 @@ export default function VisitsPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [totalManholes, setTotalManholes] = useState<number | null>(null);
+  // 自分が公開したデザインマンホールの枚数（ステッカー用）。取れなければ 0＝まだ
+  const [designManholeCount, setDesignManholeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -187,7 +189,18 @@ export default function VisitsPage() {
     }
   };
 
+  // ステッカー用。取れなくてもスタンプ帳は出すので、待たずに投げて失敗は握りつぶす
+  const loadDesignManholeCount = () => {
+    createBrowserClient()
+      .rpc('get_own_design_manhole_count' as never)
+      .then((result: any) => {
+        const count = result?.data;
+        if (!result?.error && typeof count === 'number') setDesignManholeCount(count);
+      }, () => {});
+  };
+
   const loadPassport = async () => {
+    loadDesignManholeCount();
     try {
       const [visitsResponse, data] = await Promise.all([
         fetch('/api/visits?limit=1000'),
@@ -460,7 +473,10 @@ export default function VisitsPage() {
   }, [passportManholes, visitSummaryByManholeId]);
 
   // ポケモンのメダルの絵は右のポケモンバッジと同じ蓋にそろえる
-  const stickers = useMemo(() => buildThemeBadges(passportManholes, visitedManholeIds), [passportManholes, visitedManholeIds]);
+  const stickers = useMemo(
+    () => [...buildThemeBadges(passportManholes, visitedManholeIds), buildDesignManholeSticker(designManholeCount)],
+    [passportManholes, visitedManholeIds, designManholeCount]
+  );
   const pokemonMedalIds = useMemo(
     () => pokemonBadgeManholeIds(passportManholes, representatives),
     [passportManholes, representatives]

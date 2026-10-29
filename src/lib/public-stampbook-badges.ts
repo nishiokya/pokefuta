@@ -2,6 +2,7 @@ import {
   badgeRank,
   byCollected,
   buildPokemonBadges,
+  buildDesignManholeSticker,
   buildThemeBadges,
   pokemonBadgeManholeIds,
   type BadgeManhole,
@@ -20,11 +21,14 @@ export function buildPublicStampbookBadges({
   progress,
   snapshot,
   representatives,
+  designManholeCount = 0,
 }: {
   userId: string;
   progress: PublicUserPrefectureProgress;
   snapshot: ManholeSnapshot | null;
   representatives: ReadonlyMap<string, number>;
+  /** 公開したデザインマンホールの枚数。1枚以上でステッカーが付く */
+  designManholeCount?: number;
 }) {
   // ステッカーの判定に蓋のテーマ（hashtags）が要る
   const hashtagsById = new Map((snapshot?.manholes ?? []).map((m) => [m.id, Array.isArray(m.hashtags) ? m.hashtags : null]));
@@ -56,7 +60,7 @@ export function buildPublicStampbookBadges({
       .filter((p) => p.visited > 0)
       .sort(byCollected)
       .map((p) => ({ ...p, manholeId: medalIds.get(p.name) })),
-    stickers: buildThemeBadges(manholes, visited).filter((s) => s.earned),
+    stickers: [...buildThemeBadges(manholes, visited), buildDesignManholeSticker(designManholeCount)].filter((s) => s.earned),
   };
 }
 
