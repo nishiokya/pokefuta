@@ -1,7 +1,7 @@
 -- visit.location_source（撮影位置の有無の印）を、ローカルスタックで実際にロールを切り替えて確認する。
 --
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
--- 対象: supabase/migrations/20261029120000_visit_location_source.sql
+-- 対象: supabase/migrations/20261030120000_visit_location_source.sql
 --
 -- 印は shot_location から自動で決まる生成列。visit は本人なら PostgREST で直接書けるので、
 -- 「位置情報なしの投稿が必ず none になる」「本人が印を書き換えられない」
