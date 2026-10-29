@@ -14,15 +14,18 @@ export default function PosterLink({
   href,
   ariaLabel,
   className = '',
+  extendHit = true,
   children,
 }: {
   href: string;
   ariaLabel?: string;
   className?: string;
+  /** 上下13pxの当たり判定の拡張。上下に別のリンクが並ぶ狭い帯では false にして、余白で広げる */
+  extendHit?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Link href={href} aria-label={ariaLabel} className={`relative z-[2] before:absolute before:inset-x-0 before:-inset-y-[13px] before:content-[''] ${className}`}>
+    <Link href={href} aria-label={ariaLabel} className={`relative z-[2] ${extendHit ? "before:absolute before:inset-x-0 before:-inset-y-[13px] before:content-['']" : ''} ${className}`}>
       {children}
     </Link>
   );
