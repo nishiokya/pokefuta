@@ -22,6 +22,7 @@ import type {
  *   funnel.setPhotoSource('camera');              // カメラ導線から onDrop を呼ぶ直前
  *   funnel.photoSelected({ has_gps: true });      // 写真を選んだ
  *   funnel.blocked('invalid_gps', 'photo');       // 送信に進めず止まった（理由 × 位置）
+ *   funnel.unblocked();                           // 選び直さずに送れるようになった（イベントなし）
  *   funnel.submitting(); / funnel.completed(); / funnel.failed();
  *
  * 数え方の約束（軸を混ぜないための3つ）:
@@ -103,6 +104,19 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
     },
     [submission_kind, trackSubmissionPhotoSelected]
   );
+
+  /**
+   * 止まっていた写真が、写真を選び直さずに送れるようになったこと（イベントは送らない）。
+   * 例: 位置情報の無い写真のあとで蓋を選び、その蓋の写真として受け付け直したとき（/upload）。
+   * 戻さないと、そのまま去った人が `abandoned{last_step:'blocked'}` に古い理由付きで出る。
+   * `photoSelected` は呼ばない — 同じ写真の選択を二重に数えることになる。
+   */
+  const unblocked = useCallback(() => {
+    if (stepRef.current !== 'blocked') return;
+    stepRef.current = 'photo_selected';
+    blockReasonRef.current = undefined;
+    blockPhaseRef.current = undefined;
+  }, []);
 
   /**
    * 送信に進めず止まったこと。位置（block_phase）は理由と直交する軸なので必ず渡す。
@@ -209,6 +223,7 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
     attemptNo,
     photoSelected,
     blocked,
+    unblocked,
     submitting,
     completed,
     failed,
