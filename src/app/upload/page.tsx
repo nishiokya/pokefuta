@@ -85,7 +85,8 @@ interface UploadedPhoto {
   isLandscape: boolean;
   uploadedImageId?: string;
   error?: string;
-  photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
+  // valid_no_gps: 位置情報の無い写真を、マンホール詳細から来た蓋（manhole_id）の写真として受け付けた
+  photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid' | 'valid_no_gps';
 }
 
 interface AlertMessage {
@@ -121,9 +122,10 @@ function UploadPageInner() {
   const waitingManholePhotoRef = useRef(false);
   const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
+  // マンホール詳細から来ていない（どの蓋か分からない）ときだけ出る。詳細から来ていれば valid_no_gps で通す
   const missingGpsMessage = isAndroid
-    ? '写真にGPS位置情報がありません。Androidのカメラ設定で位置情報をONにし、「カメラで撮影」から撮り直してください。GPSなし写真の投稿は現在開発中です。'
-    : 'GPS座標が見つかりません。写真の位置情報を有効にしてください。';
+    ? '写真に位置情報がありません。撮ってある写真は、マンホールの詳細ページの投稿ボタンか PC から投稿できます。蓋の前にいるなら「カメラで撮影」で撮ってください。'
+    : '写真に位置情報がありません。マンホールの詳細ページの投稿ボタンからなら、位置情報が無くても投稿できます。';
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
   useEffect(() => {
@@ -309,6 +311,10 @@ function UploadPageInner() {
       if (photo.photoStatus !== 'waiting_manhole') return photo;
 
       if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+        const hint = findHintManhole();
+        if (hint) {
+          return { ...photo, photoStatus: 'valid_no_gps', matchedManhole: hint, error: undefined };
+        }
         blockReasons.push('invalid_gps');
         return {
           ...photo,
@@ -343,6 +349,13 @@ function UploadPageInner() {
   }, [isAndroid, manholes]);
 
   const extractMetadata = extractPhotoMetadata;
+
+  // マンホール詳細から来た蓋（?manhole_id=）。一覧が届く前は undefined。
+  // hintManhole の state は一覧の到着と同じ回で入るので、コールバックの中では一覧から引き直す
+  const findHintManhole = useCallback((): Manhole | undefined => {
+    if (!hintManholeId) return undefined;
+    return manholes.find(m => m.id === hintManholeId);
+  }, [hintManholeId, manholes]);
 
   const findNearestManhole = useCallback((lat: number, lng: number): Manhole | undefined => {
     if (!manholes.length) return undefined;
@@ -391,10 +404,22 @@ function UploadPageInner() {
 
     let matchedManhole: Manhole | undefined;
     let distanceError: string | undefined;
-    let photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid';
+    let photoStatus: UploadedPhoto['photoStatus'];
 
-    // ✅ GPS座標の必須チェック
-    if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
+    const hint = findHintManhole();
+    if (!isValidCoordinates(metadata.latitude, metadata.longitude) && hint) {
+      // マンホール詳細から来ていれば、位置情報が無くてもその蓋の写真として受け付ける。
+      // 投稿は visit.location_source = 'none' になり、運営が目で確かめる
+      matchedManhole = hint;
+      photoStatus = 'valid_no_gps';
+    } else if (!isValidCoordinates(metadata.latitude, metadata.longitude) && hintManholeId && manholes.length === 0) {
+      // 詳細から来たが蓋の一覧がまだ。届いたら再評価で valid_no_gps になる
+      distanceError = 'マンホール情報をロード中です。少々お待ちください。';
+      photoStatus = 'waiting_manhole';
+      if (manholesLoadFailedRef.current) {
+        funnel.blocked('manholes_unavailable', 'photo');
+      }
+    } else if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
       distanceError = missingGpsMessage;
       photoStatus = 'invalid_gps';
       funnel.blocked('invalid_gps', 'photo');
@@ -439,12 +464,12 @@ function UploadPageInner() {
     setVisitNote(buildAutoVisitNote(metadata, matchedManhole));
 
     setLoading(false);
-  }, [isAndroid, manholes]);
+  }, [isAndroid, manholes, findHintManhole, hintManholeId]);
 
   // 送信中の写真。差し替えを止める判定と、二重送信の防止に使う
   const isUploading = photos.some(photo => photo.uploading);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open: openPhotoPicker } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.heic', '.heif']
@@ -452,7 +477,8 @@ function UploadPageInner() {
     maxFiles: 1,
     multiple: false,
     // Android 10以降では、端末内の既存写真をブラウザへ渡す際にGPS EXIFが
-    // 除去される。GPSなし投稿の確認フローができるまでは、その経路を開かない。
+    // 除去される。枠のタップはカメラにし、端末の写真はマンホール詳細から来たときだけ
+    // 「端末の写真から選ぶ」ボタン（openPhotoPicker）で開く（位置情報なしで受け付けられるのはそのときだけ）。
     noClick: isAndroid,
     noDrag: isAndroid,
     noKeyboard: isAndroid,
@@ -472,8 +498,9 @@ function UploadPageInner() {
     // 以下3つは canSubmit（photoStatus === 'valid'）を通った後の防御的な再チェックなので、
     // 通常は到達しない。GA4 上でここが非ゼロなら onDrop 側の判定に穴がある。
 
-    // ✅ GPS座標の必須チェック
-    if (!isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
+    // ✅ GPS座標の必須チェック（マンホール詳細から来た位置情報なしの写真は除く）
+    if (photo.photoStatus !== 'valid_no_gps' &&
+        !isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
       const errorMsg = missingGpsMessage;
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
@@ -603,6 +630,9 @@ function UploadPageInner() {
       if (isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
         formData.append('latitude', String(photo.metadata.latitude));
         formData.append('longitude', String(photo.metadata.longitude));
+      } else if (photo.photoStatus === 'valid_no_gps') {
+        // 位置情報なしで、マンホール詳細の蓋に投稿する（API はこれが無いと位置情報必須で返す）
+        formData.append('no_gps', 'true');
       }
 
       // Add note (個人メモ) if provided
@@ -773,8 +803,10 @@ function UploadPageInner() {
     if (!previewUrlToRevoke) return;
     return () => URL.revokeObjectURL(previewUrlToRevoke);
   }, [previewUrlToRevoke]);
-  // 有効な写真（GPSあり・マンホール検出済み）が選ばれるまで投稿ボタンは無効（/design-manholes/new と同じ）
-  const canSubmit = !!selectedPhoto && selectedPhoto.photoStatus === 'valid' &&
+  // 有効な写真（GPSあり・マンホール検出済み、またはマンホール詳細から来た位置情報なしの写真）が
+  // 選ばれるまで投稿ボタンは無効（/design-manholes/new と同じ）
+  const canSubmit = !!selectedPhoto &&
+    (selectedPhoto.photoStatus === 'valid' || selectedPhoto.photoStatus === 'valid_no_gps') &&
     !selectedPhoto.uploaded && !selectedPhoto.uploading;
 
   // 登録が完了したら専用の完了画面へ（/design-manholes/new と同じUX）
@@ -878,7 +910,7 @@ function UploadPageInner() {
         <div className="mt-4 rounded-xl border border-[#BF5640]/25 bg-[#FFF3EE] p-4">
           <p className="text-sm font-extrabold text-[#8F3F2E]">ここはポケふたの投稿ページです</p>
           <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-            投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必須です。
+            投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必要です。マンホールの詳細ページから投稿するときは、位置情報が無い写真も投稿できます。
           </p>
         </div>
 
@@ -893,7 +925,7 @@ function UploadPageInner() {
               {hintManhole.name}（{hintManhole.prefecture} {hintManhole.city}）
             </p>
             <p className="mt-1 text-xs text-[#2A2A2A]/60">
-              写真をアップロードすると、GPS位置でマンホールを確認します
+              位置情報のある写真はGPS位置でマンホールを確認します。位置情報の無い写真は、このマンホールの写真として投稿できます
             </p>
           </section>
         )}
@@ -953,7 +985,9 @@ function UploadPageInner() {
                 </p>
                 <p className="mt-1 text-xs text-[#2A2A2A]/50">
                   {isAndroid
-                    ? '端末内の写真からの投稿は現在開発中です'
+                    ? hintManholeId
+                      ? '撮ってある写真は下の「端末の写真から選ぶ」から'
+                      : '撮ってある写真は、マンホールの詳細ページの投稿ボタンか PC から投稿できます'
                     : 'JPEG, PNG, HEIC形式に対応'}
                 </p>
                 {!isAndroid && (
@@ -972,6 +1006,17 @@ function UploadPageInner() {
               </>
             )}
           </div>
+          {isAndroid && hintManholeId && !isUploading && (
+            <button
+              type="button"
+              onClick={openPhotoPicker}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+            >
+              <Upload className="h-4 w-4" />
+              端末の写真から選ぶ
+              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
+            </button>
+          )}
           {selectedPhoto && (
             <div className="mt-3 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
               <label className="flex items-center gap-2 text-sm font-bold">
@@ -1018,6 +1063,22 @@ function UploadPageInner() {
                     m.longitude
                   ) * 1000)
                 : null;
+            if (selectedPhoto.photoStatus === 'valid_no_gps') {
+              return (
+                <div className="mt-2 rounded-lg border border-[#B07818]/30 bg-[#FAF0DC] p-3 text-xs leading-relaxed text-[#5C4410]">
+                  <p className="font-bold">
+                    この蓋の写真として投稿します：{m.name}（{m.city}）
+                    <span className="ml-2 rounded-full bg-[#7B63A8] px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
+                  </p>
+                  <p className="mt-1">
+                    写真に位置情報が無いため、運営が写真を目で確かめます。この蓋の写真でないものは削除することがあります。
+                  </p>
+                  <p className="mt-1">
+                    位置情報なしの投稿は試験中の機能です。使われ方を見て、仕様を見直すことがあります。
+                  </p>
+                </div>
+              );
+            }
             return (
               <p className={`mt-2 text-xs ${isHintMismatch ? 'text-[#8A5E10]' : 'text-[#4C9A57]'}`}>
                 {isHintMismatch ? '別のマンホールが検出されました' : 'マンホールを検出しました'}:
@@ -1228,7 +1289,11 @@ function UploadPageInner() {
                 className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canSubmit}
               >
-                {selectedPhoto?.uploading ? '投稿中...' : isPublic ? 'この写真を投稿する' : 'この写真を非公開で投稿する'}
+                {selectedPhoto?.uploading
+                  ? '投稿中...'
+                  : selectedPhoto?.photoStatus === 'valid_no_gps'
+                    ? isPublic ? 'この蓋の写真として投稿' : 'この蓋の写真として非公開で投稿'
+                    : isPublic ? 'この写真を投稿する' : 'この写真を非公開で投稿する'}
               </button>
               {isPublic ? (
                 <p className="mt-2 text-center text-xs text-[#2A2A2A]/50">
