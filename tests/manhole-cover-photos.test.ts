@@ -42,3 +42,12 @@ test('風景は蓋の写真より後ろ。風景しか無ければ風景を出�
 test('蓋に紐付かない写真は無視する', () => {
   assert.deepEqual(pickCoverPhotos([photo('x', null)]), {});
 });
+
+test('丸に切り抜く位置は ai_tags の lid・crop だけを返す', () => {
+  const result = pickCoverPhotos([
+    { ...photo('a', 1), ai_tags: { lid: [0.2, 0.2, 0.8, 0.8], crop: [0, 0.1, 1, 0.9], plush: true } },
+    photo('b', 2),
+  ]);
+  assert.deepEqual(result['1'].lid_crop, { lid: [0.2, 0.2, 0.8, 0.8], crop: [0, 0.1, 1, 0.9] });
+  assert.equal(result['2'].lid_crop, null);
+});
