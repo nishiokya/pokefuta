@@ -7,7 +7,7 @@ export const HELP_PAGES = [
   { href: '/help/bulk-upload', title: 'まとめて投稿の使い方', description: '旅行の写真をまとめて選んで、ポケふたの写真だけを投稿する' },
   { href: '/help/bulk-upload-trouble', title: 'まとめて投稿がうまくいかないとき', description: '「位置情報が無い」「近くにポケふたが無い」と出たときなど' },
   { href: '/help/iphone-photos', title: 'iPhone の写真を投稿する', description: 'iPhone から直接、または Google フォト経由で PC から投稿する' },
-  { href: '/help/android-photos', title: 'Android の写真を PC に移して投稿する', description: 'Android のスマホで撮った写真は PC から投稿する' },
+  { href: '/help/android-photos', title: 'Android で撮ってある写真を投稿する', description: 'ポケふたを選んでスマホから投稿する（ベータ）か、PC に移して投稿する' },
 ] as const;
 
 export function HelpShell({ title, lead, children, current }: { title: string; lead?: ReactNode; children: ReactNode; current?: string }) {

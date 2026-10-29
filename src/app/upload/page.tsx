@@ -2,12 +2,14 @@
 
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Camera, Upload, MapPin, CheckCircle, AlertCircle, X, Search } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
+import { matchesManholeQuery } from '@/lib/manhole-search';
+import { manholeHeadingPlace, pokemonText } from '@/lib/manhole-label';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { buildAutoVisitNote, extractPhotoMetadata, type PhotoMetadata } from '@/lib/photo-exif';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -97,10 +99,13 @@ interface AlertMessage {
 
 function UploadPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const hintManholeId = searchParams.get('manhole_id') ? Number(searchParams.get('manhole_id')) : null;
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
+  // Android で撮ってある写真を投稿するときの蓋選び（manhole_id 無しで来たとき）
+  const [pickerQuery, setPickerQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [visitNote, setVisitNote] = useState<string>(''); // 個人メモ（非公開）
   const [visitComment, setVisitComment] = useState<string>(''); // 訪問コメント（次に来る人へひとこと）
@@ -124,7 +129,7 @@ function UploadPageInner() {
   const funnel = useSubmissionFunnel('character');
   // マンホール詳細から来ていない（どの蓋か分からない）ときだけ出る。詳細から来ていれば valid_no_gps で通す
   const missingGpsMessage = isAndroid
-    ? '写真に位置情報がありません。撮ってある写真は、マンホールの詳細ページの投稿ボタンか PC から投稿できます。蓋の前にいるなら「カメラで撮影」で撮ってください。'
+    ? '写真に位置情報がありません。撮ってある写真は、上の「撮ってある写真を投稿する」でポケふたを選ぶと投稿できます。'
     : '写真に位置情報がありません。マンホールの詳細ページの投稿ボタンからなら、位置情報が無くても投稿できます。';
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -275,10 +280,6 @@ function UploadPageInner() {
         const list = data.manholes as unknown as Manhole[];
         setManholes(list);
         reportManholeListProblem(list.length, data.total);
-        if (hintManholeId) {
-          const found = list.find(m => m.id === hintManholeId);
-          if (found) setHintManhole(found);
-        }
         return;
       }
       // 蓋の一覧が無いと写真は永遠に waiting_manhole のままで、UIには何も出ない。
@@ -349,6 +350,28 @@ function UploadPageInner() {
   }, [isAndroid, manholes]);
 
   const extractMetadata = extractPhotoMetadata;
+
+  // 一覧の到着時と、蓋選びで ?manhole_id= が変わったときに引き直す
+  useEffect(() => {
+    setHintManhole(hintManholeId ? manholes.find(m => m.id === hintManholeId) ?? null : null);
+  }, [hintManholeId, manholes]);
+
+  // 位置情報の無い写真を選んだあとで、案内どおりに蓋を選んだとき。
+  // ?manhole_id= に切り替わっても写真はそのまま残るので、その写真をこの蓋の写真として受け付け直す
+  // （再評価の effect は waiting_manhole しか見ないので、ここでやらないと投稿ボタンが押せないまま）。
+  // photos も見るのは、写真の解析中に蓋を選ぶと、解析が古い manhole_id のまま invalid_gps を
+  // 後から置くため。受け付け直したあとは invalid_gps が残らないので、繰り返し走ることはない
+  useEffect(() => {
+    if (!hintManhole) return;
+    if (!photos.some(photo => photo.photoStatus === 'invalid_gps')) return;
+    const next = photos.map(photo => photo.photoStatus === 'invalid_gps'
+      ? { ...photo, photoStatus: 'valid_no_gps' as const, matchedManhole: hintManhole, error: undefined }
+      : photo);
+    setPhotos(next);
+    funnel.unblocked();
+    if (next[0]) setVisitNote(buildAutoVisitNote(next[0].metadata, hintManhole));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hintManhole, photos]);
 
   // マンホール詳細から来た蓋（?manhole_id=）。一覧が届く前は undefined。
   // hintManhole の state は一覧の到着と同じ回で入るので、コールバックの中では一覧から引き直す
@@ -779,6 +802,9 @@ function UploadPageInner() {
   // 1枚のみ投稿なので先頭が選択中の写真
   const selectedPhoto = photos[0];
 
+  // Android の蓋選びの候補（全件でも約480枚なので毎回絞ってよい）
+  const pickerHits = pickerQuery.trim() ? manholes.filter(m => matchesManholeQuery(m, pickerQuery)) : [];
+
   // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
   const matchedManholeId = selectedPhoto?.matchedManhole?.id;
   useEffect(() => {
@@ -930,12 +956,79 @@ function UploadPageInner() {
           </section>
         )}
 
+        {/* Android の撮ってある写真: ブラウザで選ぶと位置情報が消えるので、先に蓋を選んでもらい
+            その蓋の投稿画面（?manhole_id=）へ切り替える。位置情報なしで受け付けるのはそこだけ */}
+        {isAndroid && !hintManholeId && (
+          <section className="mt-6 rounded-lg border-2 border-[#7B63A8]/40 bg-white p-4">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold">
+              <Upload className="h-4 w-4 text-[#7B63A8]" />
+              撮ってある写真を投稿する
+              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
+              どのポケふたの写真かを選ぶと、位置情報が無い写真も投稿できます。
+            </p>
+            <label className="relative mt-3 block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2A2A2A]/40" />
+              <input
+                value={pickerQuery}
+                onChange={(event) => setPickerQuery(event.target.value)}
+                aria-label="地域名・ポケモン名でポケふたを探す"
+                placeholder="地域名・ポケモン名で探す"
+                className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/30 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#7B63A8]"
+              />
+            </label>
+            {pickerQuery.trim() && (() => {
+              const hits = pickerHits;
+              if (hits.length === 0) {
+                return <p className="mt-2 text-xs text-[#2A2A2A]/60">見つかりませんでした。別の地域名・ポケモン名で探してください。</p>;
+              }
+              return (
+                <ul className="mt-2 max-h-72 divide-y divide-[#7B63A8]/10 overflow-y-auto rounded-lg border border-[#7B63A8]/15">
+                  {hits.slice(0, 30).map(m => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          trackNavClick('投稿:Androidの写真の蓋を選ぶ');
+                          router.replace(`/upload?manhole_id=${m.id}`);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
+                      >
+                        <span className="font-bold">{manholeHeadingPlace(m)}</span>
+                        <span className="block text-xs text-[#2A2A2A]/60">
+                          {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            {pickerHits.length > 30 && (
+              <p className="mt-1 text-xs text-[#2A2A2A]/50">30枚まで出しています。地域名を足して絞り込んでください。</p>
+            )}
+          </section>
+        )}
+
         {/* 写真 */}
         <section className="mt-6">
           <h2 className="flex items-center gap-1.5 text-sm font-bold">
             <Camera className="h-4 w-4 text-[#7B63A8]" />
-            写真 <span className="text-[#B5483C]">*</span>
+            {isAndroid && !hintManholeId ? '蓋の前にいるなら、その場で撮影' : <>写真 <span className="text-[#B5483C]">*</span></>}
           </h2>
+          {/* 詳細から来た Android: 撮ってある写真の方を先に、目立つ形で出す（カメラの枠より上） */}
+          {isAndroid && hintManholeId && !isUploading && (
+            <button
+              type="button"
+              onClick={openPhotoPicker}
+              className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+            >
+              <Upload className="h-4 w-4" />
+              端末の写真から選ぶ
+              <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-[#7B63A8]">ベータ</span>
+            </button>
+          )}
           <div
             {...getRootProps({
               onClick: () => {
@@ -986,8 +1079,8 @@ function UploadPageInner() {
                 <p className="mt-1 text-xs text-[#2A2A2A]/50">
                   {isAndroid
                     ? hintManholeId
-                      ? '撮ってある写真は下の「端末の写真から選ぶ」から'
-                      : '撮ってある写真は、マンホールの詳細ページの投稿ボタンか PC から投稿できます'
+                      ? '撮ってある写真は上の「端末の写真から選ぶ」から'
+                      : '撮ってある写真は、上の「撮ってある写真を投稿する」から'
                     : 'JPEG, PNG, HEIC形式に対応'}
                 </p>
                 {!isAndroid && (
@@ -1006,17 +1099,6 @@ function UploadPageInner() {
               </>
             )}
           </div>
-          {isAndroid && hintManholeId && !isUploading && (
-            <button
-              type="button"
-              onClick={openPhotoPicker}
-              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
-            >
-              <Upload className="h-4 w-4" />
-              端末の写真から選ぶ
-              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
-            </button>
-          )}
           {selectedPhoto && (
             <div className="mt-3 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
               <label className="flex items-center gap-2 text-sm font-bold">
