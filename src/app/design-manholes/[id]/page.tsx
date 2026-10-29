@@ -6,6 +6,7 @@ import MapSection from '../MapSection';
 import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
+import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -66,6 +67,10 @@ export default async function Page({ params }: Props) {
   if (!designManhole) {
     notFound();
   }
+
+  // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにする
+  const submitterPublicId = await loadDesignManholeSubmitterPublicId(designManhole.id);
+  const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 
   const title = displayTitle(designManhole.title);
   const pageUrl = `${SITE_URL}/design-manholes/${designManhole.id}`;
@@ -159,7 +164,16 @@ export default async function Page({ params }: Props) {
           <div className="p-4 sm:p-5">
             <h1 className="text-lg font-bold sm:text-xl">{title}</h1>
             <p className="mt-1 text-xs text-[#2A2A2A]/50">
-              {designManhole.submitter_name ? `${designManhole.submitter_name} ・ ` : ''}
+              {submitterHref ? (
+                <>
+                  <Link href={submitterHref} className="font-bold text-[#7B63A8] hover:underline">
+                    {designManhole.submitter_name || '投稿者'}のスタンプ帳 ›
+                  </Link>
+                  {' ・ '}
+                </>
+              ) : (
+                designManhole.submitter_name ? `${designManhole.submitter_name} ・ ` : ''
+              )}
               {formatDateJaJst(designManhole.created_at)}
             </p>
             {designManhole.description && (

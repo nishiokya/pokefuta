@@ -145,6 +145,24 @@ export function buildThemeBadges(
 }
 
 /**
+ * デザインふたステッカー。みんなのデザインマンホールに1枚でも投稿するともらえる（ポケふたの訪問ではない）。
+ * 枚数は公開(published)された投稿だけ。名前に枚数を添えるので、2枚目以降も貼ったものが増えて見える。
+ */
+export function buildDesignManholeSticker(count: number): ThemeBadgeProgress {
+  const posted = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return {
+    key: 'design-manhole',
+    icon: '🎨',
+    name: posted > 1 ? `デザインふた投稿 ×${posted}` : 'デザインふた投稿',
+    description: 'みんなのデザインマンホールに、ポケふた以外のご当地マンホールを投稿',
+    tag: '',
+    total: posted,
+    visited: posted,
+    earned: posted > 0,
+  };
+}
+
+/**
  * ポケモンバッジのメダルに入れる蓋。代表マンホール（dataset/pokemon_representatives.json）が
  * そのポケモンの蓋の中にあればそれ、無ければ id の小さい蓋。
  */

@@ -14,6 +14,7 @@ import { SITE_NAME } from '@/lib/constants';
 import { badgeRank, lidImageUrl } from '@/lib/badge-catalog';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
+import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
 import { buildPublicStampbookBadges, type PublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { fetchRegularBadges } from '@/lib/regular-badges';
 import { rankRing } from '@/components/users/HeroStat';
@@ -207,8 +208,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
       });
     }
 
+    const designManholeCount = progress ? await loadPublicDesignManholeCount(visitsData.userId) : 0;
     const badges = progress
-      ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives })
+      ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount })
       : null;
     const [photoUris, picked] = await Promise.all([
       loadRecentPhotoDataUris(visitsData.visits).catch(() => []),
