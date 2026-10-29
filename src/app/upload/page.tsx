@@ -1014,6 +1014,7 @@ function UploadPageInner() {
             >
               <Upload className="h-4 w-4" />
               端末の写真から選ぶ
+              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
             </button>
           )}
           {selectedPhoto && (
@@ -1065,9 +1066,15 @@ function UploadPageInner() {
             if (selectedPhoto.photoStatus === 'valid_no_gps') {
               return (
                 <div className="mt-2 rounded-lg border border-[#B07818]/30 bg-[#FAF0DC] p-3 text-xs leading-relaxed text-[#5C4410]">
-                  <p className="font-bold">この蓋の写真として投稿します：{m.name}（{m.city}）</p>
+                  <p className="font-bold">
+                    この蓋の写真として投稿します：{m.name}（{m.city}）
+                    <span className="ml-2 rounded-full bg-[#7B63A8] px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
+                  </p>
                   <p className="mt-1">
                     写真に位置情報が無いため、運営が写真を目で確かめます。この蓋の写真でないものは削除することがあります。
+                  </p>
+                  <p className="mt-1">
+                    位置情報なしの投稿は試験中の機能です。使われ方を見て、仕様を見直すことがあります。
                   </p>
                 </div>
               );
