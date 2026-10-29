@@ -813,9 +813,10 @@ function UploadPageInner() {
   useEffect(() => {
     if (!pickerMissingIds) return;
     // 打っている途中の候補まで取らないよう、手が止まってから取る。失敗したら写真なしの丸のまま
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/manholes/cover-photos?ids=${pickerMissingIds}`);
+        const response = await fetch(`/api/manholes/cover-photos?ids=${pickerMissingIds}`, { signal: controller.signal });
         if (!response.ok) return;
         const data = await response.json();
         const photos = (data.photos ?? {}) as Record<string, CoverPhoto>;
@@ -825,10 +826,13 @@ function UploadPageInner() {
           return next;
         });
       } catch (error) {
-        console.error('Failed to load picker cover photos:', error);
+        if (!controller.signal.aborted) console.error('Failed to load picker cover photos:', error);
       }
     }, 300);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [pickerMissingIds]);
 
   // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
