@@ -36,3 +36,9 @@ test('ポケモンや市区町村が無い蓋でも落ちない', () => {
     true,
   );
 });
+
+test('空白で区切った語は、すべて含まれるときだけ一致する（全角空白も区切る）', () => {
+  assert.equal(matchesManholeQuery(manhole, 'イーブイ 鹿児島'), true);
+  assert.equal(matchesManholeQuery(manhole, 'イーブイ　指宿'), true);
+  assert.equal(matchesManholeQuery(manhole, 'イーブイ 宮城'), false);
+});

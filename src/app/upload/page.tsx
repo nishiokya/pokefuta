@@ -356,6 +356,20 @@ function UploadPageInner() {
     setHintManhole(hintManholeId ? manholes.find(m => m.id === hintManholeId) ?? null : null);
   }, [hintManholeId, manholes]);
 
+  // 位置情報の無い写真を選んだあとで、案内どおりに蓋を選んだとき。
+  // ?manhole_id= に切り替わっても写真はそのまま残るので、その写真をこの蓋の写真として受け付け直す
+  // （再評価の effect は waiting_manhole しか見ないので、ここでやらないと投稿ボタンが押せないまま）
+  useEffect(() => {
+    if (!hintManhole) return;
+    if (!photos.some(photo => photo.photoStatus === 'invalid_gps')) return;
+    const next = photos.map(photo => photo.photoStatus === 'invalid_gps'
+      ? { ...photo, photoStatus: 'valid_no_gps' as const, matchedManhole: hintManhole, error: undefined }
+      : photo);
+    setPhotos(next);
+    if (next[0]) setVisitNote(buildAutoVisitNote(next[0].metadata, hintManhole));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hintManhole]);
+
   // マンホール詳細から来た蓋（?manhole_id=）。一覧が届く前は undefined。
   // hintManhole の state は一覧の到着と同じ回で入るので、コールバックの中では一覧から引き直す
   const findHintManhole = useCallback((): Manhole | undefined => {
