@@ -5,32 +5,54 @@ import { HelpShell, Section, Steps } from '../HelpParts';
 
 // Android のスマホでは、撮ってある写真をブラウザで選ぶと位置情報（EXIF の GPS）が消える。
 // 2026-10 に実機で、accept の書き方・選ぶアプリ（標準の写真選択・Google フォト・ファイル）を変えても
-// 全部消え、カメラで撮る形だけ届くと確かめた。なので撮ってある写真は PC に移して /upload/bulk から投稿してもらう。
+// 全部消え、カメラで撮る形だけ届くと確かめた。
+// 2026-10-30 から、どのポケふたの写真かを選べば位置情報なしでも投稿できる（ベータ。投稿画面の蓋選び・マンホール詳細の投稿ボタン）。
+// これを一番に案内し、PC に移して /upload/bulk から投稿する方法はもう1つの方法として残す。
 
 export const metadata: Metadata = {
-  title: `Android の写真を PC に移して投稿する | ${SITE_NAME}`,
+  title: `Android で撮ってある写真を投稿する | ${SITE_NAME}`,
   description:
-    'Android のスマホで撮ったポケふたの写真を、位置情報を残したまま PC に移し、まとめて投稿する方法です。Google フォトのウェブ版からダウンロードする方法を説明します。',
+    'Android のスマホで撮ってあるポケふたの写真を投稿する方法です。どのポケふたの写真かを選んでスマホから投稿する方法と、位置情報を残したまま PC に移してまとめて投稿する方法を説明します。',
   alternates: { canonical: `${SITE_URL}/help/android-photos` },
   robots: { index: true, follow: true },
 };
 
 export default function AndroidPhotosHelpPage() {
   return (
-    <HelpShell title="Android の写真を PC に移して投稿する" current="/help/android-photos">
+    <HelpShell title="Android で撮ってある写真を投稿する" current="/help/android-photos">
 
         <div className="mt-6 rounded-xl border border-[#B07818]/30 bg-[#FAF0DC] p-4 text-sm leading-relaxed text-[#5C4410]">
           <p>
             Android のスマホでは、撮ってある写真をブラウザで選ぶと<strong>位置情報が消えてしまい</strong>、
-            どの蓋の写真か分からないため投稿できません。
+            写真だけではどの蓋の写真か分かりません。次のどれかで投稿してください。
           </p>
           <ul className="mt-2 ml-4 list-disc space-y-1">
             <li>
+              <span className="font-bold">スマホから</span>：どのポケふたの写真かを選んで投稿する（下の手順。ベータ）
+            </li>
+            <li>
               蓋の前にいるなら、<Link href="/upload" className="font-bold underline">投稿画面</Link>の「カメラで撮影」でその場で撮って投稿できます
             </li>
-            <li>撮ってある写真は、Google フォトのウェブ版から PC にダウンロードして、PC の「まとめて投稿」から投稿してください</li>
+            <li>たくさんあるなら、Google フォトのウェブ版から PC にダウンロードして、PC の「まとめて投稿」から投稿できます</li>
           </ul>
         </div>
+
+        <Section title="スマホから: ポケふたを選んで投稿する（ベータ）">
+          <Steps>
+            <li>
+              <Link href="/upload" className="font-bold underline">投稿画面</Link>の「撮ってある写真を投稿する」で、
+              地域名やポケモン名からポケふたを探して選びます（マンホールの詳細ページの投稿ボタンからでも同じです）
+            </li>
+            <li>「端末の写真から選ぶ」で、そのポケふたの写真を選びます</li>
+            <li>「この蓋の写真として投稿」を押します</li>
+          </Steps>
+          <p>
+            写真に位置情報が無いため、運営が写真を目で確かめます。選んだポケふたの写真でないものは削除することがあります。
+          </p>
+          <p>
+            試験中の機能です。使われ方を見て、仕様を見直すことがあります。
+          </p>
+        </Section>
 
         <Section title="撮る前に: カメラの位置情報を ON にする">
           <p>

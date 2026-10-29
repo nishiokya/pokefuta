@@ -22,6 +22,7 @@ import { PhraseText } from '@/components/PhraseText';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
 import { nearbyArea } from '@/lib/nearby-area';
+import { matchesManholeQuery } from '@/lib/manhole-search';
 
 interface ManholeWithDistance extends Manhole {
   distance?: number;
@@ -495,22 +496,8 @@ export default function NearbyPage() {
   const isUnvisited = (m: ManholeWithDistance) => !m.visit && !m.is_visited;
 
   const filteredAllManholes = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return allManholes;
-
-    return allManholes.filter((manhole) => {
-      const target = [
-        manhole.title,
-        manhole.prefecture,
-        manhole.municipality,
-        manhole.city,
-        ...(manhole.pokemons || []),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return target.includes(normalized);
-    });
+    if (!query.trim()) return allManholes;
+    return allManholes.filter((manhole) => matchesManholeQuery(manhole, query));
   }, [allManholes, query]);
 
   const NUM = '"Outfit", system-ui, sans-serif';
