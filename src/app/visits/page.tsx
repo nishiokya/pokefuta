@@ -24,7 +24,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import StampPhoto from '@/components/StampPhoto';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags } from '@/lib/photo-ai-tags';
+import { isPlushPhoto, photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
 import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
@@ -33,7 +33,7 @@ import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
-import { buildDesignManholeSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
+import { buildDesignManholeSticker, buildPlushSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -474,8 +474,12 @@ export default function VisitsPage() {
 
   // ポケモンのメダルの絵は右のポケモンバッジと同じ蓋にそろえる
   const stickers = useMemo(
-    () => [...buildThemeBadges(passportManholes, visitedManholeIds), buildDesignManholeSticker(designManholeCount)],
-    [passportManholes, visitedManholeIds, designManholeCount]
+    () => [
+      ...buildThemeBadges(passportManholes, visitedManholeIds),
+      buildPlushSticker(visits.filter((visit) => visit.photos.some((photo) => isPlushPhoto(photo.ai_tags))).length),
+      buildDesignManholeSticker(designManholeCount),
+    ],
+    [passportManholes, visitedManholeIds, designManholeCount, visits]
   );
   const pokemonMedalIds = useMemo(
     () => pokemonBadgeManholeIds(passportManholes, representatives),

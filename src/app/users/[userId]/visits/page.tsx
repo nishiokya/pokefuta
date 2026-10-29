@@ -15,7 +15,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
+import { isPlushPhoto, photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import GuestOnly from '@/components/users/GuestOnly';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import MonthlyActivity, { buildMonthlyActivity } from '@/components/users/MonthlyActivity';
@@ -154,7 +154,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
   // 都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。OGP 画像と同じ組み立て
   const badges = (() => {
     if (!progress) return null;
-    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives, designManholeCount });
+    const built = buildPublicStampbookBadges({ userId: data.userId, progress, snapshot, representatives, designManholeCount, plushCount: data.visits.filter((v) => isPlushPhoto(v.aiTags)).length });
     return { ...built, pokemon: built.pokemon.map((p) => ({ ...p, href: pokemonDexUrl(p.name) })) };
   })();
 

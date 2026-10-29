@@ -163,6 +163,24 @@ export function buildDesignManholeSticker(count: number): ThemeBadgeProgress {
 }
 
 /**
+ * ぬいぐるみステッカー。ぬいぐるみが写った訪問が1回でもあるともらえる（写真の AI タグ plush で数える）。
+ * count は「ぬいぐるみが写った訪問の数」。AI の判定なので外れもあり、2回目からは枚数を添えるだけにして競わせない。
+ */
+export function buildPlushSticker(count: number): ThemeBadgeProgress {
+  const posted = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return {
+    key: 'plush',
+    icon: '🧸',
+    name: posted > 1 ? `ぬいぐるみと一緒 ×${posted}` : 'ぬいぐるみと一緒',
+    description: 'ぬいぐるみと一緒にポケふたを撮影（写真から自動で判定）',
+    tag: '',
+    total: posted,
+    visited: posted,
+    earned: posted > 0,
+  };
+}
+
+/**
  * ポケモンバッジのメダルに入れる蓋。代表マンホール（dataset/pokemon_representatives.json）が
  * そのポケモンの蓋の中にあればそれ、無ければ id の小さい蓋。
  */
