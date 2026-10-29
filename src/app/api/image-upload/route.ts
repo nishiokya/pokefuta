@@ -31,8 +31,6 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *             required:
  *               - file
  *               - manhole_id
- *               - latitude
- *               - longitude
  *             properties:
  *               file:
  *                 type: string
@@ -69,11 +67,18 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *               latitude:
  *                 type: number
  *                 format: float
- *                 description: 撮影位置の緯度（必須、マンホールから50m以内のみ登録可能）
+ *                 description: 撮影位置の緯度（no_gps でなければ必須、マンホールから50m以内のみ登録可能）
  *               longitude:
  *                 type: number
  *                 format: float
- *                 description: 撮影位置の経度（必須、マンホールから50m以内のみ登録可能）
+ *                 description: 撮影位置の経度（no_gps でなければ必須、マンホールから50m以内のみ登録可能）
+ *               no_gps:
+ *                 type: string
+ *                 enum: ['true']
+ *                 description: >-
+ *                   写真に位置情報が無く、マンホール詳細から選んだ manhole_id の写真として投稿する。
+ *                   緯度経度が無いときだけ効き、距離の確認を飛ばす。visit_id（既存の訪問への追加）とは併用できない。
+ *                   visit.location_source は DB が 'none' にし、運営が目で確かめる
  *               metadata:
  *                 type: string
  *                 description: 追加メタデータ（JSON文字列）
@@ -179,6 +184,7 @@ export async function POST(request: NextRequest) {
     const longitude = formData.get('longitude');
     const exifStr = formData.get('exif');
     const existingVisitId = formData.get('visit_id');  // 既存visitへの写真追加（一括投稿用）
+    const noGpsValue = formData.get('no_gps');  // マンホール詳細からの位置情報なし投稿
     const landscapeValue = formData.get('is_landscape');
     if (landscapeValue !== null && landscapeValue !== 'true' && landscapeValue !== 'false') {
       return NextResponse.json({ success: false, error: 'is_landscape must be true or false' }, { status: 400 });
@@ -236,8 +242,13 @@ export async function POST(request: NextRequest) {
     // ✅ GPS座標の必須チェック
     const lat = latitude ? parseFloat(latitude as string) : undefined;
     const lng = longitude ? parseFloat(longitude as string) : undefined;
+    const hasCoordinates = isValidCoordinates(lat, lng);
 
-    if (!isValidCoordinates(lat, lng)) {
+    // 位置情報なしは、マンホール詳細から蓋を選んだ新しい訪問だけ受け付ける。
+    // 印（visit.location_source = 'none'）は shot_location が無いことから DB が付ける
+    const acceptWithoutGps = !hasCoordinates && noGpsValue === 'true' && !existingVisitId;
+
+    if (!hasCoordinates && !acceptWithoutGps) {
       return NextResponse.json({
         success: false,
         error: 'GPS coordinates are required - latitude and longitude must be valid numbers'
@@ -299,8 +310,10 @@ export async function POST(request: NextRequest) {
     const manholeLatitude = manholeCoords.lat;
     const manholeLongitude = manholeCoords.lng;
 
-    // ✅ マンホール位置との距離チェック（50m以内）
-    const distance = calculateDistance(lat!, lng!, manholeLatitude, manholeLongitude);
+    // ✅ マンホール位置との距離チェック（50m以内）。位置情報なしの投稿は確かめる位置が無い
+    const distance = hasCoordinates
+      ? calculateDistance(lat!, lng!, manholeLatitude, manholeLongitude)
+      : 0;
     const distanceThreshold = MAX_DISTANCE_KM; // 50m
     if (distance > distanceThreshold) {
       const distanceM = Math.round(distance * 1000);
@@ -390,8 +403,8 @@ export async function POST(request: NextRequest) {
           shotAtDate = new Date();
         }
 
-        // Build shot_location from required, validated GPS coordinates
-        const shotLocationGeom = `POINT(${lng} ${lat})`;
+        // 位置情報なしの投稿は shot_location を入れない（DB が location_source = 'none' にする）
+        const shotLocationGeom = hasCoordinates ? `POINT(${lng} ${lat})` : null;
 
         // Create visit record with proper Date type
         const visitInsert: any = {
