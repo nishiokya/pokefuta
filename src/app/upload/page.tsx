@@ -10,6 +10,7 @@ import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { matchesManholeQuery } from '@/lib/manhole-search';
 import { manholeHeadingPlace, pokemonText } from '@/lib/manhole-label';
+import { activeSeasonalCall, type SeasonalCall } from '@/lib/seasonal-call';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { buildAutoVisitNote, extractPhotoMetadata, type PhotoMetadata } from '@/lib/photo-exif';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -103,6 +104,9 @@ function UploadPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const hintManholeId = searchParams.get('manhole_id') ? Number(searchParams.get('manhole_id')) : null;
+  // 日付で出し分けるので、サーバー描画とずれないよう画面ができてから決める
+  const [seasonalCall, setSeasonalCall] = useState<SeasonalCall | null>(null);
+  useEffect(() => setSeasonalCall(activeSeasonalCall()), []);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
@@ -969,6 +973,18 @@ function UploadPageInner() {
             投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必要です。マンホールの詳細ページから投稿するときは、位置情報が無い写真も投稿できます。
           </p>
         </div>
+
+        {/* 季節の写真の呼びかけ。終わりの日を過ぎると自動で消える（src/lib/seasonal-call.ts） */}
+        {seasonalCall && (
+          <div className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
+            <p className="text-sm font-extrabold text-[#8A5A12]">
+              {seasonalCall.icon} {seasonalCall.name}のポケふた、募集中です
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+              {seasonalCall.name}をはじめ、桜・雪など季節感のある写真があれば、ぜひ投稿してください。
+            </p>
+          </div>
+        )}
 
         {/* Hint Manhole Card */}
         {hintManhole && (
