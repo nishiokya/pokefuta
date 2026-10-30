@@ -5,6 +5,8 @@ interface PCShellProps {
   /** 右レール（sticky）。未指定時は単一カラム */
   rail?: React.ReactNode;
   className?: string;
+  /** 写真館トップ用。xl から本文の最大幅を --page-max-home に広げる */
+  home?: boolean;
 }
 
 /**
@@ -16,9 +18,9 @@ interface PCShellProps {
  * 全ページに描画するので、ここは本文のグリッドだけを担当する。
  * アクティブタブの判定も SiteChrome 側（`@/lib/siteNav` のルート表）に移した。
  */
-export default function PCShell({ children, rail, className }: PCShellProps) {
+export default function PCShell({ children, rail, className, home }: PCShellProps) {
   return (
-    <div className={`mx-auto w-full max-w-page px-4 lg:px-8 ${className ?? ''}`}>
+    <div className={`mx-auto w-full max-w-page px-4 lg:px-8 ${home ? 'xl:max-w-home' : ''} ${className ?? ''}`}>
       {rail ? (
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-[28px]">
           {/* モバイル: rail を children より先に表示 */}

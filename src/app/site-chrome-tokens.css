@@ -62,4 +62,7 @@
      図鑑側は pokefuta-tracker の apps/web/assets/site-header.css に同値をコピーしている。 */
   --page-max-wide: 1120px;
   --page-max-narrow: 720px;
+  /* 写真館トップだけの3段目（2026-10-30）。xl で最新の投稿を4列＋右レールにするため広げる。
+     トップから他のページへ移ると本文の左端が動くが、写真の一覧が主役のページなので面積を優先した */
+  --page-max-home: 1360px;
 }
