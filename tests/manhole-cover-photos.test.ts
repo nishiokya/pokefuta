@@ -5,14 +5,14 @@ import { pickCoverPhotos, type CoverPhotoCandidate } from '../src/lib/manhole-co
 const photo = (
   id: string,
   manholeId: number | null,
-  options: { qualityScore?: number; isLandscape?: boolean; createdAt?: string } = {}
+  options: { qualityScore?: number; isLandscape?: boolean; createdAt?: string; comment?: string } = {}
 ): CoverPhotoCandidate => ({
   id,
   manhole_id: manholeId,
   created_at: options.createdAt ?? '2026-10-01T00:00:00Z',
   quality_score: options.qualityScore ?? null,
   is_landscape: options.isLandscape ?? false,
-  visit: { comment: null, is_public: true },
+  visit: { comment: options.comment ?? null, is_public: true },
 });
 
 test('蓋ごとに1枚、スコアの高い写真を選ぶ', () => {
@@ -50,4 +50,12 @@ test('丸に切り抜く位置は ai_tags の lid・crop だけを返す', () =>
   ]);
   assert.deepEqual(result['1'].lid_crop, { lid: [0.2, 0.2, 0.8, 0.8], crop: [0, 0.1, 1, 0.9] });
   assert.equal(result['2'].lid_crop, null);
+});
+
+test('丸い切り抜きでは、ひとこと付きでもスコアの高い写真を選ぶ（吹き出しが出ないので）', () => {
+  const result = pickCoverPhotos([
+    photo('commented', 1, { qualityScore: 0.5, comment: 'ぬいぐるみと一緒に撮りました！' }),
+    photo('best', 1, { qualityScore: 0.9 }),
+  ]);
+  assert.equal(result['1'].photo_id, 'best');
 });
