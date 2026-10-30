@@ -62,6 +62,24 @@ type FeedVisit = {
 // タグの色は特集ページと共有する（src/lib/feed-chip-class.ts）
 const CHIP_CLASS = FEED_CHIP_CLASS;
 
+// PC のヒーローに敷く6枚。最新の投稿の1行目（4枚）はすぐ下に同じ写真が出るので飛ばし、
+// 風景写真（蓋が写っていない）と同じ蓋の重複を除く。蓋の写真が並ぶことで、何のサイトかが一目で分かる
+const HERO_PHOTO_COUNT = 6;
+function pickHeroPhotos(visits: FeedVisit[]): FeedVisit[] {
+  const seen = new Set<number>();
+  const picked: FeedVisit[] = [];
+  const sorted = [...visits].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  for (const visit of sorted.slice(4)) {
+    const photo = visit.photos?.[0];
+    const manholeId = visit.manhole?.id ?? visit.manhole_id;
+    if (!photo?.thumbnail_url || photo.is_landscape || !manholeId || seen.has(manholeId)) continue;
+    seen.add(manholeId);
+    picked.push(visit);
+    if (picked.length === HERO_PHOTO_COUNT) break;
+  }
+  return picked;
+}
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   // 最初の投稿の取得が終わったか。loading はページ送りのたびに true に戻るので、
@@ -72,6 +90,10 @@ export default function HomePage() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
+  // 写真のあるポケふたの数（site-stats の manholes_with_photos）。PC のヒーローの数字に使う
+  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
+  // PC のヒーロー右に敷く写真。最初のページの投稿から取り、ページ送りでは差し替えない
+  const [heroPhotos, setHeroPhotos] = useState<FeedVisit[] | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
   const [rareLoading, setRareLoading] = useState(true);
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
@@ -148,9 +170,12 @@ export default function HomePage() {
 
       const visits: FeedVisit[] = Array.isArray(data.visits) ? data.visits : [];
       setFeed(visits);
+      if (currentPage === 1) setHeroPhotos((prev) => prev ?? pickHeroPhotos(visits));
     } catch (error) {
       console.error('Failed to load feed:', error);
       setFeed([]);
+      // 取れなかったときはヒーローのモザイクを枠ごと消す（null のままだと空の枠が残る）
+      if (currentPage === 1) setHeroPhotos((prev) => prev ?? []);
     } finally {
       setLoading(false);
       setFeedSettled(true);
@@ -167,6 +192,7 @@ export default function HomePage() {
       // 非公開にした写真まで「集まっています」に含まれて表示と食い違う。
       setTotalPosts(typeof data.public_posts === 'number' ? data.public_posts : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
+      setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
     } catch {
       // ignore
     }
@@ -259,6 +285,14 @@ export default function HomePage() {
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
+          {/*
+            PC は左に文字と行動のカード、右に投稿写真のモザイク（2026-10-30）。全部の蓋に写真がそろって
+            「◯◯で募集中」のカードが出なくなり、PC のヒーローが文字だけで右半分が空いていた。
+            xl から。lg（1024px）だと折り返さない見出し（md:text-5xl）とモザイクが横に入りきらない。
+            それより狭い幅は今までどおり1列（モザイクは出さない）
+          */}
+          <div className="xl:flex xl:items-center xl:gap-8">
+          <div className="min-w-0 xl:flex-1">
           <div className="relative max-w-3xl">
             {/*
               日本語は単語区切りが無いので、放っておくと文字単位で折り返して
@@ -307,6 +341,28 @@ export default function HomePage() {
                 <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
               )}
             </p>
+
+            {/*
+              PC だけ、そろった範囲を数字で見せる（2026-10-30）。全部そろうと上の文が枚数だけになり、
+              何がどこまで集まったのかが読めなかった。次の行動（2枚目）にもつなぐ。
+              数字はどちらも取得後に入るので、そろうまでは行ごと出さない（PC はモザイクの高さで行が取ってある）
+            */}
+            {allCollected && manholesWithPhotos != null && manholesWithPhotos > 0 && (
+              <div className="mt-3 hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-[#4A4A4A] lg:flex">
+                <span className="whitespace-nowrap">
+                  <b className="text-xl font-extrabold text-[#7B63A8]">{manholesWithPhotos}</b> か所のポケふた すべてに写真
+                </span>
+                <span className="whitespace-nowrap">
+                  <b className="text-xl font-extrabold text-[#7B63A8]">{completion?.completeCount}</b> 都道府県すべて
+                </span>
+                <Link
+                  href={isLoggedIn ? '/upload' : '/login?redirect=/upload'}
+                  className="whitespace-nowrap text-[#B5483C] hover:underline"
+                >
+                  別の季節・2枚目も募集中 ›
+                </Link>
+              </div>
+            )}
 
             {/*
               新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
@@ -379,7 +435,7 @@ export default function HomePage() {
                     <li key={legend.id}>
                       <Link
                         href={`/users/${encodeURIComponent(legend.id)}/visits`}
-                        className="group flex w-12 flex-col items-center sm:w-[4.5rem] lg:w-20"
+                        className="group flex w-12 flex-col items-center sm:w-[4.5rem] lg:w-20 xl:w-16"
                         title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
                       >
                         <span className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-300 via-amber-200 to-sky-300 p-[2px] shadow-sm transition group-hover:scale-105 sm:h-10 sm:w-10">
@@ -446,6 +502,41 @@ export default function HomePage() {
                 </span>
               </a>
             )}
+          </div>
+          </div>
+
+          {/*
+            写真は最新の投稿から後で入るが、枠（3×2）は最初から取っておくので左の行はずれない。
+            取れなかったときは枠ごと出さない
+          */}
+          {heroPhotos?.length !== 0 && (
+            <ul className="hidden shrink-0 grid-cols-3 gap-1.5 xl:grid" aria-label="最近投稿されたポケふた">
+              {Array.from({ length: HERO_PHOTO_COUNT }, (_, index) => {
+                const visit = heroPhotos?.[index];
+                const photo = visit?.photos?.[0];
+                const manholeId = visit?.manhole?.id ?? visit?.manhole_id;
+                const label = visit?.manhole ? manholeDisplayName(visit.manhole) : visit?.shot_location || '';
+                return (
+                  <li key={visit?.id ?? `hero-slot-${index}`} className="h-[104px] w-[104px] overflow-hidden rounded-[8px] bg-[#EFE4CC] shadow-sm ring-1 ring-[#7B63A8]/10">
+                    {visit && photo?.thumbnail_url && manholeId && (
+                      <Link href={`/manhole/${manholeId}`} title={label} className="group block h-full w-full">
+                        <img
+                          src={photo.thumbnail_url}
+                          alt={label}
+                          width={104}
+                          height={104}
+                          // xl 未満はモザイクごと display:none。lazy にしておくと隠れている間は取りに行かない
+                          loading="lazy"
+                          className="h-full w-full object-cover transition group-hover:scale-105"
+                          style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
+                        />
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           </div>
 
         </section>
@@ -723,23 +814,10 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* 近くを探す。ヒーローの左のカードを /badges に譲り、ここへ下げた（2026-10-24）。下タブの「探す」と同じ先 */}
-            {sortedFeed.length > 0 && (
-              <Link
-                href="/nearby"
-                className="group mt-6 flex items-center gap-3 rounded-[8px] border border-[#7B63A8]/20 bg-white p-3 shadow-sm transition hover:shadow sm:p-4"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
-                  <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-extrabold text-[#4A4A4A] sm:text-base">近くのポケふたを探す</span>
-                  <span className="block text-xs text-[#6A4D36]">
-                    現在地から近い順<span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">›</span>
-                  </span>
-                </span>
-              </Link>
-            )}
+            {/*
+              「近くのポケふたを探す」の帯（/nearby）は外した（2026-10-30）。行き先は下タブ・PC ナビの「探す」と同じで、
+              一覧の下でもう一度出す意味が薄かった
+            */}
 
             {/* Login CTA - shown after scrolling through some photos */}
             {!isLoggedIn && sortedFeed.length > 0 && (
