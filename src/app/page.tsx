@@ -62,14 +62,16 @@ type FeedVisit = {
 // タグの色は特集ページと共有する（src/lib/feed-chip-class.ts）
 const CHIP_CLASS = FEED_CHIP_CLASS;
 
-// PC のヒーローに敷く6枚。最新の投稿の1行目（4枚）はすぐ下に同じ写真が出るので飛ばし、
-// 風景写真（蓋が写っていない）と同じ蓋の重複を除く。蓋の写真が並ぶことで、何のサイトかが一目で分かる
+// PC のヒーローに敷く6枚。最新の投稿の上3行（PC の4列で12枚）はファーストビューと
+// その直下に同じ写真が出るので後回しにし、風景写真（蓋が写っていない）と同じ蓋の重複を除く。蓋の写真が並ぶことで、何のサイトかが一目で分かる
 const HERO_PHOTO_COUNT = 6;
+const HERO_SKIP_FIRST = 12;
 function pickHeroPhotos(visits: FeedVisit[]): FeedVisit[] {
   const seen = new Set<number>();
   const picked: FeedVisit[] = [];
   const sorted = [...visits].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  for (const visit of sorted.slice(4)) {
+  // 足りなければ上の行からも取る（風景写真や同じ蓋が続いて6枚に届かないとき、枠を空けない）
+  for (const visit of [...sorted.slice(HERO_SKIP_FIRST), ...sorted.slice(0, HERO_SKIP_FIRST)]) {
     const photo = visit.photos?.[0];
     const manholeId = visit.manhole?.id ?? visit.manhole_id;
     if (!photo?.thumbnail_url || photo.is_landscape || !manholeId || seen.has(manholeId)) continue;
@@ -111,6 +113,8 @@ export default function HomePage() {
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
   const [isSp, setIsSp] = useState<boolean | null>(null);
+  // PC の広い幅（Tailwind の xl 以上）か。口コミと特集を右レールに出すかを決める。幅が分かるまでは null
+  const [isXl, setIsXl] = useState<boolean | null>(null);
   const feedPerPage = 24;
   const { trackView } = useAnalytics();
 
@@ -150,10 +154,18 @@ export default function HomePage() {
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
-    const update = () => setIsSp(mq.matches);
+    const xl = window.matchMedia('(min-width: 1280px)');
+    const update = () => {
+      setIsSp(mq.matches);
+      setIsXl(xl.matches);
+    };
     update();
     mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
+    xl.addEventListener('change', update);
+    return () => {
+      mq.removeEventListener('change', update);
+      xl.removeEventListener('change', update);
+    };
   }, []);
 
   const loadFeed = async () => {
@@ -268,7 +280,84 @@ export default function HomePage() {
   // PC の右レール（未ログイン向けの「写真ゼロを埋めよう」募集カード）は外した。
   // 登録導線はヒーロー内のボタンが担っており重複していた上に、レールが出ると
   // 本文カラムが 1064px → 618px まで縮み、見出しが折り返す原因になっていた。
-  // rail を渡さなければ PCShell は1カラムのままになる。
+  // 今の右レール（口コミ・特集、xl のみ）は PCShell の rail を使わず、ヒーローの下だけを2列にしている
+  // （ヒーローは横いっぱいのまま）。幅は PCShell の home で広げる。
+
+  // 特集（デザインふた・ぬいぐるみ）の節。PC（xl）は右レールに縦1列で、それより狭い幅は一覧の下に2列で出す
+  const renderFeatures = (inRail: boolean) =>
+    feedSettled && ((designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0)) ? (
+          <section className={inRail ? undefined : 'mt-8'}>
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
+              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
+              特集
+            </h2>
+            <div className={inRail ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2'}>
+            {designFeature && designFeature.length > 0 && (
+            <Link
+              href="/design-manholes"
+              className={`group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow ${inRail ? 'px-3 py-2.5' : 'sm:flex-row sm:items-center sm:gap-3'}`}
+            >
+              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {designFeature.map((d, index) => (
+                  <div key={d.id} className={`h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm ${index === 2 ? 'max-sm:hidden' : ''}`}>
+                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
+                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            )}
+            {plushFeature && plushFeature.count > 0 && (
+            <Link
+              href="/photos/plush"
+              className={`group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow ${inRail ? 'px-3 py-2.5' : 'sm:flex-row sm:items-center sm:gap-3'}`}
+            >
+              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {plushFeature.photos.map((photo, index) => {
+                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                  const src = `/api/photo/${photo.id}?size=small`;
+                  return (
+                    <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''} ${index > 2 ? 'hidden' : ''}`}>
+                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                        <img src={src} alt="" width={56} height={56} loading="lazy"
+                          className={lidClip ? undefined : 'h-full w-full object-cover'}
+                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                      </div>
+                      {plushClip && (
+                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
+                  ぬいぐるみと旅するポケふた
+                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                </p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  写真 {plushFeature.count}枚
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            )}
+            </div>
+          </section>
+    ) : null;
 
   return (
     // pb-nav-safe はここには要らない。固定下タブを避ける責任は、この後ろに描かれる
@@ -281,7 +370,7 @@ export default function HomePage() {
         フッターが担っているので本文には要らない。ここはフッターとの間隔として
         必要な分だけ残す。
       */}
-      <PCShell className="pb-10 pt-2 sm:pt-5 lg:pb-12 lg:pt-6">
+      <PCShell home className="pb-10 pt-2 sm:pt-5 lg:pb-12 lg:pt-6">
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-4 py-4 shadow-[0_8px_24px_rgba(123,99,168,0.10)] sm:px-8 sm:py-8">
@@ -541,6 +630,13 @@ export default function HomePage() {
 
         </section>
 
+        {/*
+          PC（xl）はヒーローの下を2列にする（2026-10-30）。左は最新の投稿を4列で、右のレールに口コミと特集。
+          以前は口コミ2段が最新の投稿の前にあり、一覧が3列（1枚約290px）だったので、ファーストビューに投稿が3枚しか入らなかった。
+          レールは前に「本文が狭くなる」で外した（上のコメント参照）が、今回は本文の幅（PCShell の home）を広げて取る
+        */}
+        <div className="xl:mt-6 xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start xl:gap-7">
+        <div className="min-w-0">
         {/* Loading State */}
         {loading && (
           <div className="mt-4 flex items-center justify-center py-8 sm:mt-6 sm:py-12">
@@ -559,12 +655,12 @@ export default function HomePage() {
           食い違うので、置く場所そのものを変える。幅が分かるまでは出さない（RecentComments は
           データが来るまで何も描かないので、出すのが少し遅れてもずれない）。一度だけ描くので取得も1回
         */}
-        {currentPage === 1 && isSp === false && <RecentComments />}
+        {currentPage === 1 && isSp === false && isXl === false && <RecentComments />}
 
         {/* Photo Gallery */}
         {!loading && (
           <>
-            <section className="mt-6">
+            <section className="mt-6 xl:mt-0">
               {/* 総枚数はヒーローに出しているので、ここでは繰り返さない */}
               <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
                 <TrendingUp className="h-5 w-5 text-[#7B63A8]" />
@@ -576,7 +672,7 @@ export default function HomePage() {
                   <p className="text-sm font-bold text-[#6B6B6B]">まだ投稿がありません</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5 xl:grid-cols-4 xl:gap-4">
                   {collapseByPoster(sortedFeed).map((item, index) => {
                     if (item.kind === 'collapsed') {
                       const hiddenPhotos = item.hidden
@@ -861,79 +957,7 @@ export default function HomePage() {
           10-24 にヒーローを「この3人に続け！」にしたので、またここ（デザインふたの右）に戻した。
           PC は写真と説明の横長カード、スマホは写真を減らす。どちらも取れなければ節ごと出さない
         */}
-        {feedSettled && ((designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0)) && (
-          <section className="mt-8">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
-              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
-              特集
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-            {designFeature && designFeature.length > 0 && (
-            <Link
-              href="/design-manholes"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {designFeature.map((d, index) => (
-                  <div key={d.id} className={`h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm ${index === 2 ? 'max-sm:hidden' : ''}`}>
-                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
-                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            )}
-            {plushFeature && plushFeature.count > 0 && (
-            <Link
-              href="/photos/plush"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {plushFeature.photos.map((photo, index) => {
-                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                  const src = `/api/photo/${photo.id}?size=small`;
-                  return (
-                    <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''} ${index > 2 ? 'hidden' : ''}`}>
-                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy"
-                          className={lidClip ? undefined : 'h-full w-full object-cover'}
-                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                      </div>
-                      {plushClip && (
-                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
-                  ぬいぐるみと旅するポケふた
-                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                </p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  写真 {plushFeature.count}枚
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            )}
-            </div>
-          </section>
-        )}
+        {isXl === false && renderFeatures(false)}
 
         {/*
           全部そろった後も投稿は集め続けているので、お礼で終わらせず「別の季節・2枚目」へつなぐ
@@ -999,6 +1023,16 @@ export default function HomePage() {
             </p>
           </section>
         )}
+        </div>
+
+        {/* 右レール（xl）。口コミはここで1回だけ描く（上の isXl === false と排他なので取得も1回） */}
+        {isXl === true && (
+          <aside className="sticky top-5 flex flex-col gap-8">
+            {currentPage === 1 && <RecentComments variant="rail" />}
+            {renderFeatures(true)}
+          </aside>
+        )}
+        </div>
       </main>
       </PCShell>
 

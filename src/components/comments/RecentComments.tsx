@@ -41,7 +41,9 @@ const KIND_LABEL: Record<RecentCommentKind, string> = {
  * 本文はカードに直接出す（hover で出すフィードのプレビューと違い、スマホでも読める）。
  * 1件も無い・取得に失敗したときはセクションごと出さない。
  */
-export default function RecentComments() {
+export default function RecentComments({ variant }: { variant?: 'rail' } = {}) {
+  // rail: PC（xl）のトップの右レール用。幅 320px の1列に6件を詰めて並べる
+  const rail = variant === 'rail';
   const [items, setItems] = useState<RecentCommentItem[]>([]);
 
   useEffect(() => {
@@ -64,25 +66,25 @@ export default function RecentComments() {
   if (items.length === 0) return null;
 
   return (
-    <section className="mt-6">
+    <section className={rail ? undefined : 'mt-6'}>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
         <MessageCircle className="h-5 w-5 text-[#7B63A8]" />
         最近の口コミ
       </h2>
-      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <ul className={rail ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3'}>
         {items.map((item, index) => {
           const { manhole } = item;
           const place = manholeDisplayName(manhole);
           return (
             <li
               key={`${item.kind}-${manhole.id}`}
-              className={index >= MOBILE_VISIBLE ? 'hidden md:block' : undefined}
+              className={!rail && index >= MOBILE_VISIBLE ? 'hidden md:block' : undefined}
             >
               <Link
                 href={`/manhole/${manhole.id}`}
-                className="flex h-full gap-3 rounded-[8px] border border-[#7B63A8]/15 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
+                className={`flex h-full rounded-[8px] border border-[#7B63A8]/15 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFB347] ${rail ? 'gap-2.5 p-2' : 'gap-3 p-3'}`}
               >
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[6px] bg-[#FFF8EB]">
+                <div className={`${rail ? 'h-14 w-14' : 'h-20 w-20'} shrink-0 overflow-hidden rounded-[6px] bg-[#FFF8EB]`}>
                   {item.thumbnail_url ? (
                     <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" loading="lazy" />
                   ) : (
@@ -93,7 +95,7 @@ export default function RecentComments() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-extrabold text-[#2E2346]">{place}</div>
-                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[#3D3D3D]">
+                  <p className={`line-clamp-2 leading-relaxed text-[#3D3D3D] ${rail ? 'mt-0.5 text-xs' : 'mt-1 text-sm'}`}>
                     「{item.content}」
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-[#6B6B6B]">

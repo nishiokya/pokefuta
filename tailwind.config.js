@@ -37,6 +37,7 @@ module.exports = {
       maxWidth: {
         page: 'var(--page-max-wide)',
         read: 'var(--page-max-narrow)',
+        home: 'var(--page-max-home)',
       },
     },
   },
