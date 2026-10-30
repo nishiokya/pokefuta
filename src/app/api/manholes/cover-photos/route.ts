@@ -18,7 +18,7 @@ const MAX_PAGES = 10;
  *
  * /nearby は今まで「見ている人自身の訪問」の写真しか出せず、まだ行っていない蓋は
  * 写真があってもプレースホルダーになっていた。ここで公開写真から1枚選んで埋める。
- * 選び方は詳細ページの代表写真と同じ rankManholePhotos。
+ * 選び方は詳細ページの代表写真と同じ rankManholePhotos（ひとこと付きを先にする決まりだけ外す。pickCoverPhotos）。
  *
  * GET /api/manholes/cover-photos?ids=404,405,407
  * → { success, photos: { "404": { photo_id, thumbnail_url, is_landscape, lid_crop } } }

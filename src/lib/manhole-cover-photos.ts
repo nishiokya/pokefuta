@@ -21,7 +21,8 @@ const lidCropOf = (aiTags: unknown): CoverPhoto['lid_crop'] => {
 
 /**
  * 蓋ごとに代表写真を1枚選ぶ。並びは詳細ページの代表写真と同じ rankManholePhotos
- * （風景は後ろ。風景しか無い蓋は風景を出す）。
+ * （風景は後ろ。風景しか無い蓋は風景を出す）。ただし、ひとこと付きを先にする決まりは外す。
+ * 丸い切り抜きには吹き出しが出ないので、ひとことを優先しても見る人には何も増えない。
  */
 export function pickCoverPhotos(photos: CoverPhotoCandidate[]): Record<string, CoverPhoto> {
   const byManhole = new Map<number, CoverPhotoCandidate[]>();
@@ -34,7 +35,7 @@ export function pickCoverPhotos(photos: CoverPhotoCandidate[]): Record<string, C
 
   const result: Record<string, CoverPhoto> = {};
   for (const [manholeId, list] of byManhole) {
-    const [best] = rankManholePhotos(list);
+    const [best] = rankManholePhotos(list, { preferCommented: false });
     if (!best) continue;
     result[String(manholeId)] = {
       photo_id: best.id,

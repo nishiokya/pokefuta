@@ -309,3 +309,13 @@ test('the centered preference does not jump over comments, unscored or ineligibl
   ]);
   assert.deepEqual(ranked.map((item) => item.id), ['commented', 'centered', 'unscored', 'centered-ineligible']);
 });
+
+test('preferCommented: false drops only the comment rule; landscapes still go last', () => {
+  const ranked = rankManholePhotos([
+    photo('commented', { qualityScore: 0.5, comment: 'とても良い場所でした' }),
+    photo('best', { qualityScore: 0.9 }),
+    photo('scenery', { qualityScore: 0.99, isLandscape: true }),
+  ], { preferCommented: false });
+  assert.deepEqual(ranked.map((p) => p.id), ['best', 'commented', 'scenery']);
+  assert.equal(rankManholePhotos(ranked)[0].id, 'commented');
+});

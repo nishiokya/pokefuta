@@ -85,15 +85,24 @@ export const getRepScore = (photo: RankableManholePhoto) => {
  * 4. 段 0 の写真すべてに rep_score があるときは、3 の代わりに「正方形に収まる（lid_fits）→ rep_score」で並べる。
  *    人が判定した比較（k11 manhole-score data/model_compare/2026-10-25-rep9v7）と同じ並べ方。
  *    1枚でも無い写真が混ざると点を比べられないので、その蓋は 3 のまま（版の切り替え中・未採点の新着）
+ *
+ * preferCommented: false で 1 を外す。蓋を丸く切り抜いて並べる一覧（pickCoverPhotos）は吹き出しを出さないので、
+ * ひとことを優先する理由が無い。2026-10-30 の DB では代表 482 枚のうち 470 枚がひとこと付きで、
+ * ぬいぐるみと一緒に撮ってひとことを書いた写真が 280 枚を占めた（1 を外すと 22 枚）
  */
-export const rankManholePhotos = <T extends RankableManholePhoto>(items: T[]) => {
+export const rankManholePhotos = <T extends RankableManholePhoto>(
+  items: T[],
+  { preferCommented = true }: { preferCommented?: boolean } = {}
+) => {
   const byRepScore = items.some((p) => rankTier(p) === 0)
     && items.every((p) => rankTier(p) !== 0 || getRepScore(p) !== null);
   return [...items].sort((a, b) => {
     if (Boolean(a.is_landscape) !== Boolean(b.is_landscape)) return a.is_landscape ? 1 : -1;
-    const aCommented = isMeaningfulVisitComment(a.visit?.comment);
-    const bCommented = isMeaningfulVisitComment(b.visit?.comment);
-    if (aCommented !== bCommented) return aCommented ? -1 : 1;
+    if (preferCommented) {
+      const aCommented = isMeaningfulVisitComment(a.visit?.comment);
+      const bCommented = isMeaningfulVisitComment(b.visit?.comment);
+      if (aCommented !== bCommented) return aCommented ? -1 : 1;
+    }
 
     const tier = rankTier(a) - rankTier(b);
     if (tier !== 0) return tier;
