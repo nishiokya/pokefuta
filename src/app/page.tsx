@@ -186,6 +186,8 @@ export default function HomePage() {
     } catch (error) {
       console.error('Failed to load feed:', error);
       setFeed([]);
+      // 取れなかったときはヒーローのモザイクを枠ごと消す（null のままだと空の枠が残る）
+      if (currentPage === 1) setHeroPhotos((prev) => prev ?? []);
     } finally {
       setLoading(false);
       setFeedSettled(true);
@@ -612,6 +614,8 @@ export default function HomePage() {
                           alt={label}
                           width={104}
                           height={104}
+                          // xl 未満はモザイクごと display:none。lazy にしておくと隠れている間は取りに行かない
+                          loading="lazy"
                           className="h-full w-full object-cover transition group-hover:scale-105"
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                         />
