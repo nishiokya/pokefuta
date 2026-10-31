@@ -9,6 +9,7 @@ import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import type { ManholeTitle } from '@/types/database';
 import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
+import { DATA_SITE_PREFIX, getSafeRedirectPath, getSignupReturnPath } from '@/lib/auth-redirect';
 
 type RarePreviewManhole = {
   id: number;
@@ -29,16 +30,6 @@ type RarePreviewItem = {
   location: string;
   pokemon: string;
 };
-
-// data.pokefuta.com（静的サイト側）からの SSO ログインのみ外部リダイレクトを許可
-const DATA_SITE_PREFIX = 'https://data.pokefuta.com/';
-
-function getSafeRedirectPath(value: string | null | undefined) {
-  if (!value) return '/';
-  if (value.startsWith(DATA_SITE_PREFIX)) return value;
-  if (!value.startsWith('/') || value.startsWith('//')) return '/';
-  return value;
-}
 
 function getAuthErrorMessage(value: string | null) {
   if (value === 'missing_auth_code') return '確認リンクが無効です。メールのリンクをもう一度開いてください。';
@@ -374,7 +365,8 @@ function LoginForm() {
       if (password.length < 8) throw new Error('パスワードは8文字以上で入力してください');
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://pokefuta.com';
       const callbackUrl = new URL('/auth/callback', origin);
-      callbackUrl.searchParams.set('next', '/upload');
+      const returnPath = getSignupReturnPath(redirectTo);
+      callbackUrl.searchParams.set('next', returnPath);
       callbackUrl.searchParams.set('conversion', 'signup_email_confirmed');
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -388,7 +380,7 @@ function LoginForm() {
       if (data.user) {
         setUser(data.user.id);
         trackSignupComplete();
-        router.push('/login?from=register&redirect=/upload');
+        router.push(`/login?from=register&redirect=${encodeURIComponent(returnPath)}`);
       }
     } catch (err: any) {
       trackAuthError(err.name || 'signup_error', err.message);

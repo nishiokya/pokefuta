@@ -32,6 +32,7 @@ import { SITE_NAME } from '@/lib/constants';
 import type { CompletionRollup } from '@/lib/prefecture-completion';
 import type { LatestManholeComment } from '@/lib/latest-manhole-comment';
 import { manholeDisplayName } from '@/lib/manhole-label';
+import { manholePhotoHref } from '@/lib/manhole-photo-link';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import PosterLink from '@/components/PosterLink';
@@ -519,7 +520,7 @@ export default function HomePage() {
                 return (
                   <li key={visit?.id ?? `hero-slot-${index}`} className="h-[104px] w-[104px] overflow-hidden rounded-[8px] bg-[#EFE4CC] shadow-sm ring-1 ring-[#7B63A8]/10">
                     {visit && photo?.thumbnail_url && manholeId && (
-                      <Link href={`/manhole/${manholeId}`} title={label} className="group block h-full w-full">
+                      <Link href={manholePhotoHref(manholeId, photo.id)} title={label} className="group block h-full w-full">
                         <img
                           src={photo.thumbnail_url}
                           alt={label}
@@ -627,7 +628,7 @@ export default function HomePage() {
                     const locationLabel = visit.manhole ? manholeDisplayName(visit.manhole) : visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
                     const canNavigate = Boolean(manholeId);
-                    const to = canNavigate ? `/manhole/${manholeId}` : '';
+                    const to = manholeId ? manholePhotoHref(manholeId, photo?.id) : '';
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
                     const latestComment = commentCount > 0 ? visit.latest_manhole_comment ?? null : null;
 

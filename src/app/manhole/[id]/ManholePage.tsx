@@ -28,6 +28,7 @@ import {
   orderManholePhotosForViewer,
   photoChronologyDate,
 } from '@/lib/manhole-photo-ranking';
+import { photoIdFromHash } from '@/lib/manhole-photo-link';
 import {
   isMeaningfulVisitComment,
   normalizeVisitComment,
@@ -276,6 +277,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   // /api/visits が返るまで「0 / N 達成」という嘘の進捗が一瞬出る。
   const [prefectureDex, setPrefectureDex] = useState<{ current: number; total: number } | null>(null);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
+  // トップなどで押された写真（`#photo-<id>`）。代表の位置に出す。hash はサーバに届かないので
+  // サーバ描画では null のまま、マウント後に読む（`src/lib/manhole-photo-link.ts`）。
+  const [focusPhotoId, setFocusPhotoId] = useState<string | null>(null);
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [photosLoading, setPhotosLoading] = useState(true);
   const [photoLoadError, setPhotoLoadError] = useState(false);
@@ -297,6 +301,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     const manholeId = params.id;
     if (manholeId) {
       setSelectedPhotoIdx(0);
+      setFocusPhotoId(photoIdFromHash(window.location.hash));
       setPhotoExpanded(false);
       // 既にこの蓋を表示できているなら状態を消さずに再取得する。初回は
       // サーバ描画ぶんが入っているのでここが真になる。再取得する理由は
@@ -751,7 +756,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   // ── Derived photo state ────────────────────────────────────────────
   const isLoggedIn = currentUserId !== null;
-  const { myPhotos, orderedPhotos: allDisplayPhotos, representativePhoto } = orderManholePhotosForViewer(photos);
+  const { myPhotos, orderedPhotos: allDisplayPhotos, representativePhoto } = orderManholePhotosForViewer(photos, focusPhotoId);
   const photoState: 'none' | 'mine' | 'community' =
     photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
   const hasMyLidPhoto = myPhotos.some(photo => !photo.is_landscape);
