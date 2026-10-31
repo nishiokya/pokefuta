@@ -44,7 +44,8 @@
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
     "verify:visit-location-source": "node tools/verify-visit-location-source.js",
-    "capture": "node tools/capture/capture.js"
+    "capture": "node tools/capture/capture.js",
+    "test:auth-redirect": "tsx --test tests/auth-redirect.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.901.0",
