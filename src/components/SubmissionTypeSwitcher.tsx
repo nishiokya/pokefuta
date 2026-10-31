@@ -83,6 +83,18 @@ export default function SubmissionTypeSwitcher({
           );
         })}
       </div>
+      {current === 'pokefuta' && (
+        <p className="mt-2 text-xs leading-relaxed text-[#5F574F]">
+          公式サイトに載っていない新しいポケふたは{' '}
+          <Link
+            href="/design-manholes/new?kind=pokefuta"
+            onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'submission_type_switcher' })}
+            className="font-bold text-[#7B63A8] underline"
+          >
+            こちらから投稿
+          </Link>
+        </p>
+      )}
     </section>
   );
 }

@@ -57,6 +57,8 @@ export default function DesignManholeNewPage() {
   }, [previewUrl]);
   const [exifPayload, setExifPayload] = useState<Record<string, any> | null>(null);
   const [title, setTitle] = useState('');
+  // 公式サイトに載っていない新しいポケふた。/upload からは ?kind=pokefuta で来る
+  const [isPokefuta, setIsPokefuta] = useState(false);
   const [description, setDescription] = useState('');
   const [submitterName, setSubmitterName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,6 +67,10 @@ export default function DesignManholeNewPage() {
   const [postedId, setPostedId] = useState<string | null>(null);
   const [postedTitle, setPostedTitle] = useState<string | null>(null);
   const [postedNeedsReview, setPostedNeedsReview] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('kind') === 'pokefuta') setIsPokefuta(true);
+  }, []);
 
   // 投稿ファネルの起点。/upload と同じく画面到達を分母にする
   useEffect(() => {
@@ -339,6 +345,7 @@ export default function DesignManholeNewPage() {
       formData.append('lat', String(lat));
       formData.append('lng', String(lng));
       if (title.trim()) formData.append('title', title.trim());
+      if (isPokefuta) formData.append('kind', 'pokefuta');
       if (description.trim()) formData.append('description', description.trim());
       if (submitterName.trim()) formData.append('submitterName', submitterName.trim());
       if (exifPayload) formData.append('exif', JSON.stringify(exifPayload));
@@ -555,9 +562,24 @@ export default function DesignManholeNewPage() {
         <div className="mt-4 rounded-xl border border-[#7B63A8]/30 bg-[#F4F0FA] p-4 shadow-sm">
           <p className="text-sm font-extrabold text-[#5E4788]">ここはデザインマンホールの投稿ページです</p>
           <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-            キャラクター・ご当地デザインなど、ポケふた以外のマンホールが対象です。写真1枚と位置情報が必須です。
+            キャラクター・ご当地デザインなどのマンホールが対象です。写真1枚と位置情報が必須です。
           </p>
         </div>
+
+        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#BF5640]/30 bg-[#FFF3EE] p-3">
+          <input
+            type="checkbox"
+            checked={isPokefuta}
+            onChange={(e) => setIsPokefuta(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[#BF5640]"
+          />
+          <span className="text-sm leading-relaxed">
+            <span className="font-extrabold text-[#8F3F2E]">公式サイトに載っていない新しいポケふた</span>
+            <span className="block text-xs text-[#2A2A2A]/70">
+              公式サイトが止まっている間に見つけた新しいポケふたは、ここにチェックして投稿してください。
+            </span>
+          </span>
+        </label>
 
         {/* 写真 */}
         <section className="mt-6">
@@ -747,7 +769,7 @@ export default function DesignManholeNewPage() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={100}
-              placeholder="例: ○○市の花柄マンホール"
+              placeholder={isPokefuta ? '例: ○○市のピカチュウのポケふた' : '例: ○○市の花柄マンホール'}
               className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
             />
           </div>

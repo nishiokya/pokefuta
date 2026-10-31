@@ -425,6 +425,7 @@ export interface Database {
           width: number | null;
           height: number | null;
           exif: Record<string, any> | null;
+          kind: 'design' | 'pokefuta';
           status: 'published' | 'needs_review' | 'hidden';
           nearby_official_manhole_id: number | null;
           nearby_official_manhole_distance_m: number | null;
@@ -447,6 +448,7 @@ export interface Database {
           width?: number | null;
           height?: number | null;
           exif?: Record<string, any> | null;
+          kind?: 'design' | 'pokefuta';
           status?: 'published' | 'needs_review' | 'hidden';
           nearby_official_manhole_id?: number | null;
           nearby_official_manhole_distance_m?: number | null;
