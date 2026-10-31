@@ -2,16 +2,8 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { SITE_URL } from '@/lib/constants';
+import { getSafeRedirectPath } from '@/lib/auth-redirect';
 
-// data.pokefuta.com（静的サイト側）からの SSO ログインのみ外部リダイレクトを許可
-const DATA_SITE_PREFIX = 'https://data.pokefuta.com/';
-
-function getSafeRedirectPath(value: string | null) {
-  if (!value) return '/';
-  if (value.startsWith(DATA_SITE_PREFIX)) return value;
-  if (!value.startsWith('/') || value.startsWith('//')) return '/';
-  return value;
-}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);

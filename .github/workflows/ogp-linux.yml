@@ -43,6 +43,7 @@ jobs:
       - run: npm run test:japanese-phrases
       - run: npm run test:site-nav
       - run: npm run test:trip-activity
+      - run: npm run test:auth-redirect
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux
