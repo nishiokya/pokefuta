@@ -195,6 +195,8 @@ export async function POST(request: NextRequest) {
     // 5. テキスト項目（すべて任意・長さ上限で切り詰め）
     const title = optionalText(formData.get('title'), MAX_TITLE_LENGTH);
     const description = optionalText(formData.get('description'), MAX_DESCRIPTION_LENGTH);
+    // 公式サイトに載っていない新しいポケふたかどうか（投稿者の申告。既定はデザインマンホール）
+    const kind: 'design' | 'pokefuta' = formData.get('kind') === 'pokefuta' ? 'pokefuta' : 'design';
     const submitterName =
       optionalText(formData.get('submitterName'), MAX_SUBMITTER_NAME_LENGTH) ??
       (displayName ? displayName.slice(0, MAX_SUBMITTER_NAME_LENGTH) : null);
@@ -277,6 +279,7 @@ export async function POST(request: NextRequest) {
         width,
         height,
         exif,
+        kind,
         status: publicationStatus,
         nearby_official_manhole_id:
           proximityDecision.official_manhole?.id ?? null,
