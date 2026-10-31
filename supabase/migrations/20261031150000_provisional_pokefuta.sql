@@ -369,7 +369,7 @@ BEGIN
 
   PERFORM 1 FROM public.provisional_manhole AS pm
   WHERE pm.id = p_provisional_id AND pm.status = 'published' AND pm.state = 'open'
-  FOR SHARE;
+  FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'provisional_add_hint: 仮ポケふたが見つからない' USING ERRCODE = 'P0002';
   END IF;
@@ -385,6 +385,9 @@ BEGIN
     (p_provisional_id, v_user, p_lat, p_lng, nullif(btrim(p_facility), ''),
      nullif(btrim(p_source_url), ''), nullif(btrim(p_note), ''))
   RETURNING id INTO v_id;
+
+  -- 運営の recent() と一覧は updated_at の新しい順。古い仮ポケふたへの手がかりも上に出す
+  UPDATE public.provisional_manhole AS pm SET updated_at = now() WHERE pm.id = p_provisional_id;
   RETURN v_id;
 END;
 $$;

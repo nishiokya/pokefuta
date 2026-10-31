@@ -186,9 +186,15 @@ BEGIN
   -- -------------------------------------------------------------------
   -- 5. 手がかり・通報・取り下げ（本人は auth.uid()）
   -- -------------------------------------------------------------------
+  UPDATE public.provisional_manhole SET updated_at = now() - interval '30 days' WHERE id = pm1;
   SET LOCAL ROLE authenticated;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', u2, 'role', 'authenticated')::text, true);
   hint1 := public.provisional_add_hint(pm1, 35.68, 139.76, '検証公園', 'https://example.test/news', '入口の近く');
+  RESET ROLE;
+  IF (SELECT updated_at FROM public.provisional_manhole WHERE id = pm1) < now() THEN
+    RAISE EXCEPTION '[5] 手がかりを足しても仮ポケふたの updated_at が進まない（運営の recent() に出ない）';
+  END IF;
+  SET LOCAL ROLE authenticated;
   BEGIN
     PERFORM public.provisional_add_hint(pm1, NULL, NULL, NULL, NULL, 'メモだけ');
     RAISE EXCEPTION '[5] 座標・施設名・URL のどれも無い手がかりが入った';
