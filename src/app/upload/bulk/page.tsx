@@ -19,6 +19,7 @@ import {
 } from '@/lib/bulk-upload';
 import { pokefutaEvents } from '@/lib/analytics/gtag';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { DesignManholeAfterUploadLink } from '@/components/DesignManhole/SubmitCta';
 import { classifyClientSubmissionError } from '@/lib/analytics/submission-error';
 import { pageTitle } from '@/lib/constants';
 import { filesFromDataTransfer, isImageFile, makeThumbnail } from './browser-files';
@@ -1104,6 +1105,7 @@ function DoneSummary({
           続けて投稿する
         </button>
       </div>
+      {doneCount > 0 && <DesignManholeAfterUploadLink surface="bulk_upload_complete" className="mt-4" />}
     </section>
   );
 }
