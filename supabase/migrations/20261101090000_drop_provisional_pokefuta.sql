@@ -5,14 +5,18 @@
 -- 印を足して受ける。受付は一度も開いていないので、行は無いはず。行があれば消さずに止まる。
 
 DO $$
+DECLARE
+  t text;
+  has_rows boolean;
 BEGIN
-  IF to_regclass('public.provisional_manhole') IS NOT NULL
-     AND (EXISTS (SELECT 1 FROM public.provisional_manhole)
-          OR EXISTS (SELECT 1 FROM public.provisional_photo)
-          OR EXISTS (SELECT 1 FROM public.provisional_location_hint)
-          OR EXISTS (SELECT 1 FROM public.provisional_report)) THEN
-    RAISE EXCEPTION '未掲載ポケふたの表に行がある。取り下げる前に中身を確かめること';
-  END IF;
+  FOREACH t IN ARRAY ARRAY['provisional_manhole', 'provisional_photo', 'provisional_location_hint', 'provisional_report'] LOOP
+    IF to_regclass('public.' || t) IS NOT NULL THEN
+      EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I)', t) INTO has_rows;
+      IF has_rows THEN
+        RAISE EXCEPTION '未掲載ポケふたの表 % に行がある。取り下げる前に中身を確かめること', t;
+      END IF;
+    END IF;
+  END LOOP;
 END $$;
 
 DROP FUNCTION IF EXISTS
