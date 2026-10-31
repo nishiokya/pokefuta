@@ -76,8 +76,13 @@ function query(dbUrl, sql) {
     const detail = `${error.stdout ?? ''}${error.stderr ?? ''}`.split(dbUrl).join('<db-url>').trim();
     fail(`問い合わせに失敗\n${detail}`);
   }
-  const start = out.indexOf('[');
-  return JSON.parse(start >= 0 ? out.slice(start) : out);
+  // 素の配列のほか、AI エージェントの環境では { boundary, rows, warning } の封筒で返ってくる
+  const start = out.search(/[[{]/);
+  if (start < 0) fail(`問い合わせの応答が JSON ではない\n${out.trim()}`);
+  const parsed = JSON.parse(out.slice(start));
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.rows)) return parsed.rows;
+  fail('問い合わせの応答に行が無い');
 }
 
 // ローカルの Supabase には pg_net が入っていて net の表が PUBLIC に開いている（verify:provisional と同じ扱い）。
