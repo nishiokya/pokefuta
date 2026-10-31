@@ -44,7 +44,6 @@
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
     "verify:visit-location-source": "node tools/verify-visit-location-source.js",
-    "verify:provisional": "node tools/verify-provisional.js",
     "capture": "node tools/capture/capture.js",
     "test:auth-redirect": "tsx --test tests/auth-redirect.test.ts"
   },
