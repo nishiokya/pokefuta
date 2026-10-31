@@ -10,8 +10,9 @@
 --   * 対象は設置済みで写真のあるものだけ。仮のポケふたは最初の写真と同じトランザクションで作る
 --   * 写真は受け付けてすぐ公開する。スタンプ帳・制覇率には数えない（visit/photo に入れない）
 --   * 公式が戻ったら、運営が正式な manhole.id へ結びつけ（provisional_ops.link）、
---     写真を通常の visit/photo に移す。自動では結びつけない。visit.shot_location は入れない
---     （ピンや蓋の座標を撮影位置にしない）
+--     写真を通常の visit/photo に移す。自動では結びつけない。visit.shot_location は写真の EXIF GPS
+--     （通常の投稿と同じ）。手がかりのピンや蓋の座標は撮影位置にしない
+--   * 写真は EXIF の撮影日時と GPS が両方あるものだけ。GPS は運営が場所を決める材料で、公開しない
 --   * 場所の手がかり（ピン・施設名・出典URL）は写真が無くても足せる。確定位置には昇格させない
 --
 -- manhole に入れない理由: manhole.id は公式の番号で、photo.manhole_id / visit.manhole_id は
@@ -158,6 +159,9 @@ CREATE TABLE public.provisional_photo (
   file_size integer CHECK (file_size IS NULL OR file_size > 0),
   sha256 text CHECK (sha256 IS NULL OR sha256 ~ '^[0-9a-f]{64}$'),
   shot_at timestamptz NOT NULL,
+  -- EXIF の GPS（撮影者の位置）。運営だけが見る。一覧・詳細・本人向けにも返さない
+  shot_lat double precision NOT NULL,
+  shot_lng double precision NOT NULL,
   comment text CHECK (comment IS NULL OR char_length(comment) <= 500),
   status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'hidden', 'withdrawn')),
   -- 正式IDへ移した先。visit/photo は本人が後で消せるので外部キーにしない（消えても移行済みの記録は残す）
@@ -167,12 +171,13 @@ CREATE TABLE public.provisional_photo (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT provisional_photo_transfer_all_or_none CHECK (
     (transferred_visit_id IS NULL) = (transferred_photo_id IS NULL)
-    AND (transferred_visit_id IS NULL) = (transferred_at IS NULL))
+    AND (transferred_visit_id IS NULL) = (transferred_at IS NULL)),
+  CONSTRAINT provisional_photo_shot_in_japan CHECK (shot_lat BETWEEN 20 AND 46 AND shot_lng BETWEEN 122 AND 154)
 );
 CREATE INDEX idx_provisional_photo_manhole ON public.provisional_photo (provisional_manhole_id, created_at DESC);
 CREATE INDEX idx_provisional_photo_user ON public.provisional_photo (user_id, created_at DESC);
 COMMENT ON TABLE public.provisional_photo IS
-  '未掲載ポケふたの写真。位置情報（EXIF）は持たない。withdrawn=本人が取り下げ、hidden=運営が非表示';
+  '未掲載ポケふたの写真。EXIF の GPS は shot_lat/shot_lng に持つが公開しない（運営と、正式IDへ移すときの visit.shot_location だけ）。withdrawn=本人が取り下げ、hidden=運営が非表示';
 
 CREATE TABLE public.provisional_location_hint (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -283,6 +288,8 @@ CREATE OR REPLACE FUNCTION public.provisional_submit_photo(
   p_file_size integer,
   p_sha256 text,
   p_shot_at timestamptz,
+  p_shot_lat double precision,
+  p_shot_lng double precision,
   p_comment text
 )
 RETURNS TABLE (provisional_manhole_id uuid, photo_id uuid)
@@ -301,6 +308,9 @@ BEGIN
   END IF;
   IF p_shot_at IS NULL OR p_shot_at > now() + interval '1 day' OR p_shot_at < timestamptz '2016-01-01' THEN
     RAISE EXCEPTION 'provisional_submit_photo: 撮影日時が不正' USING ERRCODE = '22023';
+  END IF;
+  IF p_shot_lat IS NULL OR p_shot_lng IS NULL THEN
+    RAISE EXCEPTION 'provisional_submit_photo: 撮影位置（GPS）が無い' USING ERRCODE = '22023';
   END IF;
 
   PERFORM provisional_ops.require_accepting();
@@ -327,9 +337,9 @@ BEGIN
   END IF;
 
   INSERT INTO public.provisional_photo
-    (provisional_manhole_id, user_id, storage_key, width, height, file_size, sha256, shot_at, comment)
+    (provisional_manhole_id, user_id, storage_key, width, height, file_size, sha256, shot_at, shot_lat, shot_lng, comment)
   VALUES
-    (v_manhole, p_user_id, p_storage_key, p_width, p_height, p_file_size, p_sha256, p_shot_at,
+    (v_manhole, p_user_id, p_storage_key, p_width, p_height, p_file_size, p_sha256, p_shot_at, p_shot_lat, p_shot_lng,
      nullif(btrim(p_comment), ''))
   RETURNING id INTO v_photo;
 
@@ -570,7 +580,7 @@ AS $$
   SELECT coalesce((SELECT s.accepting FROM public.provisional_setting AS s WHERE s.id), false)
 $$;
 
-REVOKE ALL ON FUNCTION public.provisional_submit_photo(uuid, uuid, text, integer, text, text, integer, integer, integer, text, timestamptz, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.provisional_submit_photo(uuid, uuid, text, integer, text, text, integer, integer, integer, text, timestamptz, double precision, double precision, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.provisional_add_hint(uuid, double precision, double precision, text, text, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.provisional_report_target(text, uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.provisional_withdraw_photo(uuid) FROM PUBLIC, anon;
@@ -580,7 +590,7 @@ REVOKE ALL ON FUNCTION public.provisional_detail(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.provisional_photo_key(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.provisional_is_accepting() FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION public.provisional_submit_photo(uuid, uuid, text, integer, text, text, integer, integer, integer, text, timestamptz, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.provisional_submit_photo(uuid, uuid, text, integer, text, text, integer, integer, integer, text, timestamptz, double precision, double precision, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.provisional_add_hint(uuid, double precision, double precision, text, text, text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.provisional_report_target(text, uuid, text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.provisional_withdraw_photo(uuid) TO authenticated, service_role;
@@ -716,7 +726,8 @@ AS $$
           'status', pm.status, 'state', pm.state, 'merged_into_id', pm.merged_into_id,
           'official_manhole_id', pm.official_manhole_id, 'created_at', pm.created_at, 'updated_at', pm.updated_at,
           'photos', coalesce((SELECT jsonb_agg(jsonb_build_object(
-                     'id', ph.id, 'status', ph.status, 'shot_at', ph.shot_at, 'created_at', ph.created_at,
+                     'id', ph.id, 'status', ph.status, 'shot_at', ph.shot_at,
+                     'shot_lat', ph.shot_lat, 'shot_lng', ph.shot_lng, 'created_at', ph.created_at,
                      'sha256', ph.sha256, 'transferred_visit_id', ph.transferred_visit_id) ORDER BY ph.created_at)
                    FROM public.provisional_photo AS ph WHERE ph.provisional_manhole_id = pm.id), '[]'::jsonb),
           'hints', coalesce((SELECT jsonb_agg(jsonb_build_object(
@@ -890,12 +901,20 @@ AS $$
     'photos_already_transferred', (SELECT count(*) FROM public.provisional_photo AS ph
                                    WHERE ph.provisional_manhole_id = p_id AND ph.transferred_visit_id IS NOT NULL),
     'contributors', (SELECT count(DISTINCT ph.user_id) FROM public.provisional_photo AS ph
-                     WHERE ph.provisional_manhole_id = p_id AND ph.status = 'published')
+                     WHERE ph.provisional_manhole_id = p_id AND ph.status = 'published'),
+    -- 移す写真の撮影位置から正式な蓋までの距離（m）。遠ければ結びつけ違いを疑う。蓋に座標が無ければ null
+    'photo_distances_m', (SELECT jsonb_agg(round(extensions.st_distance(
+                              extensions.st_setsrid(extensions.st_makepoint(ph.shot_lng, ph.shot_lat), 4326)::extensions.geography,
+                              mh.location)::numeric) ORDER BY ph.created_at)
+                          FROM public.provisional_photo AS ph
+                          JOIN public.manhole AS mh ON mh.id = p_official_manhole_id
+                          WHERE ph.provisional_manhole_id = p_id AND ph.status = 'published'
+                            AND ph.transferred_visit_id IS NULL)
   )
 $$;
 
 -- 正式IDへ移す。公開中の写真1枚ごとに visit 1件＋photo 1件を作る（別の人・別の日をまとめない）。
---   * visit.shot_location は入れない（撮影位置が無い＝location_source は 'none'）
+--   * visit.shot_location は写真の EXIF GPS（location_source は 'gps'。通常の投稿と同じ）
 --   * 画像は動かさない（保存キーをそのまま photo.storage_key にする）。途中で失敗すれば全部戻る
 --   * 再実行: 同じ正式IDなら、移していない公開写真だけを移す（移した写真は transferred_* で分かる）。
 --     別の正式IDは拒否（誤った結びつけを再実行で上書きしない）
@@ -941,8 +960,10 @@ BEGIN
     ORDER BY p.created_at, p.id
     FOR UPDATE
   LOOP
-    INSERT INTO public.visit (user_id, manhole_id, shot_at, comment, is_public)
-    VALUES (ph.user_id, p_official_manhole_id, ph.shot_at, ph.comment, true)
+    INSERT INTO public.visit (user_id, manhole_id, shot_at, shot_location, comment, is_public)
+    VALUES (ph.user_id, p_official_manhole_id, ph.shot_at,
+            extensions.st_setsrid(extensions.st_makepoint(ph.shot_lng, ph.shot_lat), 4326)::extensions.geography,
+            ph.comment, true)
     RETURNING id INTO v_visit;
 
     INSERT INTO public.photo (visit_id, manhole_id, storage_key, file_size, content_type, width, height, sha256)

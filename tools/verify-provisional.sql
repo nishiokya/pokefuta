@@ -32,8 +32,8 @@ DECLARE
   -- 写真の登録（service_role の経路）。保存キーは毎回別の uuid
   -- p_provisional_id が NULL なら新規
 BEGIN
-  SELECT id INTO official FROM public.manhole ORDER BY id LIMIT 1;
-  SELECT id INTO official2 FROM public.manhole ORDER BY id OFFSET 1 LIMIT 1;
+  SELECT id INTO official FROM public.manhole ORDER BY (location IS NULL), id LIMIT 1;
+  SELECT id INTO official2 FROM public.manhole WHERE id <> official ORDER BY id LIMIT 1;
   SELECT id INTO pref FROM public.prefecture ORDER BY id LIMIT 1;
   IF official IS NULL OR official2 IS NULL OR pref IS NULL THEN
     RAISE EXCEPTION 'manhole（2件以上）/ prefecture が無い。シードを流してから実行すること';
@@ -95,7 +95,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[2] authenticated が provisional_submit_photo を呼べた（画像処理を迂回できる）';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
@@ -110,7 +110,7 @@ BEGIN
   SET LOCAL ROLE service_role;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, '新しいふた', pref, '検証市',
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[3] 受付が閉なのに写真が入った';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%受付を停止%' THEN RAISE; END IF;
@@ -129,7 +129,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[3] 運営ロールが写真の登録関数を呼べた';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   PERFORM provisional_ops.set_accepting(true, '検証');
@@ -142,41 +142,53 @@ BEGIN
   SELECT s.provisional_manhole_id, s.photo_id INTO pm1, ph1
   FROM public.provisional_submit_photo(u1, NULL, '新しいふた', pref, '検証市',
     'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000,
-    repeat('a', 64), now() - interval '1 hour', '最初の写真') AS s;
+    repeat('a', 64), now() - interval '1 hour', 35.6812345, 139.7671234, '最初の写真') AS s;
   SELECT s.photo_id INTO ph2
   FROM public.provisional_submit_photo(u2, pm1, NULL, NULL, NULL,
-    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), NULL) AS s;
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), 35.6812345, 139.7671234, NULL) AS s;
   SELECT s.photo_id INTO ph_hidden
   FROM public.provisional_submit_photo(u2, pm1, NULL, NULL, NULL,
-    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), NULL) AS s;
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), 35.6812345, 139.7671234, NULL) AS s;
   SELECT s.provisional_manhole_id INTO pm2
   FROM public.provisional_submit_photo(u1, NULL, '重複のふた', pref, NULL,
-    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), NULL) AS s;
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), 35.6812345, 139.7671234, NULL) AS s;
 
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL, 'photos/original/2026/10/evil.png',
-      1, 1, 1, NULL, now(), NULL);
+      1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[4] 形の違う保存キーが入った';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, '   ', pref, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[4] 空の呼び名で入った';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now() + interval '3 days', NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now() + interval '3 days', 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[4] 未来の撮影日時が入った';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  BEGIN
+    PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL,
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL, NULL, NULL);
+    RAISE EXCEPTION '[4] GPS の無い写真が入った';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%GPS%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM public.provisional_submit_photo(u1, NULL, 'x', pref, NULL,
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 10, 10, NULL);
+    RAISE EXCEPTION '[4] 日本の外の撮影位置が入った';
+  EXCEPTION WHEN check_violation THEN NULL; END;
 
   -- u1 は 2枚。あと3枚で上限（5枚）
   FOR n IN 1..3 LOOP
     PERFORM public.provisional_submit_photo(u1, pm2, NULL, NULL, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
   END LOOP;
   BEGIN
     PERFORM public.provisional_submit_photo(u1, pm2, NULL, NULL, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[4] 6枚目が入った（上限が効いていない）';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%上限%' THEN RAISE; END IF;
@@ -244,8 +256,9 @@ BEGIN
   IF jsonb_array_length(j->'photos') <> 2 THEN
     RAISE EXCEPTION '[6] 詳細の写真が % 枚（非表示を除いて2枚のはず）', jsonb_array_length(j->'photos');
   END IF;
-  IF j::text LIKE '%' || u1::text || '%' OR j::text LIKE '%' || u2::text || '%' OR j::text LIKE '%photos/original%' THEN
-    RAISE EXCEPTION '[6] 詳細に auth の id か保存キーが出ている';
+  IF j::text LIKE '%' || u1::text || '%' OR j::text LIKE '%' || u2::text || '%' OR j::text LIKE '%photos/original%'
+     OR j::text LIKE '%35.68123%' OR j::text LIKE '%139.76712%' THEN
+    RAISE EXCEPTION '[6] 詳細に auth の id・保存キー・撮影位置が出ている';
   END IF;
   IF public.provisional_photo_key(ph_hidden) IS NOT NULL THEN
     RAISE EXCEPTION '[6] 非表示の写真の保存キーが返った';
@@ -282,7 +295,7 @@ BEGIN
   SET LOCAL ROLE service_role;
   SELECT s.provisional_manhole_id INTO pm_tmp
   FROM public.provisional_submit_photo(u2, NULL, '非表示でまとめる', pref, NULL,
-    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL) AS s;
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL) AS s;
   RESET ROLE;
   SET LOCAL ROLE provisional_operator;
   PERFORM provisional_ops.set_status('manhole', pm_tmp, 'hidden', '検証');
@@ -299,7 +312,7 @@ BEGIN
   SET LOCAL ROLE service_role;
   BEGIN
     PERFORM public.provisional_submit_photo(u2, pm2, NULL, NULL, NULL,
-      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
+      'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL);
     RAISE EXCEPTION '[7] まとめた元に写真を追加できた';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%受付を終えた%' THEN RAISE; END IF;
@@ -307,14 +320,19 @@ BEGIN
   RESET ROLE;
 
   -- -------------------------------------------------------------------
-  -- 8. 正式IDへの移行: 公開中の写真1枚ごとに visit＋photo。shot_location は無し。
+  -- 8. 正式IDへの移行: 公開中の写真1枚ごとに visit＋photo。shot_location は写真の GPS。
   --    再実行で増えない。別の正式IDは拒否。非表示の写真は移らない
   -- -------------------------------------------------------------------
   SELECT count(*) INTO visits_before FROM public.visit WHERE user_id IN (u1, u2);
+  SELECT count(*) INTO n FROM public.manhole WHERE id = official AND location IS NOT NULL;
   SET LOCAL ROLE provisional_operator;
   j := provisional_ops.preview_link(pm1, official);
   IF (j->>'photos_to_transfer')::int <> 6 OR (j->>'photos_not_transferred')::int <> 1 THEN
     RAISE EXCEPTION '[8] 移行の確認が想定と違う: %', j;
+  END IF;
+  -- 正式な蓋に座標があれば、移す写真ごとに撮影位置からの距離が出る
+  IF n = 1 AND jsonb_array_length(coalesce(j->'photo_distances_m', '[]')) <> 6 THEN
+    RAISE EXCEPTION '[8] 移行の確認に撮影位置からの距離が無い: %', j->'photo_distances_m';
   END IF;
   j := provisional_ops.link(pm1, official, '公式復旧');
   IF jsonb_array_length(j->'moved') <> 6 THEN
@@ -351,9 +369,11 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.visit v
              JOIN public.provisional_photo ph ON ph.transferred_visit_id = v.id
-             WHERE v.shot_location IS NOT NULL OR v.location_source <> 'none'
+             WHERE v.shot_location IS NULL OR v.location_source <> 'gps'
+                OR abs(extensions.st_y(v.shot_location::extensions.geometry) - ph.shot_lat) > 1e-6
+                OR abs(extensions.st_x(v.shot_location::extensions.geometry) - ph.shot_lng) > 1e-6
                 OR v.manhole_id <> official OR v.shot_at <> ph.shot_at OR v.user_id <> ph.user_id) THEN
-    RAISE EXCEPTION '[8] 移した visit の中身が想定と違う（撮影位置が入った等）';
+    RAISE EXCEPTION '[8] 移した visit の中身が想定と違う（撮影位置が写真の GPS でない等）';
   END IF;
   IF EXISTS (SELECT 1 FROM public.photo p
              JOIN public.provisional_photo ph ON ph.transferred_photo_id = p.id
@@ -375,7 +395,7 @@ BEGIN
   SET LOCAL ROLE service_role;
   SELECT s.provisional_manhole_id INTO pm2
   FROM public.provisional_submit_photo(u2, NULL, '非表示のふた', pref, NULL,
-    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL) AS s;
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), 35.6812345, 139.7671234, NULL) AS s;
   RESET ROLE;
   SET LOCAL ROLE provisional_operator;
   PERFORM provisional_ops.set_status('manhole', pm2, 'hidden', '検証');
