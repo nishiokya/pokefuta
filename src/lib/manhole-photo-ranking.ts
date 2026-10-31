@@ -202,16 +202,28 @@ export const orderManholePhotosNewestFirst = <T extends RankableManholePhoto>(ph
 /**
  * 見ている人向けの並び。「自分の写真」は API が返す `visit.is_own` で判定する
  * （以前は `visit.user_id === currentUserId` だったが、auth UID は応答から外した）。
+ *
+ * `focusPhotoId` はトップなどで押された写真（`#photo-<id>`）。見えている写真ならそれを先頭（代表の位置）に置く。
+ * ただし蓋の写真が1枚も無い蓋で風景を押したときは、「蓋の写真を募集中」の表示を崩さないよう先頭にしない。
  */
-export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(photos: T[]) => {
+export const orderManholePhotosForViewer = <T extends RankableManholePhoto>(
+  photos: T[],
+  focusPhotoId?: string | null
+) => {
   const myPhotos = rankManholePhotos(photos.filter((photo) => photo.visit?.is_own === true));
   const visiblePhotos = rankManholePhotos(
     photos.filter(
       (photo) => photo.visit?.is_public === true || photo.visit?.is_own === true
     )
   );
-  const representativePhoto = myPhotos.find(photo => !photo.is_landscape)
+  const rankedRepresentative = myPhotos.find(photo => !photo.is_landscape)
     ?? visiblePhotos.find(photo => !photo.is_landscape) ?? null;
+  const focusedPhoto = focusPhotoId
+    ? visiblePhotos.find((photo) => photo.id.toLowerCase() === focusPhotoId.toLowerCase()) ?? null
+    : null;
+  const representativePhoto = focusedPhoto && (rankedRepresentative || !focusedPhoto.is_landscape)
+    ? focusedPhoto
+    : rankedRepresentative;
   const orderedPhotos = representativePhoto
     ? [representativePhoto, ...visiblePhotos.filter((photo) => photo.id !== representativePhoto.id)]
     : visiblePhotos;

@@ -319,3 +319,29 @@ test('preferCommented: false drops only the comment rule; landscapes still go la
   assert.deepEqual(ranked.map((p) => p.id), ['best', 'commented', 'scenery']);
   assert.equal(rankManholePhotos(ranked)[0].id, 'commented');
 });
+
+test('a photo clicked elsewhere (#photo-<id>) takes the representative slot', () => {
+  const photos = [
+    photo('best', { score: 90 }),
+    photo('clicked', { score: 10 }),
+    photo('scenery', { isLandscape: true }),
+    photo('private', { score: 50, isPublic: false }),
+  ];
+  const result = orderManholePhotosForViewer(asViewer(photos, null), 'clicked');
+  assert.equal(result.representativePhoto?.id, 'clicked');
+  assert.deepEqual(result.orderedPhotos.map(p => p.id), ['clicked', 'best', 'scenery']);
+
+  // 見えない写真・知らない ID はいつもの代表のまま
+  for (const focus of ['private', 'missing', null]) {
+    const fallback = orderManholePhotosForViewer(asViewer(photos, null), focus);
+    assert.equal(fallback.representativePhoto?.id, 'best');
+  }
+  // 蓋の写真がある蓋なら、押された風景も先頭に出す
+  assert.equal(orderManholePhotosForViewer(asViewer(photos, null), 'scenery').representativePhoto?.id, 'scenery');
+});
+
+test('a clicked scenery photo does not hide the "no lid photo yet" state', () => {
+  const result = orderManholePhotosForViewer(asViewer([photo('scenery', { isLandscape: true })], null), 'scenery');
+  assert.equal(result.representativePhoto, null);
+  assert.deepEqual(result.orderedPhotos.map(p => p.id), ['scenery']);
+});
