@@ -38,6 +38,30 @@ export function SubmitCta({ className, surface = 'design_manhole' }: { className
   );
 }
 
+/**
+ * ポケふたの投稿完了画面に出す、デザインマンホール投稿への1行の案内。
+ * 写真を整理しているその場で「同じ旅で撮ったご当地デザインの蓋」を思い出してもらう。
+ * 完了画面の主ボタン（スタンプ帳・続けて投稿）より目立たせないよう文字リンクにする。
+ * 停止中は案内自体を出さない。
+ */
+export function DesignManholeAfterUploadLink({ surface, className = '' }: { surface: string; className?: string }) {
+  const { trackSubmissionEntry } = useAnalytics();
+
+  if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) return null;
+  return (
+    <p className={`text-xs text-[#2A2A2A]/70 ${className}`}>
+      この旅で、ご当地デザインのマンホールも撮りましたか？
+      <Link
+        href="/design-manholes/new"
+        onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface })}
+        className="ml-1 font-bold text-[#2A2A2A] underline hover:opacity-80"
+      >
+        デザインふたを投稿する
+      </Link>
+    </p>
+  );
+}
+
 /** 停止中だけ出る告知。閲覧は止めていないことと、ポケふた側は使えることを伝える。 */
 export function SuspendedNotice({ className = 'mt-5' }: { className?: string }) {
   if (!DESIGN_MANHOLE_SUBMISSION_SUSPENDED) return null;

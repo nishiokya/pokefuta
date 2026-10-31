@@ -24,6 +24,7 @@ import { collectVisitComments } from '@/lib/visit-comment-quality';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
+import { DesignManholeAfterUploadLink } from '@/components/DesignManhole/SubmitCta';
 import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 import StampPhoto from '@/components/StampPhoto';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
@@ -928,6 +929,7 @@ function UploadPageInner() {
               続けて投稿する
             </button>
           </div>
+          <DesignManholeAfterUploadLink surface="upload_complete" className="mt-5" />
         </main>
       </div>
     );
