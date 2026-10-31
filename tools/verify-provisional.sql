@@ -17,6 +17,7 @@ DECLARE
   was_member boolean;
   pm1 uuid;
   pm2 uuid;
+  pm_tmp uuid;
   ph1 uuid;
   ph2 uuid;
   ph_hidden uuid;
@@ -112,7 +113,7 @@ BEGIN
       'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 2048, 1536, 100000, NULL, now(), NULL);
     RAISE EXCEPTION '[3] 受付が閉なのに写真が入った';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%受付を停止%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%受付を停止%' THEN RAISE; END IF;
   END;
   RESET ROLE;
 
@@ -178,7 +179,7 @@ BEGIN
       'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
     RAISE EXCEPTION '[4] 6枚目が入った（上限が効いていない）';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%上限%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%上限%' THEN RAISE; END IF;
   END;
   RESET ROLE;
 
@@ -264,12 +265,27 @@ BEGIN
     PERFORM provisional_ops.merge(pm2, pm1, 'もう一度');
     RAISE EXCEPTION '[7] merged をもう一度まとめられた';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%open であること%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%open で公開中であること%' THEN RAISE; END IF;
   END;
   BEGIN
     PERFORM provisional_ops.merge(pm1, pm1, '自分');
     RAISE EXCEPTION '[7] 自分自身へまとめられた';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  RESET ROLE;
+  -- 非表示の仮ポケふたはまとめられない（中の写真が公開に戻るため）
+  SET LOCAL ROLE service_role;
+  SELECT s.provisional_manhole_id INTO pm_tmp
+  FROM public.provisional_submit_photo(u2, NULL, '非表示でまとめる', pref, NULL,
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL) AS s;
+  RESET ROLE;
+  SET LOCAL ROLE provisional_operator;
+  PERFORM provisional_ops.set_status('manhole', pm_tmp, 'hidden', '検証');
+  BEGIN
+    PERFORM provisional_ops.merge(pm_tmp, pm1, '非表示から');
+    RAISE EXCEPTION '[7] 非表示の仮ポケふたをまとめられた';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%open で公開中であること%' THEN RAISE; END IF;
+  END;
   RESET ROLE;
   IF public.provisional_detail(pm2)->>'merged_into_id' IS DISTINCT FROM pm1::text THEN
     RAISE EXCEPTION '[7] まとめた元の詳細が転送先を返さない';
@@ -280,7 +296,7 @@ BEGIN
       'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
     RAISE EXCEPTION '[7] まとめた元に写真を追加できた';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%受付を終えた%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%受付を終えた%' THEN RAISE; END IF;
   END;
   RESET ROLE;
 
@@ -306,20 +322,20 @@ BEGIN
     PERFORM provisional_ops.link(pm1, official2, '別のID');
     RAISE EXCEPTION '[8] 別の正式IDへ結びつけ直せた';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%結びつけ済み%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%結びつけ済み%' THEN RAISE; END IF;
   END;
   BEGIN
     PERFORM provisional_ops.link(pm2, official, 'まとめ済み');
     RAISE EXCEPTION '[8] まとめ済みを結びつけられた';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%まとめ済み%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%まとめ済み%' THEN RAISE; END IF;
   END;
   -- 移した後の写真は仮の側で非表示にできない（通常の visit の側で扱う）
   BEGIN
     PERFORM provisional_ops.set_status('photo', ph1, 'hidden', '移した後');
     RAISE EXCEPTION '[8] 移した写真を仮の側で非表示にできた（公開は止まらないのに成功になる）';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%移し済み%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%移し済み%' THEN RAISE; END IF;
   END;
   RESET ROLE;
 
@@ -361,7 +377,7 @@ BEGIN
     PERFORM provisional_ops.link(pm2, official, '非表示');
     RAISE EXCEPTION '[8] 非表示の仮ポケふたを移せた';
   EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM NOT LIKE '%非表示の仮ポケふたは移さない%' THEN RAISE; END IF;
+    IF SQLERRM LIKE '[%' OR SQLERRM NOT LIKE '%非表示の仮ポケふたは移さない%' THEN RAISE; END IF;
   END;
   RESET ROLE;
 
@@ -400,7 +416,7 @@ BEGIN
   DELETE FROM public.provisional_location_hint WHERE user_id IN (u1, u2);
   DELETE FROM public.provisional_photo WHERE user_id IN (u1, u2);
   DELETE FROM public.provisional_manhole WHERE merged_into_id = pm1;
-  DELETE FROM public.provisional_manhole WHERE id IN (pm1, pm2) OR created_by IN (u1, u2);
+  DELETE FROM public.provisional_manhole WHERE id IN (pm1, pm2, pm_tmp) OR created_by IN (u1, u2);
   DELETE FROM provisional_ops.operation_log WHERE created_at >= now();
   DELETE FROM public.app_user WHERE auth_uid IN (u1, u2);
   DELETE FROM auth.users WHERE id IN (u1, u2);

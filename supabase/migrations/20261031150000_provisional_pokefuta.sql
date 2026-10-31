@@ -818,7 +818,8 @@ END;
 $$;
 
 -- 重複のまとめ: p_source の写真・手がかりを p_target へ付け替え、p_source を merged にする。
--- どちらも open に限る（merged / linked は対象にしない＝循環も移行済みとの競合も起きない）。
+-- どちらも open かつ公開中に限る（merged / linked は対象にしない＝循環も移行済みとの競合も起きない。
+-- 非表示の側は対象にしない＝まとめで運営の非表示が取り消されない）。
 -- 2行を id の順にロックする（同時に逆向きのまとめが来てもデッドロックしない）
 CREATE OR REPLACE FUNCTION provisional_ops.merge(p_source uuid, p_target uuid, p_reason text)
 RETURNS jsonb
@@ -834,8 +835,8 @@ BEGIN
   IF p_source IS NULL OR p_target IS NULL OR p_source = p_target OR coalesce(btrim(p_reason), '') = '' THEN
     RAISE EXCEPTION 'merge: 別々の2つと理由が必要' USING ERRCODE = '22023';
   END IF;
-  SELECT jsonb_object_agg(pm.id::text, pm.state) INTO v_states FROM (
-    SELECT pm.id, pm.state FROM public.provisional_manhole AS pm
+  SELECT jsonb_object_agg(pm.id::text, pm.state || '/' || pm.status) INTO v_states FROM (
+    SELECT pm.id, pm.state, pm.status FROM public.provisional_manhole AS pm
     WHERE pm.id IN (p_source, p_target)
     ORDER BY pm.id
     FOR UPDATE
@@ -843,8 +844,9 @@ BEGIN
   IF v_states IS NULL OR NOT (v_states ? p_source::text AND v_states ? p_target::text) THEN
     RAISE EXCEPTION 'merge: 見つからない' USING ERRCODE = 'P0002';
   END IF;
-  IF v_states->>p_source::text <> 'open' OR v_states->>p_target::text <> 'open' THEN
-    RAISE EXCEPTION 'merge: どちらも open であること（%）', v_states USING ERRCODE = 'P0001';
+  -- 非表示の側をまとめると、中の写真・手がかり（個々は published のまま）が公開に戻る。先に unhide させる
+  IF v_states->>p_source::text <> 'open/published' OR v_states->>p_target::text <> 'open/published' THEN
+    RAISE EXCEPTION 'merge: どちらも open で公開中であること（%）', v_states USING ERRCODE = 'P0001';
   END IF;
 
   UPDATE public.provisional_photo AS ph SET provisional_manhole_id = p_target WHERE ph.provisional_manhole_id = p_source;
