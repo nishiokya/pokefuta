@@ -263,7 +263,9 @@ BEGIN
   BEGIN
     PERFORM provisional_ops.merge(pm2, pm1, 'もう一度');
     RAISE EXCEPTION '[7] merged をもう一度まとめられた';
-  EXCEPTION WHEN raise_exception THEN NULL; END;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%open であること%' THEN RAISE; END IF;
+  END;
   BEGIN
     PERFORM provisional_ops.merge(pm1, pm1, '自分');
     RAISE EXCEPTION '[7] 自分自身へまとめられた';
@@ -277,7 +279,9 @@ BEGIN
     PERFORM public.provisional_submit_photo(u2, pm2, NULL, NULL, NULL,
       'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL);
     RAISE EXCEPTION '[7] まとめた元に写真を追加できた';
-  EXCEPTION WHEN raise_exception THEN NULL; END;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%受付を終えた%' THEN RAISE; END IF;
+  END;
   RESET ROLE;
 
   -- -------------------------------------------------------------------
@@ -301,11 +305,22 @@ BEGIN
   BEGIN
     PERFORM provisional_ops.link(pm1, official2, '別のID');
     RAISE EXCEPTION '[8] 別の正式IDへ結びつけ直せた';
-  EXCEPTION WHEN raise_exception THEN NULL; END;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%結びつけ済み%' THEN RAISE; END IF;
+  END;
   BEGIN
     PERFORM provisional_ops.link(pm2, official, 'まとめ済み');
     RAISE EXCEPTION '[8] まとめ済みを結びつけられた';
-  EXCEPTION WHEN raise_exception THEN NULL; END;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%まとめ済み%' THEN RAISE; END IF;
+  END;
+  -- 移した後の写真は仮の側で非表示にできない（通常の visit の側で扱う）
+  BEGIN
+    PERFORM provisional_ops.set_status('photo', ph1, 'hidden', '移した後');
+    RAISE EXCEPTION '[8] 移した写真を仮の側で非表示にできた（公開は止まらないのに成功になる）';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%移し済み%' THEN RAISE; END IF;
+  END;
   RESET ROLE;
 
   SELECT count(*) INTO n FROM public.visit WHERE user_id IN (u1, u2);
@@ -334,6 +349,34 @@ BEGIN
     RAISE EXCEPTION '[8] 移した写真が仮の配信からまだ出る';
   END IF;
 
+  -- 非表示の仮ポケふたは移せない（移すと写真が公開に戻る）
+  SET LOCAL ROLE service_role;
+  SELECT s.provisional_manhole_id INTO pm2
+  FROM public.provisional_submit_photo(u2, NULL, '非表示のふた', pref, NULL,
+    'photos/original/2026/10/' || gen_random_uuid() || '.jpg', 1, 1, 1, NULL, now(), NULL) AS s;
+  RESET ROLE;
+  SET LOCAL ROLE provisional_operator;
+  PERFORM provisional_ops.set_status('manhole', pm2, 'hidden', '検証');
+  BEGIN
+    PERFORM provisional_ops.link(pm2, official, '非表示');
+    RAISE EXCEPTION '[8] 非表示の仮ポケふたを移せた';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%非表示の仮ポケふたは移さない%' THEN RAISE; END IF;
+  END;
+  RESET ROLE;
+
+  -- 作った人（u1）が退会しても、他の人の写真が載った仮ポケふたは残る
+  DELETE FROM public.photo WHERE id IN (SELECT transferred_photo_id FROM public.provisional_photo WHERE user_id = u1);
+  DELETE FROM public.visit WHERE user_id = u1;
+  DELETE FROM public.app_user WHERE auth_uid = u1;
+  DELETE FROM auth.users WHERE id = u1;
+  IF NOT EXISTS (SELECT 1 FROM public.provisional_manhole WHERE id = pm1 AND created_by IS NULL) THEN
+    RAISE EXCEPTION '[8] 作った人の退会で仮ポケふたが消えた（または created_by が残った）';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.provisional_photo WHERE user_id = u1) THEN
+    RAISE EXCEPTION '[8] 退会した人の写真が残った';
+  END IF;
+
   -- -------------------------------------------------------------------
   -- 9. 運営の操作はログに残る。anon / authenticated は provisional_ops を呼べない
   -- -------------------------------------------------------------------
@@ -356,8 +399,8 @@ BEGIN
   DELETE FROM public.provisional_report WHERE reporter_user_id IN (u1, u2);
   DELETE FROM public.provisional_location_hint WHERE user_id IN (u1, u2);
   DELETE FROM public.provisional_photo WHERE user_id IN (u1, u2);
-  DELETE FROM public.provisional_manhole WHERE created_by IN (u1, u2) AND merged_into_id IS NOT NULL;
-  DELETE FROM public.provisional_manhole WHERE created_by IN (u1, u2);
+  DELETE FROM public.provisional_manhole WHERE merged_into_id = pm1;
+  DELETE FROM public.provisional_manhole WHERE id IN (pm1, pm2) OR created_by IN (u1, u2);
   DELETE FROM provisional_ops.operation_log WHERE created_at >= now();
   DELETE FROM public.app_user WHERE auth_uid IN (u1, u2);
   DELETE FROM auth.users WHERE id IN (u1, u2);

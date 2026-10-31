@@ -114,7 +114,8 @@ GRANT USAGE ON SCHEMA provisional_ops TO provisional_operator;
 
 -- ---------------------------------------------------------------------------
 -- 表
--- 投稿者は auth.users の id（visit.user_id と同じ）。退会すると行ごと消える。
+-- 投稿者は auth.users の id（visit.user_id と同じ）。写真・手がかり・通報は本人が退会すると消える。
+-- 仮ポケふた自体は他の人の写真も載るので、作った人が退会しても残す（created_by を NULL にする）。
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE public.provisional_setting (
@@ -131,7 +132,7 @@ CREATE TABLE public.provisional_manhole (
   title text NOT NULL CHECK (char_length(btrim(title)) BETWEEN 1 AND 100),
   prefecture_id integer NOT NULL REFERENCES public.prefecture(id),
   city text CHECK (city IS NULL OR char_length(city) BETWEEN 1 AND 50),
-  created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'hidden')),
   state text NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'merged', 'linked')),
   merged_into_id uuid REFERENCES public.provisional_manhole(id),
@@ -757,17 +758,28 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   v_old text;
+  v_state text;
+  v_visit uuid;
 BEGIN
   IF p_status NOT IN ('published', 'hidden') OR coalesce(btrim(p_reason), '') = '' THEN
     RAISE EXCEPTION 'set_status: 状態は published / hidden、理由が必要' USING ERRCODE = '22023';
   END IF;
   IF p_kind = 'manhole' THEN
-    SELECT pm.status INTO v_old FROM public.provisional_manhole AS pm WHERE pm.id = p_id FOR UPDATE;
+    SELECT pm.status, pm.state INTO v_old, v_state FROM public.provisional_manhole AS pm WHERE pm.id = p_id FOR UPDATE;
+    IF v_state = 'linked' THEN
+      RAISE EXCEPTION 'set_status: 正式IDへ移し済み。写真は通常の visit の側で扱うこと' USING ERRCODE = 'P0001';
+    END IF;
     UPDATE public.provisional_manhole AS pm SET status = p_status, updated_at = now() WHERE pm.id = p_id;
   ELSIF p_kind = 'photo' THEN
-    SELECT ph.status INTO v_old FROM public.provisional_photo AS ph WHERE ph.id = p_id FOR UPDATE;
+    SELECT ph.status, ph.transferred_visit_id INTO v_old, v_visit
+    FROM public.provisional_photo AS ph WHERE ph.id = p_id FOR UPDATE;
     IF v_old = 'withdrawn' THEN
       RAISE EXCEPTION 'set_status: 本人が取り下げた写真は再表示しない' USING ERRCODE = 'P0001';
+    END IF;
+    -- 移した後は通常の写真（visit）が公開の本体。ここを変えても公開は止まらないので、成功にしない
+    IF v_visit IS NOT NULL THEN
+      RAISE EXCEPTION 'set_status: 正式IDへ移し済み。通常の写真（visit %）の側で扱うこと', v_visit
+        USING ERRCODE = 'P0001';
     END IF;
     UPDATE public.provisional_photo AS ph SET status = p_status WHERE ph.id = p_id;
   ELSIF p_kind = 'hint' THEN
@@ -902,6 +914,10 @@ BEGIN
   SELECT * INTO m FROM public.provisional_manhole AS pm WHERE pm.id = p_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'link: 仮ポケふたが見つからない' USING ERRCODE = 'P0002';
+  END IF;
+  -- 非表示の仮ポケふたを移すと、写真が通常の公開に戻ってしまう（運営の判断を黙って取り消す）
+  IF m.status = 'hidden' THEN
+    RAISE EXCEPTION 'link: 非表示の仮ポケふたは移さない（先に unhide するか、そのままにする）' USING ERRCODE = 'P0001';
   END IF;
   IF m.state = 'merged' THEN
     RAISE EXCEPTION 'link: まとめ済み。まとめ先 % を結びつけること', m.merged_into_id USING ERRCODE = 'P0001';
