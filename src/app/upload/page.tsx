@@ -135,7 +135,7 @@ function UploadPageInner() {
   // entry と photo のどちらで数えるかの判定に使う。
   // loadManholes はマウント時のクロージャなので photos state を読めず、ref で渡す。
   const waitingManholePhotoRef = useRef(false);
-  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick } = useAnalytics();
+  const { track, trackView, trackPhotoUploadStart, trackPhotoUploadComplete, trackVisitRegister, trackSubmissionFailed, trackNavClick, trackSubmissionEntry } = useAnalytics();
   const funnel = useSubmissionFunnel('character');
   // マンホール詳細から来ていない（どの蓋か分からない）ときだけ出る。詳細から来ていれば valid_no_gps で通す
   const missingGpsMessage = isAndroid
@@ -1254,15 +1254,27 @@ function UploadPageInner() {
               {selectedPhoto.photoStatus === 'no_nearby_manhole' &&
                 (DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
                   <p className="mt-1 text-[#2A2A2A]/50">
-                    ポケふた以外のデザインマンホール投稿は現在一時停止中です。
+                    デザインマンホール（公式サイトに載っていない新しいポケふたを含む）の投稿は現在一時停止中です。
                   </p>
                 ) : (
-                  <Link
-                    href="/design-manholes/new"
-                    className="mt-1 inline-block font-bold underline hover:opacity-80"
-                  >
-                    ポケふた以外のマンホールなら → デザインマンホール投稿へ
-                  </Link>
+                  // 新しいポケふたを撮った人はほぼ必ずここに来る（公式に無いので近くの蓋が見つからない）。
+                  // 「ポケふた以外なら」だけだと自分は違うと読めるか、ふつうのデザインふたとして投稿されていた
+                  <div className="mt-1 flex flex-col items-start gap-1">
+                    <Link
+                      href="/design-manholes/new?kind=pokefuta"
+                      onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'upload_no_nearby_manhole' })}
+                      className="font-bold underline hover:opacity-80"
+                    >
+                      公式サイトに載っていない新しいポケふたなら → こちらから投稿
+                    </Link>
+                    <Link
+                      href="/design-manholes/new"
+                      onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'upload_no_nearby_manhole' })}
+                      className="font-bold underline hover:opacity-80"
+                    >
+                      ポケふた以外のマンホールなら → デザインマンホール投稿へ
+                    </Link>
+                  </div>
                 ))}
             </div>
           )}
