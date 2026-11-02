@@ -4,7 +4,7 @@ import Link from 'next/link';
 import XLogo from '@/components/XLogo';
 import { usePathname } from 'next/navigation';
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Camera, CircleDot, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
+import { Camera, CircleDot, Home, Info, Search, User as UserIcon, UserPlus } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -71,7 +71,8 @@ type ChromeState = {
  * 見た目・文言・項目順を揃えている。片方だけ変えないこと。
  *
  * SP も PC も「マーク＋ポケふた｜写真館＋キャレット」。SP は文字を幅に合わせて小さくする
- * （図鑑の .site-header__brand-name と同じ clamp）。ホームへはメニューの先頭「写真館」＝ `/` から行ける。
+ * （図鑑の .site-header__brand-name と同じ clamp）。ロゴ自体はホームへのリンクではないので、
+ * ホームへは PC ナビの「ホーム」・SP ヘッダーの家アイコン（ログイン中のみ）から行く（メニューの先頭「写真館」も `/`）。
  */
 function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
   const pathname = usePathname();
@@ -208,13 +209,16 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
 // ─────────────────────────────────────────────
 
 /**
- * 要素は「ロゴ（ポケふた｜写真館） / 認証」だけ。図鑑の SP ヘッダーと同じ並び・同じ形にしている。
+ * 要素は「ロゴ（ポケふた｜写真館） / ホーム / 認証」。図鑑の SP ヘッダーと同じ並び・同じ形に、
+ * ホームの家アイコンだけ足している（ロゴはサイト切り替えのボタンで、下タブにも `/` が無いため）。
+ * 家アイコンはログイン中だけ。未ログインは「ログイン」「新規登録」の2つが並ぶので、
+ * 足すと 360〜414px 幅でも「ポケふた｜写真館」が「…」で切れた。
  * 以前は真ん中にページ名（「石垣のポケふた」など）を出していたが、ページごとに変わって
  * 図鑑と揃わなかったのでやめた。
  * Info・X・図鑑・デザインふたをヘッダーに並べていた頃はタップ領域が潰れていたので、
  * ナビは下タブ、ユーティリティはフッターへ分けている。
  */
-function SpHeader({ user, authLoaded }: ChromeState) {
+function SpHeader({ user, authLoaded, pathname }: ChromeState) {
   return (
     <header
       // z-50 / 下タブの z-40 は --chrome-z-header / --chrome-z-bottomnav と対応。
@@ -246,6 +250,23 @@ function SpHeader({ user, authLoaded }: ChromeState) {
         <SiteSwitcher variant="sp" />
 
         <div className="flex-1" />
+
+        {authLoaded && user && (
+          <Link
+            href="/"
+            aria-label="ホーム"
+            title="ホーム"
+            aria-current={pathname === '/' ? 'page' : undefined}
+            className="flex flex-shrink-0 items-center justify-center rounded-lg transition hover:bg-[var(--chrome-accent-soft)]"
+            style={{
+              width: 'var(--chrome-tap-min)',
+              height: 'var(--chrome-tap-min)',
+              color: pathname === '/' ? 'var(--chrome-accent)' : 'var(--chrome-ink)',
+            }}
+          >
+            <Home className="h-5 w-5" strokeWidth={2.2} />
+          </Link>
+        )}
 
         {authLoaded &&
           (user ? (
@@ -361,6 +382,10 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
         項目はログインの有無で変わらないので、ちらつきも起きない。
       */}
       <div style={{ display: 'flex', gap: 4, marginLeft: 18 }}>
+        {/* ロゴはサイト切り替えのボタンなので、ホームはここに出す。SP 下タブには足さない（中央の投稿 FAB の左右がそろわなくなる） */}
+        <Link href="/" aria-current={pathname === '/' ? 'page' : undefined} style={pcNavLinkStyle(pathname === '/')}>
+          ホーム
+        </Link>
         {NAV_ITEMS.map(({ key, label, href }) => (
           <Link key={key} href={href} style={pcNavLinkStyle(activeNav ? activeNav === key : isActivePath(pathname, href))}>
             {label}
