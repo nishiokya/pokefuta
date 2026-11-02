@@ -33,6 +33,11 @@ import {
  *           type: boolean
  *         description: 写真付きのみ
  *       - in: query
+ *         name: with_location
+ *         schema:
+ *           type: boolean
+ *         description: 撮影位置（写真の GPS）がある訪問のみ
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
@@ -131,6 +136,9 @@ export async function GET(request: NextRequest) {
     const includeManholeTags = searchParams.get('include_manhole_tags') === 'true';
     // 蓋1つにつき1問い合わせ増えるので、トップのフィードだけが明示して求める
     const withLatestComment = searchParams.get('with_latest_comment') === 'true';
+    // トップのフィードは撮影位置（写真の GPS）がある投稿だけにする。位置の無い写真は
+    // まとめて上げられることが多く、新着の大半を埋めてしまう
+    const withLocation = searchParams.get('with_location') === 'true';
     const manholeTagFields = includeManholeTags
       ? `,
             titles,
@@ -249,6 +257,9 @@ export async function GET(request: NextRequest) {
     // TransformBuilder になり、そこから先は eq() を生やせない。
     if (prefecture) {
       query = query.eq('manhole.prefecture', prefecture);
+    }
+    if (withLocation) {
+      query = query.not('shot_location', 'is', null);
     }
 
     const { data: visits, error } = await query
