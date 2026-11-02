@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { applyLeafletDefaultIcon } from '@/components/Map/leafletDefaultIcon';
+import { bindRouteLinkTracking, googleMapsRouteUrl } from '@/components/Map/routeLink';
 
 applyLeafletDefaultIcon();
 
@@ -272,6 +273,16 @@ export default function MapComponent({
                   詳細を見る
                 </button>
               </div>
+              <a
+                href="${googleMapsRouteUrl(manhole.latitude, manhole.longitude)}"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-route-link
+                class="flex items-center justify-center w-full mt-2 px-3 py-2 rounded text-xs font-bold text-white"
+                style="background:#1f9d63;color:#fff"
+              >
+                Googleマップで経路案内
+              </a>
             </div>
           </div>
         `;
@@ -284,6 +295,11 @@ export default function MapComponent({
           autoClose: false,
           closeOnEscapeKey: true
         });
+        if (popup) bindRouteLinkTracking(marker, () => ({
+          manhole_id: manhole.id,
+          prefecture: manhole.prefecture ?? undefined,
+          surface: 'map_popup',
+        }));
 
         // ツールチップ（ホバー時 - PC用）
         const tooltipContent = `

@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { DesignManhole } from '@/types/database';
 import { applyLeafletDefaultIcon } from '@/components/Map/leafletDefaultIcon';
+import { bindRouteLinkTracking, googleMapsRouteUrl } from '@/components/Map/routeLink';
 
 applyLeafletDefaultIcon();
 
@@ -68,8 +69,14 @@ export default function DesignManholeMap({ designManholes }: DesignManholeMapPro
         `<div style="text-align:center;min-width:120px;">
           <img src="${dm.photo_url}" alt="${title}" style="max-width:150px;max-height:150px;border-radius:8px;" loading="lazy" />
           <div style="margin-top:4px;font-weight:bold;font-size:12px;">${title}</div>
+          <a href="${googleMapsRouteUrl(dm.latitude, dm.longitude)}" target="_blank" rel="noopener noreferrer" data-route-link
+            style="display:block;margin-top:6px;padding:6px 8px;border-radius:6px;background:#1f9d63;color:#fff;font-size:12px;font-weight:bold;text-decoration:none;">
+            Googleマップで経路案内
+          </a>
         </div>`
       );
+      // manhole_id はキャラふたの id なので、デザインふたは surface だけで分ける
+      bindRouteLinkTracking(marker, () => ({ surface: 'design_map_popup' }));
       marker.addTo(layer);
     });
 
