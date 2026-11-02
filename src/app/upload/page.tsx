@@ -139,7 +139,7 @@ function UploadPageInner() {
   const funnel = useSubmissionFunnel('character');
   // マンホール詳細から来ていない（どの蓋か分からない）ときだけ出る。詳細から来ていれば valid_no_gps で通す
   const missingGpsMessage = isAndroid
-    ? '写真に位置情報がありません。撮ってある写真は、上の「撮ってある写真を投稿する」でポケふたを選ぶと投稿できます。'
+    ? '写真に位置情報がありません。撮ってある写真は、下の「撮ってある写真を投稿する」でポケふたを選ぶと投稿できます。'
     : '写真に位置情報がありません。マンホールの詳細ページの投稿ボタンからなら、位置情報が無くても投稿できます。';
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
@@ -978,25 +978,6 @@ function UploadPageInner() {
           current="pokefuta"
           designSubmissionSuspended={DESIGN_MANHOLE_SUBMISSION_SUSPENDED}
         />
-        <div className="mt-4 rounded-xl border border-[#BF5640]/25 bg-[#FFF3EE] p-4">
-          <p className="text-sm font-extrabold text-[#8F3F2E]">ここはポケふたの投稿ページです</p>
-          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-            投稿すると訪問記録として図鑑に掲載されます。GPS位置情報付きの写真（マンホール位置から50m以内）が必要です。マンホールの詳細ページから投稿するときは、位置情報が無い写真も投稿できます。
-          </p>
-        </div>
-
-        {/* 季節の写真の呼びかけ。終わりの日を過ぎると自動で消える（src/lib/seasonal-call.ts） */}
-        {seasonalCall && (
-          <div className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
-            <p className="text-sm font-extrabold text-[#8A5A12]">
-              {seasonalCall.icon} {seasonalCall.name}のポケふた、募集中です
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-              {seasonalCall.name}をはじめ、桜・雪など季節感のある写真があれば、ぜひ投稿してください。
-            </p>
-          </div>
-        )}
-
         {/* Hint Manhole Card */}
         {hintManhole && (
           <section className="mt-4 flex items-start gap-3 rounded-lg border border-[#7B63A8]/20 bg-white/70 p-3">
@@ -1026,77 +1007,27 @@ function UploadPageInner() {
           </section>
         )}
 
-        {/* Android の撮ってある写真: ブラウザで選ぶと位置情報が消えるので、先に蓋を選んでもらい
-            その蓋の投稿画面（?manhole_id=）へ切り替える。位置情報なしで受け付けるのはそこだけ */}
-        {isAndroid && !hintManholeId && (
-          <section className="mt-6 rounded-lg border-2 border-[#7B63A8]/40 bg-white p-4">
-            <h2 className="flex items-center gap-1.5 text-sm font-bold">
-              <Upload className="h-4 w-4 text-[#7B63A8]" />
-              撮ってある写真を投稿する
-              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
-              どのポケふたの写真かを選ぶと、位置情報が無い写真も投稿できます。
-            </p>
-            <label className="relative mt-3 block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2A2A2A]/40" />
-              <input
-                value={pickerQuery}
-                onChange={(event) => setPickerQuery(event.target.value)}
-                aria-label="地域名・ポケモン名でポケふたを探す"
-                placeholder="地域名・ポケモン名で探す"
-                className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/30 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#7B63A8]"
-              />
-            </label>
-            {pickerQuery.trim() && (() => {
-              const hits = pickerHits;
-              if (hits.length === 0) {
-                return <p className="mt-2 text-xs text-[#2A2A2A]/60">見つかりませんでした。別の地域名・ポケモン名で探してください。</p>;
-              }
-              return (
-                <ul className="mt-2 max-h-72 divide-y divide-[#7B63A8]/10 overflow-y-auto rounded-lg border border-[#7B63A8]/15">
-                  {pickerShown.map(m => (
-                    <li key={m.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          trackNavClick('投稿:Androidの写真の蓋を選ぶ');
-                          router.replace(`/upload?manhole_id=${m.id}`);
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
-                      >
-                        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#7B63A8]/10">
-                          {lidCovers[String(m.id)] && (
-                            <StampPhoto
-                              src={lidCovers[String(m.id)]!.thumbnail_url}
-                              aiTags={lidCovers[String(m.id)]!.lid_crop}
-                            />
-                          )}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-bold">{manholeHeadingPlace(m)}</span>
-                          <span className="block text-xs text-[#2A2A2A]/60">
-                            {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-            {pickerHits.length > 30 && (
-              <p className="mt-1 text-xs text-[#2A2A2A]/50">30枚まで出しています。地域名を足して絞り込んでください。</p>
-            )}
-          </section>
-        )}
-
         {/* 写真 */}
         <section className="mt-6">
           <h2 className="flex items-center gap-1.5 text-sm font-bold">
             <Camera className="h-4 w-4 text-[#7B63A8]" />
             {isAndroid && !hintManholeId ? '蓋の前にいるなら、その場で撮影' : <>写真 <span className="text-[#B5483C]">*</span></>}
           </h2>
+          <p className="mt-1 text-xs text-[#2A2A2A]/60">
+            位置情報付きの写真（蓋から50m以内）で、訪問記録として図鑑に載ります
+          </p>
+          {/* その場で撮るのがいちばん確実（GPS が必ず乗る）なので、撮ってある写真より先に大きく出す。
+              Android は下の枠のタップがそのままカメラなので出さない */}
+          {!isAndroid && !selectedPhoto && !isUploading && (
+            <button
+              type="button"
+              onClick={captureFromCamera}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#7B63A8] px-4 py-3.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+            >
+              <Camera className="h-5 w-5" />
+              その場で撮影する
+            </button>
+          )}
           {/* 詳細から来た Android: 撮ってある写真の方を先に、目立つ形で出す（カメラの枠より上） */}
           {isAndroid && hintManholeId && !isUploading && (
             <button
@@ -1123,7 +1054,9 @@ function UploadPageInner() {
               },
               'aria-label': isAndroid ? 'カメラでポケふたを撮影' : '投稿する写真を選択',
             })}
-            className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
+            className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed text-center transition ${
+              isAndroid || selectedPhoto ? 'p-6' : 'p-4'
+            } ${
               isDragActive
                 ? 'border-[#7B63A8] bg-[#7B63A8]/10'
                 : 'border-[#7B63A8]/30 bg-white/60 hover:bg-white'
@@ -1147,35 +1080,22 @@ function UploadPageInner() {
                 {isAndroid ? (
                   <Camera className="mx-auto mb-2 h-10 w-10 text-[#7B63A8]/50" />
                 ) : (
-                  <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
+                  <Upload className={`mx-auto mb-1 h-6 w-6 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
                 )}
-                <p className="text-sm text-[#2A2A2A]/60">
+                <p className="text-sm font-bold text-[#2A2A2A]/70">
                   {isAndroid
                     ? 'タップしてカメラで撮影'
                     : isDragActive
                       ? '写真をドロップ！'
-                      : 'タップして写真を選択（またはドラッグ&ドロップ）'}
+                      : '撮ってある写真を選ぶ'}
                 </p>
                 <p className="mt-1 text-xs text-[#2A2A2A]/50">
                   {isAndroid
                     ? hintManholeId
                       ? '撮ってある写真は上の「端末の写真から選ぶ」から'
-                      : '撮ってある写真は、上の「撮ってある写真を投稿する」から'
-                    : 'JPEG, PNG, HEIC形式に対応'}
+                      : '撮ってある写真は、下の「撮ってある写真を投稿する」から'
+                    : 'JPEG・PNG・HEIC（PC はドラッグ&ドロップも可）'}
                 </p>
-                {!isAndroid && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      captureFromCamera();
-                    }}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
-                  >
-                    <Camera className="h-4 w-4" />
-                    カメラで撮影
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -1280,6 +1200,88 @@ function UploadPageInner() {
           )}
         </section>
 
+        {/* 写真を選んで通ったら出さない（下の入力欄との間に挟まって画面が伸びる）。
+            通らなかったときは残す。Android で位置情報の無い写真を撮ると、エラー文が
+            この蓋選びへ案内し、選ぶと ?manhole_id= に切り替わってその写真を受け付ける */}
+        {(!selectedPhoto || !!selectedPhoto.error) && (
+          <>
+        {/* Android の撮ってある写真: ブラウザで選ぶと位置情報が消えるので、先に蓋を選んでもらい
+            その蓋の投稿画面（?manhole_id=）へ切り替える。位置情報なしで受け付けるのはそこだけ */}
+        {isAndroid && !hintManholeId && (
+          <section className="mt-6 rounded-lg border-2 border-[#7B63A8]/40 bg-white p-4">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold">
+              <Upload className="h-4 w-4 text-[#7B63A8]" />
+              撮ってある写真を投稿する
+              <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
+              どのポケふたの写真かを選ぶと、位置情報が無い写真も投稿できます。
+            </p>
+            <label className="relative mt-3 block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2A2A2A]/40" />
+              <input
+                value={pickerQuery}
+                onChange={(event) => setPickerQuery(event.target.value)}
+                aria-label="地域名・ポケモン名でポケふたを探す"
+                placeholder="地域名・ポケモン名で探す"
+                className="min-h-[44px] w-full rounded-lg border border-[#7B63A8]/30 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#7B63A8]"
+              />
+            </label>
+            {pickerQuery.trim() && (() => {
+              const hits = pickerHits;
+              if (hits.length === 0) {
+                return <p className="mt-2 text-xs text-[#2A2A2A]/60">見つかりませんでした。別の地域名・ポケモン名で探してください。</p>;
+              }
+              return (
+                <ul className="mt-2 max-h-72 divide-y divide-[#7B63A8]/10 overflow-y-auto rounded-lg border border-[#7B63A8]/15">
+                  {pickerShown.map(m => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          trackNavClick('投稿:Androidの写真の蓋を選ぶ');
+                          router.replace(`/upload?manhole_id=${m.id}`);
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
+                      >
+                        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#7B63A8]/10">
+                          {lidCovers[String(m.id)] && (
+                            <StampPhoto
+                              src={lidCovers[String(m.id)]!.thumbnail_url}
+                              aiTags={lidCovers[String(m.id)]!.lid_crop}
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-bold">{manholeHeadingPlace(m)}</span>
+                          <span className="block text-xs text-[#2A2A2A]/60">
+                            {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            {pickerHits.length > 30 && (
+              <p className="mt-1 text-xs text-[#2A2A2A]/50">30枚まで出しています。地域名を足して絞り込んでください。</p>
+            )}
+          </section>
+        )}
+
+        {/* 季節の写真の呼びかけ。終わりの日を過ぎると自動で消える（src/lib/seasonal-call.ts） */}
+        {seasonalCall && (
+          <div className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
+            <p className="text-sm font-extrabold text-[#8A5A12]">
+              {seasonalCall.icon} {seasonalCall.name}のポケふた、募集中です
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
+              {seasonalCall.name}をはじめ、桜・雪など季節感のある写真があれば、ぜひ投稿してください。
+            </p>
+          </div>
+        )}
+
         {/* 撮ってある写真をまとめて投稿する入口。Android のスマホはブラウザで選ぶと GPS が消えるので、
             まとめて投稿は PC から、と伝えて写真の移し方へ案内する */}
         {isAndroid ? (
@@ -1305,49 +1307,11 @@ function UploadPageInner() {
             <span className="ml-2 rounded-full bg-[#7B63A8] px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
           </p>
         )}
+          </>
+        )}
 
-        {/* 撮影のコツ */}
-        <details className="mt-4 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
-          <summary className="cursor-pointer text-sm font-bold">蓋の写真を撮るコツ（OK / NG例）</summary>
-
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded-lg border border-[#4C9A57]/30 bg-[#4C9A57]/5 p-2">
-              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#4C9A57]">
-                <CheckCircle className="w-3 h-3" />
-                <span>OK</span>
-              </div>
-              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
-                <li>・マンホール全体が入っている</li>
-                <li>・真上に近い角度で撮れている</li>
-                <li>・絵柄や文字がはっきり見える</li>
-              </ul>
-            </div>
-
-            <div className="rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/5 p-2">
-              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#B5483C]">
-                <AlertCircle className="w-3 h-3" />
-                <span>NG</span>
-              </div>
-              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
-                <li>・斜めすぎて歪んでいる</li>
-                <li>・反射/影で見えにくい</li>
-                <li>・暗い/ブレている</li>
-              </ul>
-            </div>
-          </div>
-
-          <p className="mt-2 text-xs text-[#2A2A2A]/60">
-            📍 <strong>GPS位置情報は必須です。</strong> 写真の位置情報を有効にしてアップロードしてください。マンホール位置から50m以内の写真のみ登録できます。
-          </p>
-
-          <div className="mt-3 space-y-1 text-xs text-[#2A2A2A]/60">
-            <p>過去に撮った写真も登録できます。ただしトップページは日付順に並ぶため、昔の日付で登録すると下の方に表示されます。</p>
-            <p>同じポケふたに複数の写真を登録できます（別角度・別日・アップなど）。あとから追加登録もOKです。</p>
-            <p>いい写真が撮れたら、ぜひ新規投稿して図鑑を盛り上げてください。</p>
-          </div>
-        </details>
-
-        {/* コメント・公開設定・個人メモ */}
+        {/* コメント・公開設定・個人メモ。写真を選ぶまでは出さない（送信もできないので、画面を短く保つ） */}
+        {selectedPhoto && (
         <section className="mt-6">
             <div className="space-y-4">
               <div>
@@ -1434,15 +1398,17 @@ function UploadPageInner() {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="up-note" className="text-sm font-bold">
+              {/* 使う人が少ないので畳んでおく */}
+              <details open={visitNote.length > 0}>
+                <summary className="cursor-pointer text-sm font-bold">
                   個人メモ <span className="text-xs font-normal text-[#2A2A2A]/50">（任意・非公開）</span>
-                </label>
+                </summary>
                 <p className="mt-0.5 text-xs text-[#2A2A2A]/60">
                   カメラ情報など、自分だけが見るメモです（公開設定に関わらず非公開）
                 </p>
                 <textarea
                   id="up-note"
+                  aria-label="個人メモ"
                   className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
                   placeholder="例: カメラ: iPhone 15 Pro&#10;レンズ: 広角&#10;撮影日時: 2025/10/20 15:30"
                   rows={4}
@@ -1453,7 +1419,7 @@ function UploadPageInner() {
                 <p className="mt-1 text-right text-xs text-[#2A2A2A]/50">
                   {visitNote.length}/1000文字
                 </p>
-              </div>
+              </details>
             </div>
 
             {/* 送信 */}
@@ -1480,6 +1446,49 @@ function UploadPageInner() {
               )}
             </div>
         </section>
+        )}
+
+        {/* 撮影のコツ */}
+        <details className="mt-4 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
+          <summary className="cursor-pointer text-sm font-bold">撮り方のコツと投稿のルール</summary>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-[#4C9A57]/30 bg-[#4C9A57]/5 p-2">
+              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#4C9A57]">
+                <CheckCircle className="w-3 h-3" />
+                <span>OK</span>
+              </div>
+              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
+                <li>・マンホール全体が入っている</li>
+                <li>・真上に近い角度で撮れている</li>
+                <li>・絵柄や文字がはっきり見える</li>
+              </ul>
+            </div>
+
+            <div className="rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/5 p-2">
+              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-[#B5483C]">
+                <AlertCircle className="w-3 h-3" />
+                <span>NG</span>
+              </div>
+              <ul className="space-y-1 text-xs text-[#2A2A2A]/70">
+                <li>・斜めすぎて歪んでいる</li>
+                <li>・反射/影で見えにくい</li>
+                <li>・暗い/ブレている</li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="mt-2 text-xs text-[#2A2A2A]/60">
+            📍 <strong>GPS位置情報は必須です。</strong> 写真の位置情報を有効にしてアップロードしてください。マンホール位置から50m以内の写真のみ登録できます。
+            マンホールの詳細ページから投稿するときは、位置情報が無い写真も投稿できます。
+          </p>
+
+          <div className="mt-3 space-y-1 text-xs text-[#2A2A2A]/60">
+            <p>過去に撮った写真も登録できます。ただしトップページは日付順に並ぶため、昔の日付で登録すると下の方に表示されます。</p>
+            <p>同じポケふたに複数の写真を登録できます（別角度・別日・アップなど）。あとから追加登録もOKです。</p>
+            <p>いい写真が撮れたら、ぜひ新規投稿して図鑑を盛り上げてください。</p>
+          </div>
+        </details>
       </main>
 
     </div>
