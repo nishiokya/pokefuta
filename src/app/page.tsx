@@ -89,6 +89,8 @@ export default function HomePage() {
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  // フィードのページ送りに使う数。totalPosts（写真の総数）は撮影位置の無い投稿も含むので使わない
+  const [feedTotal, setFeedTotal] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
   // 写真のあるポケふたの数（site-stats の manholes_with_photos）。PC のヒーローの数字に使う
@@ -162,7 +164,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true`,
+        `/api/visits?with_photos=true&with_location=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -171,6 +173,8 @@ export default function HomePage() {
 
       const visits: FeedVisit[] = Array.isArray(data.visits) ? data.visits : [];
       setFeed(visits);
+      const matched = data?.pagination?.matched;
+      setFeedTotal(typeof matched === 'number' ? matched : null);
       if (currentPage === 1) setHeroPhotos((prev) => prev ?? pickHeroPhotos(visits));
     } catch (error) {
       console.error('Failed to load feed:', error);
@@ -261,7 +265,7 @@ export default function HomePage() {
   );
   const sameDayCounts = sameDayVisitorCounts(sortedFeed);
   const feedById = new Map(sortedFeed.map((visit) => [visit.id, visit]));
-  const totalFeedCount = totalPosts && totalPosts > 0 ? totalPosts : null;
+  const totalFeedCount = feedTotal && feedTotal > 0 ? feedTotal : null;
   const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
   const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
   const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
