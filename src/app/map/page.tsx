@@ -79,6 +79,9 @@ const MapComponent = dynamic(
   }
 );
 
+// 位置情報の許可の確認に答えないまま待たせない。過ぎたら全国表示のまま「取得中」を戻す
+const LOCATE_DEADLINE_MS = 15000;
+
 interface Visit {
   id: string;
   manhole_id: number;
@@ -121,6 +124,9 @@ export default function MapPage() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
+  // 古い取得の応答を捨てる番号と、取得を待つ間に地図を動かしたか（手で触った・県を選んだ）
+  const locateSeqRef = useRef(0);
+  const movedSinceLocateRef = useRef(false);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
   const { trackFilterApply, trackRouteOpen } = useAnalytics();
 
@@ -239,6 +245,7 @@ export default function MapPage() {
   );
 
   const handlePrefectureClick = (prefecture: PrefectureCount) => {
+    movedSinceLocateRef.current = true;
     setMapCenter({ lat: prefecture.lat, lng: prefecture.lng });
     setMapZoom(prefecture.zoom);
     setPrefSheetOpen(false);
@@ -252,29 +259,60 @@ export default function MapPage() {
     setSelectedId(manhole.id);
   };
 
-  // 許可の確認はこのボタンを押したときだけ出す（開いた瞬間には出さない）
-  const handleLocate = () => {
+  /**
+   * 現在地を取って地図を寄せる。取れなければ地図は今の位置（初期は全国）のまま。
+   * auto は開いた直後の自動取得。待っている間に地図を手で動かしたり県を選んだりしていたら、
+   * 後から位置が届いても地図は動かさない（現在地のピンだけ出す）
+   */
+  const locate = (auto: boolean) => {
     if (!navigator.geolocation) {
-      setLocationNote('この端末では現在地を取得できません');
+      setLocationNote(auto ? null : 'この端末では現在地を取得できません');
       return;
     }
+    const seq = ++locateSeqRef.current;
+    movedSinceLocateRef.current = false;
     setLocating(true);
     setLocationNote(null);
+    // timeout は許可の確認を待つ時間を含まないので、こちらでも締め切りを置いてボタンを戻す
+    const deadline = window.setTimeout(() => {
+      if (seq !== locateSeqRef.current) return;
+      setLocating(false);
+      setLocationNote(auto ? '現在地が取れないので全国を表示しています' : '現在地を取得できませんでした');
+    }, LOCATE_DEADLINE_MS);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (seq !== locateSeqRef.current) return;
+        window.clearTimeout(deadline);
         const location = { lat: position.coords.latitude, lng: position.coords.longitude };
         setUserLocation(location);
+        setLocating(false);
+        setLocationNote(null);
+        if (auto && movedSinceLocateRef.current) return;
         setMapCenter(location);
         setMapZoom(12);
         setRecenterKey((k) => k + 1);
-        setLocating(false);
       },
       () => {
-        setLocationNote('現在地を取得できませんでした。ブラウザの位置情報の許可を確認してください');
+        if (seq !== locateSeqRef.current) return;
+        window.clearTimeout(deadline);
         setLocating(false);
+        setLocationNote(
+          auto
+            ? '現在地が取れないので全国を表示しています'
+            : '現在地を取得できませんでした。ブラウザの位置情報の許可を確認してください',
+        );
       },
+      // 既定は timeout が無限で、位置情報サービスが応答しないと「取得中」のまま終わらない
+      { timeout: 10000, maximumAge: 60000 },
     );
   };
+  const handleLocate = () => locate(false);
+
+  // スマホは開いたら現在地の周辺を出す（地図を持って歩く使い方なので）。PC は全国のまま、ボタンで寄せる
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 1023px)').matches) locate(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const prefectureList = (
     <div className="space-y-2">
@@ -391,6 +429,9 @@ export default function MapPage() {
                         plainMarker={!isLoggedIn}
                         popup={false}
                         recenterKey={recenterKey}
+                        onUserInteract={() => {
+                          movedSinceLocateRef.current = true;
+                        }}
                         minHeight={0}
                       />
                     )}
