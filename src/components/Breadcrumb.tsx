@@ -25,13 +25,14 @@ import { ArrowLeft } from 'lucide-react';
  *
  * 判定はタブに載っているかどうかで見る。**サイトスイッチャー（写真館 ⇄ 図鑑）は
  * ボタンを開かないと出てこないので、ここでいう「常時見えている」には数えない。**
- * `/users/[userId]/visits` の `/` 行きが残っているのはこのため。
+ *
+ * トップ（`/`）行きは置かない。`/users/[userId]/visits` に「ホームへ」を置いていたが、
+ * SP は下タブで回遊でき、ホームは PC ナビとログイン中の SP ヘッダー（家アイコン）に
+ * あるので、導線を重ねずシンプルにするため外した（#417）。
  *
  * 現在の利用箇所:
  *
- * - `/p/[photoId]` → その写真の `/manhole/[id]`（個別ページ。タブに無い）
- * - `/users/[userId]/prefectures/[prefecture]` → そのユーザーのスタンプ帳（同上）
- * - `/users/[userId]/visits` → `/`（スイッチャーを開けば行けるが、タブには無い）
+ * - `/users/[userId]/prefectures/[prefecture]` → そのユーザーのスタンプ帳（個別ページ。タブに無い）
  *
  * ## router.back() を使わない理由
  *
