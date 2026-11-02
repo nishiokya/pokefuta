@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { LocateFixed, MapPin, X } from 'lucide-react';
+import { LocateFixed, MapPin, Navigation, X } from 'lucide-react';
 import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -112,7 +112,7 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState<number>(6);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // 押したピン（地図の下にカードで出す）と、県で絞るシート（スマホ）
+  // 押したピン（地図の上にカードで重ねる）と、県で絞るシート（スマホ）
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [prefSheetOpen, setPrefSheetOpen] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -122,7 +122,7 @@ export default function MapPage() {
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
-  const { trackFilterApply } = useAnalytics();
+  const { trackFilterApply, trackRouteOpen } = useAnalytics();
 
   // シートを開いたら中へフォーカスを移し、Tab はシート内で回し、Escape で閉じ、閉じたらボタンへ戻す
   useEffect(() => {
@@ -247,7 +247,7 @@ export default function MapPage() {
     trackFilterApply('prefecture', prefecture.name, prefecture.count);
   };
 
-  // ピンは押しても移動しない。地図の位置とズームを残したまま、下のカードで見せる
+  // ピンは押しても移動しない。地図の位置とズームを残したまま、地図に重ねたカードで見せる
   const handleManholeClick = (manhole: { id: number }) => {
     setSelectedId(manhole.id);
   };
@@ -356,7 +356,7 @@ export default function MapPage() {
                 */}
                 <p className="mb-3 font-pixelJp text-xs text-[#6A4D36]">
                   {isLoggedIn
-                    ? '訪問済み/未訪問を色で表示します。ピンをタップすると下にカードが出ます。'
+                    ? '訪問済み/未訪問を色で表示します。ピンをタップすると経路案内が出ます。'
                     : '全国のポケふたを表示します。ログインすると自分の訪問済み・未訪問を確認できます。'}
                 </p>
 
@@ -413,6 +413,46 @@ export default function MapPage() {
                       <MapPin className="h-4 w-4" /> 県で絞る
                     </button>
                   </div>
+                  {/* 押したピンのカード。地図の下に出すとスマホでは画面の外で気づかないので、地図の上に重ねる。
+                      地図の位置は動かさない。現地へ向かう人が多いので、詳細より経路（Googleマップ）を先に置く */}
+                  {selected && (
+                    <div className="absolute inset-x-2 bottom-2 z-[1000] rounded-[12px] border border-[#e9dfc7] bg-white p-3 shadow-lg lg:left-auto lg:w-[360px]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-pixelJp text-sm font-bold text-[#4F3828]">{selected.name || selected.title || 'ポケふた'}</p>
+                          <p className="mt-0.5 font-pixelJp text-xs text-[#6A4D36]">
+                            {selected.prefecture} {selected.city || selected.municipality || ''}
+                            {isLoggedIn && (
+                              <span className={`ml-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                                selected.is_visited ? 'bg-[#4ecdc4]/20 text-[#1f7a73]' : 'bg-[#ff6b6b]/15 text-[#b43c3c]'
+                              }`}>
+                                {selected.is_visited ? '✓ 訪問済み' : '? 未訪問'}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <button onClick={() => setSelectedId(null)} aria-label="カードを閉じる" className="-mr-2 -mt-2 inline-flex h-10 w-10 shrink-0 items-center justify-center text-[#6A4D36]">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        {selected.latitude != null && selected.longitude != null && (
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${selected.latitude},${selected.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => trackRouteOpen({ manhole_id: selected.id, prefecture: selected.prefecture, surface: 'visits_map' })}
+                            className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#1f9d63] px-3 font-pixelJp text-xs font-bold text-white"
+                          >
+                            <Navigation className="h-4 w-4" /> Googleマップで経路案内
+                          </a>
+                        )}
+                        <Link href={`/manhole/${selected.id}`} className="inline-flex min-h-[40px] shrink-0 items-center rounded-lg border border-[#7B63A8]/30 bg-white px-3 font-pixelJp text-xs font-bold text-[#7B63A8]">
+                          詳細
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {locationNote && <p role="status" className="mt-2 font-pixelJp text-xs text-[#bf5640]">{locationNote}</p>}
@@ -446,33 +486,6 @@ export default function MapPage() {
                       <Link href={`/manhole/${nearestUnvisited.manhole.id}`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#bf5640] px-3 font-pixelJp text-xs font-bold text-white">
                         詳細を見る
                       </Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* 押したピンのカード。地図の位置は動かさない。詳細へは「詳細を見る」から */}
-                {selected && (
-                  <div className="mt-3 flex items-start justify-between gap-3 rounded-[12px] border border-[#e9dfc7] bg-white p-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-pixelJp text-sm font-bold text-[#4F3828]">{selected.name || selected.title || 'ポケふた'}</p>
-                      <p className="mt-0.5 font-pixelJp text-xs text-[#6A4D36]">
-                        {selected.prefecture} {selected.city || selected.municipality || ''}
-                      </p>
-                      {isLoggedIn && (
-                        <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 font-pixelJp text-[11px] font-bold ${
-                          selected.is_visited ? 'bg-[#4ecdc4]/20 text-[#1f7a73]' : 'bg-[#ff6b6b]/15 text-[#b43c3c]'
-                        }`}>
-                          {selected.is_visited ? '✓ 訪問済み' : '? 未訪問'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Link href={`/manhole/${selected.id}`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#7B63A8] px-3 font-pixelJp text-xs font-bold text-white">
-                        詳細を見る
-                      </Link>
-                      <button onClick={() => setSelectedId(null)} aria-label="カードを閉じる" className="inline-flex h-10 w-10 items-center justify-center text-[#6A4D36]">
-                        <X className="h-4 w-4" />
-                      </button>
                     </div>
                   </div>
                 )}
