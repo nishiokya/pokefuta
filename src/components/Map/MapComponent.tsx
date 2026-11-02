@@ -74,6 +74,11 @@ interface MapComponentProps {
    * 呼び出し側の「現在地」ボタンなどで戻せるようにする（既定は変えない）。
    */
   recenterKey?: number;
+  /**
+   * 利用者が地図を触った（ドラッグ・ピンチ・ズームボタン・ホイール・キー操作）ときに呼ぶ。
+   * setView などプログラムからの移動では呼ばない。自動で寄せる前に、手で動かしたかを見るのに使う
+   */
+  onUserInteract?: () => void;
 }
 
 export default function MapComponent({
@@ -87,12 +92,18 @@ export default function MapComponent({
   plainMarker = false,
   popup = true,
   recenterKey = 0,
+  onUserInteract,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const onManholeClickRef = useRef(onManholeClick);
   const markerStatusRef = useRef(markerStatus);
+  const onUserInteractRef = useRef(onUserInteract);
+
+  useEffect(() => {
+    onUserInteractRef.current = onUserInteract;
+  }, [onUserInteract]);
 
   useEffect(() => {
     onManholeClickRef.current = onManholeClick;
@@ -124,7 +135,17 @@ export default function MapComponent({
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
 
+    // Leaflet の movestart / zoomstart は setView でも出るので、利用者の入力そのものを拾う
+    const container = map.getContainer();
+    const notifyInteract = () => onUserInteractRef.current?.();
+    container.addEventListener('pointerdown', notifyInteract);
+    container.addEventListener('wheel', notifyInteract, { passive: true });
+    container.addEventListener('keydown', notifyInteract);
+
     return () => {
+      container.removeEventListener('pointerdown', notifyInteract);
+      container.removeEventListener('wheel', notifyInteract);
+      container.removeEventListener('keydown', notifyInteract);
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;

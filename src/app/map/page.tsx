@@ -124,7 +124,7 @@ export default function MapPage() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [locationNote, setLocationNote] = useState<string | null>(null);
-  // 古い取得の応答を捨てる番号と、取得を待つ間に県を選んで地図を動かしたか
+  // 古い取得の応答を捨てる番号と、取得を待つ間に地図を動かしたか（手で触った・県を選んだ）
   const locateSeqRef = useRef(0);
   const movedSinceLocateRef = useRef(false);
   const [prefectureSortOrder, setPrefectureSortOrder] = useState<'code' | 'count'>('code');
@@ -261,7 +261,7 @@ export default function MapPage() {
 
   /**
    * 現在地を取って地図を寄せる。取れなければ地図は今の位置（初期は全国）のまま。
-   * auto は開いた直後の自動取得。待っている間に県を選んで地図を動かしていたら、
+   * auto は開いた直後の自動取得。待っている間に地図を手で動かしたり県を選んだりしていたら、
    * 後から位置が届いても地図は動かさない（現在地のピンだけ出す）
    */
   const locate = (auto: boolean) => {
@@ -429,6 +429,9 @@ export default function MapPage() {
                         plainMarker={!isLoggedIn}
                         popup={false}
                         recenterKey={recenterKey}
+                        onUserInteract={() => {
+                          movedSinceLocateRef.current = true;
+                        }}
                         minHeight={0}
                       />
                     )}
