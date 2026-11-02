@@ -177,6 +177,10 @@ export async function GET(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
 
+    // with_location の指定時だけ総数を数える。トップのページ送りは写真の総数ではなく、
+    // この絞り込みで残る訪問の数で決めないと、最後のページの先に空のページが出る
+    const selectOptions = withLocation ? { count: 'exact' as const } : undefined;
+
     // Build query
     let query;
     if (viewerUserId) {
@@ -214,7 +218,7 @@ export async function GET(request: NextRequest) {
             height,
             created_at
           )
-        `)
+        `, selectOptions)
         .eq('user_id', viewerUserId);
     } else {
       // ✅ 未ログイン時: 公開(is_public=true)の訪問記録を返す（noteは返さない）
@@ -249,7 +253,7 @@ export async function GET(request: NextRequest) {
             height,
             created_at
           )
-        `)
+        `, selectOptions)
         .eq('is_public', true);
     }
 
@@ -262,7 +266,7 @@ export async function GET(request: NextRequest) {
       query = query.not('shot_location', 'is', null);
     }
 
-    const { data: visits, error } = await query
+    const { data: visits, error, count } = await query
       .order(orderBy, { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -529,7 +533,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         limit,
         offset,
-        total: filteredVisits.length
+        total: filteredVisits.length,
+        ...(withLocation && typeof count === 'number' ? { matched: count } : {}),
       }
     }, {
       headers: {
