@@ -1699,19 +1699,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           {/*
-            一覧は代表写真のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
-            コメント欄と地図を挟んで2回出ていた。上の枠に全部収まる3枚以下なら出さない。
-          */}
-          {allPhotosGrid}
-          {/* 上の枠に全部収まる蓋は allPhotosGrid が無いので、タグの注釈をここで出す（拡大表示にはタグが出る） */}
-          {!allPhotosGrid && (
-            <AiTagNote show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
-          )}
-
-          {/*
-            住所・経路案内・登場ポケモンを写真のすぐ下にも出す（スマホのみ）。
+            住所・経路案内・登場ポケモンを代表写真のすぐ下にも出す（スマホのみ）。
             スマホの見出しには住所が無く、コメント欄の下の「場所」まで下りないと
             住所も経路案内も出てこなかったので、現地で探せなかった。
+            「すべての写真」の後ろに置くと、写真の多い蓋（13枚で約1,650px下）では
+            やはり遠いので、一覧より前に置く（#422 の後追い）。
             PC は見出しに同じものが出ているので重ねない。
           */}
           <dl className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs lg:hidden">
@@ -1756,6 +1748,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             )}
           </dl>
+
+          {/*
+            一覧は代表写真（スマホは住所の欄）のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
+            コメント欄と地図を挟んで2回出ていた。上の枠に全部収まる3枚以下なら出さない。
+          */}
+          {allPhotosGrid}
+          {/* 上の枠に全部収まる蓋は allPhotosGrid が無いので、タグの注釈をここで出す（拡大表示にはタグが出る） */}
+          {!allPhotosGrid && (
+            <AiTagNote show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
+          )}
 
           {/*
             自分の記録のメモと公開設定。以前はタイトル下で他人のひとことも出していたが、
