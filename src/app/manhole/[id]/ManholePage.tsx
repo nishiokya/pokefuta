@@ -1709,6 +1709,55 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           {/*
+            住所・経路案内・登場ポケモンを写真のすぐ下にも出す（スマホのみ）。
+            スマホの見出しには住所が無く、コメント欄の下の「場所」まで下りないと
+            住所も経路案内も出てこなかったので、現地で探せなかった。
+            PC は見出しに同じものが出ているので重ねない。
+          */}
+          <dl className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs lg:hidden">
+            <div className="flex items-center gap-3 py-1">
+              <dt className="shrink-0 font-bold text-[#9b917e]">住所</dt>
+              <dd className="min-w-0 flex-1 font-bold leading-snug text-[#2c2a26]">
+                {manhole.address || `${manhole.prefecture}${manhole.city || manhole.municipality || ''}`}
+              </dd>
+              <dd className="shrink-0">
+                <button
+                  type="button"
+                  onClick={openInMaps}
+                  className="inline-flex items-center gap-1 rounded-full bg-[#1f9d63] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white transition-colors hover:bg-[#1a8a56]"
+                >
+                  <Navigation className="h-3 w-3" strokeWidth={2.6} />
+                  経路案内
+                </button>
+              </dd>
+            </div>
+            {landmarkLabel(manhole) && (
+              <div className="flex gap-3 py-1">
+                <dt className="shrink-0 font-bold text-[#9b917e]">目印</dt>
+                <dd className="font-bold leading-snug text-[#2c2a26]">{landmarkLabel(manhole)}</dd>
+              </div>
+            )}
+            {manhole.pokemons && manhole.pokemons.length > 0 && (
+              <div className="flex items-start gap-3 py-1">
+                <dt className="shrink-0 pt-1 font-bold text-[#9b917e]">登場ポケモン</dt>
+                <dd className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                  {manhole.pokemons.map((pokemon) => (
+                    <a
+                      key={pokemon}
+                      href={pokemonDexUrl(pokemon)}
+                      aria-label={`ポケふた図鑑で${pokemon}を見る`}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] hover:text-[#bf5640]"
+                    >
+                      <span className="text-[10px]">◓</span>
+                      {pokemon}
+                    </a>
+                  ))}
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          {/*
             自分の記録のメモと公開設定。以前はタイトル下で他人のひとことも出していたが、
             「訪れた人のひとこと」の1位と同じ文が二重に並ぶので、他人の分はそちらと
             写真上の吹き出しに任せ、ここは自分の記録の操作に絞った。
