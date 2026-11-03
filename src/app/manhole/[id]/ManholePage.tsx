@@ -34,7 +34,7 @@ import {
   normalizeVisitComment,
   collectVisitComments,
 } from '@/lib/visit-comment-quality';
-import { updateVisitVisibility, showVisibilityToast } from '@/lib/visit-visibility';
+import { updateVisitVisibility, showVisibilityToast, PRIVATE_VISIBILITY_NOTICE, PRIVATE_VISIBILITY_NOTICE_MS } from '@/lib/visit-visibility';
 import { formatPhotoDateJst, formatPhotoDateJstCompact } from '@/lib/date';
 import {
   filterPokemons,
@@ -619,7 +619,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         is_public: nextIsPublic,
         surface: 'manhole_detail',
       });
-      showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
+      if (nextIsPublic) {
+        showVisibilityToast('公開しました');
+      } else {
+        showVisibilityToast(PRIVATE_VISIBILITY_NOTICE, true, PRIVATE_VISIBILITY_NOTICE_MS);
+      }
     } else {
       setLocal(!nextIsPublic);
       showVisibilityToast('公開設定の変更に失敗しました', false);

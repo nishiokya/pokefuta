@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
-import { storage } from '@/lib/storage';
+import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 
 /**
@@ -229,16 +229,19 @@ export async function DELETE(
     const deletedPhotoIds = photosToDelete.map((photo) => photo.id);
 
     for (const photo of photosToDelete) {
-      try {
-        if (storage.delete) {
-          await storage.delete(photo.storage_key);
-          console.log(`Deleted photo from storage: ${photo.storage_key}`);
-        } else {
-          console.warn('Storage adapter does not support delete operation');
+      // サムネイルも消す。残すと CDN に残った ?size=small の転送先がまだ表示できる（#282）
+      for (const key of photoObjectKeys(photo.storage_key)) {
+        try {
+          if (storage.delete) {
+            await storage.delete(key);
+            console.log(`Deleted photo from storage: ${key}`);
+          } else {
+            console.warn('Storage adapter does not support delete operation');
+          }
+        } catch (storageError: any) {
+          console.error('Error deleting photo from storage:', storageError);
+          // Continue DB deletion even if the object has already gone missing.
         }
-      } catch (storageError: any) {
-        console.error('Error deleting photo from storage:', storageError);
-        // Continue DB deletion even if the object has already gone missing.
       }
     }
 
