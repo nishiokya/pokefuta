@@ -5,7 +5,7 @@ import { Manhole } from '@/types/database';
 import VisitPhotoCard from '@/components/VisitPhotoCard';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { updateVisitVisibility, publishAllPrivateVisits, showVisibilityToast } from '@/lib/visit-visibility';
+import { updateVisitVisibility, publishAllPrivateVisits, showVisibilityToast, PRIVATE_VISIBILITY_NOTICE, PRIVATE_VISIBILITY_NOTICE_MS } from '@/lib/visit-visibility';
 import { EyeOff } from 'lucide-react';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
 import { dedupTripVisits, tripMonthAnchor } from '@/lib/trip-activity';
@@ -93,7 +93,11 @@ export default function TripDiary({ initialVisits }: { initialVisits: JourneyVis
       // surface はマイ旅のころの値（my_trip / my_trip_bulk）のまま。同じ画面・同じ操作なので、
       // 名前を変えずに1本の系列として前後を見る（2026-10 に /my-trip → /visits/trip へ移した）
       trackVisitVisibilityChange({ is_public: nextIsPublic, surface: 'my_trip' });
-      showVisibilityToast(nextIsPublic ? '公開しました' : '非公開にしました');
+      if (nextIsPublic) {
+        showVisibilityToast('公開しました');
+      } else {
+        showVisibilityToast(PRIVATE_VISIBILITY_NOTICE, true, PRIVATE_VISIBILITY_NOTICE_MS);
+      }
     } else {
       setLocal(!nextIsPublic);
       showVisibilityToast('公開設定の変更に失敗しました', false);

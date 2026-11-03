@@ -44,16 +44,31 @@ export async function publishAllPrivateVisits(): Promise<number | null> {
 }
 
 /**
+ * 非公開にしたときの案内。写真のリダイレクトは CDN に最大1日残り、その転送先の
+ * 署名URLは2日有効なので、URLを直接持っている人にはしばらく見え続ける（#282、
+ * src/lib/photo-redirect-cache.ts）。プライバシーポリシーの「3. 公開される情報」と揃える。
+ */
+export const PRIVATE_VISIBILITY_NOTICE =
+  '非公開にしました。一覧からはすぐに消えますが、写真のURLを知っている人には最大2日ほど表示されることがあります。すぐに見えなくしたい場合は記録を削除してください。';
+
+/** PRIVATE_VISIBILITY_NOTICE は長いので、読み切れるだけ出しておく */
+export const PRIVATE_VISIBILITY_NOTICE_MS = 7000;
+
+/**
  * 簡易トースト。グローバルなトースト基盤が無いので
  * ShareButtons.tsx の showCopyToast と同じ DOM 差し込み方式に揃えている。
  */
-export function showVisibilityToast(message: string, success: boolean = true) {
+export function showVisibilityToast(
+  message: string,
+  success: boolean = true,
+  durationMs: number = 2000
+) {
   if (typeof document === 'undefined') return;
   const toast = document.createElement('div');
-  toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50 text-white ${
+  toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 w-max max-w-[min(90vw,24rem)] px-4 py-3 rounded-lg shadow-lg font-pixelJp text-sm z-50 text-white ${
     success ? 'bg-[#4F3828]' : 'bg-rpg-red'
   }`;
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+  setTimeout(() => toast.remove(), durationMs);
 }

@@ -49,6 +49,16 @@ export function deriveSmallKey(storageKey: string): string | null {
     .replace(/\.[^./]+$/, '.webp');
 }
 
+/**
+ * 訪問写真1枚ぶんの R2 オブジェクトのキー（元写真と、あればサムネイル）。
+ * 削除のときに使う。サムネイルを残すと、CDN に残った /api/photo/[id]?size=small の
+ * 転送先がまだ表示できてしまう（#282 で署名URLを2日に延ばした）。
+ */
+export function photoObjectKeys(storageKey: string): string[] {
+  const smallKey = deriveSmallKey(storageKey);
+  return smallKey ? [storageKey, smallKey] : [storageKey];
+}
+
 export function generateContextImageStorageKey(manholeId: number, contentType?: string): string {
   const date = new Date();
   const year = date.getFullYear();

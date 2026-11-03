@@ -4,8 +4,8 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
-import { storage, deriveSmallKey } from '@/lib/storage';
-import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
+import { storage, deriveSmallKey, photoObjectKeys } from '@/lib/storage';
+import { photoRedirectCachePolicy } from '@/lib/photo-redirect-cache';
 
 export const dynamic = 'force-dynamic';
 // 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
@@ -147,18 +147,14 @@ export async function GET(
 
     // 公開設定は PATCH /api/visits/[id] で後から変更できる。公開 → 非公開に戻したとき、
     // 共有キャッシュに残った 307 とその先の署名URLがどれだけ生き延びるかが
-    // そのまま「非公開にしたのにまだ見える」時間になる。
-    // Get signed URL from storage provider
-    const signedUrl = await storage.getSignedUrl(storageKey, PHOTO_SIGNED_URL_TTL_SECONDS);
-
-    // Cache the redirect so browsers reuse the same signed URL (which lets the
-    // immutable R2 object hit the browser cache). max-age は署名URLの寿命より
-    // 十分短くして、キャッシュされた Location が期限切れURLを指さないようにする
-    // （stale-while-revalidate は寿命を超えて配り続けるため公開写真でも使わない）。
+    // そのまま「非公開にしたのにまだ見える」時間になる。公開写真はこれを1日まで許して
+    // CDN に置き、SSR の起動を減らす（#282。寿命の決め方は photo-redirect-cache.ts）。
+    // stale-while-revalidate は署名URLの寿命を超えて配り続けうるので使わない。
     // Private photos must not enter shared caches.
-    const cacheControl = visit?.is_public === true && !readCookies
-      ? 'public, max-age=300'
-      : 'private, max-age=300';
+    const { cacheControl, signedUrlTtlSeconds } = photoRedirectCachePolicy(
+      visit?.is_public === true && !readCookies
+    );
+    const signedUrl = await storage.getSignedUrl(storageKey, signedUrlTtlSeconds);
 
     // Redirect to the signed URL
     return NextResponse.redirect(signedUrl.url, {
@@ -226,18 +222,21 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    // ✅ 4. R2から画像ファイルを削除
-    try {
-      if (storage.delete) {
-        await storage.delete(photo.storage_key);
-        console.log(`Deleted photo from storage: ${photo.storage_key}`);
-      } else {
-        console.warn('Storage adapter does not support delete operation');
+    // ✅ 4. R2から画像ファイルを削除（サムネイルも。残すと CDN に残った
+    // ?size=small の転送先がまだ表示できる。#282）
+    for (const key of photoObjectKeys(photo.storage_key)) {
+      try {
+        if (storage.delete) {
+          await storage.delete(key);
+          console.log(`Deleted photo from storage: ${key}`);
+        } else {
+          console.warn('Storage adapter does not support delete operation');
+        }
+      } catch (storageError: any) {
+        console.error('Error deleting photo from storage:', storageError);
+        // ストレージ削除に失敗してもDB削除は続行
+        // （ファイルが既に存在しない可能性もあるため）
       }
-    } catch (storageError: any) {
-      console.error('Error deleting photo from storage:', storageError);
-      // ストレージ削除に失敗してもDB削除は続行
-      // （ファイルが既に存在しない可能性もあるため）
     }
 
     // ✅ 5. データベースから写真レコードを削除
