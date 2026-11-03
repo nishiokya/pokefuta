@@ -192,6 +192,8 @@ export interface SubmissionBlockedParams extends SubmissionEventParams {
    * ただしこれも件数であって**人数ではない**（1人が写真を選び直せば何件でも出る）。
    */
   is_repeat?: boolean;
+  /** 画面のエラー文に出した問い合わせ用のコード（`src/lib/error-ref.ts`）。問い合わせからこのイベントを引く。 */
+  error_ref?: string;
 }
 
 export interface SubmissionCompleteParams extends SubmissionEventParams {
@@ -212,6 +214,8 @@ export interface SubmissionFailedParams extends SubmissionEventParams {
    * `src/lib/analytics/submission-error.ts` で両系統とも同じ規則を使う。
    */
   error_type?: SubmissionErrorType;
+  /** 画面のエラー文に出した問い合わせ用のコード（`src/lib/error-ref.ts`）。 */
+  error_ref?: string;
 }
 
 /**

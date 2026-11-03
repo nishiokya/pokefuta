@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useAnalytics } from './useAnalytics';
+import { makeErrorRef } from '@/lib/error-ref';
 import type {
   PhotoSource,
   SubmissionBlockPhase,
@@ -126,13 +127,17 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
    * `postsend` は応答を待つ間に写真を選び直せてしまうので、**その送信の属性**を
    * `attribution` で明示的に渡す。ref を読み直すと、いま画面にある別の写真の
    * `photo_source` が、前の送信のブロックに付く。
+   *
+   * 戻り値は問い合わせ用のコード（`error_ref`）。画面のエラー文に `withErrorRef` で付ける。
+   * 文言を先に作る呼び出し側は `makeErrorRef` で作ったものを `errorRef` で渡す。
    */
   const blocked = useCallback(
     (
       block_reason: SubmissionBlockReason,
       block_phase: SubmissionBlockPhase,
-      attribution?: { photo_source?: PhotoSource; attempt_no?: number }
-    ) => {
+      attribution?: { photo_source?: PhotoSource; attempt_no?: number },
+      errorRef: string = makeErrorRef(block_reason)
+    ): string => {
       stepRef.current = 'blocked';
       blockReasonRef.current = block_reason;
       blockPhaseRef.current = block_phase;
@@ -148,7 +153,9 @@ export function useSubmissionFunnel(submission_kind: SubmissionKind) {
         is_repeat,
         attempt_no: attribution?.attempt_no ?? attemptRef.current,
         photo_source: attribution?.photo_source ?? selectedPhotoSourceRef.current,
+        error_ref: errorRef,
       });
+      return errorRef;
     },
     [submission_kind, trackSubmissionBlocked]
   );
