@@ -26,6 +26,7 @@ import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import { DesignManholeAfterUploadLink } from '@/components/DesignManhole/SubmitCta';
 import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
+import { makeErrorRef, withErrorRef } from '@/lib/error-ref';
 import StampPhoto from '@/components/StampPhoto';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
 
@@ -316,7 +317,7 @@ function UploadPageInner() {
     // 蓋の一覧が届く前に写真を選ぶと waiting_manhole になり、ここで初めて可否が決まる。
     // 回線が遅いほど通る経路なので、ここで数えないと onDrop 側の分だけが計上され、
     // 「離脱理由なしで止まっている人」として見える。
-    const blockReasons: SubmissionBlockReason[] = [];
+    const blockReasons: { reason: SubmissionBlockReason; ref: string }[] = [];
 
     const reevaluate = (photo: UploadedPhoto): UploadedPhoto => {
       if (photo.photoStatus !== 'waiting_manhole') return photo;
@@ -326,11 +327,12 @@ function UploadPageInner() {
         if (hint) {
           return { ...photo, photoStatus: 'valid_no_gps', matchedManhole: hint, error: undefined };
         }
-        blockReasons.push('invalid_gps');
+        const ref = makeErrorRef('invalid_gps');
+        blockReasons.push({ reason: 'invalid_gps', ref });
         return {
           ...photo,
           photoStatus: 'invalid_gps',
-          error: missingGpsMessage
+          error: withErrorRef(missingGpsMessage, ref)
         };
       }
 
@@ -343,11 +345,12 @@ function UploadPageInner() {
         return { ...photo, photoStatus: 'valid', matchedManhole, error: undefined };
       }
 
-      blockReasons.push('no_nearby_manhole');
+      const ref = makeErrorRef('no_nearby_manhole');
+      blockReasons.push({ reason: 'no_nearby_manhole', ref });
       return {
         ...photo,
         photoStatus: 'no_nearby_manhole',
-        error: '50m以内にマンホールが見つかりません。位置情報を確認してください。'
+        error: withErrorRef('50m以内にマンホールが見つかりません。位置情報を確認してください。', ref)
       };
     };
 
@@ -355,7 +358,7 @@ function UploadPageInner() {
     // 2回呼ばれうるので、その中でイベントを送ると二重に数える。
     const reevaluated = photos.map(reevaluate);
     setPhotos(reevaluated);
-    blockReasons.forEach(reason => funnel.blocked(reason, 'photo'));
+    blockReasons.forEach(({ reason, ref }) => funnel.blocked(reason, 'photo', undefined, ref));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAndroid, manholes]);
 
@@ -453,9 +456,8 @@ function UploadPageInner() {
         funnel.blocked('manholes_unavailable', 'photo');
       }
     } else if (!isValidCoordinates(metadata.latitude, metadata.longitude)) {
-      distanceError = missingGpsMessage;
       photoStatus = 'invalid_gps';
-      funnel.blocked('invalid_gps', 'photo');
+      distanceError = withErrorRef(missingGpsMessage, funnel.blocked('invalid_gps', 'photo'));
     } else if (manholes.length > 0) { // マンホール一覧が利用可能な場合のみ判定
       // isValidCoordinates が true の場合、lat/lng は有効な数値
       matchedManhole = findNearestManhole(
@@ -465,9 +467,11 @@ function UploadPageInner() {
       if (matchedManhole) {
         photoStatus = 'valid';
       } else {
-        distanceError = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
         photoStatus = 'no_nearby_manhole';
-        funnel.blocked('no_nearby_manhole', 'photo');
+        distanceError = withErrorRef(
+          '50m以内にマンホールが見つかりません。位置情報を確認してください。',
+          funnel.blocked('no_nearby_manhole', 'photo')
+        );
       }
     } else {
       distanceError = 'マンホール情報をロード中です。少々お待ちください。';
@@ -534,7 +538,8 @@ function UploadPageInner() {
     // ✅ GPS座標の必須チェック（マンホール詳細から来た位置情報なしの写真は除く）
     if (photo.photoStatus !== 'valid_no_gps' &&
         !isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
-      const errorMsg = missingGpsMessage;
+      const errorRef = makeErrorRef('invalid_gps');
+      const errorMsg = withErrorRef(missingGpsMessage, errorRef);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -542,13 +547,14 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('invalid_gps', 'presend');
+      funnel.blocked('invalid_gps', 'presend', undefined, errorRef);
       return;
     }
 
     // ✅ マンホールが選択されているかチェック
     if (!photo.matchedManhole) {
-      const errorMsg = 'マンホールが見つかりません。別の写真を試してください。';
+      const errorRef = makeErrorRef('no_nearby_manhole');
+      const errorMsg = withErrorRef('マンホールが見つかりません。別の写真を試してください。', errorRef);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -556,7 +562,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('no_nearby_manhole', 'presend');
+      funnel.blocked('no_nearby_manhole', 'presend', undefined, errorRef);
       return;
     }
 
@@ -565,7 +571,8 @@ function UploadPageInner() {
       photo.matchedManhole.latitude == null ||
       photo.matchedManhole.longitude == null
     ) {
-      const errorMsg = 'マンホール位置情報が見つかりません。別の写真を試してください。';
+      const errorRef = makeErrorRef('manhole_location_missing');
+      const errorMsg = withErrorRef('マンホール位置情報が見つかりません。別の写真を試してください。', errorRef);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -573,7 +580,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('manhole_location_missing', 'presend');
+      funnel.blocked('manhole_location_missing', 'presend', undefined, errorRef);
       return;
     }
 
@@ -586,7 +593,8 @@ function UploadPageInner() {
 
     if (distance > MAX_DISTANCE_KM) {
       const distanceM = Math.round(distance * 1000);
-      const errorMsg = `マンホール位置から${distanceM}m離れています。50m以内で撮影した写真を登録してください。`;
+      const errorRef = makeErrorRef('too_far');
+      const errorMsg = withErrorRef(`マンホール位置から${distanceM}m離れています。50m以内で撮影した写真を登録してください。`, errorRef);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -594,7 +602,7 @@ function UploadPageInner() {
         } : p
       ));
       notify('error', errorMsg);
-      funnel.blocked('too_far', 'presend');
+      funnel.blocked('too_far', 'presend', undefined, errorRef);
       return;
     }
 
@@ -629,8 +637,8 @@ function UploadPageInner() {
         // ここを失敗に混ぜると運用上の失敗件数が水増しされ、
         // block_reason:'unsupported_format' がキャラふた側で永久にゼロになる。
         blockedBeforeSubmit = true;
-        funnel.blocked('unsupported_format', 'presend');
-        throw new Error('この画像形式は変換できませんでした。JPEG画像でお試しください', {
+        const errorRef = funnel.blocked('unsupported_format', 'presend');
+        throw new Error(withErrorRef('この画像形式は変換できませんでした。JPEG画像でお試しください', errorRef), {
           cause: compressionError,
         });
       }
@@ -756,6 +764,8 @@ function UploadPageInner() {
       // ここで p_app_error を別に送らない — 同じ失敗が p_submission_failed と
       // 二重に数えられ、障害の規模が2倍に見えていた（デザインふた側は送っていない）。
       const errorType = classifyClientSubmissionError(error, responseStatus);
+      // 圧縮で止まった場合は blocked のコードが既に文言に入っている
+      const errorRef = blockedBeforeSubmit ? undefined : makeErrorRef(errorType);
 
       // 圧縮できずに止まった場合は既に blocked として数えている。
       // ここで失敗にも数えると二重になり、障害の件数が水増しされる。
@@ -769,10 +779,12 @@ function UploadPageInner() {
           error_type: errorType,
           photo_source: submittedPhotoSource,
           attempt_no: submittedAttemptNo,
+          error_ref: errorRef,
         });
       }
 
-      const errorMsg = error?.message || 'アップロードに失敗しました';
+      const baseErrorMsg = error?.message || 'アップロードに失敗しました';
+      const errorMsg = errorRef ? withErrorRef(baseErrorMsg, errorRef) : baseErrorMsg;
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
