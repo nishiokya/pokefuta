@@ -58,14 +58,13 @@ BEGIN
   END;
 
   -- ---------------------------------------------------------------------
-  -- 3. 公開側（anon / authenticated）からは印を読めない（列単位 GRANT に入れていない）
+  -- 3. 公開側（anon / authenticated）からも印を読める（20261103100000 で列単位 GRANT に追加）
+  --    詳細ページの写真に「位置情報あり／なし」のアイコンを出す（2026-11-03 ユーザー決定）
   -- ---------------------------------------------------------------------
-  BEGIN
-    SELECT location_source INTO src FROM public.visit WHERE id = v_none;
-    RAISE EXCEPTION '[3] authenticated から location_source が読めてしまった';
-  EXCEPTION
-    WHEN insufficient_privilege THEN NULL;  -- 期待どおり
-  END;
+  SELECT location_source INTO src FROM public.visit WHERE id = v_none;
+  IF src IS DISTINCT FROM 'none' THEN
+    RAISE EXCEPTION '[3] authenticated から location_source が読めない（期待 none / 実際 %）', src;
+  END IF;
 
   -- 既存の公開列の読み取りは変わらない
   SELECT count(*) INTO n FROM public.visit WHERE id IN (v_gps, v_none);

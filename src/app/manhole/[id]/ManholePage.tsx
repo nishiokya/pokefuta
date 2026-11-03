@@ -16,6 +16,7 @@ import DeletePhotoModal from '@/components/DeletePhotoModal';
 import VisitVisibilityModal from '@/components/VisitVisibilityModal';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
+import PhotoLocationIcon from '@/components/PhotoLocationIcon';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
@@ -87,6 +88,8 @@ interface Photo {
     note?: string;
     comment?: string;
     is_public?: boolean;
+    /** 撮影位置（EXIF の GPS）の有無。座標は返さない。/api/image-upload が返す */
+    location_source?: 'gps' | 'none' | null;
   };
 }
 
@@ -1126,15 +1129,21 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   )}
                   <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
                 </div>
-                {dateLabel && (
-                  // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
-                  // title と aria-label で補う。
-                  <span
-                    title={`${dateLabel}${dateKind}`}
-                    className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
-                  >
-                    {dateLabel}
-                  </span>
+                {(dateLabel || photo.visit?.location_source) && (
+                  <div className="flex items-center gap-1">
+                    {/* 位置情報の有無は日付の左。現地で撮られた写真かを一目で分ける */}
+                    <PhotoLocationIcon source={photo.visit?.location_source} />
+                    {dateLabel && (
+                      // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
+                      // title と aria-label で補う。
+                      <span
+                        title={`${dateLabel}${dateKind}`}
+                        className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
+                      >
+                        {dateLabel}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1684,6 +1693,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
                             @{getPhotoUserLabel(photo)}
                           </span>
+                          <PhotoLocationIcon source={photo.visit?.location_source} tone="dark" />
                           {photo.visit?.shot_at && (
                             <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
                               {formatPhotoDate(photo.visit.shot_at)}

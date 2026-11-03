@@ -644,7 +644,8 @@ export async function GET(request: NextRequest) {
             created_at,
             manhole_id,
             comment,
-            is_public
+            is_public,
+            location_source
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false });
