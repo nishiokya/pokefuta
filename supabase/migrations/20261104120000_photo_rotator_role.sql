@@ -24,7 +24,8 @@
 --   * ai_tags の crop / lid / lid_fits / plush_box（回す前の写真の座標）を外す。採点し直すまでの間に
 --     古い座標で切り抜かないため。外した写真は真ん中で切る（photo-ai-tags.ts）
 --
--- 戻し方: 同じ関数を古いキーと新しいキーを入れ替え、turn を 360 - turn にして呼ぶ。
+-- 戻し方: 同じ関数を古いキーと新しいキーを入れ替え、turn を 360 - turn、source を 'revert' にして呼ぶ。
+-- file_size・sha256・content_type は差し替えの記録（operation_log）に残した元の値に戻す（渡した値は使わない）。
 --
 -- 何が誰に開いているか: photo_scorer と同じ作り（20260927100000_photo_scorer_role.sql）。
 --   * photo_rotator はテーブル権限を持たず、rotation_ops の関数の EXECUTE だけ
@@ -117,6 +118,10 @@ CREATE TABLE rotation_ops.operation_log (
   new_key text NOT NULL,
   turn integer NOT NULL,
   source text NOT NULL,
+  -- 差し替える前の値（戻すときにこれに戻す。投稿の content_type は file.type なので .jpg のキーでも HEIC などがある）
+  old_file_size integer,
+  old_sha256 text,
+  old_content_type text,
   actor text NOT NULL DEFAULT session_user,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -139,7 +144,10 @@ SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
-  n integer;
+  cur record;
+  v_size integer := p_file_size;
+  v_sha text := p_sha256;
+  v_type text := 'image/jpeg';
 BEGIN
   -- 呼び出しを1本ずつにする。下の「新しいキーが未使用か」「24 時間の上限」の確認と書き込みの間に
   -- 別の接続が割り込まないように（photo.storage_key に一意制約は無い）
@@ -161,11 +169,23 @@ BEGIN
   IF p_new_key = p_old_key THEN
     RAISE EXCEPTION 'apply_rotation: 新しいキーが古いキーと同じ';
   END IF;
-  IF p_file_size IS NULL OR p_file_size <= 0 OR p_file_size > 50 * 1024 * 1024 THEN
-    RAISE EXCEPTION 'apply_rotation: file_size が範囲外: %', p_file_size;
-  END IF;
-  IF p_sha256 IS NULL OR p_sha256 !~ '^[0-9a-f]{64}$' THEN
-    RAISE EXCEPTION 'apply_rotation: sha256 の形が不正';
+  IF p_source = 'revert' THEN
+    -- 戻すのは、このキーの組で差し替えた記録があるときだけ。値は記録の元の値
+    SELECT l.old_file_size, l.old_sha256, l.old_content_type INTO v_size, v_sha, v_type
+    FROM rotation_ops.operation_log AS l
+    WHERE l.photo_id = p_photo_id AND l.new_key = p_old_key AND l.old_key = p_new_key AND l.source <> 'revert'
+    ORDER BY l.id DESC
+    LIMIT 1;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'apply_rotation: 戻す元の差し替えの記録が無い';
+    END IF;
+  ELSE
+    IF p_file_size IS NULL OR p_file_size <= 0 OR p_file_size > 50 * 1024 * 1024 THEN
+      RAISE EXCEPTION 'apply_rotation: file_size が範囲外: %', p_file_size;
+    END IF;
+    IF p_sha256 IS NULL OR p_sha256 !~ '^[0-9a-f]{64}$' THEN
+      RAISE EXCEPTION 'apply_rotation: sha256 の形が不正';
+    END IF;
   END IF;
   IF EXISTS (SELECT 1 FROM public.photo WHERE storage_key = p_new_key) THEN
     RAISE EXCEPTION 'apply_rotation: 新しいキーは既にほかの写真が使っている';
@@ -174,11 +194,19 @@ BEGIN
     RAISE EXCEPTION 'apply_rotation: 24 時間の上限（300 枚）に達した';
   END IF;
 
+  SELECT p.file_size, p.sha256, p.content_type INTO cur
+  FROM public.photo AS p
+  WHERE p.id = p_photo_id AND p.storage_key = p_old_key
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
   UPDATE public.photo AS p
   SET storage_key = p_new_key,
-      file_size = p_file_size,
-      sha256 = p_sha256,
-      content_type = 'image/jpeg',
+      file_size = v_size,
+      sha256 = v_sha,
+      content_type = v_type,
       width = CASE WHEN p_turn IN (90, 270) THEN p.height ELSE p.width END,
       height = CASE WHEN p_turn IN (90, 270) THEN p.width ELSE p.height END,
       quality_score_version = NULL,
@@ -186,13 +214,10 @@ BEGIN
       ai_tags = CASE WHEN p.ai_tags IS NULL THEN NULL
                      ELSE p.ai_tags - 'crop' - 'lid' - 'lid_fits' - 'plush_box' END
   WHERE p.id = p_photo_id AND p.storage_key = p_old_key;
-  GET DIAGNOSTICS n = ROW_COUNT;
-  IF n = 0 THEN
-    RETURN false;
-  END IF;
 
-  INSERT INTO rotation_ops.operation_log (photo_id, old_key, new_key, turn, source)
-  VALUES (p_photo_id, p_old_key, p_new_key, p_turn, p_source);
+  INSERT INTO rotation_ops.operation_log
+    (photo_id, old_key, new_key, turn, source, old_file_size, old_sha256, old_content_type)
+  VALUES (p_photo_id, p_old_key, p_new_key, p_turn, p_source, cur.file_size, cur.sha256, cur.content_type);
   RETURN true;
 END;
 $$;
