@@ -193,5 +193,5 @@ BEGIN
     EXECUTE format('REVOKE photo_scorer FROM %I', current_user);
   END IF;
 
-  RAISE NOTICE 'verify-photo-rotator: 全項目合格。検証行とメンバーシップは戻した。';
+  RAISE NOTICE 'verify-photo-rotation: 全項目合格。検証行とメンバーシップは戻した。';
 END $$;
