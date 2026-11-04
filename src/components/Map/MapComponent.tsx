@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { applyLeafletDefaultIcon } from '@/components/Map/leafletDefaultIcon';
-import { bindRouteLinkTracking, googleMapsRouteUrl } from '@/components/Map/routeLink';
+import { bindRouteLinkTracking, googleMapsPlaceUrl } from '@/components/Map/routeLink';
 
 applyLeafletDefaultIcon();
 
@@ -295,7 +295,7 @@ export default function MapComponent({
                 </button>
               </div>
               <a
-                href="${googleMapsRouteUrl(manhole.latitude, manhole.longitude)}"
+                href="${googleMapsPlaceUrl(manhole.latitude, manhole.longitude)}"
                 target="_blank"
                 rel="noopener noreferrer"
                 data-route-link

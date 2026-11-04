@@ -49,6 +49,7 @@ import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import type { ManholeTitle } from '@/types/database';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
+import { googleMapsPlaceUrl } from '@/components/Map/routeLink';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -501,7 +502,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     if (manhole?.latitude && manhole?.longitude) {
       trackRouteOpen({ manhole_id: manhole.id, prefecture: manhole.prefecture });
       window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`,
+        googleMapsPlaceUrl(manhole.latitude, manhole.longitude),
         '_blank',
         'noopener,noreferrer'
       );
