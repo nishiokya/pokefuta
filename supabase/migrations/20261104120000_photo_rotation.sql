@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- 横・逆さで保存された投稿写真を 90° 刻みで直す: k11 の写真の向きジョブ専用ロール photo_rotator
+-- 横・逆さで保存された投稿写真を 90° 刻みで直す: scoring.apply_photo_rotation（自動採点ロール photo_scorer から呼ぶ）
 --
 -- 背景（2026-11-04）: iPhone を真下に向けてマンホールを撮ると、どちらが上か決められずに
 -- 写真が横・逆さで保存される。k11 の manhole-ai Tools/pokefuta-id/orient.py が、同じ蓋のほかの
@@ -25,93 +25,35 @@
 --     古い座標で切り抜かないため。外した写真は真ん中で切る（photo-ai-tags.ts）
 --
 -- 戻し方: 同じ関数を古いキーと新しいキーを入れ替え、turn を 360 - turn、source を 'revert' にして呼ぶ。
--- file_size・sha256・content_type は差し替えの記録（operation_log）に残した元の値に戻す（渡した値は使わない）。
+-- file_size・sha256・content_type は差し替えの記録（photo_rotation.operation_log）に残した元の値に戻す（渡した値は使わない）。
 --
--- 何が誰に開いているか: photo_scorer と同じ作り（20260927100000_photo_scorer_role.sql）。
---   * photo_rotator はテーブル権限を持たず、rotation_ops の関数の EXECUTE だけ
---   * rotation_ops は PostgREST の api.schemas に含めない
---   * k11 のジョブは書き込みの前に毎回 rotation_ops.audit_photo_rotator() を呼び、違反があれば止まる
+-- 誰が呼ぶか: 新しいロールは作らず、k11 で既に動いている自動採点ロール photo_scorer に EXECUTE を足す
+-- （パスワードと接続先を増やさないため）。合わせて scoring.audit_photo_scorer() の許可リストにこの関数を足す。
+-- **同じマイグレーションで両方を変える**（関数だけ先に入ると、自己点検が違反として本番の自動採点を止める）。
 --   * 暴走しても被害を限るため、24 時間で 300 枚を超える差し替えは関数が拒否する（戻すのは数えない）
+--   * 差し替えの記録の表は scoring に置かない（scoring の表は自己点検が違反にする）。
+--     photo_rotation スキーマに置き、photo_scorer には USAGE も与えない（関数の中から所有者として書くだけ）
 --
--- パスワードはここに書かない。本番では SQL Editor で1回だけ
---   ALTER ROLE photo_rotator WITH PASSWORD '...';
--- を流し、k11 の ~/.config/pokefuta-rotator/env（600）に置く。リポジトリにも .env.local にも置かない。
---
--- 検査: npm run verify:photo-rotator（tools/verify-photo-rotator.sql）
+-- 検査: npm run verify:photo-rotation（tools/verify-photo-rotation.sql）、npm run verify:photo-scorer
 -- ---------------------------------------------------------------------------
 
--- ---------------------------------------------------------------------------
--- ロール（photo_scorer と同じ検査。既存の同名ロールに強い権限があれば失敗させる）
--- ---------------------------------------------------------------------------
-
-DO $$
-DECLARE
-  r pg_roles%ROWTYPE;
-  existed boolean;
-BEGIN
-  SELECT * INTO r FROM pg_roles WHERE rolname = 'photo_rotator';
-  existed := FOUND;
-  IF NOT existed THEN
-    CREATE ROLE photo_rotator
-      LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION
-      CONNECTION LIMIT 2;
-  ELSIF r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
-        OR NOT r.rolcanlogin OR r.rolinherit THEN
-    RAISE EXCEPTION 'photo_rotator が既にあり、属性が想定と違う';
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member = 'photo_rotator'::regrole) THEN
-    RAISE EXCEPTION 'photo_rotator が他のロールのメンバーになっている';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM pg_auth_members
-    WHERE roleid = 'photo_rotator'::regrole
-      AND (member <> (SELECT oid FROM pg_roles WHERE rolname = current_user) OR set_option OR inherit_option)
-  ) THEN
-    RAISE EXCEPTION 'photo_rotator に SET ROLE / 継承できるロールがある';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM pg_shdepend
-    WHERE refclassid = 'pg_authid'::regclass AND refobjid = 'photo_rotator'::regrole AND deptype = 'o'
-  ) THEN
-    RAISE EXCEPTION 'photo_rotator が所有しているオブジェクトがある';
-  END IF;
-
-  IF existed THEN
-    ALTER ROLE photo_rotator PASSWORD NULL;
-    ALTER ROLE photo_rotator RESET ALL;
-  END IF;
-END $$;
-
-ALTER ROLE photo_rotator CONNECTION LIMIT 2;
-ALTER ROLE photo_rotator SET statement_timeout = '60s';
-
-COMMENT ON ROLE photo_rotator IS
-  '投稿写真の向きを 90° 刻みで直す k11 のジョブ専用。テーブル権限なし。rotation_ops の関数の EXECUTE のみ';
-
--- ---------------------------------------------------------------------------
--- スキーマ rotation_ops（PostgREST の api.schemas に含めない）
--- **ここに関数を足すときは必ず REVOKE ALL ... FROM PUBLIC を書き、audit の許可リストに足すこと。**
--- ---------------------------------------------------------------------------
-
+-- 差し替えの記録（戻すときに元の値を引く。1日あたりの上限もここで数える）
 DO $$
 DECLARE
   owner_name text;
 BEGIN
-  SELECT nspowner::regrole::text INTO owner_name FROM pg_namespace WHERE nspname = 'rotation_ops';
+  SELECT nspowner::regrole::text INTO owner_name FROM pg_namespace WHERE nspname = 'photo_rotation';
   IF NOT FOUND THEN
-    CREATE SCHEMA rotation_ops;
+    CREATE SCHEMA photo_rotation;
   ELSIF owner_name <> 'postgres' THEN
-    RAISE EXCEPTION 'rotation_ops スキーマが既にあり、所有者が %', owner_name;
+    RAISE EXCEPTION 'photo_rotation スキーマが既にあり、所有者が %', owner_name;
   END IF;
 END $$;
 
-ALTER SCHEMA rotation_ops OWNER TO postgres;
-REVOKE ALL ON SCHEMA rotation_ops FROM PUBLIC;
-GRANT USAGE ON SCHEMA rotation_ops TO photo_rotator;
+ALTER SCHEMA photo_rotation OWNER TO postgres;
+REVOKE ALL ON SCHEMA photo_rotation FROM PUBLIC;
 
--- 差し替えの記録（戻すときに古いキーを引く。1日あたりの上限もここで数える）
-CREATE TABLE rotation_ops.operation_log (
+CREATE TABLE photo_rotation.operation_log (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   photo_id uuid NOT NULL,
   old_key text NOT NULL,
@@ -125,8 +67,8 @@ CREATE TABLE rotation_ops.operation_log (
   actor text NOT NULL DEFAULT session_user,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_rotation_log_created ON rotation_ops.operation_log (created_at);
-REVOKE ALL ON rotation_ops.operation_log FROM PUBLIC, anon, authenticated, service_role;
+CREATE INDEX idx_photo_rotation_log_created ON photo_rotation.operation_log (created_at);
+REVOKE ALL ON photo_rotation.operation_log FROM PUBLIC, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 差し替え
@@ -135,7 +77,7 @@ REVOKE ALL ON rotation_ops.operation_log FROM PUBLIC, anon, authenticated, servi
 -- 古いキーが今の storage_key と一致しなければ何もしない（楽観ロック。別の経路で変わっていたら書かない）
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION rotation_ops.apply_rotation(
+CREATE OR REPLACE FUNCTION scoring.apply_photo_rotation(
   p_photo_id uuid, p_old_key text, p_new_key text, p_turn integer,
   p_file_size integer, p_sha256 text, p_source text)
 RETURNS boolean
@@ -152,52 +94,52 @@ DECLARE
 BEGIN
   -- 呼び出しを1本ずつにする。下の「新しいキーが未使用か」「24 時間の上限」の確認と書き込みの間に
   -- 別の接続が割り込まないように（photo.storage_key に一意制約は無い）
-  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('rotation_ops.apply_rotation'));
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('scoring.apply_photo_rotation'));
 
   IF p_photo_id IS NULL OR p_old_key IS NULL THEN
-    RAISE EXCEPTION 'apply_rotation: photo_id と古いキーは必須';
+    RAISE EXCEPTION 'apply_photo_rotation: photo_id と古いキーは必須';
   END IF;
   IF p_turn IS NULL OR p_turn NOT IN (90, 180, 270) THEN
-    RAISE EXCEPTION 'apply_rotation: turn は 90・180・270 のどれか: %', p_turn;
+    RAISE EXCEPTION 'apply_photo_rotation: turn は 90・180・270 のどれか: %', p_turn;
   END IF;
   IF p_source IS NULL OR p_source NOT IN ('human', 'auto', 'revert') THEN
-    RAISE EXCEPTION 'apply_rotation: source が不正: %', left(p_source, 40);
+    RAISE EXCEPTION 'apply_photo_rotation: source が不正: %', left(p_source, 40);
   END IF;
   -- アプリの generateStorageKey と同じ形（deriveSmallKey がサムネイルのキーを出せる形）だけ受ける
   IF p_new_key IS NULL OR p_new_key !~ '^photos/original/[0-9]{4}/[0-9]{2}/[0-9a-f-]{36}\.jpg$' THEN
-    RAISE EXCEPTION 'apply_rotation: 新しいキーの形が不正: %', left(p_new_key, 120);
+    RAISE EXCEPTION 'apply_photo_rotation: 新しいキーの形が不正: %', left(p_new_key, 120);
   END IF;
   IF p_new_key = p_old_key THEN
-    RAISE EXCEPTION 'apply_rotation: 新しいキーが古いキーと同じ';
+    RAISE EXCEPTION 'apply_photo_rotation: 新しいキーが古いキーと同じ';
   END IF;
   IF p_source = 'revert' THEN
     -- 戻すのは、このキーの組で差し替えた記録があるときだけ。値は記録の元の値
     SELECT l.old_file_size, l.old_sha256, l.old_content_type, l.turn INTO v_size, v_sha, v_type, v_turn
-    FROM rotation_ops.operation_log AS l
+    FROM photo_rotation.operation_log AS l
     WHERE l.photo_id = p_photo_id AND l.new_key = p_old_key AND l.old_key = p_new_key AND l.source <> 'revert'
     ORDER BY l.id DESC
     LIMIT 1;
     IF NOT FOUND THEN
-      RAISE EXCEPTION 'apply_rotation: 戻す元の差し替えの記録が無い';
+      RAISE EXCEPTION 'apply_photo_rotation: 戻す元の差し替えの記録が無い';
     END IF;
     IF p_turn <> 360 - v_turn THEN
-      RAISE EXCEPTION 'apply_rotation: 戻す角度は % のはず（記録は %）: %', 360 - v_turn, v_turn, p_turn;
+      RAISE EXCEPTION 'apply_photo_rotation: 戻す角度は % のはず（記録は %）: %', 360 - v_turn, v_turn, p_turn;
     END IF;
   ELSE
     IF p_file_size IS NULL OR p_file_size <= 0 OR p_file_size > 50 * 1024 * 1024 THEN
-      RAISE EXCEPTION 'apply_rotation: file_size が範囲外: %', p_file_size;
+      RAISE EXCEPTION 'apply_photo_rotation: file_size が範囲外: %', p_file_size;
     END IF;
     IF p_sha256 IS NULL OR p_sha256 !~ '^[0-9a-f]{64}$' THEN
-      RAISE EXCEPTION 'apply_rotation: sha256 の形が不正';
+      RAISE EXCEPTION 'apply_photo_rotation: sha256 の形が不正';
     END IF;
   END IF;
   IF EXISTS (SELECT 1 FROM public.photo WHERE storage_key = p_new_key) THEN
-    RAISE EXCEPTION 'apply_rotation: 新しいキーは既にほかの写真が使っている';
+    RAISE EXCEPTION 'apply_photo_rotation: 新しいキーは既にほかの写真が使っている';
   END IF;
   -- 戻すのは上限に数えない（自動の回が上限まで間違えても、すぐ戻せるように）
-  IF p_source <> 'revert' AND (SELECT count(*) FROM rotation_ops.operation_log
+  IF p_source <> 'revert' AND (SELECT count(*) FROM photo_rotation.operation_log
                                WHERE created_at > now() - interval '24 hours' AND source <> 'revert') >= 300 THEN
-    RAISE EXCEPTION 'apply_rotation: 24 時間の上限（300 枚）に達した';
+    RAISE EXCEPTION 'apply_photo_rotation: 24 時間の上限（300 枚）に達した';
   END IF;
 
   SELECT p.file_size, p.sha256, p.content_type INTO cur
@@ -221,40 +163,47 @@ BEGIN
                      ELSE p.ai_tags - 'crop' - 'lid' - 'lid_fits' - 'plush_box' END
   WHERE p.id = p_photo_id AND p.storage_key = p_old_key;
 
-  INSERT INTO rotation_ops.operation_log
+  INSERT INTO photo_rotation.operation_log
     (photo_id, old_key, new_key, turn, source, old_file_size, old_sha256, old_content_type)
   VALUES (p_photo_id, p_old_key, p_new_key, p_turn, p_source, cur.file_size, cur.sha256, cur.content_type);
   RETURN true;
 END;
 $$;
 
+ALTER FUNCTION scoring.apply_photo_rotation(uuid, text, text, integer, integer, text, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION scoring.apply_photo_rotation(uuid, text, text, integer, integer, text, text) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION scoring.apply_photo_rotation(uuid, text, text, integer, integer, text, text) TO photo_scorer;
+
 -- ---------------------------------------------------------------------------
--- 権限の自己点検（scoring.audit_photo_scorer と同じ考え方。k11 のジョブは書き込みの前に毎回呼び、違反があれば止まる）
+-- 自動採点の権限の自己点検に apply_photo_rotation を足す（20260927100000 の定義から許可リスト3か所だけ変える）
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION rotation_ops.audit_photo_rotator()
+CREATE OR REPLACE FUNCTION scoring.audit_photo_scorer()
 RETURNS TABLE (kind text, detail text)
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
 SET search_path = pg_catalog, pg_temp
 AS $$
-  SELECT 'role_attribute', format('super=%s createrole=%s createdb=%s bypassrls=%s replication=%s login=%s inherit=%s connlimit=%s',
-      r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolbypassrls, r.rolreplication, r.rolcanlogin, r.rolinherit, r.rolconnlimit)
+  SELECT 'role_attribute', format(
+      'super=%s createrole=%s createdb=%s bypassrls=%s replication=%s login=%s inherit=%s connlimit=%s',
+      r.rolsuper, r.rolcreaterole, r.rolcreatedb, r.rolbypassrls, r.rolreplication,
+      r.rolcanlogin, r.rolinherit, r.rolconnlimit)
   FROM pg_catalog.pg_roles AS r
-  WHERE r.rolname = 'photo_rotator'
+  WHERE r.rolname = 'photo_scorer'
     AND (r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
          OR NOT r.rolcanlogin OR r.rolinherit OR r.rolconnlimit <> 2)
 
   UNION ALL
   SELECT 'member_of', m.roleid::pg_catalog.regrole::text
   FROM pg_catalog.pg_auth_members AS m
-  WHERE m.member = 'photo_rotator'::pg_catalog.regrole
+  WHERE m.member = 'photo_scorer'::pg_catalog.regrole
 
   UNION ALL
   SELECT 'can_become', m.member::pg_catalog.regrole::text
   FROM pg_catalog.pg_auth_members AS m
-  WHERE m.roleid = 'photo_rotator'::pg_catalog.regrole AND (m.set_option OR m.inherit_option)
+  WHERE m.roleid = 'photo_scorer'::pg_catalog.regrole
+    AND (m.set_option OR m.inherit_option)
 
   UNION ALL
   SELECT 'reachable_relation', ns.nspname || '.' || c.relname
@@ -262,10 +211,10 @@ AS $$
   JOIN pg_catalog.pg_namespace AS ns ON ns.oid = c.relnamespace
   WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
     AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-    AND pg_catalog.has_schema_privilege('photo_rotator', ns.oid, 'USAGE')
-    AND (pg_catalog.has_table_privilege('photo_rotator', c.oid,
+    AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
+    AND (pg_catalog.has_table_privilege('photo_scorer', c.oid,
            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN')
-         OR pg_catalog.has_any_column_privilege('photo_rotator', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
+         OR pg_catalog.has_any_column_privilege('photo_scorer', c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
 
   UNION ALL
   SELECT 'reachable_sequence', ns.nspname || '.' || c.relname
@@ -273,19 +222,20 @@ AS $$
   JOIN pg_catalog.pg_namespace AS ns ON ns.oid = c.relnamespace
   WHERE c.relkind = 'S'
     AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-    -- has_sequence_privilege はシーケンス以外に渡すと例外になり、WHERE の評価順は保証されないので CASE で先に relkind を見る
+    -- has_sequence_privilege はシーケンス以外に渡すと例外になり、WHERE の評価順は
+    -- 保証されないので CASE で先に relkind を見る
     AND CASE WHEN c.relkind = 'S'
-             THEN pg_catalog.has_sequence_privilege('photo_rotator', c.oid, 'USAGE, SELECT, UPDATE')
+             THEN pg_catalog.has_sequence_privilege('photo_scorer', c.oid, 'USAGE, SELECT, UPDATE')
              ELSE false END
 
   UNION ALL
   SELECT 'database_create', pg_catalog.current_database()
-  WHERE pg_catalog.has_database_privilege('photo_rotator', pg_catalog.current_database(), 'CREATE')
+  WHERE pg_catalog.has_database_privilege('photo_scorer', pg_catalog.current_database(), 'CREATE')
 
   UNION ALL
   SELECT 'schema_create', ns.nspname
   FROM pg_catalog.pg_namespace AS ns
-  WHERE pg_catalog.has_schema_privilege('photo_rotator', ns.oid, 'CREATE')
+  WHERE pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'CREATE')
 
   UNION ALL
   SELECT 'secdef_function', f.sig
@@ -295,34 +245,45 @@ AS $$
     JOIN pg_catalog.pg_namespace AS ns ON ns.oid = p.pronamespace
     WHERE p.prosecdef
       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND pg_catalog.has_schema_privilege('photo_rotator', ns.oid, 'USAGE')
-      AND pg_catalog.has_function_privilege('photo_rotator', p.oid, 'EXECUTE')
+      AND pg_catalog.has_schema_privilege('photo_scorer', ns.oid, 'USAGE')
+      AND pg_catalog.has_function_privilege('photo_scorer', p.oid, 'EXECUTE')
   ) AS f
   WHERE f.sig NOT IN (
-    'rotation_ops.apply_rotation(uuid, text, text, integer, integer, text, text)'
+    'scoring.unscored_photos(text, integer)',
+    'scoring.apply_photo_scores(text, timestamp with time zone, jsonb)',
+    'scoring.apply_photo_rotation(uuid, text, text, integer, integer, text, text)'
   )
 
   UNION ALL
-  SELECT 'ops_object', 'function ' || f.sig
+  SELECT 'scoring_object', 'relation ' || c.relname
+  FROM pg_catalog.pg_class AS c
+  WHERE c.relnamespace = 'scoring'::pg_catalog.regnamespace
+  UNION ALL
+  SELECT 'scoring_object', 'function ' || f.sig
   FROM (
     SELECT p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS sig
     FROM pg_catalog.pg_proc AS p
-    WHERE p.pronamespace = 'rotation_ops'::pg_catalog.regnamespace
+    WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
   ) AS f
   WHERE f.sig NOT IN (
-    'apply_rotation(uuid, text, text, integer, integer, text, text)', 'audit_photo_rotator()'
+    'active_version()', 'unscored_photos(text, integer)',
+    'apply_photo_scores(text, timestamp with time zone, jsonb)', 'audit_photo_scorer()',
+    'apply_photo_rotation(uuid, text, text, integer, integer, text, text)'
   )
 
   UNION ALL
-  SELECT 'function_attribute', format('%s owner=%s secdef=%s config=%s', p.proname,
-           pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef,
+  SELECT 'function_attribute', format('%s owner=%s secdef=%s config=%s',
+           p.proname, pg_catalog.pg_get_userbyid(p.proowner), p.prosecdef,
            coalesce(pg_catalog.array_to_string(p.proconfig, ','), 'NULL'))
   FROM pg_catalog.pg_proc AS p
-  WHERE p.pronamespace = 'rotation_ops'::pg_catalog.regnamespace
+  WHERE p.pronamespace = 'scoring'::pg_catalog.regnamespace
+    AND p.proname IN ('active_version', 'unscored_photos', 'apply_photo_scores', 'audit_photo_scorer',
+                      'apply_photo_rotation')
     -- NULL になりうる proconfig（RESET search_path 後）も違反として拾うよう、NULL 安全に比べる
     AND (pg_catalog.pg_get_userbyid(p.proowner) IS DISTINCT FROM 'postgres'
          OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, pg_temp']::text[]
-         OR p.prosecdef IS DISTINCT FROM (p.proname = 'apply_rotation'))
+         OR p.prosecdef IS DISTINCT FROM (p.proname IN ('unscored_photos', 'apply_photo_scores',
+                                                        'apply_photo_rotation')))
 
   UNION ALL
   SELECT 'extension', 'pg_net ' || e.extversion
@@ -330,10 +291,7 @@ AS $$
   WHERE e.extname = 'pg_net'
 $$;
 
-ALTER FUNCTION rotation_ops.apply_rotation(uuid, text, text, integer, integer, text, text) OWNER TO postgres;
-ALTER FUNCTION rotation_ops.audit_photo_rotator() OWNER TO postgres;
-REVOKE ALL ON FUNCTION rotation_ops.apply_rotation(uuid, text, text, integer, integer, text, text)
-  FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION rotation_ops.audit_photo_rotator() FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION rotation_ops.apply_rotation(uuid, text, text, integer, integer, text, text) TO photo_rotator;
-GRANT EXECUTE ON FUNCTION rotation_ops.audit_photo_rotator() TO photo_rotator;
+
+ALTER FUNCTION scoring.audit_photo_scorer() OWNER TO postgres;
+REVOKE ALL ON FUNCTION scoring.audit_photo_scorer() FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION scoring.audit_photo_scorer() TO photo_scorer;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * photo_rotator（k11 の写真の向きジョブ専用ロール）の権限と rotation_ops 関数の挙動を、
+ * 写真の向きの差し替え scoring.apply_photo_rotation の権限と挙動を、
  * ローカルスタックで実際にロールを切り替えて確認する（verify-photo-scorer と同じ作り）。
  *
  * 前提: `supabase start` でローカルスタックが動いていること。
@@ -9,7 +9,7 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 
-const SQL_FILE = path.join(__dirname, 'verify-photo-rotator.sql');
+const SQL_FILE = path.join(__dirname, 'verify-photo-rotation.sql');
 
 try {
   execFileSync(
@@ -19,7 +19,7 @@ try {
   );
 } catch (error) {
   const detail = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim();
-  console.error('verify-photo-rotator: 失敗\n');
+  console.error('verify-photo-rotation: 失敗\n');
   console.error(detail || error.message);
   console.error(
     '\nローカルスタックが動いていない場合は `supabase start` を先に実行すること。' +
@@ -28,4 +28,4 @@ try {
   process.exit(1);
 }
 
-console.log('verify-photo-rotator: 全項目合格');
+console.log('verify-photo-rotation: 全項目合格');
