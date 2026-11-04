@@ -11,6 +11,7 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import { pageTitle } from '@/lib/constants';
 import PCShell from '@/components/PCShell';
 import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
+import { googleMapsPlaceUrl } from '@/components/Map/routeLink';
 
 // 都道府県マスターデータ（都道府県コード、名称、中心座標）
 const PREFECTURES = [
@@ -479,7 +480,7 @@ export default function MapPage() {
                       <div className="mt-2 flex gap-2">
                         {selected.latitude != null && selected.longitude != null && (
                           <a
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${selected.latitude},${selected.longitude}`}
+                            href={googleMapsPlaceUrl(selected.latitude, selected.longitude)}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => trackRouteOpen({ manhole_id: selected.id, prefecture: selected.prefecture, surface: 'visits_map' })}
