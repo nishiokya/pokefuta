@@ -302,7 +302,7 @@ export default function MapComponent({
                 class="flex items-center justify-center w-full mt-2 px-3 py-2 rounded text-xs font-bold text-white"
                 style="background:#1f9d63;color:#fff"
               >
-                Googleマップで経路案内
+                経路案内
               </a>
             </div>
           </div>
