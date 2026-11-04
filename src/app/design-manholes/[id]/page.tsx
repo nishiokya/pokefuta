@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Share2 } from 'lucide-react';
+import { ChevronRight, MapPin, Share2 } from 'lucide-react';
 import MapSection from '../MapSection';
 import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
 import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
+import { loadDesignManholeLink } from '@/lib/design-manhole-link';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -69,7 +70,11 @@ export default async function Page({ params }: Props) {
   }
 
   // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにする
-  const submitterPublicId = await loadDesignManholeSubmitterPublicId(designManhole.id);
+  // 紐付いたキャラクターマンホール（図鑑が持つ。取れなければ出さない）も並べて読む
+  const [submitterPublicId, characterLink] = await Promise.all([
+    loadDesignManholeSubmitterPublicId(designManhole.id),
+    loadDesignManholeLink(designManhole.id),
+  ]);
   const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 
   const title = displayTitle(designManhole.title);
@@ -201,6 +206,70 @@ export default async function Page({ params }: Props) {
                 LINEで送る
               </a>
             </div>
+            {characterLink && (
+              <section
+                aria-labelledby="character-link-heading"
+                className="mt-5 overflow-hidden rounded-lg border border-[#7B63A8]/25 bg-white"
+              >
+                <div className="flex items-start gap-3 p-4 sm:p-5">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white"
+                  >
+                    <MapPin className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold tracking-wide text-[#7B63A8]">キャラクターマンホール</p>
+                    <h2 id="character-link-heading" className="mt-0.5 text-base font-bold sm:text-lg">
+                      {characterLink.work_name}のマンホール
+                    </h2>
+                    <p className="mt-1 text-sm text-[#2A2A2A]/80">
+                      {characterLink.place}
+                      {(characterLink.prefecture || characterLink.city) && (
+                        <span className="text-[#2A2A2A]/60">
+                          （{characterLink.prefecture}
+                          {characterLink.city}）
+                        </span>
+                      )}
+                    </p>
+                    {characterLink.spots > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs text-[#2A2A2A]/60">
+                          全国{characterLink.spots}枚のうち、写真が投稿されているのは
+                          <span className="font-bold text-[#2A2A2A]">{characterLink.spots_with_photo}枚</span>
+                        </p>
+                        <div
+                          className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#7B63A8]/15"
+                          role="presentation"
+                        >
+                          <div
+                            className="h-full rounded-full bg-[#7B63A8]"
+                            style={{
+                              width: `${Math.min(100, Math.round((characterLink.spots_with_photo / characterLink.spots) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 border-t border-[#7B63A8]/10 bg-[#7B63A8]/5 px-4 py-3 sm:px-5">
+                  <a
+                    href={characterLink.url}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+                  >
+                    ポケふた図鑑で設置場所を見る
+                    <ChevronRight className="h-4 w-4" />
+                  </a>
+                  <a
+                    href={characterLink.guide_url}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#7B63A8]/30 bg-white px-4 py-2 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/5"
+                  >
+                    {characterLink.work_name}のマンホールを巡る
+                  </a>
+                </div>
+              </section>
+            )}
           </div>
         </article>
 
