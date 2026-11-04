@@ -485,7 +485,7 @@ export default function MapPage() {
                             onClick={() => trackRouteOpen({ manhole_id: selected.id, prefecture: selected.prefecture, surface: 'visits_map' })}
                             className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#1f9d63] px-3 font-pixelJp text-xs font-bold text-white"
                           >
-                            <Navigation className="h-4 w-4" /> Googleマップで経路案内
+                            <Navigation className="h-4 w-4" /> 経路案内
                           </a>
                         )}
                         <Link href={`/manhole/${selected.id}`} className="inline-flex min-h-[40px] shrink-0 items-center rounded-lg border border-[#7B63A8]/30 bg-white px-3 font-pixelJp text-xs font-bold text-[#7B63A8]">

@@ -71,7 +71,7 @@ export default function DesignManholeMap({ designManholes }: DesignManholeMapPro
           <div style="margin-top:4px;font-weight:bold;font-size:12px;">${title}</div>
           <a href="${googleMapsRouteUrl(dm.latitude, dm.longitude)}" target="_blank" rel="noopener noreferrer" data-route-link
             style="display:block;margin-top:6px;padding:6px 8px;border-radius:6px;background:#1f9d63;color:#fff;font-size:12px;font-weight:bold;text-decoration:none;">
-            Googleマップで経路案内
+            経路案内
           </a>
         </div>`
       );
