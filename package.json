@@ -40,6 +40,7 @@
     "verify:photo-visibility": "node tools/verify-photo-visibility.js",
     "verify:photo-landscape": "node tools/verify-photo-landscape.js",
     "verify:photo-scorer": "node tools/verify-photo-scorer.js",
+    "verify:photo-rotator": "node tools/verify-photo-rotator.js",
     "verify:app-user-visibility": "node tools/verify-app-user-visibility.js",
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
