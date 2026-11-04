@@ -2,7 +2,7 @@
 -- ローカルスタックで実際にロールを切り替えて確認する。
 --
 -- 期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
--- マイグレーション: supabase/migrations/20261104120000_photo_rotation.sql
+-- マイグレーション: supabase/migrations/20261104140000_photo_rotation.sql
 -- 自己点検の網そのもの（表・スキーマ・メンバーシップなど）は verify-photo-scorer.sql が見る。
 -- ここでは足した関数が許可リストに入ったこと・属性の退行を検出すること・関数の挙動と入力検査を見る。
 -- 検証のために postgres へ一時的に photo_scorer の SET を付与する（SET ROLE のため）。
