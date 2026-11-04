@@ -180,6 +180,8 @@ BEGIN
   BEGIN PERFORM rotation_ops.apply_rotation(pid, k_new,
       'photos/original/2026/11/00000000-0000-0000-0000-0000000fd199.jpg', 270, 1, sha, 'revert');
     RAISE EXCEPTION '[8] 記録の無いキーへ戻せた'; EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[8]%' THEN RAISE; END IF; END;
+  BEGIN PERFORM rotation_ops.apply_rotation(pid, k_new, k_old, 180, 1, NULL, 'revert');
+    RAISE EXCEPTION '[8] 記録と合わない角度で戻せた'; EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[8]%' THEN RAISE; END IF; END;
   -- 戻すときは渡した値ではなく記録の元の値（HEIC の content_type・大きさ・ハッシュ）に戻る
   IF NOT rotation_ops.apply_rotation(pid, k_new, k_old, 270, 1, NULL, 'revert') THEN
     RAISE EXCEPTION '[8] 戻せなかった';

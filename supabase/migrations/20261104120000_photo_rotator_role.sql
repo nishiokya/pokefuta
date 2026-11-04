@@ -31,7 +31,7 @@
 --   * photo_rotator はテーブル権限を持たず、rotation_ops の関数の EXECUTE だけ
 --   * rotation_ops は PostgREST の api.schemas に含めない
 --   * k11 のジョブは書き込みの前に毎回 rotation_ops.audit_photo_rotator() を呼び、違反があれば止まる
---   * 暴走しても被害を限るため、24 時間で 300 枚を超える差し替えは関数が拒否する
+--   * 暴走しても被害を限るため、24 時間で 300 枚を超える差し替えは関数が拒否する（戻すのは数えない）
 --
 -- パスワードはここに書かない。本番では SQL Editor で1回だけ
 --   ALTER ROLE photo_rotator WITH PASSWORD '...';
@@ -148,6 +148,7 @@ DECLARE
   v_size integer := p_file_size;
   v_sha text := p_sha256;
   v_type text := 'image/jpeg';
+  v_turn integer;
 BEGIN
   -- 呼び出しを1本ずつにする。下の「新しいキーが未使用か」「24 時間の上限」の確認と書き込みの間に
   -- 別の接続が割り込まないように（photo.storage_key に一意制約は無い）
@@ -171,13 +172,16 @@ BEGIN
   END IF;
   IF p_source = 'revert' THEN
     -- 戻すのは、このキーの組で差し替えた記録があるときだけ。値は記録の元の値
-    SELECT l.old_file_size, l.old_sha256, l.old_content_type INTO v_size, v_sha, v_type
+    SELECT l.old_file_size, l.old_sha256, l.old_content_type, l.turn INTO v_size, v_sha, v_type, v_turn
     FROM rotation_ops.operation_log AS l
     WHERE l.photo_id = p_photo_id AND l.new_key = p_old_key AND l.old_key = p_new_key AND l.source <> 'revert'
     ORDER BY l.id DESC
     LIMIT 1;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'apply_rotation: 戻す元の差し替えの記録が無い';
+    END IF;
+    IF p_turn <> 360 - v_turn THEN
+      RAISE EXCEPTION 'apply_rotation: 戻す角度は % のはず（記録は %）: %', 360 - v_turn, v_turn, p_turn;
     END IF;
   ELSE
     IF p_file_size IS NULL OR p_file_size <= 0 OR p_file_size > 50 * 1024 * 1024 THEN
@@ -190,7 +194,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.photo WHERE storage_key = p_new_key) THEN
     RAISE EXCEPTION 'apply_rotation: 新しいキーは既にほかの写真が使っている';
   END IF;
-  IF (SELECT count(*) FROM rotation_ops.operation_log WHERE created_at > now() - interval '24 hours') >= 300 THEN
+  -- 戻すのは上限に数えない（自動の回が上限まで間違えても、すぐ戻せるように）
+  IF p_source <> 'revert' AND (SELECT count(*) FROM rotation_ops.operation_log
+                               WHERE created_at > now() - interval '24 hours' AND source <> 'revert') >= 300 THEN
     RAISE EXCEPTION 'apply_rotation: 24 時間の上限（300 枚）に達した';
   END IF;
 
