@@ -17,8 +17,10 @@
 -- 差し替えで変えるもの:
 --   * storage_key・file_size・sha256・content_type（回した元写真のもの）
 --   * width / height（90°・270° は入れ替え）
---   * quality_score_version / quality_scored_at を空にする → 翌朝の自動採点（photo_scorer）が
---     回した写真で採点し直す（scoring.unscored_photos は版の違う行を返す）
+--   * quality_score_version を空にする → 翌朝の自動採点（photo_scorer）が回した写真で採点し直す
+--     （scoring.unscored_photos は版の違う行を返す）。quality_scored_at は差し替えた時刻にする。
+--     apply_photo_scores の楽観ロックは (expected_version, expected_scored_at) なので、差し替えの前に
+--     回す前の写真を読んだ採点のバッチ（どちらも NULL を読んでいる）は書けなくなる
 --   * ai_tags の crop / lid / lid_fits / plush_box（回す前の写真の座標）を外す。採点し直すまでの間に
 --     古い座標で切り抜かないため。外した写真は真ん中で切る（photo-ai-tags.ts）
 --
@@ -139,6 +141,10 @@ AS $$
 DECLARE
   n integer;
 BEGIN
+  -- 呼び出しを1本ずつにする。下の「新しいキーが未使用か」「24 時間の上限」の確認と書き込みの間に
+  -- 別の接続が割り込まないように（photo.storage_key に一意制約は無い）
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('rotation_ops.apply_rotation'));
+
   IF p_photo_id IS NULL OR p_old_key IS NULL THEN
     RAISE EXCEPTION 'apply_rotation: photo_id と古いキーは必須';
   END IF;
@@ -176,7 +182,7 @@ BEGIN
       width = CASE WHEN p_turn IN (90, 270) THEN p.height ELSE p.width END,
       height = CASE WHEN p_turn IN (90, 270) THEN p.width ELSE p.height END,
       quality_score_version = NULL,
-      quality_scored_at = NULL,
+      quality_scored_at = pg_catalog.clock_timestamp(),
       ai_tags = CASE WHEN p.ai_tags IS NULL THEN NULL
                      ELSE p.ai_tags - 'crop' - 'lid' - 'lid_fits' - 'plush_box' END
   WHERE p.id = p_photo_id AND p.storage_key = p_old_key;

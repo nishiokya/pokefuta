@@ -18,6 +18,7 @@ DECLARE
   k_new text := 'photos/original/2026/11/00000000-0000-0000-0000-0000000fd102.jpg';
   sha text := repeat('a', 64);
   ok boolean;
+  ts1 timestamptz;
   row public.photo%ROWTYPE;
   f_apply regprocedure := 'rotation_ops.apply_rotation(uuid,text,text,integer,integer,text,text)'::regprocedure;
 BEGIN
@@ -162,7 +163,7 @@ BEGIN
   SELECT * INTO row FROM public.photo WHERE id = pid;
   IF row.storage_key <> k_new OR row.file_size <> 2000 OR row.sha256 <> sha OR row.content_type <> 'image/jpeg'
      OR row.width <> 3024 OR row.height <> 4032
-     OR row.quality_score_version IS NOT NULL OR row.quality_scored_at IS NOT NULL
+     OR row.quality_score_version IS NOT NULL OR row.quality_scored_at IS NULL
      OR row.ai_tags ?| ARRAY['crop', 'lid', 'lid_fits', 'plush_box']
      OR row.ai_tags->>'scene' IS DISTINCT FROM 'centered_clean' OR row.ai_tags->>'rep_score' IS NULL THEN
     RAISE EXCEPTION '[7] 差し替えた行が想定と違う: %', to_jsonb(row) - 'exif';
@@ -170,6 +171,7 @@ BEGIN
   IF (SELECT count(*) FROM rotation_ops.operation_log WHERE photo_id = pid AND new_key = k_new AND turn = 90) <> 1 THEN
     RAISE EXCEPTION '[7] 記録が1行でない';
   END IF;
+  ts1 := row.quality_scored_at;
 
   -- 8. 新しいキーはほかの写真に使わせない・戻せる
   SET LOCAL ROLE photo_rotator;
@@ -182,6 +184,10 @@ BEGIN
   SELECT * INTO row FROM public.photo WHERE id = pid;
   IF row.storage_key <> k_old OR row.width <> 4032 OR row.height <> 3024 THEN
     RAISE EXCEPTION '[8] 戻した行が想定と違う';
+  END IF;
+  -- 採点し直す前にもう一度差し替えても、採点の楽観ロック（版と採点時刻）が変わる
+  IF row.quality_scored_at IS NULL OR row.quality_scored_at = ts1 THEN
+    RAISE EXCEPTION '[8] 差し替えのたびに quality_scored_at が変わらない（採点の楽観ロックが効かない）';
   END IF;
 
   -- 9. 180° は縦横を入れ替えない
