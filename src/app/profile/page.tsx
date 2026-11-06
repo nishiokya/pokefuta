@@ -3,8 +3,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Check, ExternalLink, Loader2, LogOut, UserRound } from 'lucide-react';
+import { Camera, Check, ExternalLink, Loader2, LogOut } from 'lucide-react';
 import PCShell from '@/components/PCShell';
+import UserAvatar from '@/components/users/UserAvatar';
+import AvatarPicker from '@/components/users/AvatarPicker';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import { pokefutaEvents } from '@/lib/analytics/gtag';
@@ -41,6 +43,9 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   /** 保存が成功するたびに増やす。非制御フォームを作り直して入力欄を正規化後の値に揃える */
   const [formRevision, setFormRevision] = useState(0);
+  /** アイコンにしている写真。プロフィールのフォームとは別に、選んだ時点で保存する */
+  const [avatarPhotoId, setAvatarPhotoId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const { trackView, trackLogout, clearUser } = useAnalytics();
 
   useEffect(() => {
@@ -59,10 +64,17 @@ export default function ProfilePage() {
         // 設定率の分母は導線クリックではなく編集画面への到達にする。
         // 導線は散らばって取りこぼす（投稿ファネルで同じ判断をしている）。
         pokefutaEvents.goFriendEditView({ surface: 'profile' });
-        const res = await fetch('/api/user/profile');
+        const [res, avatarRes] = await Promise.all([
+          fetch('/api/user/profile'),
+          fetch('/api/user/avatar').catch(() => null),
+        ]);
         if (res.ok) {
           const data = await res.json();
           if (!cancelled && data?.profile) setProfile(data.profile);
+        }
+        if (avatarRes?.ok) {
+          const avatar = await avatarRes.json().catch(() => null);
+          if (!cancelled) setAvatarPhotoId(avatar?.photoId ?? null);
         }
       } catch {
         // 取得失敗時は空のまま（下でエラー表示）
@@ -178,9 +190,21 @@ export default function ProfilePage() {
           {/* プロフィール編集 */}
           <div className="overflow-hidden rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border-2 border-[#bf5640]/40 bg-[#efe6cf]">
-                <UserRound className="h-6 w-6 text-[#8C6A4A]" />
-              </span>
+              {/* アイコンは選んだ時点で保存する（下のフォームの「保存する」とは別） */}
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                disabled={!profile}
+                className="relative flex-shrink-0 rounded-full disabled:cursor-default"
+                aria-label={avatarPhotoId ? 'アイコンを変える' : 'アイコンを写真から選ぶ'}
+              >
+                <UserAvatar photoId={avatarPhotoId} size={48} />
+                {profile && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#fffdf7] bg-[#bf5640] text-white">
+                    <Camera className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </button>
               <div>
                 <h1 className="font-pixelJp text-base font-bold text-[#4F3828]">プロフィール</h1>
                 <p className="text-xs text-[#9b917e]" style={{ fontFamily: ROUND }}>
@@ -341,6 +365,16 @@ export default function ProfilePage() {
         </div>
       </PCShell>
 
+      {pickerOpen && (
+        <AvatarPicker
+          currentPhotoId={avatarPhotoId}
+          onClose={() => setPickerOpen(false)}
+          onSaved={(photoId) => {
+            setAvatarPhotoId(photoId);
+            setPickerOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
