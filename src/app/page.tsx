@@ -36,6 +36,7 @@ import { manholePhotoHref } from '@/lib/manhole-photo-link';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import PosterLink from '@/components/PosterLink';
+import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
 
 type FeedVisit = {
@@ -444,18 +445,24 @@ export default function HomePage() {
                         title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
                       >
                         <span className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-300 via-amber-200 to-sky-300 p-[2px] shadow-sm transition group-hover:scale-105 sm:h-10 sm:w-10">
-                          {legend.photoId ? (
-                            <img
-                              src={`/api/photo/${legend.photoId}?size=small`}
-                              alt=""
-                              width={40}
-                              height={40}
-                              loading="lazy"
-                              className="h-full w-full rounded-full bg-[#EFE4CC] object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm">🏆</span>
-                          )}
+                          {/* 本人が /profile で選んだアイコンを先に。未設定なら今までどおりその人の写真 */}
+                          <PosterAvatar
+                            publicUserId={legend.id}
+                            size={40}
+                            className="!h-full !w-full"
+                            fallback={legend.photoId ? (
+                              <img
+                                src={`/api/photo/${legend.photoId}?size=small`}
+                                alt=""
+                                width={40}
+                                height={40}
+                                loading="lazy"
+                                className="h-full w-full rounded-full bg-[#EFE4CC] object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm">🏆</span>
+                            )}
+                          />
                         </span>
                         <span className="mt-0.5 w-full truncate text-center text-[10px] font-bold text-[#4A4A4A] group-hover:underline">{legend.name}</span>
                       </Link>
@@ -704,14 +711,14 @@ export default function HomePage() {
                               ariaLabel={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
                               className="mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
                             >
-                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <PosterAvatar publicUserId={visit.public_user_id} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                               <ChevronRight className="h-3 w-3 shrink-0 opacity-80" />
                             </PosterLink>
                           ) : (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
-                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <PosterAvatar publicUserId={visit.public_user_id} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                             </div>
