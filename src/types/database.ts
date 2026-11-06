@@ -40,6 +40,9 @@ export interface Database {
           pokemon_go_friend_code: string | null;
           pokemon_go_friend_note: string | null;
           pokemon_go_friend_open: boolean;
+          // アイコンにする写真。anon / authenticated への GRANT は無く、
+          // set_own_avatar_photo() だけが書く。公開は get_public_avatar_photo_id() 経由。
+          avatar_photo_id: string | null;
         };
         Insert: {
           id?: string;
@@ -55,6 +58,7 @@ export interface Database {
           pokemon_go_friend_code?: string | null;
           pokemon_go_friend_note?: string | null;
           pokemon_go_friend_open?: boolean;
+          avatar_photo_id?: string | null;
         };
         Update: {
           display_name?: string | null;
@@ -68,6 +72,7 @@ export interface Database {
           pokemon_go_friend_code?: string | null;
           pokemon_go_friend_note?: string | null;
           pokemon_go_friend_open?: boolean;
+          avatar_photo_id?: string | null;
         };
         Relationships: [];
       };
@@ -848,6 +853,24 @@ export interface Database {
           pokemon_go_friend_code: string | null;
           pokemon_go_friend_note: string | null;
         }[];
+      };
+      /**
+       * 自分のアイコンを自分の公開訪問の写真から選ぶ。NULL で外す。
+       * 他人の写真・非公開訪問の写真は 'Photo is not available for avatar' で落ちる。
+       */
+      set_own_avatar_photo: {
+        Args: { p_photo_id: string | null };
+        Returns: string | null;
+      };
+      /** 自分のアイコン。訪問が非公開になっていれば NULL（公開ページと同じ条件） */
+      get_own_avatar_photo_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      /** 公開ページのアイコン。本人の公開訪問の写真のときだけ写真IDが返る */
+      get_public_avatar_photo_id: {
+        Args: { p_user_id: string };
+        Returns: string | null;
       };
       get_own_profile: {
         Args: Record<string, never>;

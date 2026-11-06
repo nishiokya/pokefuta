@@ -37,6 +37,8 @@ export type PublicUserVisits = {
   // 募集スイッチが OFF のユーザーでは常に null。出し分けは get_public_profile() 側で行う
   pokemonGoFriendCode: string | null;
   pokemonGoFriendNote: string | null;
+  /** アイコンの写真ID。本人の公開訪問の写真のときだけ入る（get_public_avatar_photo_id） */
+  avatarPhotoId: string | null;
   totalVisits: number;
   prefectureCount: number;
   visits: PublicVisit[];
@@ -72,10 +74,10 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const { data: userInfo, error: userInfoError } = await liveClient.rpc(
-    'get_public_profile' as never,
-    { p_user_id: trimmedUserId } as never
-  );
+  const [{ data: userInfo, error: userInfoError }, avatarPhotoId] = await Promise.all([
+    liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
+    loadPublicAvatarPhotoId(liveClient, trimmedUserId),
+  ]);
 
   if (userInfoError) {
     throw new Error(userInfoError.message);
@@ -146,11 +148,36 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     instagramUrl: appUserRow.instagram_url || null,
     pokemonGoFriendCode: appUserRow.pokemon_go_friend_code || null,
     pokemonGoFriendNote: appUserRow.pokemon_go_friend_note || null,
+    avatarPhotoId,
     totalVisits,
     prefectureCount: stats.prefectureCount,
     visits: publicVisits,
     isTruncated: totalVisits > publicVisits.length,
   };
+}
+
+/**
+ * 公開ページのアイコン。取れなければ null（アイコン無し）で、ページは落とさない。
+ * マイグレーション（20261106150000）の適用前にデプロイが先に出た窓でも、
+ * 公開ページそのものが 500 にならないようにする。
+ */
+async function loadPublicAvatarPhotoId(
+  client: NonNullable<ReturnType<typeof getPublicLiveClient>>,
+  userId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await client.rpc(
+      'get_public_avatar_photo_id' as never,
+      { p_user_id: userId } as never
+    );
+    if (error) {
+      console.warn('Failed to load public avatar:', error.message);
+      return null;
+    }
+    return typeof data === 'string' ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 export const loadPublicUserVisits = cache(loadPublicUserVisitsImpl);
