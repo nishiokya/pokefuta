@@ -164,6 +164,10 @@ export default function AvatarPicker({ currentPhotoId, onClose, onSaved }: Props
                   >
                     <img
                       src={avatarPhotoUrl(candidate.photoId)}
+                      // 縮小版が無い写真は 404（strict=1）。元画像を配らないよう候補から外す
+                      onError={() =>
+                        setCandidates((prev) => prev.filter((c) => c.photoId !== candidate.photoId))
+                      }
                       alt=""
                       className="h-full w-full object-cover"
                       loading="lazy"
