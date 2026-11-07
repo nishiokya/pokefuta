@@ -10,6 +10,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiTagNote from '@/components/AiTagNote';
 import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import PosterAvatar from '@/components/users/PosterAvatar';
 
 // ベータ。中身（AI の判定）と見せ方を確かめてから検索に出す
 export const metadata: Metadata = {
@@ -133,7 +134,7 @@ export default async function PlushPhotosPage() {
                         <span className="line-clamp-1">{photo.manholeName}</span>
                       </div>
                       <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-semibold text-[#6A4D36]">
-                        <UserRound className="h-3.5 w-3.5 shrink-0" />
+                        <PosterAvatar publicUserId={photo.posterPublicId} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
                         <span className="truncate">{photo.posterName}</span>
                         <PosterRegularBadge publicUserId={photo.posterPublicId} size="icon" />
                         <span className="ml-auto shrink-0 text-[#8b816f]">{formatDateJaJst(shotAt)}</span>

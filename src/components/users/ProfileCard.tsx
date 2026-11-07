@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Instagram, Pencil, UserRound } from 'lucide-react';
+import { ExternalLink, Instagram, Pencil } from 'lucide-react';
 import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import UserAvatar from '@/components/users/UserAvatar';
+import { useOwnAvatarPhotoId } from '@/lib/own-avatar';
 import ShareButtons from '@/components/ShareButtons';
 import { SITE_URL } from '@/lib/constants';
 import { loadPublicVisitStats, type PublicVisitStats } from '@/lib/public-visit-stats';
@@ -34,6 +36,8 @@ export default function ProfileCard({
   showShare?: boolean;
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
+  // /profile で選んだアイコン。このカードは自分のスタンプ帳にだけ出る
+  const avatarPhotoId = useOwnAvatarPhotoId(true);
   // 共有文の数字はリンク先の公開ページと同じもの（公開の記録だけ）。本人の全記録から数えるとずれる
   const [shareStats, setShareStats] = useState<PublicVisitStats | null>(null);
 
@@ -87,9 +91,7 @@ export default function ProfileCard({
       </div>
 
       <div className="mt-2 flex items-center gap-3">
-        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-2 border-[#bf5640]/40 bg-[#efe6cf]">
-          <UserRound className="h-5 w-5 text-[#8C6A4A]" />
-        </span>
+        <UserAvatar photoId={avatarPhotoId} size={44} />
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="truncate font-pixelJp text-base font-bold text-[#4F3828]">{profile.displayName}</p>

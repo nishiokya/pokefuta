@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Camera, Check, ExternalLink, Loader2, LogOut } from 'lucide-react';
 import PCShell from '@/components/PCShell';
 import UserAvatar from '@/components/users/UserAvatar';
+import { notifyOwnAvatarChanged } from '@/lib/own-avatar';
+import { setPublicAvatarPhotoId } from '@/lib/public-avatars';
 import AvatarPicker from '@/components/users/AvatarPicker';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -371,6 +373,10 @@ export default function ProfilePage() {
           onClose={() => setPickerOpen(false)}
           onSaved={(photoId) => {
             setAvatarPhotoId(photoId);
+            // ヘッダー・スタンプ帳のトレーナー情報にもすぐ出す
+            notifyOwnAvatarChanged(photoId);
+            // 一覧（トップの投稿カード・LEGEND など）で覚えている自分のアイコンも差し替える
+            if (profile?.publicUserId) setPublicAvatarPhotoId(profile.publicUserId, photoId);
             setPickerOpen(false);
           }}
         />

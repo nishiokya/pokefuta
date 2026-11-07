@@ -8,6 +8,8 @@ import { Camera, CircleDot, Home, Info, Search, User as UserIcon, UserPlus } fro
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { useOwnAvatarPhotoId } from '@/lib/own-avatar';
+import PosterAvatar from '@/components/users/PosterAvatar';
 import { NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNav';
 
 /**
@@ -58,6 +60,8 @@ type ChromeState = {
   authLoaded: boolean;
   activeNav?: NavKey;
   pathname: string;
+  /** ログイン中の人が /profile で選んだアイコンの写真ID。未設定・未ログインは null */
+  ownAvatarPhotoId?: string | null;
 };
 
 // ─────────────────────────────────────────────
@@ -218,7 +222,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
  * Info・X・図鑑・デザインふたをヘッダーに並べていた頃はタップ領域が潰れていたので、
  * ナビは下タブ、ユーティリティはフッターへ分けている。
  */
-function SpHeader({ user, authLoaded, pathname }: ChromeState) {
+function SpHeader({ user, authLoaded, pathname, ownAvatarPhotoId }: ChromeState) {
   return (
     <header
       // z-50 / 下タブの z-40 は --chrome-z-header / --chrome-z-bottomnav と対応。
@@ -282,7 +286,11 @@ function SpHeader({ user, authLoaded, pathname }: ChromeState) {
                 color: 'var(--chrome-ink)',
               }}
             >
-              <UserIcon className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--chrome-accent)' }} />
+              <PosterAvatar
+                photoId={ownAvatarPhotoId ?? null}
+                size={20}
+                fallback={<UserIcon className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--chrome-accent)' }} />}
+              />
               <span className="truncate">{displayNameOf(user)}</span>
             </Link>
           ) : (
@@ -350,7 +358,7 @@ function pcNavLinkStyle(isActive: boolean): React.CSSProperties {
   };
 }
 
-function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
+function PcTopNav({ user, authLoaded, activeNav, pathname, ownAvatarPhotoId }: ChromeState) {
   const { trackXLinkClick, trackSubmissionEntry } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
   const isUploading = isActivePath(pathname, '/upload');
@@ -465,9 +473,15 @@ function PcTopNav({ user, authLoaded, activeNav, pathname }: ChromeState) {
               background: pathname === '/profile' ? 'var(--chrome-pc-nav-active-bg)' : 'transparent',
             }}
           >
-            <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
-              👤
-            </span>
+            <PosterAvatar
+              photoId={ownAvatarPhotoId ?? null}
+              size={26}
+              fallback={
+                <span style={{ width: 26, height: 26, borderRadius: 999, background: '#dfe7f3', display: 'grid', placeItems: 'center', fontSize: 13, flexShrink: 0 }}>
+                  👤
+                </span>
+              }
+            />
             {displayNameOf(user)}
           </Link>
         ) : (
@@ -703,7 +717,9 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-  const state: ChromeState = { user, authLoaded, activeNav: route.activeNav, pathname };
+  // ヘッダーの名前の前に、/profile で選んだアイコンを出す（#433 では /profile と公開スタンプ帳だけだった）
+  const ownAvatarPhotoId = useOwnAvatarPhotoId(Boolean(user));
+  const state: ChromeState = { user, authLoaded, activeNav: route.activeNav, pathname, ownAvatarPhotoId };
   if (route.bare) return <>{children}</>;
 
   return (

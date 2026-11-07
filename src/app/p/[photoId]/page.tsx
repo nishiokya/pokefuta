@@ -23,6 +23,7 @@ import {
   loadPublicSharedPhoto,
 } from '@/lib/shared-photo';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import PosterAvatar from '@/components/users/PosterAvatar';
 
 type PageProps = {
   params: {
@@ -168,9 +169,16 @@ export default async function SharedPhotoPage({ params }: PageProps) {
 
             {/* 投稿者。押すと投稿者のページへ */}
             <div className="flex items-center gap-3 rounded-[10px] border border-[#8C6A4A]/15 bg-white/80 p-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8]/10 text-[#7B63A8]">
-                <UserRound className="h-5 w-5" />
-              </span>
+              {/* 投稿者が /profile で選んだアイコン。未設定なら人のマーク */}
+              <PosterAvatar
+                publicUserId={extras.posterPublicId}
+                size={40}
+                fallback={
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8]/10 text-[#7B63A8]">
+                    <UserRound className="h-5 w-5" />
+                  </span>
+                }
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-bold text-[#8b816f]">投稿者</p>
                 {posterHref ? (
