@@ -44,6 +44,10 @@ export default function DesignManholeMap({ designManholes, prefectureById }: Des
   const prefectureLayerRef = useRef<L.LayerGroup | null>(null);
   const overviewEnabledRef = useRef(Boolean(prefectureById));
   overviewEnabledRef.current = Boolean(prefectureById);
+  // 県の丸から寄ったときの倍率。北海道のように広い県は倍率6以下でないと全部入らないので、
+  // この倍率以上にいる間は倍率6以下でもピンを出す（さらに縮小したら丸に戻す）
+  const pinZoomFloorRef = useRef<number | null>(null);
+  const refreshLayersRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -67,16 +71,27 @@ export default function DesignManholeMap({ designManholes, prefectureById }: Des
       const markers = markersLayerRef.current;
       const prefectures = prefectureLayerRef.current;
       if (!markers || !prefectures) return;
-      const showOverview = overviewEnabledRef.current && map.getZoom() <= PREFECTURE_OVERVIEW_MAX_ZOOM;
+      const zoom = map.getZoom();
+      const focusingPrefecture = pinZoomFloorRef.current !== null;
+      const showOverview =
+        overviewEnabledRef.current && !focusingPrefecture && zoom <= PREFECTURE_OVERVIEW_MAX_ZOOM;
       const [show, hide] = showOverview ? [prefectures, markers] : [markers, prefectures];
       if (map.hasLayer(hide)) map.removeLayer(hide);
       if (!map.hasLayer(show)) show.addTo(map);
     };
-    map.on('zoomend', refreshLayers);
+    // 寄った倍率より縮小したら、県の丸に戻す
+    const onZoomEnd = () => {
+      const floor = pinZoomFloorRef.current;
+      if (floor !== null && map.getZoom() < floor) pinZoomFloorRef.current = null;
+      refreshLayers();
+    };
+    map.on('zoomend', onZoomEnd);
+    refreshLayersRef.current = refreshLayers;
     refreshLayers();
 
     return () => {
-      map.off('zoomend', refreshLayers);
+      map.off('zoomend', onZoomEnd);
+      refreshLayersRef.current = null;
       map.remove();
       mapInstanceRef.current = null;
       markersLayerRef.current = null;
@@ -150,17 +165,24 @@ export default function DesignManholeMap({ designManholes, prefectureById }: Des
       const marker = L.marker(center, { icon, title: `${prefecture}: ${items.length}枚`, keyboard: true });
       marker.on('click', () => {
         const prefBounds = L.latLngBounds(items.map((dm) => [dm.latitude, dm.longitude]));
-        const zoom = Math.min(
-          PREFECTURE_FOCUS_MAX_ZOOM,
-          Math.max(PREFECTURE_OVERVIEW_MAX_ZOOM + 1, map.getBoundsZoom(prefBounds, false, L.point(40, 40)))
-        );
+        // その県の投稿が全部入る倍率（寄りすぎない上限つき）。倍率6以下になってもピンを出す
+        const zoom = Math.min(PREFECTURE_FOCUS_MAX_ZOOM, map.getBoundsZoom(prefBounds, false, L.point(40, 40)));
+        pinZoomFloorRef.current = zoom;
         map.setView(prefBounds.getCenter(), zoom);
+        // 倍率が変わらないと zoomend が来ないので、ここでも切り替える
+        refreshLayersRef.current?.();
       });
       marker.addTo(prefectureLayer);
     });
 
-    // 初期表示は県ごとの枚数（全国が入る倍率に収める）
+    // 初期表示は県ごとの枚数。丸は県庁所在地に置くので、投稿の位置だけでなく丸の位置も入れる
+    // （小笠原の投稿だけなら東京の丸が画面外になる）
+    pinZoomFloorRef.current = null;
+    prefectureLayer.eachLayer((layer) => {
+      if (layer instanceof L.Marker) bounds.extend(layer.getLatLng());
+    });
     map.fitBounds(bounds, { padding: [24, 24], maxZoom: PREFECTURE_OVERVIEW_MAX_ZOOM });
+    refreshLayersRef.current?.();
   }, [designManholes, prefectureById]);
 
   return <div ref={mapRef} className="h-72 w-full rounded-lg border border-[#7B63A8]/20 sm:h-96" />;
