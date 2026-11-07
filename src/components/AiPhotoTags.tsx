@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { AI_TAG_HELP, photoAiTags } from '@/lib/photo-ai-tags';
 
 /**
- * 自動で付いたタグ（ぬいぐるみ・夜・風景）を小さなチップで出す。
+ * 自動で付いたタグ（ぬいぐるみ・夜・風景・人物・雪・紅葉・足元）を小さなチップで出す。
  * 投稿者の申告（LandscapePhotoBadge）と見分けられるよう色を変える。「AI」の印は付けず、
  * 自動判定であることは各画面の注釈（AI_TAG_HELP）で伝える。
  */

@@ -16,6 +16,8 @@
 
 DO $$
 DECLARE
+  attr_name text;
+  attr_value jsonb;
   r pg_roles%ROWTYPE;
   bad text;
   was_member boolean;
@@ -657,6 +659,37 @@ BEGIN
       'ai_tags', jsonb_build_object('model', 'm', 'rep_score', 'null'::jsonb))));
     RAISE EXCEPTION '[16] null の rep_score が通った';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[16]%' THEN RAISE; END IF; END;
+  RESET ROLE;
+
+  -- 17. 公開用属性: boolean のみ。旧タグとの混在を保ち、不正値は拒否。
+  SELECT quality_score_version, quality_scored_at INTO ev, ts FROM public.photo WHERE id = pid;
+  SET LOCAL ROLE photo_scorer;
+  SELECT scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+    'id', pid, 'score', 0.78, 'eligible', true, 'expected_version', ev, 'expected_scored_at', ts,
+    'ai_tags', jsonb_build_object('model', 'scene_attrs/2', 'plush', true, 'rep_score', -4.3125,
+      'attrs_model', 'public_attrs/1', 'person', true, 'snow', false, 'autumn', true, 'feet', true)))) INTO n;
+  IF n <> 1 THEN RAISE EXCEPTION '[17] 公開用属性の更新が % 行', n; END IF;
+  RESET ROLE;
+  SELECT ai_tags INTO tags FROM public.photo WHERE id = pid;
+  IF tags->'person' IS DISTINCT FROM 'true'::jsonb OR tags->'snow' IS DISTINCT FROM 'false'::jsonb
+     OR tags->'autumn' IS DISTINCT FROM 'true'::jsonb OR tags->'feet' IS DISTINCT FROM 'true'::jsonb
+     OR tags->>'attrs_model' IS DISTINCT FROM 'public_attrs/1'
+     OR tags->'rep_score' IS DISTINCT FROM '-4.3125'::jsonb THEN
+    RAISE EXCEPTION '[17] 公開用属性が期待と違う: %', tags;
+  END IF;
+  SET LOCAL ROLE photo_scorer;
+  FOREACH attr_name IN ARRAY ARRAY['person', 'snow', 'autumn', 'feet', 'attrs_model'] LOOP
+    FOR attr_value IN SELECT value FROM jsonb_array_elements(
+      CASE WHEN attr_name = 'attrs_model' THEN '[null,true,1,"",[]]'::jsonb || jsonb_build_array(repeat('x',41))
+      ELSE '[null,"true",1,0.9,[],{}]'::jsonb END) LOOP
+      BEGIN
+        PERFORM scoring.apply_photo_scores(v1, now(), jsonb_build_array(jsonb_build_object(
+          'id', pid, 'score', 0.5, 'eligible', true, 'expected_version', null, 'expected_scored_at', null,
+          'ai_tags', jsonb_build_object('model', 'm', attr_name, attr_value))));
+        RAISE EXCEPTION '[17] 不正な % = % が通った', attr_name, attr_value;
+      EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '[17]%' THEN RAISE; END IF; END;
+    END LOOP;
+  END LOOP;
   RESET ROLE;
 
   -- 11. anon / authenticated は scoring の関数を呼べない

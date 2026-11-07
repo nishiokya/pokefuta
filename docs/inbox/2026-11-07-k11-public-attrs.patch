@@ -1,0 +1,101 @@
+diff --git a/scripts/public_attrs.py b/scripts/public_attrs.py
+new file mode 100644
+index 0000000..a68ea6f
+--- /dev/null
++++ b/scripts/public_attrs.py
+@@ -0,0 +1,75 @@
++"""公開用の人物・雪・紅葉・足元。学習と新着の推論で同じ特徴量を使う。
++
++公開モデルは固定ファイル。確認用 attr_models_latest.json の更新では切り替わらない。
++学習: .venv/bin/python scripts/public_attrs.py --train
++"""
++import json
++import pickle
++from pathlib import Path
++import numpy as np
++import attr_models as A
++import train_scene_attrs as T
++
++ATTRS = ('person', 'snow', 'autumn', 'feet')
++VERSION = 'public_attrs/1'
++MODEL = T.ROOT / 'models' / 'public_attrs_v1.pkl'
++
++
++def train():
++    if MODEL.exists():
++        raise SystemExit(f'{MODEL} は公開用の固定モデル。別の版に保存すること')
++    features = A.Features(A.ALL_FEATURES)
++    lab = A.labels()
++    models, reports = {}, {}
++    for attr in ATTRS:
++        model, report, _ = A.fit(features, lab, attr)
++        if model is None or report.get('precision', 0) < 0.5:
++            raise SystemExit(f'{attr}: 公開基準（適合率 >= 0.5）を満たさない: {report}')
++        models[attr], reports[attr] = model, report
++        print(attr, json.dumps(report, ensure_ascii=False), flush=True)
++    artifact = dict(format=1, version=VERSION, features=list(A.ALL_FEATURES),
++                    models=models, reports=reports, db_backup=features.db_backup)
++    tmp = MODEL.with_suffix('.tmp')
++    tmp.write_bytes(pickle.dumps(artifact))
++    tmp.replace(MODEL)
++    (MODEL.with_suffix('.json')).write_text(json.dumps(
++        {k: v for k, v in artifact.items() if k != 'models'}, ensure_ascii=False, indent=2))
++
++
++class PublicAttrs:
++    def __init__(self, path=MODEL):
++        with Path(path).open('rb') as f:
++            self.m = pickle.load(f)
++        if (self.m.get('format') != 1 or self.m.get('version') != VERSION
++                or self.m.get('features') != list(A.ALL_FEATURES)
++                or set(self.m.get('models', {})) != set(ATTRS)):
++            raise ValueError('公開属性モデルの形式が違う')
++        for attr in ATTRS:
++            report = self.m['reports'][attr]
++            if (report['status'] != 'trained' or not np.isfinite(report['precision'])
++                    or report['precision'] < 0.5 or not 0 <= report['threshold'] <= 1):
++                raise ValueError(f'{attr}: 公開基準を満たさない')
++
++    def tags(self, recs, E, feats, det, ts):
++        if not recs:
++            return {}
++        boxes = A.box_features({r['photo_id']: r for r in recs})
++        X = np.array([np.concatenate([
++            E[i], T.hand_vector(feats.get(r['photo_id'])), T.det_features(det, r['photo_id']),
++            T.ts_features(ts, r['photo_id']), boxes.get(r['photo_id'], [0.] * 5)
++        ]) for i, r in enumerate(recs)])
++        probabilities = {a: model.predict_proba(X)[:, 1] for a, model in self.m['models'].items()}
++        if any(not np.isfinite(p).all() for p in probabilities.values()):
++            raise ValueError('公開属性の確率が有限でない')
++        return {r['photo_id']: {
++            'attrs_model': self.m['version'],
++            **{a: bool(probabilities[a][i] >= self.m['reports'][a]['threshold']) for a in ATTRS}
++        } for i, r in enumerate(recs)}
++
++
++if __name__ == '__main__':
++    import argparse
++    ap = argparse.ArgumentParser(description=__doc__)
++    ap.add_argument('--train', action='store_true', required=True)
++    ap.parse_args()
++    train()
+diff --git a/scripts/scene_attrs.py b/scripts/scene_attrs.py
+index 201a76a..8c42561 100644
+--- a/scripts/scene_attrs.py
++++ b/scripts/scene_attrs.py
+@@ -32,0 +33 @@ from lid_crop import LidCrop
++from public_attrs import PublicAttrs
+@@ -74,0 +76 @@ class SceneAttrs:
++        self.public_attrs = PublicAttrs()
+@@ -108,0 +111 @@ class SceneAttrs:
++        public_tags = self.public_attrs.tags(recs, E, feats, det, ts)
+@@ -128,0 +132 @@ class SceneAttrs:
++            t.update(public_tags[r["photo_id"]])
+diff --git a/scripts/score_incremental.py b/scripts/score_incremental.py
+index 3cb7e83..e23d14a 100644
+--- a/scripts/score_incremental.py
++++ b/scripts/score_incremental.py
+@@ -64 +64,2 @@ MAX_BATCHES = 10   # 1回の実行で回す上限（--limit 1000 なら 1万枚
+-JOB_VERSION = "quality_score/0.11.0"
++# 0.12.0: 公開用の人物・雪・紅葉・足元を追加。既存の採点は同じ。
++JOB_VERSION = "quality_score/0.12.0"
