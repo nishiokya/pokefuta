@@ -38,6 +38,12 @@ import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import PosterLink from '@/components/PosterLink';
 import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
+import {
+  EMPTY_NEW_POKEFUTA_WANTED,
+  NEW_POKEFUTA_UPLOAD_PATH,
+  fetchNewPokefutaWanted,
+  newPokefutaWantedLabel,
+} from '@/lib/new-pokefuta-wanted';
 
 type FeedVisit = {
   id: string;
@@ -107,6 +113,8 @@ export default function HomePage() {
   // undefined は取得中（ヒーローに枠を確保しておく）、null は取れなかった・0枚
   // LEGEND の人（ヒーローの「LEGEND を目指そう」のカード）。regulars.json と同じ取得で読む
   const [legends, setLegends] = useState<readonly RegularLegend[]>([]);
+  // 設置が発表されたのに写真がまだ届いていない新しいポケふた（図鑑の provisional-wanted.json）。ヒーローの「募集中」カード
+  const [newWanted, setNewWanted] = useState(EMPTY_NEW_POKEFUTA_WANTED);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
@@ -148,6 +156,7 @@ export default function HomePage() {
       setRegularBadges(badges);
       setLegends(loaded);
     });
+    fetchNewPokefutaWanted().then(setNewWanted);
   }, []);
 
   useEffect(() => {
@@ -501,7 +510,32 @@ export default function HomePage() {
                 <span className="block h-10 w-10" />
               </div>
             )}
-            {wantedPrefecture && wantedHref && (
+            {/*
+              新しいポケふたの「募集中」（2026-11-07）。公式サイトにまだ載っていない新作は、写真の GPS から図鑑に
+              載せるので、場所の分からない蓋の写真を集めたい。全部の蓋に写真がそろって上の県のカードが出なくなった
+              枠に入る（両方あるときはこちらを先に）。押すとデザインマンホール投稿の「新しいポケふた」へ
+            */}
+            {newWanted.total > 0 && (
+              <Link
+                // 未ログインなら middleware がログインへ送り、?kind=pokefuta ごと戻す
+                href={NEW_POKEFUTA_UPLOAD_PATH}
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-[11px] font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xs">
+                  NEW
+                </span>
+                <span className="min-w-0">
+                  {/* PC は3枚が横に並んで幅が狭いので、見出しは短く、県名は下の行に（折り返すと2行になる） */}
+                  <span className="block whitespace-nowrap text-xs font-extrabold text-[#4A4A4A] sm:text-base">
+                    新作を<span className="text-[#B5483C]">募集中</span>
+                  </span>
+                  <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
+                    {newPokefutaWantedLabel(newWanted)} <b className="text-[#B5483C]">{newWanted.total}</b>か所
+                  </span>
+                </span>
+              </Link>
+            )}
+            {!newWanted.total && wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
                 className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2`}
