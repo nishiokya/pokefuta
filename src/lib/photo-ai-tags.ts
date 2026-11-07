@@ -176,3 +176,49 @@ export function hasPlushClip(aiTags: unknown): boolean {
   const { lid, plush } = photoAiBoxes(aiTags);
   return Boolean(lid && plush && isRecord(aiTags) && unitBox(aiTags.crop));
 }
+
+/** 蓋の枠として信じる縦/横の範囲（ピクセルで）。avatarCropSquare */
+export const LID_SANE_ASPECT: [number, number] = [0.65, 1.5];
+
+export type PixelSquare = { left: number; top: number; width: number; height: number };
+
+/**
+ * アイコン（/api/photo/[id]/avatar）で写真から切り出す正方形（ピクセル）。丸く見せたとき蓋が丸をいっぱいに埋めるようにする。
+ *
+ * ai_tags.lid（蓋の枠）があれば、その長いほうの辺 × 1.04 を一辺にし、蓋の中心に合わせる（photoLidZoom と同じ寄せ方）。
+ * 一辺は写真の短辺まで・短辺の 1/LID_ZOOM_MAX 以上（小さい蓋を拡大しすぎてぼやけさせない）。写真の外が入らないよう端ではずらす。
+ * lid が無ければ一覧の正方形（ai_tags.crop）、それも無ければ真ん中の正方形。
+ *
+ * 蓋の枠がピクセルで見て正方形から大きく外れている（縦/横が LID_SANE_ASPECT の外）ときは、lid も
+ * それから決めた crop も信用せず真ん中で切る。蓋は丸いので枠はほぼ正方形（斜めから撮ると横長になる程度）。
+ * 2026-11 の点検で、縦/横が (4/3)² ≈ 1.78 や (3/4)² ≈ 0.56 の枠が1割弱あった（採点が写真を 90° 回った向きで見た跡）。
+ */
+export function avatarCropSquare(aiTags: unknown, width: number, height: number): PixelSquare {
+  const W = Math.max(1, Math.round(width));
+  const H = Math.max(1, Math.round(height));
+  const short = Math.min(W, H);
+  let lid = isRecord(aiTags) ? unitBox(aiTags.lid) : null;
+  let crop = isRecord(aiTags) ? unitBox(aiTags.crop) : null;
+  if (lid) {
+    const ratio = ((lid[3] - lid[1]) * H) / ((lid[2] - lid[0]) * W);
+    if (ratio < LID_SANE_ASPECT[0] || ratio > LID_SANE_ASPECT[1]) {
+      lid = null;
+      crop = null;
+    }
+  }
+  let side = short;
+  let cx = W / 2;
+  let cy = H / 2;
+  if (lid) {
+    side = Math.max((lid[2] - lid[0]) * W, (lid[3] - lid[1]) * H) * 1.04;
+    side = Math.min(Math.max(side, short / LID_ZOOM_MAX), short);
+    cx = ((lid[0] + lid[2]) / 2) * W;
+    cy = ((lid[1] + lid[3]) / 2) * H;
+  } else if (crop) {
+    cx = ((crop[0] + crop[2]) / 2) * W;
+    cy = ((crop[1] + crop[3]) / 2) * H;
+  }
+  const s = Math.max(1, Math.min(Math.round(side), short));
+  const clamp = (v: number, hi: number) => Math.min(Math.max(Math.round(v), 0), hi);
+  return { left: clamp(cx - s / 2, W - s), top: clamp(cy - s / 2, H - s), width: s, height: s };
+}

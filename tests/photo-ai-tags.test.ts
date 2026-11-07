@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AI_TAG_HELP, LID_ZOOM_MAX, hasPlushClip, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
+import { AI_TAG_HELP, LID_ZOOM_MAX, avatarCropSquare, hasPlushClip, photoAiTags, photoBoxZoom, photoLidZoom, photoObjectPosition } from '../src/lib/photo-ai-tags';
 
 const labels = (photo: Parameters<typeof photoAiTags>[0]) => photoAiTags(photo).map((t) => t.label);
 
@@ -115,4 +115,32 @@ test('ぬいぐるみの特集: 蓋とぬいぐるみの枠と crop がそろっ
   assert.equal(hasPlushClip({ crop: [0, 0, 1, 1], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
   assert.equal(hasPlushClip({ lid: [0.1, 0.1, 0.5, 0.5], plush_box: [0.5, 0.5, 0.9, 0.9] }), false);
   assert.equal(hasPlushClip(null), false);
+});
+
+test('avatarCropSquare: 蓋の枠の長辺 × 1.04 の正方形を蓋の中心に合わせる', () => {
+  // 300×400 の縦長写真、蓋は (0.2〜0.8, 0.3〜0.75) → 幅 180px・高さ 180px
+  const sq = avatarCropSquare({ lid: [0.2, 0.3, 0.8, 0.75], crop: [0, 0.1, 1, 0.85] }, 300, 400);
+  assert.deepEqual(sq, { left: 57, top: 117, width: 187, height: 187 });
+});
+
+test('avatarCropSquare: 端の蓋は写真の内側にずらし、短辺を超えない', () => {
+  const sq = avatarCropSquare({ lid: [0, 0, 0.99, 0.6] }, 300, 400);
+  assert.deepEqual(sq, { left: 0, top: 0, width: 300, height: 300 });
+});
+
+test('avatarCropSquare: 小さい蓋は短辺の 1/3 までしか拡大しない', () => {
+  const sq = avatarCropSquare({ lid: [0.45, 0.45, 0.55, 0.55] }, 300, 300);
+  assert.deepEqual(sq, { left: 100, top: 100, width: 100, height: 100 });
+});
+
+test('avatarCropSquare: lid が無ければ crop、それも無ければ真ん中の正方形', () => {
+  assert.deepEqual(avatarCropSquare({ crop: [0, 0.25, 1, 1] }, 300, 400), { left: 0, top: 100, width: 300, height: 300 });
+  assert.deepEqual(avatarCropSquare(null, 300, 400), { left: 0, top: 50, width: 300, height: 300 });
+  assert.deepEqual(avatarCropSquare({ lid: [0.5, 0.5, 0.4, 0.6] }, 400, 300), { left: 50, top: 0, width: 300, height: 300 });
+});
+
+test('avatarCropSquare: 正方形から大きく外れた蓋の枠（90° 回った向きで採点した跡）は lid も crop も使わず真ん中', () => {
+  // 300×400 の写真で、横長の写真なら正方形だった枠（縦/横 ≈ 1.78）
+  const tags = { lid: [0.1564, 0.0359, 0.7703, 0.8549], crop: [0, 0.0704, 1, 0.8204] };
+  assert.deepEqual(avatarCropSquare(tags, 300, 400), { left: 0, top: 50, width: 300, height: 300 });
 });
