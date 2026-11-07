@@ -8,13 +8,13 @@ import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submis
 import { loadDesignManholeForOgp, loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import {
   loadDesignManholeSubmitterProfile,
+  loadSnapshotManholesForNearby,
   nearbyDesignManholes,
   nearbyPokefuta,
 } from '@/lib/design-manhole-detail-extras';
 import NearbyPokefutaList from '@/components/DesignManhole/NearbyPokefutaList';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
 import UserAvatar from '@/components/users/UserAvatar';
-import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { formatDistanceKm } from '@/lib/manhole-label';
 import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
 import { loadDesignManholeLink } from '@/lib/design-manhole-link';
@@ -86,17 +86,17 @@ export default async function Page({ params }: Props) {
   // 紐付いたキャラクターマンホール（図鑑が持つ）、近くのポケふた（図鑑のスナップショット）、
   // 近くのデザインマンホール（一覧と同じ公開200件）も並べて読む。どれも取れなければその節を出さないだけ
   const submitterPublicIdPromise = loadDesignManholeSubmitterPublicId(designManhole.id);
-  const [submitterPublicId, submitterProfile, characterLink, snapshot, allDesignManholes] = await Promise.all([
+  const [submitterPublicId, submitterProfile, characterLink, snapshotManholes, allDesignManholes] = await Promise.all([
     submitterPublicIdPromise,
     submitterPublicIdPromise.then((id) => (id ? loadDesignManholeSubmitterProfile(id) : null)),
     loadDesignManholeLink(designManhole.id),
-    fetchManholeSnapshot().catch(() => null),
+    loadSnapshotManholesForNearby(),
     loadPublishedDesignManholes(200).catch((error) => {
       console.warn('Failed to load design manholes for nearby:', error);
       return [];
     }),
   ]);
-  const { nearby: nearbyPokefutaItems, nearbyIsFallback, placeTags } = nearbyPokefuta(designManhole, snapshot?.manholes ?? []);
+  const { nearby: nearbyPokefutaItems, nearbyIsFallback, placeTags } = nearbyPokefuta(designManhole, snapshotManholes);
   const nearbyDesignItems = nearbyDesignManholes(designManhole, allDesignManholes);
   const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 

@@ -10,7 +10,7 @@ import {
   getPublicLiveClient,
   type PublicProfileRow,
 } from '@/lib/user-prefecture-progress';
-import type { SnapshotManhole } from '@/lib/manhole-snapshot';
+import { fetchManholeSnapshot, type SnapshotManhole } from '@/lib/manhole-snapshot';
 import type { DesignManhole } from '@/types/database';
 
 /**
@@ -26,6 +26,51 @@ export const NEARBY_POKEFUTA_FALLBACK_LIMIT = 3;
 export const NEARBY_DESIGN_MANHOLE_LIMIT = 6;
 
 type Point = { latitude: number; longitude: number };
+
+const SNAPSHOT_TTL_MS = 60 * 60 * 1000;
+const SNAPSHOT_RETRY_MS = 60 * 1000;
+const SNAPSHOT_TIMEOUT_MS = 1500;
+
+let snapshotCache: { at: number; ttl: number; manholes: SnapshotManhole[] } | null = null;
+let snapshotInflight: Promise<SnapshotManhole[] | null> | null = null;
+
+/**
+ * 近くのポケふたを出すための蓋の一覧（図鑑のスナップショット）。
+ *
+ * 投稿詳細は `fetchCache = 'force-no-store'` なので、スナップショットの revalidate が効かず
+ * 全件（約720KB）を毎回取り直すことになる。サーバのメモリに1時間持つ（design-manhole-link.ts と同じ考え）。
+ * 図鑑が遅い・落ちているときは 1.5 秒で見切り、近くの節を出さないだけでページは待たせない。
+ * 取れなかったときも1分は覚えて、落ちている間に毎回待たせない。
+ */
+export async function loadSnapshotManholesForNearby(): Promise<SnapshotManhole[]> {
+  const now = Date.now();
+  if (snapshotCache && now - snapshotCache.at < snapshotCache.ttl) return snapshotCache.manholes;
+
+  snapshotInflight ??= fetchManholeSnapshot()
+    .then((snapshot) => snapshot?.manholes ?? null)
+    .catch(() => null)
+    .then((manholes) => {
+      snapshotCache = manholes
+        ? { at: Date.now(), ttl: SNAPSHOT_TTL_MS, manholes }
+        : { at: Date.now(), ttl: SNAPSHOT_RETRY_MS, manholes: snapshotCache?.manholes ?? [] };
+      return manholes;
+    })
+    .finally(() => {
+      snapshotInflight = null;
+    });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), SNAPSHOT_TIMEOUT_MS);
+  });
+  try {
+    const manholes = await Promise.race([snapshotInflight, timeout]);
+    // 時間切れでも取り込みは裏で続き、終われば次のリクエストから使われる
+    return manholes ?? snapshotCache?.manholes ?? [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export type NearbyPokefuta = { id: number; label: string; distanceKm: number };
 
