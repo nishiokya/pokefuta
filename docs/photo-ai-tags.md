@@ -64,7 +64,7 @@ K11の `scripts/public_attrs.py` が既存の `attr_models.py` の学習・特�
 
 1. K11変更を取り込む前に `scripts/public_attrs.py --train` で公開用モデルを作る。
    すでに固定済みなら再学習せず、同梱JSONの成績と版を確認する。
-2. 本番へ `20261107120000_photo_ai_tags_attributes.sql` を適用。
+2. 本番へ `20261107130000_photo_ai_tags_attributes.sql` を適用。
 3. K11に対応する変更を取り込み、ジョブを `quality_score/0.12.0` に切り替える。
    全件再採点のため、通常の `pokefuta-score.service` を実行する。
 4. 書き込み成功・4属性の件数・代表写真の点の欠落が無いことを確認する。
