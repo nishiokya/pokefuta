@@ -17,6 +17,13 @@ const DesignManholeMap = dynamic(
   }
 );
 
-export default function MapSection({ designManholes }: { designManholes: DesignManhole[] }) {
-  return <DesignManholeMap designManholes={designManholes} />;
+export default function MapSection({
+  designManholes,
+  prefectureById,
+}: {
+  designManholes: DesignManhole[];
+  /** 渡すと引いた倍率で県ごとの枚数を出す（一覧用）。詳細ページは渡さずピンだけ */
+  prefectureById?: Record<string, string>;
+}) {
+  return <DesignManholeMap designManholes={designManholes} prefectureById={prefectureById} />;
 }

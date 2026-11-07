@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
+import { resolveDesignManholePrefectures } from '@/lib/design-manhole-prefecture';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
@@ -80,6 +81,10 @@ export default async function DesignManholesPage() {
     console.error('Failed to load design manholes for listing:', error);
     loadError = true;
   }
+  // 地図の初期表示（県ごとの枚数）用。一覧の並びや枚数には使わない
+  const prefectureById = designManholes.length > 0
+    ? await resolveDesignManholePrefectures(designManholes)
+    : {};
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -143,7 +148,7 @@ export default async function DesignManholesPage() {
         ) : (
           <>
             <div className="mt-5">
-              <MapSection designManholes={designManholes} />
+              <MapSection designManholes={designManholes} prefectureById={prefectureById} />
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
