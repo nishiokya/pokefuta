@@ -6,6 +6,7 @@ import {
   isValidFriendCode,
   normalizeFriendCode,
 } from '@/lib/pokemon-go-friend-code';
+import { INSTAGRAM_HOSTS, INSTAGRAM_SITE, X_HOSTS, X_SITE, normalizeSocialUrl } from '@/lib/social-url';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
@@ -119,8 +120,9 @@ export async function PATCH(request: Request) {
 
   const displayName = input.displayName.trim();
   const bio = input.bio.trim();
-  const xUrl = input.xUrl.trim();
-  const instagramUrl = input.instagramUrl.trim();
+  // https:// の付け忘れ・@ユーザー名・共有リンクの ?s=21 などはここで保存できる形に寄せる
+  const xUrl = normalizeSocialUrl(input.xUrl, X_SITE);
+  const instagramUrl = normalizeSocialUrl(input.instagramUrl, INSTAGRAM_SITE);
   // 3項目が1つも来ていないのは、デプロイ前に開かれたプロフィール画面やキャッシュされた
   // PWA が旧4項目だけを送ってきた場合。この payload は旧4項目だけを更新する4引数版の
   // RPC へ回す。ここで現在値を読み直して7引数版へ渡し直すと、読んでから書くまでの間に
@@ -140,11 +142,11 @@ export async function PATCH(request: Request) {
   if ([...bio].length > BIO_MAX) {
     return NextResponse.json({ error: `一言は${BIO_MAX}文字以内で入力してください。` }, { status: 400 });
   }
-  if (xUrl.length > URL_MAX || !isSocialUrl(xUrl, ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'])) {
-    return NextResponse.json({ error: 'XのプロフィールURLを https://x.com/ユーザー名 の形で入力してください。' }, { status: 400 });
+  if (xUrl.length > URL_MAX || !isSocialUrl(xUrl, X_HOSTS)) {
+    return NextResponse.json({ error: 'XのプロフィールURL（x.com/ユーザー名）か @ユーザー名 を入力してください。' }, { status: 400 });
   }
-  if (instagramUrl.length > URL_MAX || !isSocialUrl(instagramUrl, ['instagram.com', 'www.instagram.com'])) {
-    return NextResponse.json({ error: 'InstagramのプロフィールURLを https://instagram.com/ユーザー名 の形で入力してください。' }, { status: 400 });
+  if (instagramUrl.length > URL_MAX || !isSocialUrl(instagramUrl, INSTAGRAM_HOSTS)) {
+    return NextResponse.json({ error: 'InstagramのプロフィールURL（instagram.com/ユーザー名）か @ユーザー名 を入力してください。' }, { status: 400 });
   }
   if (!legacyPayload && !isValidFriendCode(input.pokemonGoFriendCode ?? '')) {
     return NextResponse.json({ error: 'トレーナーコードは数字12桁で入力してください。' }, { status: 400 });

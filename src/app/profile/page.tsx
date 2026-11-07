@@ -259,8 +259,8 @@ export default function ProfilePage() {
                       style={{ fontFamily: ROUND }}
                     />
                   </label>
-                  <Field label="X URL" name="xUrl" type="url" defaultValue={profile.xUrl || ''} maxLength={300} placeholder="https://x.com/username" inputMode="url" />
-                  <Field label="Instagram URL" name="instagramUrl" type="url" defaultValue={profile.instagramUrl || ''} maxLength={300} placeholder="https://instagram.com/username" inputMode="url" />
+                  <Field label="X URL" name="xUrl" type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} defaultValue={profile.xUrl || ''} maxLength={300} placeholder="x.com/username または @username" inputMode="url" />
+                  <Field label="Instagram URL" name="instagramUrl" type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} defaultValue={profile.instagramUrl || ''} maxLength={300} placeholder="instagram.com/username または @username" inputMode="url" />
                 </div>
 
                 {/* Pokémon GO フレンド募集 */}
