@@ -49,6 +49,7 @@
     "test:auth-redirect": "tsx --test tests/auth-redirect.test.ts",
     "test:photo-redirect-cache": "tsx --test tests/photo-redirect-cache.test.ts",
     "test:public-avatars": "tsx --test tests/public-avatars.test.ts",
+    "test:shared-avatar-cookie": "tsx --test tests/shared-avatar-cookie.test.ts",
     "test:new-pokefuta-wanted": "tsx --test tests/new-pokefuta-wanted.test.ts"
   },
   "dependencies": {

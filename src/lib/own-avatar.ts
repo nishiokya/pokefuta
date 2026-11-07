@@ -7,13 +7,17 @@ import { useEffect, useState } from 'react';
 // /profile で選び直したら notifyOwnAvatarChanged() で開いている画面にすぐ反映する。
 
 const EVENT = 'pokefuta:own-avatar-changed';
-let shared: Promise<string | null> | null = null;
+// undefined は「取れなかった」（未設定の null と分ける。図鑑と共有するクッキーを消さないため）
+let shared: Promise<string | null | undefined> | null = null;
 
-function loadOwnAvatarPhotoId(): Promise<string | null> {
+export function loadOwnAvatarPhotoId(): Promise<string | null | undefined> {
   shared ??= fetch('/api/user/avatar')
-    .then(async (res) => (res.ok ? ((await res.json()) as { photoId?: unknown }).photoId : null))
-    .then((photoId) => (typeof photoId === 'string' && photoId ? photoId : null))
-    .catch(() => null);
+    .then(async (res) => {
+      if (!res.ok) return undefined;
+      const photoId = ((await res.json()) as { photoId?: unknown }).photoId;
+      return typeof photoId === 'string' && photoId ? photoId : null;
+    })
+    .catch(() => undefined);
   return shared;
 }
 
@@ -33,7 +37,7 @@ export function useOwnAvatarPhotoId(enabled: boolean): string | null {
     }
     let cancelled = false;
     loadOwnAvatarPhotoId().then((loaded) => {
-      if (!cancelled) setPhotoId(loaded);
+      if (!cancelled) setPhotoId(loaded ?? null);
     });
     const onChange = (event: Event) => setPhotoId((event as CustomEvent<string | null>).detail ?? null);
     window.addEventListener(EVENT, onChange);
