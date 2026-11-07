@@ -24,9 +24,10 @@ async function fetchChunk(chunk: typeof queue) {
   } catch {
     // 下で覚えた分を捨てる
   }
-  if (!avatars) {
-    // 一時的な失敗を null として覚えると、再読み込みするまで戻らない
-    for (const id of ids) cache.delete(id);
+  // 一時的な失敗を null として覚えると、再読み込みするまで戻らない。
+  // 応答ごと取れなかったときと、サーバーで取れなかった人（avatars に入っていない）は覚えない
+  for (const id of ids) {
+    if (!avatars || !Object.prototype.hasOwnProperty.call(avatars, id)) cache.delete(id);
   }
   for (const { id, resolve } of chunk) {
     const photoId = avatars?.[id];

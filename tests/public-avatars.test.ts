@@ -69,3 +69,21 @@ test('本人が選び直したら、覚えている値をすぐ差し替える',
   assert.equal(await loadPublicAvatarPhotoId(id(400)), 'after');
   assert.equal(calls, 1);
 });
+
+test('サーバーで取れなかった人（avatars に入っていない）は覚えず、取れた人だけ覚える', async () => {
+  let calls = 0;
+  globalThis.fetch = (async (url: string) => {
+    calls += 1;
+    const ids = new URL(url, 'http://x').searchParams.get('ids')!.split(',');
+    // 1回目は id(501) だけ取れない
+    const avatars = Object.fromEntries(ids.filter((i) => calls > 1 || i !== id(501)).map((i) => [i, `p-${i.slice(-3)}`]));
+    return new Response(JSON.stringify({ avatars }));
+  }) as typeof fetch;
+  const [a, b] = await Promise.all([loadPublicAvatarPhotoId(id(500)), loadPublicAvatarPhotoId(id(501))]);
+  assert.equal(a, 'p-500');
+  assert.equal(b, null);
+  assert.equal(await loadPublicAvatarPhotoId(id(500)), 'p-500');
+  assert.equal(calls, 1);
+  assert.equal(await loadPublicAvatarPhotoId(id(501)), 'p-501');
+  assert.equal(calls, 2);
+});

@@ -19,20 +19,32 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAnonClient();
+  // 取れなかった人（RPC の一時的な失敗）は「未設定（null）」と区別して avatars に入れない。
+  // その応答は共有キャッシュにもブラウザにも置かず、次に開いたときに取り直させる
   const entries = await Promise.all(
-    ids.map(async (id): Promise<[string, string | null]> => {
+    ids.map(async (id): Promise<[string, string | null] | null> => {
       try {
         const { data, error } = await supabase.rpc('get_public_avatar_photo_id' as never, { p_user_id: id } as never);
-        if (error) return [id, null];
+        if (error) {
+          console.warn('Failed to load public avatar:', error.message);
+          return null;
+        }
         return [id, typeof data === 'string' ? data : null];
       } catch {
-        return [id, null];
+        return null;
       }
     })
   );
+  const loaded = entries.filter((entry): entry is [string, string | null] => entry !== null);
 
   return NextResponse.json(
-    { avatars: Object.fromEntries(entries) },
-    { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } }
+    { avatars: Object.fromEntries(loaded) },
+    {
+      headers: {
+        'Cache-Control': loaded.length === ids.length
+          ? 'public, s-maxage=300, stale-while-revalidate=3600'
+          : 'no-store',
+      },
+    }
   );
 }
