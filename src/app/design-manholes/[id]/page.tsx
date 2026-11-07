@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronRight, MapPin, Share2 } from 'lucide-react';
+import { ChevronRight, MapPin, Navigation, Share2, Tag } from 'lucide-react';
 import MapSection from '../MapSection';
 import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
-import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
+import { loadDesignManholeForOgp, loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
+import {
+  loadDesignManholeSubmitterProfile,
+  nearbyDesignManholes,
+  nearbyPokefuta,
+} from '@/lib/design-manhole-detail-extras';
+import NearbyPokefutaList from '@/components/DesignManhole/NearbyPokefutaList';
+import PosterRegularBadge from '@/components/PosterRegularBadge';
+import UserAvatar from '@/components/users/UserAvatar';
+import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
+import { formatDistanceKm } from '@/lib/manhole-label';
 import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
 import { loadDesignManholeLink } from '@/lib/design-manhole-link';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
@@ -28,6 +38,9 @@ const NOT_FOUND_METADATA: Metadata = {
 };
 
 const displayTitle = (title: string | null) => title || 'デザインマンホール';
+
+const TAG_CLASS =
+  'inline-flex items-center gap-1 rounded-full border border-[#7B63A8]/25 bg-[#7B63A8]/5 px-2.5 py-1 text-xs font-bold text-[#7B63A8]';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const designManhole = await loadDesignManholeForOgp(params.id);
@@ -69,12 +82,22 @@ export default async function Page({ params }: Props) {
     notFound();
   }
 
-  // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにする
-  // 紐付いたキャラクターマンホール（図鑑が持つ。取れなければ出さない）も並べて読む
-  const [submitterPublicId, characterLink] = await Promise.all([
-    loadDesignManholeSubmitterPublicId(designManhole.id),
+  // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにし、プロフィールのカードを出す
+  // 紐付いたキャラクターマンホール（図鑑が持つ）、近くのポケふた（図鑑のスナップショット）、
+  // 近くのデザインマンホール（一覧と同じ公開200件）も並べて読む。どれも取れなければその節を出さないだけ
+  const submitterPublicIdPromise = loadDesignManholeSubmitterPublicId(designManhole.id);
+  const [submitterPublicId, submitterProfile, characterLink, snapshot, allDesignManholes] = await Promise.all([
+    submitterPublicIdPromise,
+    submitterPublicIdPromise.then((id) => (id ? loadDesignManholeSubmitterProfile(id) : null)),
     loadDesignManholeLink(designManhole.id),
+    fetchManholeSnapshot().catch(() => null),
+    loadPublishedDesignManholes(200).catch((error) => {
+      console.warn('Failed to load design manholes for nearby:', error);
+      return [];
+    }),
   ]);
+  const { nearby: nearbyPokefutaItems, nearbyIsFallback, placeTags } = nearbyPokefuta(designManhole, snapshot?.manholes ?? []);
+  const nearbyDesignItems = nearbyDesignManholes(designManhole, allDesignManholes);
   const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 
   const title = displayTitle(designManhole.title);
@@ -187,6 +210,34 @@ export default async function Page({ params }: Props) {
               </p>
             )}
 
+            {(placeTags.length > 0 || characterLink) && (
+              <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="タグ">
+                {placeTags.map((tag) => (
+                  <li key={tag.label}>
+                    {tag.href ? (
+                      <a href={tag.href} className={TAG_CLASS}>
+                        <Tag className="h-3 w-3" aria-hidden="true" />
+                        {tag.label}
+                      </a>
+                    ) : (
+                      <span className={TAG_CLASS}>
+                        <Tag className="h-3 w-3" aria-hidden="true" />
+                        {tag.label}
+                      </span>
+                    )}
+                  </li>
+                ))}
+                {characterLink && (
+                  <li>
+                    <a href={characterLink.guide_url} className={TAG_CLASS}>
+                      <Tag className="h-3 w-3" aria-hidden="true" />
+                      {characterLink.work_name}
+                    </a>
+                  </li>
+                )}
+              </ul>
+            )}
+
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <a
                 href={xShareUrl}
@@ -206,6 +257,35 @@ export default async function Page({ params }: Props) {
                 LINEで送る
               </a>
             </div>
+            {submitterProfile && submitterHref && (
+              <section aria-label="投稿者" className="mt-5 rounded-lg border border-[#7B63A8]/15 bg-[#F6EEDC]/60 p-4">
+                <p className="text-xs font-bold tracking-wide text-[#7B63A8]">投稿したトレーナー</p>
+                <Link href={submitterHref} className="mt-2 flex items-center gap-3 hover:opacity-80">
+                  <UserAvatar
+                    photoId={submitterProfile.avatarPhotoId}
+                    size={44}
+                    alt={`${submitterProfile.displayName}のアイコン`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <PosterRegularBadge publicUserId={submitterProfile.publicId} />
+                      <span className="font-bold">{submitterProfile.displayName}</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-[#2A2A2A]/60">
+                      {[
+                        submitterProfile.totalVisits > 0 && `ポケふた ${submitterProfile.totalVisits}枚`,
+                        submitterProfile.prefectureCount > 0 && `${submitterProfile.prefectureCount}都道府県`,
+                        submitterProfile.designManholeCount > 0 &&
+                          `デザインマンホール ${submitterProfile.designManholeCount}枚`,
+                      ]
+                        .filter(Boolean)
+                        .join(' ・ ')}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#7B63A8]" aria-hidden="true" />
+                </Link>
+              </section>
+            )}
             {characterLink && (
               <section
                 aria-labelledby="character-link-heading"
@@ -276,6 +356,50 @@ export default async function Page({ params }: Props) {
         <div className="mt-5">
           <MapSection designManholes={[mapItem]} />
         </div>
+
+        {(nearbyPokefutaItems.length > 0 || nearbyDesignItems.length > 0) && (
+          <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
+            {nearbyPokefutaItems.length > 0 && (
+              <section aria-labelledby="nearby-pokefuta-heading">
+                <h2 id="nearby-pokefuta-heading" className="mb-3 flex items-center gap-1.5 text-sm font-bold">
+                  <Navigation className="h-4 w-4 text-[#7B63A8]" aria-hidden="true" />
+                  {nearbyIsFallback ? 'いちばん近いポケふた' : '近くのポケふた'}
+                </h2>
+                <NearbyPokefutaList items={nearbyPokefutaItems} />
+              </section>
+            )}
+            {nearbyDesignItems.length > 0 && (
+              <section aria-labelledby="nearby-design-heading">
+                <h2 id="nearby-design-heading" className="mb-3 flex items-center gap-1.5 text-sm font-bold">
+                  <MapPin className="h-4 w-4 text-[#7B63A8]" aria-hidden="true" />
+                  近くのデザインマンホール
+                </h2>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {nearbyDesignItems.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        href={`/design-manholes/${item.id}`}
+                        className="block overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white transition hover:shadow-md"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.photoUrl}
+                          alt={item.title}
+                          loading="lazy"
+                          className="aspect-square w-full bg-[#EFE5CE] object-cover"
+                        />
+                        <span className="block px-2 py-1.5">
+                          <span className="block truncate text-xs font-bold">{item.title}</span>
+                          <span className="block text-[11px] text-[#2A2A2A]/50">{formatDistanceKm(item.distanceKm)}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-5 text-center">
           <p className="text-sm text-[#2A2A2A]/70">
