@@ -1,0 +1,3 @@
+
+# パッチの空行のコンテキストは単一スペース。実装コードの空白検査は維持する。
+docs/inbox/2026-11-07-k11-public-attrs.patch -whitespace

@@ -18,7 +18,7 @@ export type PhotoAiTags = {
   scene?: 'centered_clean' | 'wide_context' | 'signage_info' | 'landscape';
   plush?: boolean;
   plush_score?: number;
-  /** K11 の公開用属性モデル。折り外の適合率 50% 以上で採用 */
+  /** K11 の公開用属性モデル。独立した検証分の適合率 50% 以上で採用 */
   person?: boolean;
   snow?: boolean;
   autumn?: boolean;
@@ -48,7 +48,10 @@ export const AI_TAG_HELP =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean | null }): AiTag[] {
+export function photoAiTags(
+  photo: { ai_tags?: unknown; is_landscape?: boolean | null },
+  { compact = false }: { compact?: boolean } = {},
+): AiTag[] {
   const tags = photo.ai_tags;
   if (!isRecord(tags)) return [];
   const out: AiTag[] = [];
@@ -56,6 +59,7 @@ export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean |
   if (tags.night === true) out.push({ key: 'night', label: '夜', ai: false });
   if (tags.scene === 'landscape' && !photo.is_landscape) out.push({ key: 'landscape', label: '風景', ai: true });
   for (const [key, label] of [['person', '人物'], ['snow', '雪'], ['autumn', '紅葉'], ['feet', '足元']] as const) {
+    if (compact && (key === 'person' || key === 'feet')) continue;
     if (tags[key] === true) out.push({ key, label, ai: true });
   }
   return out;

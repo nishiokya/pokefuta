@@ -1,36 +1,43 @@
 # 写真館の公開用 AI タグ追加
 
-人物・雪・紅葉・足元を追加。採用基準は折り外の適合率50%以上（写真ごとの確率50%以上ではない）。
-仕様・成績・反映順は [photo-ai-tags](../photo-ai-tags.md)。
+人物・雪・紅葉・足元を追加。採用基準は独立した検証データの適合率50%以上。
+仕様・最新成績・反映順は [photo-ai-tags](../photo-ai-tags.md)。
 
-## K11
+## K11の状態
 
-- ソース: `/home/tako/projects/manhole-score`（remote未設定）
-- 隔離worktree: `/tmp/manhole-score-ai-tags`、ブランチ `codex/expand-ai-tags`
-- 元のHEAD: `76a3df0`、実装コミット: `c670049b9bb5865b4a0e8bc9171b0c7f6fbcb3cb`
-- 固定済みモデル: `/home/tako/projects/manhole-score/models/public_attrs_v1.pkl`
-- SHA256: `d195e9671aa5100067b37cc767528edc9e7b1267339bd24e05783e5f5d7bf94c`
-- 成績: 同じ場所の `public_attrs_v1.json`。雪は最初の確認以降の教師の更新により閾値0.70→0.51、適合率0.700→0.696。
-- データ・既存モデル・venvは元のプロジェクトを参照。新しい公開用モデルだけ追加した。既存モデルを上書きしていない。
-- 元のworktreeには既存の未追跡 `scripts/ablate_ranker.py` がある。触れていない。
+- 元ソース: `/home/tako/projects/manhole-score`（remote未設定）、元HEAD `76a3df0`。
+- 隔離worktree: `/tmp/manhole-score-ai-tags`、ブランチ `codex/expand-ai-tags`。
+- 最新実装: `de5cc84f48d740c9ce2c8cdb109e557a8ac70f07`。先行 `c670049` だけではレビュー修正が入らない。
+- 固定モデル: `/home/tako/projects/manhole-score/models/public_attrs_v2.pkl`、成績は同じ場所の `public_attrs_v2.json`。
+- SHA256: `b9efd9b4f2eb6d3ff95537c42f69af65f183623e9aff202d07de28a80d0e1b40`。
+- 旧 `public_attrs_v1.pkl` は未公開の比較用。今回の配信には使わない。既存のシーン・代表写真モデルは不変。
+- 元worktreeの既存未追跡 `scripts/ablate_ranker.py` には触れていない。
 - 本番ジョブのソース・systemd・DB・写真はまだ切り替えていない。
 
-同梱 [パッチ](2026-11-07-k11-public-attrs.patch) はGitで共有する正本。
-適用先で既存変更を確認し、`git apply --unidiff-zero --check` → `git apply --unidiff-zero` で3ファイルを適用できる。
-K11のコミットを使う場合はDB適用後にcherry-pickする。基準cloneがdirtyなまま自動適用しない。
-先に公開用モデルの存在・版・成績を確認する。モデルがない環境ではパッチから `public_attrs.py` を用意し学習してから切り替える。
+## 適用
 
-## 検証
+同梱 [パッチ](2026-11-07-k11-public-attrs.patch) は元HEADに対する前後3行つきの累積差分。
+適用先の状態を確認し、`git apply --check` → `git apply` で4ファイルを適用する。
+元のK11で通常の `git apply --check` が成功することを確認済み。行番号だけで当てる `--unidiff-zero` は使わない。
+パッチファイルだけ `.gitattributes` で空白検査を除外する（空行コンテキストの単一スペースはパッチの構文）。
 
-- 写真一覧関連64テスト、型検査・GA4等の契約検査: 合格。
-- K11ローカルSupabase DB: 新migrationと `tools/verify-photo-scorer.sql` を同一トランザクションで実行し全項目合格、ROLLBACK済み。
-  pg_netのローカル既知警告あり。本番の権限検査を無効にする変更はない。
-- K11: 24枚×4属性で学習時と新着推論の判定が一致。
-- K11: 同じ24枚で既存のシーン・ぬいぐるみ・夜・切り抜き情報の値が変更前と完全一致。
-- Next.jsの本番ビルド: 合格（既存のlint警告あり）。型検査はローカル設定なしで実行。
-- 本番への反映と全件再採点は未実施。
+すでに先行版を適用した場合は累積パッチを重ねず、K11ブランチの追補 `de5cc84` を使う。
+基準cloneがdirtyなまま自動適用しない。モデル版・成績・SHAを確認後、DB→K11→全件採点→アプリの順に反映する。
+別の環境では先に `public_attrs.py` を用意し `--train` する。検証結果が50%未満の属性は配信しない。
+モデルは検証データを含めて学習し直さない。
 
-## レビュー確認後の追補
+## レビュー対応と検証
 
-PR #444 のレビューは指摘なし。最新mainの #442 が `20261107120000` を使用したため、
-本PRのmigrationは `20261107130000_photo_ai_tags_attributes.sql` に変更した。SQLの内容は不変。
+自動レビューの初回結果は指摘なしだったが、その後のClaude Codeレビュー10件を確認して修正・検証した。
+最新mainの #442 と重複したmigration番号は `20261107130000_photo_ai_tags_attributes.sql` に変更済み。
+
+- Python回帰テスト4件: 合格。合格条件のNaN/欠損/境界、学習・閾値選択からの検証隔離、ID逆順と欠落、枠欠損、丸めとサイズ制限を検証。
+- K11実写真は枠あり12枚・枠なし12枚で、4属性の学習/推論・ID逆順の結果一致。既存タグ・切り抜き情報も不変。
+- 全キー・最長モデル名・長い小数を含む検証値は、丸め後のPostgreSQL `jsonb::text` で425/500バイト。
+- K11ローカルDBで新migrationとscorer権限・入力検査を全件実行して合格、ROLLBACK済み。各属性のtrue/false双方でモデル版欠落を拒否。
+  ローカルのpg_net警告は既知。本番権限の検査を無効にしていない。
+- アプリのタグ表示23テスト・型/GA4等の契約検査: 合格。小さいタイルから人物・足元を除くことも検証。
+- レビュー修正後の本番ビルドも合格（ローカル向けの仮設定を使い、本番の接続情報は不使用）。
+
+`validate_ai_tags` の関数分離は今回行わない。scoringの関数追加には監査の許可リスト変更も伴うため、
+今回は既存の署名・権限と入力検査の回帰テストを維持し、分離は別の変更として扱う。

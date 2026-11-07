@@ -153,3 +153,11 @@ test('追加属性は true のときだけ表示し、未採用の属性は表�
     rain: true, shadow: true, glare: true, cut: true, sakura: true } }), []);
   assert.ok(photoAiTags({ ai_tags: { person: true, snow: true, autumn: true, feet: true } }).every(t => t.ai));
 });
+
+
+test('小さなタイルでは人物・足元を省き、季節タグと既存タグを残す', () => {
+  const photo = { ai_tags: { plush: true, night: true, scene: 'landscape', person: true, feet: true, snow: true, autumn: true } };
+  assert.deepEqual(photoAiTags(photo, { compact: true }).map(t => t.label), ['ぬいぐるみ', '夜', '風景', '雪', '紅葉']);
+  assert.equal(photoAiTags(photo).length, 7);
+  assert.deepEqual(photoAiTags({ ai_tags: { person: true, feet: true } }, { compact: true }), []);
+});

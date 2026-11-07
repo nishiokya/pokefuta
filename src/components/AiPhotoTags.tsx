@@ -12,7 +12,7 @@ export default function AiPhotoTags({
   linkFeatures = false,
 }: {
   photo: { ai_tags?: unknown; is_landscape?: boolean | null };
-  /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰める */
+  /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰め、人物・足元は表示しない */
   compact?: boolean;
   /**
    * ぬいぐるみのチップを特集ページ（/photos/plush）へのリンクにする。
@@ -20,7 +20,7 @@ export default function AiPhotoTags({
    */
   linkFeatures?: boolean;
 }) {
-  const tags = photoAiTags(photo);
+  const tags = photoAiTags(photo, { compact });
   if (tags.length === 0) return null;
   return (
     <span className="flex flex-wrap gap-1" title={AI_TAG_HELP}>

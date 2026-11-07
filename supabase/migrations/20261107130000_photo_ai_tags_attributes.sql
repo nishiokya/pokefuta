@@ -1,5 +1,5 @@
--- 人物・雪・紅葉・足元を追加。公開用モデルの折り外適合率 >= 0.5 で採用。
--- 写真ごとの閾値は K11 の評価時の閾値を固定（0.5 に一律変更しない）。
+-- 人物・雪・紅葉・足元を追加。公開用モデルの独立検証の適合率 >= 0.5 で採用。
+-- 写真ごとの閾値は K11 の学習側だけで選んだ閾値を固定（0.5 に一律変更しない）。
 -- DB → K11 quality_score/0.12.0 → 全件採点 → アプリの順に反映。
 -- 既存の品質スコア・代表写真の点は変更しない。権限・型検査・楽観ロックを維持。
 -- 20261025120000 の apply_photo_scores に追加キーの検査だけを追加。
@@ -108,6 +108,8 @@ BEGIN
             SELECT 1 FROM jsonb_each(e -> 'ai_tags') AS attr(k, v)
             WHERE k IN ('person', 'snow', 'autumn', 'feet') AND jsonb_typeof(v) IS DISTINCT FROM 'boolean'
           )
+          OR ((e -> 'ai_tags') ?| ARRAY['person', 'snow', 'autumn', 'feet']
+              AND NOT (e -> 'ai_tags' ? 'attrs_model'))
           OR (e -> 'ai_tags' ? 'attrs_model' AND (
                 jsonb_typeof(e -> 'ai_tags' -> 'attrs_model') IS DISTINCT FROM 'string'
                 OR length(e -> 'ai_tags' ->> 'attrs_model') NOT BETWEEN 1 AND 40))
@@ -158,7 +160,7 @@ BEGIN
                 END)
       END
   ) THEN
-    RAISE EXCEPTION 'apply_photo_scores: ai_tags の形が不正（model=文字列（必須）, scene=4種のどれか, plush=真偽, plush_score=0〜1, night=真偽か null, crop / lid / plush_box=0〜1 の数4つ（x0<x1, y0<y1）, lid_fits=真偽か null, rep_score=-1000〜1000 の数, person / snow / autumn / feet=真偽, attrs_model=1〜40文字。500バイトまで。ほかのキーは不可）';
+    RAISE EXCEPTION 'apply_photo_scores: ai_tags の形が不正（model=文字列（必須）, scene=4種のどれか, plush=真偽, plush_score=0〜1, night=真偽か null, crop / lid / plush_box=0〜1 の数4つ（x0<x1, y0<y1）, lid_fits=真偽か null, rep_score=-1000〜1000 の数, person / snow / autumn / feet=真偽, attrs_model=1〜40文字（公開属性を含む場合は必須）。500バイトまで。ほかのキーは不可）';
   END IF;
 
   -- 型の変換に失敗した行（id が uuid でない、時刻が読めない等）はここで例外になる
