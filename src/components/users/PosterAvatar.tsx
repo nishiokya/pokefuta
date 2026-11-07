@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { avatarPhotoUrl } from '@/components/users/UserAvatar';
-import { loadPublicAvatarPhotoId } from '@/lib/public-avatars';
+import { PUBLIC_AVATAR_EVENT, loadPublicAvatarPhotoId } from '@/lib/public-avatars';
 
 /**
  * 投稿者名の前に出す小さなアイコン。公開ID を渡すと、その人が選んだアイコン（公開写真）を
@@ -32,8 +32,16 @@ export default function PosterAvatar({
     loadPublicAvatarPhotoId(publicUserId).then((loaded) => {
       if (!cancelled) setLoadedPhotoId(loaded);
     });
+    // 本人が /profile で選び直したら、開いている画面のその人のアイコンも差し替える
+    const id = publicUserId.toLowerCase();
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; photoId: string | null }>).detail;
+      if (detail?.id === id) setLoadedPhotoId(detail.photoId);
+    };
+    window.addEventListener(PUBLIC_AVATAR_EVENT, onChange);
     return () => {
       cancelled = true;
+      window.removeEventListener(PUBLIC_AVATAR_EVENT, onChange);
     };
   }, [publicUserId, givenPhotoId]);
 
