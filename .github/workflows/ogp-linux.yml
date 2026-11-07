@@ -46,6 +46,7 @@ jobs:
       - run: npm run test:auth-redirect
       - run: npm run test:photo-redirect-cache
       - run: npm run test:public-avatars
+      - run: npm run test:new-pokefuta-wanted
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux

@@ -48,7 +48,8 @@
     "capture": "node tools/capture/capture.js",
     "test:auth-redirect": "tsx --test tests/auth-redirect.test.ts",
     "test:photo-redirect-cache": "tsx --test tests/photo-redirect-cache.test.ts",
-    "test:public-avatars": "tsx --test tests/public-avatars.test.ts"
+    "test:public-avatars": "tsx --test tests/public-avatars.test.ts",
+    "test:new-pokefuta-wanted": "tsx --test tests/new-pokefuta-wanted.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.901.0",
