@@ -100,8 +100,6 @@ export default function HomePage() {
   const [feedTotal, setFeedTotal] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
-  // 写真のあるポケふたの数（site-stats の manholes_with_photos）。PC のヒーローの数字に使う
-  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   // PC のヒーロー右に敷く写真。最初のページの投稿から取り、ページ送りでは差し替えない
   const [heroPhotos, setHeroPhotos] = useState<FeedVisit[] | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
@@ -209,7 +207,6 @@ export default function HomePage() {
       // 非公開にした写真まで「集まっています」に含まれて表示と食い違う。
       setTotalPosts(typeof data.public_posts === 'number' ? data.public_posts : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
-      setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
     } catch {
       // ignore
     }
@@ -364,28 +361,6 @@ export default function HomePage() {
             </p>
 
             {/*
-              PC だけ、そろった範囲を数字で見せる（2026-10-30）。全部そろうと上の文が枚数だけになり、
-              何がどこまで集まったのかが読めなかった。次の行動（2枚目）にもつなぐ。
-              数字はどちらも取得後に入るので、そろうまでは行ごと出さない（PC はモザイクの高さで行が取ってある）
-            */}
-            {allCollected && manholesWithPhotos != null && manholesWithPhotos > 0 && (
-              <div className="mt-3 hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-[#4A4A4A] lg:flex">
-                <span className="whitespace-nowrap">
-                  <b className="text-xl font-extrabold text-[#7B63A8]">{manholesWithPhotos}</b> か所のポケふた すべてに写真
-                </span>
-                <span className="whitespace-nowrap">
-                  <b className="text-xl font-extrabold text-[#7B63A8]">{completion?.completeCount}</b> 都道府県すべて
-                </span>
-                <Link
-                  href={isLoggedIn ? '/upload' : '/login?redirect=/upload'}
-                  className="whitespace-nowrap text-[#B5483C] hover:underline"
-                >
-                  別の季節・2枚目も募集中 ›
-                </Link>
-              </div>
-            )}
-
-            {/*
               新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
               並んでいて、どちらが主かが読めなかった。登録側だけを一段大きくし、
               スタンプ帳は枠線を外して副次的な見た目に落とす。
@@ -420,7 +395,7 @@ export default function HomePage() {
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
               href="/badges"
-              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:hidden sm:gap-3 sm:p-4 lg:flex-1"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:hidden sm:gap-3 sm:p-4 lg:hidden"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
                 <Award className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -436,7 +411,7 @@ export default function HomePage() {
             {/*
               「この◯人に続け！」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
               LEGEND のトレーナーを写真と名前で見せ、押すとその人の公開スタンプ帳へ。順位にしないため枚数は出さず名前順。
-              スマホは「バッジを集めよう」を出さず、このカード1枚を横いっぱいに（称号のお知らせのリンクで /badges へ）。
+              スマホと PC は「バッジを集めよう」を出さず（PC は 2026-11-07 に外した）、称号のお知らせのリンクで /badges へ。スマホはこのカード1枚を横いっぱいに。
               タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。どれも3人まで。
               名前と写真は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）。
               まだ届いていない（取れなかった）ときは「LEGEND を目指そう」として /badges の説明へ送る
