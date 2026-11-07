@@ -8,7 +8,8 @@ import { Camera, CircleDot, Home, Info, Search, User as UserIcon, UserPlus } fro
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { useOwnAvatarPhotoId } from '@/lib/own-avatar';
+import { loadOwnAvatarPhotoId, useOwnAvatarPhotoId } from '@/lib/own-avatar';
+import { writeSharedAvatarCookie } from '@/lib/shared-avatar-cookie';
 import PosterAvatar from '@/components/users/PosterAvatar';
 import { NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNav';
 
@@ -718,7 +719,24 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   }, []);
 
   // ヘッダーの名前の前に、/profile で選んだアイコンを出す（#433 では /profile と公開スタンプ帳だけだった）
-  const ownAvatarPhotoId = useOwnAvatarPhotoId(Boolean(user));
+  // 図鑑のヘッダーにも同じアイコンを出すため、.pokefuta.com で共有するクッキーに写しておく
+  // （src/lib/shared-avatar-cookie.ts）。ログアウトしたら消す。取れなかったときは触らない
+  const userId = user?.id ?? null;
+  const ownAvatarPhotoId = useOwnAvatarPhotoId(userId);
+  useEffect(() => {
+    if (!authLoaded) return;
+    if (!userId) {
+      writeSharedAvatarCookie(null, null);
+      return;
+    }
+    let cancelled = false;
+    loadOwnAvatarPhotoId(userId).then((photoId) => {
+      if (!cancelled && photoId !== undefined) writeSharedAvatarCookie(userId, photoId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoaded, userId, ownAvatarPhotoId]);
   const state: ChromeState = { user, authLoaded, activeNav: route.activeNav, pathname, ownAvatarPhotoId };
   if (route.bare) return <>{children}</>;
 
