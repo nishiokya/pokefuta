@@ -719,10 +719,10 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
   }, []);
 
   // ヘッダーの名前の前に、/profile で選んだアイコンを出す（#433 では /profile と公開スタンプ帳だけだった）
-  const ownAvatarPhotoId = useOwnAvatarPhotoId(Boolean(user));
   // 図鑑のヘッダーにも同じアイコンを出すため、.pokefuta.com で共有するクッキーに写しておく
   // （src/lib/shared-avatar-cookie.ts）。ログアウトしたら消す。取れなかったときは触らない
   const userId = user?.id ?? null;
+  const ownAvatarPhotoId = useOwnAvatarPhotoId(userId);
   useEffect(() => {
     if (!authLoaded) return;
     if (!userId) {
@@ -730,7 +730,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
       return;
     }
     let cancelled = false;
-    loadOwnAvatarPhotoId().then((photoId) => {
+    loadOwnAvatarPhotoId(userId).then((photoId) => {
       if (!cancelled && photoId !== undefined) writeSharedAvatarCookie(userId, photoId);
     });
     return () => {
