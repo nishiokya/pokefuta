@@ -25,7 +25,7 @@ export async function loadPublicDesignManholeCount(publicUserId: string): Promis
   }
 }
 
-/** デザインマンホールの投稿者の公開ID。公開スタンプ帳へリンクできない人は null */
+/** 公開デザインマンホールの投稿者の公開ID。非公開投稿・プロフィールなしは null */
 export async function loadDesignManholeSubmitterPublicId(designManholeId: string): Promise<string | null> {
   const client = getPublicLiveClient();
   if (!client) return null;

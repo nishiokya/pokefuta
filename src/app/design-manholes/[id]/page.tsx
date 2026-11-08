@@ -82,7 +82,7 @@ export default async function Page({ params }: Props) {
     notFound();
   }
 
-  // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにし、プロフィールのカードを出す
+  // 公開投稿に紐付くプロフィールがあれば、訪問0件でもスタンプ帳へのリンクとカードを出す
   // 紐付いたキャラクターマンホール（図鑑が持つ）、近くのポケふた（図鑑のスナップショット）、
   // 近くのデザインマンホール（一覧と同じ公開200件）も並べて読む。どれも取れなければその節を出さないだけ
   const submitterPublicIdPromise = loadDesignManholeSubmitterPublicId(designManhole.id);

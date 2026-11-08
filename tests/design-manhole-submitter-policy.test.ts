@@ -15,8 +15,22 @@ test('デザインマンホールの公開面: published だけを数え、auth_
   assert.doesNotMatch(migration, /SELECT[^;]*d\.created_by[^;]*AS/);
 });
 
-test('デザインマンホールの公開面: 投稿者の公開IDは get_public_user_ids に委ねる', () => {
-  assert.match(migration, /public\.get_public_user_ids\(ARRAY\[d\.created_by\]\)/);
+const submitterMigration = readFileSync(
+  fileURLToPath(new URL('../supabase/migrations/20261109090000_design_manhole_submitter_profile.sql', import.meta.url)),
+  'utf8'
+);
+
+test('投稿者の公開ID: 公開デザイン投稿自体を根拠にし、内部IDは返さない', () => {
+  assert.match(submitterMigration, /SELECT au\.id/);
+  assert.match(submitterMigration, /JOIN app_user au ON au\.auth_uid = d\.created_by/);
+  assert.match(submitterMigration, /d\.id = p_design_manhole_id/);
+  assert.match(submitterMigration, /d\.status = 'published'/);
+  assert.doesNotMatch(submitterMigration, /public\.get_public_user_ids\(/);
+  assert.match(submitterMigration, /RETURNS uuid/);
+  assert.match(submitterMigration, /SECURITY DEFINER/);
+  assert.match(submitterMigration, /SET search_path TO 'public'/);
+  assert.match(submitterMigration, /REVOKE ALL ON FUNCTION .* FROM PUBLIC/);
+  assert.match(submitterMigration, /GRANT EXECUTE ON FUNCTION .* TO anon, authenticated, service_role/);
 });
 
 test('デザインマンホールの公開面: 自分の枚数は anon に渡さない', () => {
