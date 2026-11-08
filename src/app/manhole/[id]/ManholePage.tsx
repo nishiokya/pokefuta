@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  MapPin, ArrowLeft, Navigation,
+  MapPin, ArrowLeft, Navigation, User,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, ExternalLink, BookOpen,
   MessageCircle, Pencil, Check, X,
@@ -19,6 +19,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import PosterAvatar from '@/components/users/PosterAvatar';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
@@ -99,6 +100,17 @@ const getPhotoUserLabel = (photo: Photo) => {
   if (publicId && publicId.length >= 8) return `ユーザー:${publicId.slice(0, 8)}`;
   return '名無しのトレーナー';
 };
+
+function PhotoPosterAvatar({ photo }: { photo: Photo }) {
+  return (
+    <PosterAvatar
+      key={photo.visit?.public_user_id || photo.id}
+      publicUserId={photo.visit?.public_user_id}
+      size={20}
+      fallback={<User aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full bg-black/20 p-0.5" />}
+    />
+  );
+}
 
 /** 写真の上に重ねる一言。ゴミ判定を通ったものだけ、改行を空白に畳んで返す */
 const getPhotoCaption = (photo: Photo) =>
@@ -1087,7 +1099,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     type="button"
                     onClick={() => setOpenGridCommentPhotoId(photo.id)}
                     aria-label={`@${userLabel}さんのコメントを読む`}
-                    className="absolute bottom-0 left-0 z-10 p-1"
+                    className="absolute top-0 left-0 z-10 p-1"
                   >
                     <span className="inline-flex items-center rounded-full bg-black/60 p-1 text-white">
                       <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
@@ -1106,37 +1118,34 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     </span>
                   </button>
                 )}
+                {/* 名前は写真ボタンと兄弟にして、プロフィールリンクを重ねる。 */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/[0.85] via-black/[0.45] to-transparent px-1.5 pb-1.5 pt-6 text-white">
+                  <div className="flex min-w-0 items-center gap-1">
+                    <PhotoPosterAvatar photo={photo} />
+                    {profileHref ? (
+                      <Link
+                        href={profileHref}
+                        className="pointer-events-auto min-w-0 truncate font-pixelJp text-[10.5px] font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80"
+                      >
+                        @{userLabel}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate font-pixelJp text-[10.5px] font-bold">
+                        @{userLabel}
+                      </span>
+                    )}
+                    <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                  </div>
+                  {dateLabel && (
+                    <span title={`${dateLabel}${dateKind}`} className="font-['Outfit'] text-[10px] font-bold text-white/85">
+                      {dateLabel}
+                    </span>
+                  )}
+                </div>
               </div>
-              {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
-                  投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
               <div className="flex flex-col gap-0.5 px-1.5 py-1">
                 <LandscapePhotoBadge isLandscape={photo.is_landscape} />
                 <AiPhotoTags photo={photo} linkFeatures />
-                <div className="flex min-w-0 items-center gap-1">
-                  {profileHref ? (
-                    <Link
-                      href={profileHref}
-                      className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
-                    >
-                      @{userLabel}
-                    </Link>
-                  ) : (
-                    <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
-                      @{userLabel}
-                    </span>
-                  )}
-                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
-                </div>
-                {dateLabel && (
-                  // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
-                  // title と aria-label で補う。
-                  <span
-                    title={`${dateLabel}${dateKind}`}
-                    className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
-                  >
-                    {dateLabel}
-                  </span>
-                )}
               </div>
             </div>
           );
@@ -1309,6 +1318,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           <div className="flex min-w-0 items-center gap-2">
+            <PhotoPosterAvatar photo={featuredPhoto} />
             {!featuredPhoto.visit?.is_own && featuredPhoto.visit?.public_user_id ? (
               <Link
                 href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
@@ -1634,6 +1644,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     </span>
                   )}
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
+                    <PhotoPosterAvatar photo={allDisplayPhotos[0]} />
                     <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
                     {allDisplayPhotos[0].visit?.shot_at && (
                       <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
@@ -1681,7 +1692,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                             </span>
                           </span>
                         )}
-                        <span className="absolute inset-x-0 bottom-0 flex items-end gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
+                        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
+                          <PhotoPosterAvatar photo={photo} />
                           <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
                             @{getPhotoUserLabel(photo)}
                           </span>
