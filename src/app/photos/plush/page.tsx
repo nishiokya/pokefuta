@@ -86,7 +86,7 @@ export default async function PlushPhotosPage() {
                 undefined,
               );
               const tagPhoto = { ai_tags: photo.aiTags, is_landscape: photo.isLandscape };
-              const aiLabels = photoAiTags(tagPhoto).map((t) => t.label);
+              const aiLabels = photoAiTags(tagPhoto, { compact: true }).map((t) => t.label);
               const href = photo.posterPublicId ? `/users/${encodeURIComponent(photo.posterPublicId)}/visits` : `/p/${photo.id}`;
               const shotAt = photo.shotAt ?? photo.createdAt;
               // 蓋のタグは描かれているポケモン（多い蓋は3匹まで）

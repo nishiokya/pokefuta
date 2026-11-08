@@ -1,9 +1,9 @@
 diff --git a/scripts/public_attrs.py b/scripts/public_attrs.py
 new file mode 100644
-index 0000000..f33eea6
+index 0000000..47a6058
 --- /dev/null
 +++ b/scripts/public_attrs.py
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,128 @@
 +"""公開用属性。蓋単位で隔離した検証データで適合率50%以上の属性だけを配信する。
 +
 +閾値は学習側だけのOOFで選ぶ。検証側は学習・閾値選択に使わず、評価後も再学習しない。
@@ -92,20 +92,6 @@ index 0000000..f33eea6
 +
 +
 +
-+def normalize_tags(tags):
-+    """DBのjsonb文字列表現と同じ空白を含めて500バイト以内。枠は小数4桁に固定。"""
-+    out = dict(tags)
-+    for key in ('crop', 'lid', 'plush_box'):
-+        if key in out:
-+            out[key] = [round(float(v), 4) for v in out[key]]
-+    for key, digits in (('plush_score', 3), ('rep_score', 4)):
-+        if key in out:
-+            out[key] = round(float(out[key]), digits)
-+    size = len(json.dumps(out, ensure_ascii=False, allow_nan=False).encode('utf-8'))
-+    if size > 500:
-+        raise ValueError(f'公開タグが500バイト超（{size}バイト）。書き込み前に停止')
-+    return out
-+
 +
 +class PublicAttrs:
 +    def __init__(self, path=MODEL):
@@ -182,18 +168,10 @@ index 201a76a..e9985d3 100644
              out[r["photo_id"]] = t
          return out
 diff --git a/scripts/score_incremental.py b/scripts/score_incremental.py
-index 3cb7e83..5e4adaa 100644
+index 3cb7e83..5d23736 100644
 --- a/scripts/score_incremental.py
 +++ b/scripts/score_incremental.py
-@@ -28,6 +28,7 @@ PGPASSWORD / PGDATABASE を書く。パスワードは表示しない。
- import argparse
- import json
- import math
-+from public_attrs import normalize_tags
- import os
- import sys
- import time
-@@ -61,7 +62,8 @@ MAX_BATCHES = 10   # 1回の実行で回す上限（--limit 1000 なら 1万枚
+@@ -61,7 +61,8 @@ MAX_BATCHES = 10   # 1回の実行で回す上限（--limit 1000 なら 1万枚
  #        比較回 data/model_compare/2026-10-25-rep9（rep7 との比較は 2026-10-25-rep9v7）。ほかは 0.9.0 と同じ
  # 0.11.0: 人が「影あり」と付けた写真の rep_score から 30 引く（rep_score.SHADOW_LABEL_PENALTY）。影ありは同じ蓋の
  #        影なしの候補より後ろに並ぶ。モデルとほかのタグは 0.10.0 と同じ
@@ -203,20 +181,150 @@ index 3cb7e83..5e4adaa 100644
  ENV_KEYS = ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE")
  OPTIONAL_ENV_KEYS = ("PGSSLMODE",)   # ローカルスタックは SSL 無しなので disable を書く。既定は require
  
-@@ -197,6 +199,7 @@ def run_batch(connect, args, status, deps) -> int:
+@@ -125,6 +126,9 @@ def run_batch(connect, args, status, deps) -> int:
+     2026-10-04、全件を採点し直したときに、採点中に開きっぱなしだった接続がプール側で
+     切られ、書き込みの応答を待ったまま止まった（TCP の keepalive が切れるまで約2時間）。
+     """
++    from tag_payload import prepare_tags
++
++    status["stage"] = "batch"
+     extract_features, embed_paths, CLASSES, POLICY_VERSION, score_photo, train_shot_context, Jsonb, scene, rep = deps
+     with connect() as conn:
+         todo = conn.execute(
+@@ -160,6 +164,9 @@ def run_batch(connect, args, status, deps) -> int:
+         print(f"[飛ばす] 画像を読めない: {len(unreadable)} 枚 {unreadable[:5]}")
+ 
+     rows = []
++    tag_payload_errors = []
++    status["tag_payload_errors"] = tag_payload_errors
++    status["tag_payload_skipped"] = 0
+     status["rep_score_skipped"] = 0   # 前のバッチの値を合計に二重に数えない
+     status["rep_score_skipped_ids"] = []
+     status["pending_plush_box"] = 0
+@@ -197,6 +204,11 @@ def run_batch(connect, args, status, deps) -> int:
                  t["rep_score"] = v
              else:
                  rep_skipped.append(r["photo_id"])
-+            t = normalize_tags(t)
++            t = prepare_tags(t, r["photo_id"], tag_payload_errors)
++            if t is None:
++                status["tag_payload_skipped"] = len(tag_payload_errors)
++                print(f"[タグを飛ばす] {tag_payload_errors[-1]}")
++                continue
              rows.append({"id": r["photo_id"], "score": round(sp["score"], 4),
                           "eligible": sp["eligible"], "reasons": sp["reasons"],
                           "ai_tags": t})
+@@ -220,7 +232,8 @@ def run_batch(connect, args, status, deps) -> int:
+     run_file = RUNS_DIR / f"{scored_at.strftime('%Y%m%dT%H%M%SZ')}.json"
+     run_file.write_text(json.dumps({"policy_version": POLICY_VERSION,
+                                     "scored_at": scored_at.isoformat(), "rows": rows,
+-                                    "missing_in_mirror": missing, "unreadable": unreadable},
++                                    "missing_in_mirror": missing, "unreadable": unreadable,
++                                    "tag_payload_errors": tag_payload_errors},
+                                    ensure_ascii=False, indent=1), encoding="utf-8")
+     status["run_file"] = str(run_file)
+ 
+@@ -231,6 +244,7 @@ def run_batch(connect, args, status, deps) -> int:
+                     "expected_version": seen[r["id"]][0],
+                     "expected_scored_at": seen[r["id"]][1].isoformat() if seen[r["id"]][1] else None}
+                    for r in rows]
++        status["stage"] = "permission_audit"
+         with connect() as conn:
+             audit(conn, status)   # 書き込みの前に毎回点検する（接続ごと）
+             with conn.transaction():
+@@ -282,11 +296,14 @@ def main() -> None:
+         # 1回の実行で未採点が無くなるまで繰り返す。版を切り替えたときに新旧のスコアが
+         # 並びの中で混ざる時間を短くするため（PR #274 の Codex レビュー P2）。
+         # 書けた行が0（ミラーに原本がまだ無い写真だけが残っている等）なら止める。
++        status["stage"] = "model_validation"
+         deps = (extract_features, embed_paths, CLASSES, POLICY_VERSION, score_photo,
+                 train_shot_context, Jsonb, SceneAttrs(), RepScorer())
+         deps[-1].self_check()   # 傷のモデルの入力の次元など、写真に依らない故障は書く前に止める
+         total = {"batches": 0, "candidates": 0, "scored": 0, "updated": 0, "pending_plush_box": 0, "rep_score_skipped": 0,
+                  "rep_score_skipped_ids": []}
++        total["tag_payload_errors"] = []
++        total["tag_payload_skipped"] = 0
+         status["total"] = total   # 途中のバッチで止まっても、それまでの集計を last-status に残す
+         for batch in range(1, MAX_BATCHES + 1):
+             print(f"--- バッチ {batch}", flush=True)
+@@ -295,6 +312,10 @@ def main() -> None:
+             for k in ("candidates", "scored", "updated", "pending_plush_box", "rep_score_skipped"):
+                 total[k] += status.get(k, 0)
+             total["rep_score_skipped_ids"] = (total["rep_score_skipped_ids"] + status.get("rep_score_skipped_ids", []))[:50]
++            known = {e["photo_id"]: e for e in total["tag_payload_errors"]}
++            known.update({e["photo_id"]: e for e in status.get("tag_payload_errors", [])})
++            total["tag_payload_errors"] = list(known.values())
++            total["tag_payload_skipped"] = len(known)
+             if args.dry_run or n == 0:
+                 break
+         status["total"] = total
+@@ -305,7 +326,7 @@ def main() -> None:
+         status["remaining_unscored"] = remaining
+         print(f"[残り] 未採点 {remaining} 枚（{total['batches']} バッチで {total['updated']} 行を書いた）")
+ 
+-        status["result"] = "ok"
++        status["result"] = "partial" if total["tag_payload_skipped"] else "ok"
+     except (Exception, SystemExit) as e:
+         status["error"] = f"{type(e).__name__}: {e}"
+         raise
+diff --git a/scripts/tag_payload.py b/scripts/tag_payload.py
+new file mode 100644
+index 0000000..f14b3d7
+--- /dev/null
++++ b/scripts/tag_payload.py
+@@ -0,0 +1,47 @@
++"""タグのJSON契約。標準ライブラリだけで使える（学習モデルをimportしない）。"""
++import json
++from numbers import Integral, Real
++
++
++def _plain(value):
++    if value is None or isinstance(value, (str, bool)):
++        return value
++    if isinstance(value, dict):
++        return {key: _plain(v) for key, v in value.items()}
++    if isinstance(value, (list, tuple)):
++        return [_plain(v) for v in value]
++    # numpyをimportせず、numpy scalarのitemだけを明示的に扱う。
++    if type(value).__module__.split('.')[0] == 'numpy' and hasattr(value, 'item'):
++        scalar = value.item()
++        if type(scalar).__module__.split('.')[0] == 'numpy':
++            raise TypeError('Python標準型に変換できないnumpy値')
++        return _plain(scalar)
++    if isinstance(value, Integral):
++        return int(value)
++    if isinstance(value, Real):
++        return float(value)
++    raise TypeError(f'JSONタグの値の型が不正: {type(value).__name__}')
++
++
++def normalize_tags(tags):
++    """標準型へ変換し、枠を4桁に丸め、空白込みUTF-8で500バイト以内にする。"""
++    out = _plain(tags)
++    for key in ('crop', 'lid', 'plush_box'):
++        if key in out:
++            out[key] = [round(float(v), 4) for v in out[key]]
++    for key, digits in (('plush_score', 3), ('rep_score', 4)):
++        if key in out:
++            out[key] = round(float(out[key]), digits)
++    size = len(json.dumps(out, ensure_ascii=False, allow_nan=False).encode('utf-8'))
++    if size > 500:
++        raise ValueError(f'公開タグが500バイト超（{size}バイト）')
++    return out
++
++
++def prepare_tags(tags, photo_id, errors):
++    """個別の不正値は記録してスキップする。採点済みにしないので修正後に再試行できる。"""
++    try:
++        return normalize_tags(tags)
++    except (ValueError, TypeError, OverflowError) as error:
++        errors.append({'photo_id': photo_id, 'reason': f'{type(error).__name__}: {error}'[:300]})
++        return None
 diff --git a/scripts/test_public_attrs.py b/scripts/test_public_attrs.py
 new file mode 100644
-index 0000000..9a57be0
+index 0000000..f70ea38
 --- /dev/null
 +++ b/scripts/test_public_attrs.py
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,158 @@
 +"""公開属性の評価分離・保存条件・ID照合・枠欠損・DBサイズ契約の回帰テスト。"""
 +import json
 +import unittest
@@ -224,6 +332,7 @@ index 0000000..9a57be0
 +import numpy as np
 +import public_attrs as P
 +import attr_models as A
++from tag_payload import normalize_tags, prepare_tags
 +
 +
 +def valid_report():
@@ -239,6 +348,18 @@ index 0000000..9a57be0
 +
 +
 +class PublicAttrsTest(unittest.TestCase):
++    def test_missing_or_corrupt_model_fails_before_scoring(self):
++        from tempfile import TemporaryDirectory
++        from pathlib import Path
++        import pickle
++        with TemporaryDirectory() as tmp:
++            path = Path(tmp)/"model.pkl"
++            with self.assertRaises(FileNotFoundError):
++                P.PublicAttrs(path)
++            path.write_bytes(b"not a pickle")
++            with self.assertRaises(pickle.UnpicklingError):
++                P.PublicAttrs(path)
++
 +    def test_same_validation_rejects_nonfinite_and_invalid_reports(self):
 +        P.validate_report(valid_report())  # ちょうど50%は採用
 +        for key, values in {
@@ -301,20 +422,63 @@ index 0000000..9a57be0
 +        self.assertEqual(report['precision'], 1.)
 +        P.validate_report(report)
 +
++    def test_bad_tag_photo_does_not_block_other_database_rows(self):
++        from types import SimpleNamespace
++        from tempfile import TemporaryDirectory
++        from pathlib import Path
++        from unittest.mock import MagicMock
++        import score_incremental as S
++        todo = [('bad', 'bad.jpg', 'm', None, None, None), ('good', 'good.jpg', 'm', None, None, None)]
++        conn = MagicMock()
++        conn.execute.return_value.fetchall.return_value = todo
++        conn.execute.return_value.fetchone.return_value = (1,)
++        context = MagicMock()
++        context.__enter__.return_value = conn
++        def scene_tags(*args):
++            return {'bad': {'model': 'm', 'extra': 'x'*501}, 'good': {'model': 'm'}}
++        scene = SimpleNamespace(tags=scene_tags, pending=[])
++        deps = (SimpleNamespace(analyze=lambda r: {}), lambda paths: np.zeros((len(paths), 2)),
++                ['a', 'b'], 'quality_score/0.12.0',
++                lambda p, f: dict(score=.5, eligible=True, reasons=[]),
++                lambda: SimpleNamespace(predict_proba=lambda E: np.full((len(E), 2), .5)),
++                lambda v: v, scene, SimpleNamespace(score=lambda *a: 1.))
++        status = {}
++        with TemporaryDirectory() as tmp, patch.object(S, 'RUNS_DIR', Path(tmp)), \
++                patch.object(S, 'resolve', side_effect=lambda k: Path(tmp)/k), patch.object(S, 'audit'):
++            updated = S.run_batch(lambda: context, SimpleNamespace(limit=1000, dry_run=False), status, deps)
++            run = json.loads(Path(status['run_file']).read_text())
++        self.assertEqual(updated, 1)
++        sent = next(c.args[1][2] for c in conn.execute.call_args_list if 'apply_photo_scores' in c.args[0])
++        self.assertEqual([row['id'] for row in sent], ['good'])
++        self.assertEqual(status['tag_payload_skipped'], 1)
++        self.assertEqual(run['tag_payload_errors'][0]['photo_id'], 'bad')
++
++    def test_numpy_scalars_and_bad_photo_do_not_block_good_photo(self):
++        errors = []
++        bad = prepare_tags({"model": "m", "unexpected": "x"*501}, "bad", errors)
++        good = prepare_tags({"model": "m", "plush": np.bool_(True), "night": np.bool_(False),
++                             "plush_score": np.float32(.5), "lid_fits": np.bool_(True),
++                             "crop": np.array([.1, .2, .8, .9]).tolist()}, "good", errors)
++        self.assertIsNone(bad)
++        self.assertEqual([e["photo_id"] for e in errors], ["bad"])
++        self.assertIs(type(good["plush"]), bool)
++        self.assertIs(type(good["plush_score"]), float)
++        json.dumps(good, allow_nan=False)
++
 +    def test_tag_rounding_and_worst_case_size(self):
 +        tags = dict(model='s'*40, attrs_model='a'*40, scene='centered_clean',
 +                    plush=True, plush_score=.9999999999, night=False, lid_fits=False,
 +                    rep_score=-999.999999999, person=False, snow=False, autumn=False, feet=False)
 +        for k in ('crop', 'lid', 'plush_box'):
 +            tags[k] = [.15640000000000001, .1234567890123, .9876543210987, .8765432109876]
-+        out = P.normalize_tags(tags)
++        out = normalize_tags(tags)
 +        self.assertEqual(out['lid'], [.1564, .1235, .9877, .8765])
 +        self.assertLessEqual(len(json.dumps(out).encode()), 500)
 +        self.assertNotEqual(tags['lid'], out['lid'])
 +        with self.assertRaises(ValueError):
-+            P.normalize_tags({**tags, 'unexpected': 'x'*501})
++            normalize_tags({**tags, 'unexpected': 'x'*501})
 +        with self.assertRaises(ValueError):
-+            P.normalize_tags({'rep_score': float('nan')})
++            normalize_tags({'rep_score': float('nan')})
 +
 +
 +if __name__ == '__main__':
