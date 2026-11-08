@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { AI_TAG_HELP, photoAiTags } from '@/lib/photo-ai-tags';
 
 /**
- * 自動で付いたタグ（ぬいぐるみ・夜・風景）を小さなチップで出す。
+ * 自動で付いたタグ（ぬいぐるみ・夜・風景・人物・雪・紅葉・足元）を小さなチップで出す。
  * 投稿者の申告（LandscapePhotoBadge）と見分けられるよう色を変える。「AI」の印は付けず、
  * 自動判定であることは各画面の注釈（AI_TAG_HELP）で伝える。
  */
@@ -12,7 +12,7 @@ export default function AiPhotoTags({
   linkFeatures = false,
 }: {
   photo: { ai_tags?: unknown; is_landscape?: boolean | null };
-  /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰める */
+  /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰め、人物・足元は表示しない */
   compact?: boolean;
   /**
    * ぬいぐるみのチップを特集ページ（/photos/plush）へのリンクにする。
@@ -20,7 +20,7 @@ export default function AiPhotoTags({
    */
   linkFeatures?: boolean;
 }) {
-  const tags = photoAiTags(photo);
+  const tags = photoAiTags(photo, { compact });
   if (tags.length === 0) return null;
   return (
     <span className="flex flex-wrap gap-1" title={AI_TAG_HELP}>

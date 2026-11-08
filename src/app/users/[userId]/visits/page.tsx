@@ -362,7 +362,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
         <AiTagNote
           className="mt-4"
           show={prefectureGroups.some((group) =>
-            group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }).length > 0))}
+            group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }, { compact: true }).length > 0))}
         />
 
         <section className="mt-10">
@@ -485,7 +485,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
       <div className="p-1.5 sm:p-2.5">
         <div className="flex flex-wrap gap-1">
           <LandscapePhotoBadge isLandscape={visit.isLandscape} />
-          <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} />
+          <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} compact />
         </div>
         <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">
           {title}

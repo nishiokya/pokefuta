@@ -817,7 +817,7 @@ export default function VisitsPage() {
                   </div>
                 ))}
               </div>
-              <AiTagNote className="mt-2" show={sampleVisits.slice(0, 6).some((sv) => photoAiTags(sv).length > 0)} />
+              <AiTagNote className="mt-2" show={sampleVisits.slice(0, 6).some((sv) => photoAiTags(sv, { compact: true }).length > 0)} />
               <p className="mt-3 text-center text-xs text-[#6A4D36]">
                 登録すると、あなたの旅写真もここに残せます
               </p>

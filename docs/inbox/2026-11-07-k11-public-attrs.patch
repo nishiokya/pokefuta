@@ -1,0 +1,485 @@
+diff --git a/scripts/public_attrs.py b/scripts/public_attrs.py
+new file mode 100644
+index 0000000..47a6058
+--- /dev/null
++++ b/scripts/public_attrs.py
+@@ -0,0 +1,128 @@
++"""公開用属性。蓋単位で隔離した検証データで適合率50%以上の属性だけを配信する。
++
++閾値は学習側だけのOOFで選ぶ。検証側は学習・閾値選択に使わず、評価後も再学習しない。
++学習: .venv/bin/python scripts/public_attrs.py --train
++"""
++import json
++import pickle
++from pathlib import Path
++import numpy as np
++from sklearn.model_selection import StratifiedGroupKFold
++import attr_models as A
++import train_scene_attrs as T
++
++ATTRS = ('person', 'snow', 'autumn', 'feet')
++VERSION = 'public_attrs/2'
++MODEL = T.ROOT / 'models' / 'public_attrs_v2.pkl'
++EVALUATION = 'group_holdout_v1'
++
++
++def validate_report(report):
++    """保存時と読み込み時の公開条件を1か所で検査する。NaN/欠損/文字列も拒否。"""
++    if report.get('status') != 'trained' or report.get('evaluation') != EVALUATION:
++        raise ValueError('公開属性の評価方式または学習状態が違う')
++    for name, lo, hi in (('precision', .5, 1.), ('threshold', 0., 1.)):
++        v = report.get(name)
++        if isinstance(v, bool) or not isinstance(v, (int, float)) or not np.isfinite(v) or not lo <= v <= hi:
++            raise ValueError(f'公開属性の {name} が不正: {v}')
++    if report.get('validation_positives', 0) < 1 or report.get('validation_predicted', 0) < 1:
++        raise ValueError('検証側の正例または予測陽性が無い')
++
++
++def fit_holdout(features, lab, attr):
++    ids = sorted(pid for pid, labels in lab.items() if attr in labels and pid in features.emb and pid in features.src)
++    y = np.array([lab[i][attr] for i in ids], dtype=int)
++    if y.sum() < A.MIN_POS or T.group_support(y, features.groups(ids)) < 5:
++        return None, dict(status='too_few', positives=int(y.sum()))
++    X, groups = features.X(ids), np.array(features.groups(ids))
++    # 分割を探し直して良い成績を選ばない。固定seed・最初のfoldを検証専用にする。
++    train_idx, valid_idx = next(StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=17).split(X, y, groups))
++    if set(groups[train_idx]) & set(groups[valid_idx]):
++        raise ValueError('学習と検証に同じ蓋が混ざっている')
++    # A.report は閾値選択用にだけ使い、公開のprecisionには使わない。
++    tuned = A.report(y[train_idx], A.oof(X[train_idx], y[train_idx], groups[train_idx]))
++    threshold = tuned['threshold']
++    model = A.make().fit(X[train_idx], y[train_idx])
++    pred = model.predict_proba(X[valid_idx])[:, 1] >= threshold
++    truth = y[valid_idx]
++    tp = int((pred & (truth == 1)).sum())
++    report = dict(status='trained', evaluation=EVALUATION, threshold=threshold,
++                  positives=int(y.sum()), train_count=len(train_idx), validation_count=len(valid_idx),
++                  validation_positives=int(truth.sum()), validation_predicted=int(pred.sum()),
++                  validation_true_positive=tp,
++                  precision=tp / int(pred.sum()) if pred.sum() else 0.,
++                  recall=tp / int(truth.sum()) if truth.sum() else 0.)
++    # この同じモデルを保存する。検証側を含めた全件でのfitはしない。
++    return model, report
++
++
++def train():
++    if MODEL.exists():
++        raise SystemExit(f'{MODEL} は公開用の固定モデル。別の版に保存すること')
++    features, lab = A.Features(A.ALL_FEATURES), A.labels()
++    models, reports, excluded = {}, {}, {}
++    for attr in ATTRS:
++        model, report = fit_holdout(features, lab, attr)
++        try:
++            validate_report(report)
++            if model is None:
++                raise ValueError('モデルが無い')
++        except ValueError as e:
++            excluded[attr] = report
++            print(f'[除外] {attr}: {e}', json.dumps(report, ensure_ascii=False), flush=True)
++            continue
++        models[attr], reports[attr] = model, report
++        print(attr, json.dumps(report, ensure_ascii=False), flush=True)
++    if not models:
++        raise ValueError('公開基準を満たす属性が無い。モデルを保存しない')
++    artifact = dict(format=2, version=VERSION, features=list(A.ALL_FEATURES),
++                    models=models, reports=reports, excluded=excluded, db_backup=features.db_backup)
++    metadata = json.dumps({k: v for k, v in artifact.items() if k != "models"},
++                          ensure_ascii=False, indent=2, allow_nan=False)
++    tmp = MODEL.with_suffix(".tmp")
++    tmp.write_bytes(pickle.dumps(artifact))
++    tmp.replace(MODEL)
++    MODEL.with_suffix(".json").write_text(metadata)
++
++
++
++
++class PublicAttrs:
++    def __init__(self, path=MODEL):
++        with Path(path).open('rb') as f:
++            self.m = pickle.load(f)
++        models = self.m.get('models', {})
++        if (self.m.get('format') != 2 or self.m.get('version') != VERSION
++                or self.m.get('features') != list(A.ALL_FEATURES)
++                or not models or not set(models) <= set(ATTRS)
++                or set(models) != set(self.m.get('reports', {}))):
++            raise ValueError('公開属性モデルの形式が違う')
++        for report in self.m['reports'].values():
++            validate_report(report)
++
++    def tags(self, recs, embeddings, feats, det, ts):
++        ids = [r['photo_id'] for r in recs]
++        if len(set(ids)) != len(ids) or set(ids) != set(embeddings):
++            raise ValueError('公開属性の写真IDと埋め込みの対応が違う')
++        if not recs:
++            return {}
++        boxes = A.box_features({r['photo_id']: r for r in recs})
++        X = np.array([np.concatenate([
++            embeddings[r['photo_id']], T.hand_vector(feats.get(r['photo_id'])), T.det_features(det, r['photo_id']),
++            T.ts_features(ts, r['photo_id']), boxes.get(r['photo_id'], [0.] * 5)
++        ]) for r in recs])
++        probabilities = {a: model.predict_proba(X)[:, 1] for a, model in self.m['models'].items()}
++        if any(not np.isfinite(p).all() for p in probabilities.values()):
++            raise ValueError('公開属性の確率が有限でない')
++        return {pid: {
++            'attrs_model': self.m['version'],
++            **{a: bool(probabilities[a][i] >= self.m['reports'][a]['threshold']) for a in probabilities}
++        } for i, pid in enumerate(ids)}
++
++
++if __name__ == '__main__':
++    import argparse
++    ap = argparse.ArgumentParser(description=__doc__)
++    ap.add_argument('--train', action='store_true', required=True)
++    ap.parse_args()
++    train()
+diff --git a/scripts/scene_attrs.py b/scripts/scene_attrs.py
+index 201a76a..e9985d3 100644
+--- a/scripts/scene_attrs.py
++++ b/scripts/scene_attrs.py
+@@ -30,6 +30,7 @@ import numpy as np
+ from detect_people_plush import Detector
+ from extract_time_season import JST, color_fractions, load_backup_tables, time_fields
+ from lid_crop import LidCrop
++from public_attrs import PublicAttrs
+ from train_scene_attrs import ROOT, det_features, hand_vector, ts_features
+ 
+ # 本番の採点が読むモデル。train_scene_attrs.py の既定の書き先（scene_attrs_v1.pkl）とは分けてあり、
+@@ -72,6 +73,7 @@ class SceneAttrs:
+         # 黙って違う答えを出すので止める
+         if self.m.get("format") != 2:
+             raise SystemExit(f"{model_path} は古い形式（format={self.m.get('format')}）。train_scene_attrs.py で作り直す")
++        self.public_attrs = PublicAttrs()
+         self.det = Detector()
+         self.backup = load_backup_tables()
+         self.crop = LidCrop()
+@@ -106,6 +108,7 @@ class SceneAttrs:
+                        for i, r in enumerate(recs)])
+         attr_p = {a: mm.predict_proba(XA)[:, 1] for a, mm in m["attrs"].items()}
+ 
++        public_tags = self.public_attrs.tags(recs, dict(zip((r["photo_id"] for r in recs), E, strict=True)), feats, det, ts)
+         out = {}
+         self.pending = []   # OWLv2 の答えを待つ写真。score_incremental.py が書かずに次の回へ回す
+         for i, r in enumerate(recs):
+@@ -126,5 +129,6 @@ class SceneAttrs:
+             t.update(self.crop.tags(r["photo_id"], r["path"], bool(t.get("plush"))))
+             if t.get("plush") and pb:
+                 t["plush_box"] = [round(float(v), 4) for v in pb]
++            t.update(public_tags[r["photo_id"]])
+             out[r["photo_id"]] = t
+         return out
+diff --git a/scripts/score_incremental.py b/scripts/score_incremental.py
+index 3cb7e83..5d23736 100644
+--- a/scripts/score_incremental.py
++++ b/scripts/score_incremental.py
+@@ -61,7 +61,8 @@ MAX_BATCHES = 10   # 1回の実行で回す上限（--limit 1000 なら 1万枚
+ #        比較回 data/model_compare/2026-10-25-rep9（rep7 との比較は 2026-10-25-rep9v7）。ほかは 0.9.0 と同じ
+ # 0.11.0: 人が「影あり」と付けた写真の rep_score から 30 引く（rep_score.SHADOW_LABEL_PENALTY）。影ありは同じ蓋の
+ #        影なしの候補より後ろに並ぶ。モデルとほかのタグは 0.10.0 と同じ
+-JOB_VERSION = "quality_score/0.11.0"
++# 0.12.0: 公開用の人物・雪・紅葉・足元を追加。既存の採点は同じ。
++JOB_VERSION = "quality_score/0.12.0"
+ ENV_KEYS = ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE")
+ OPTIONAL_ENV_KEYS = ("PGSSLMODE",)   # ローカルスタックは SSL 無しなので disable を書く。既定は require
+ 
+@@ -125,6 +126,9 @@ def run_batch(connect, args, status, deps) -> int:
+     2026-10-04、全件を採点し直したときに、採点中に開きっぱなしだった接続がプール側で
+     切られ、書き込みの応答を待ったまま止まった（TCP の keepalive が切れるまで約2時間）。
+     """
++    from tag_payload import prepare_tags
++
++    status["stage"] = "batch"
+     extract_features, embed_paths, CLASSES, POLICY_VERSION, score_photo, train_shot_context, Jsonb, scene, rep = deps
+     with connect() as conn:
+         todo = conn.execute(
+@@ -160,6 +164,9 @@ def run_batch(connect, args, status, deps) -> int:
+         print(f"[飛ばす] 画像を読めない: {len(unreadable)} 枚 {unreadable[:5]}")
+ 
+     rows = []
++    tag_payload_errors = []
++    status["tag_payload_errors"] = tag_payload_errors
++    status["tag_payload_skipped"] = 0
+     status["rep_score_skipped"] = 0   # 前のバッチの値を合計に二重に数えない
+     status["rep_score_skipped_ids"] = []
+     status["pending_plush_box"] = 0
+@@ -197,6 +204,11 @@ def run_batch(connect, args, status, deps) -> int:
+                 t["rep_score"] = v
+             else:
+                 rep_skipped.append(r["photo_id"])
++            t = prepare_tags(t, r["photo_id"], tag_payload_errors)
++            if t is None:
++                status["tag_payload_skipped"] = len(tag_payload_errors)
++                print(f"[タグを飛ばす] {tag_payload_errors[-1]}")
++                continue
+             rows.append({"id": r["photo_id"], "score": round(sp["score"], 4),
+                          "eligible": sp["eligible"], "reasons": sp["reasons"],
+                          "ai_tags": t})
+@@ -220,7 +232,8 @@ def run_batch(connect, args, status, deps) -> int:
+     run_file = RUNS_DIR / f"{scored_at.strftime('%Y%m%dT%H%M%SZ')}.json"
+     run_file.write_text(json.dumps({"policy_version": POLICY_VERSION,
+                                     "scored_at": scored_at.isoformat(), "rows": rows,
+-                                    "missing_in_mirror": missing, "unreadable": unreadable},
++                                    "missing_in_mirror": missing, "unreadable": unreadable,
++                                    "tag_payload_errors": tag_payload_errors},
+                                    ensure_ascii=False, indent=1), encoding="utf-8")
+     status["run_file"] = str(run_file)
+ 
+@@ -231,6 +244,7 @@ def run_batch(connect, args, status, deps) -> int:
+                     "expected_version": seen[r["id"]][0],
+                     "expected_scored_at": seen[r["id"]][1].isoformat() if seen[r["id"]][1] else None}
+                    for r in rows]
++        status["stage"] = "permission_audit"
+         with connect() as conn:
+             audit(conn, status)   # 書き込みの前に毎回点検する（接続ごと）
+             with conn.transaction():
+@@ -282,11 +296,14 @@ def main() -> None:
+         # 1回の実行で未採点が無くなるまで繰り返す。版を切り替えたときに新旧のスコアが
+         # 並びの中で混ざる時間を短くするため（PR #274 の Codex レビュー P2）。
+         # 書けた行が0（ミラーに原本がまだ無い写真だけが残っている等）なら止める。
++        status["stage"] = "model_validation"
+         deps = (extract_features, embed_paths, CLASSES, POLICY_VERSION, score_photo,
+                 train_shot_context, Jsonb, SceneAttrs(), RepScorer())
+         deps[-1].self_check()   # 傷のモデルの入力の次元など、写真に依らない故障は書く前に止める
+         total = {"batches": 0, "candidates": 0, "scored": 0, "updated": 0, "pending_plush_box": 0, "rep_score_skipped": 0,
+                  "rep_score_skipped_ids": []}
++        total["tag_payload_errors"] = []
++        total["tag_payload_skipped"] = 0
+         status["total"] = total   # 途中のバッチで止まっても、それまでの集計を last-status に残す
+         for batch in range(1, MAX_BATCHES + 1):
+             print(f"--- バッチ {batch}", flush=True)
+@@ -295,6 +312,10 @@ def main() -> None:
+             for k in ("candidates", "scored", "updated", "pending_plush_box", "rep_score_skipped"):
+                 total[k] += status.get(k, 0)
+             total["rep_score_skipped_ids"] = (total["rep_score_skipped_ids"] + status.get("rep_score_skipped_ids", []))[:50]
++            known = {e["photo_id"]: e for e in total["tag_payload_errors"]}
++            known.update({e["photo_id"]: e for e in status.get("tag_payload_errors", [])})
++            total["tag_payload_errors"] = list(known.values())
++            total["tag_payload_skipped"] = len(known)
+             if args.dry_run or n == 0:
+                 break
+         status["total"] = total
+@@ -305,7 +326,7 @@ def main() -> None:
+         status["remaining_unscored"] = remaining
+         print(f"[残り] 未採点 {remaining} 枚（{total['batches']} バッチで {total['updated']} 行を書いた）")
+ 
+-        status["result"] = "ok"
++        status["result"] = "partial" if total["tag_payload_skipped"] else "ok"
+     except (Exception, SystemExit) as e:
+         status["error"] = f"{type(e).__name__}: {e}"
+         raise
+diff --git a/scripts/tag_payload.py b/scripts/tag_payload.py
+new file mode 100644
+index 0000000..f14b3d7
+--- /dev/null
++++ b/scripts/tag_payload.py
+@@ -0,0 +1,47 @@
++"""タグのJSON契約。標準ライブラリだけで使える（学習モデルをimportしない）。"""
++import json
++from numbers import Integral, Real
++
++
++def _plain(value):
++    if value is None or isinstance(value, (str, bool)):
++        return value
++    if isinstance(value, dict):
++        return {key: _plain(v) for key, v in value.items()}
++    if isinstance(value, (list, tuple)):
++        return [_plain(v) for v in value]
++    # numpyをimportせず、numpy scalarのitemだけを明示的に扱う。
++    if type(value).__module__.split('.')[0] == 'numpy' and hasattr(value, 'item'):
++        scalar = value.item()
++        if type(scalar).__module__.split('.')[0] == 'numpy':
++            raise TypeError('Python標準型に変換できないnumpy値')
++        return _plain(scalar)
++    if isinstance(value, Integral):
++        return int(value)
++    if isinstance(value, Real):
++        return float(value)
++    raise TypeError(f'JSONタグの値の型が不正: {type(value).__name__}')
++
++
++def normalize_tags(tags):
++    """標準型へ変換し、枠を4桁に丸め、空白込みUTF-8で500バイト以内にする。"""
++    out = _plain(tags)
++    for key in ('crop', 'lid', 'plush_box'):
++        if key in out:
++            out[key] = [round(float(v), 4) for v in out[key]]
++    for key, digits in (('plush_score', 3), ('rep_score', 4)):
++        if key in out:
++            out[key] = round(float(out[key]), digits)
++    size = len(json.dumps(out, ensure_ascii=False, allow_nan=False).encode('utf-8'))
++    if size > 500:
++        raise ValueError(f'公開タグが500バイト超（{size}バイト）')
++    return out
++
++
++def prepare_tags(tags, photo_id, errors):
++    """個別の不正値は記録してスキップする。採点済みにしないので修正後に再試行できる。"""
++    try:
++        return normalize_tags(tags)
++    except (ValueError, TypeError, OverflowError) as error:
++        errors.append({'photo_id': photo_id, 'reason': f'{type(error).__name__}: {error}'[:300]})
++        return None
+diff --git a/scripts/test_public_attrs.py b/scripts/test_public_attrs.py
+new file mode 100644
+index 0000000..f70ea38
+--- /dev/null
++++ b/scripts/test_public_attrs.py
+@@ -0,0 +1,158 @@
++"""公開属性の評価分離・保存条件・ID照合・枠欠損・DBサイズ契約の回帰テスト。"""
++import json
++import unittest
++from unittest.mock import patch
++import numpy as np
++import public_attrs as P
++import attr_models as A
++from tag_payload import normalize_tags, prepare_tags
++
++
++def valid_report():
++    return dict(status='trained', evaluation=P.EVALUATION, precision=.5, threshold=.5,
++                validation_positives=1, validation_predicted=2)
++
++
++class CaptureModel:
++    def predict_proba(self, X):
++        self.X = X
++        p = np.clip(X[:, 0], 0, 1)
++        return np.column_stack([1 - p, p])
++
++
++class PublicAttrsTest(unittest.TestCase):
++    def test_missing_or_corrupt_model_fails_before_scoring(self):
++        from tempfile import TemporaryDirectory
++        from pathlib import Path
++        import pickle
++        with TemporaryDirectory() as tmp:
++            path = Path(tmp)/"model.pkl"
++            with self.assertRaises(FileNotFoundError):
++                P.PublicAttrs(path)
++            path.write_bytes(b"not a pickle")
++            with self.assertRaises(pickle.UnpicklingError):
++                P.PublicAttrs(path)
++
++    def test_same_validation_rejects_nonfinite_and_invalid_reports(self):
++        P.validate_report(valid_report())  # ちょうど50%は採用
++        for key, values in {
++            'precision': [float('nan'), float('inf'), .499, 1.1, None, '0.9', True],
++            'threshold': [float('nan'), float('inf'), -.1, 1.1, None],
++            'status': ['too_few', None], 'evaluation': ['oof', None],
++            'validation_positives': [0], 'validation_predicted': [0]
++        }.items():
++            for value in values:
++                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
++                    P.validate_report({**valid_report(), key: value})
++
++    def test_missing_boxes_and_id_order_match_training(self):
++        features = A.Features.__new__(A.Features)
++        features.use = A.ALL_FEATURES
++        features.emb = {'a': np.array([.1, .2]), 'b': np.array([.8, .9])}
++        features.hand, features.det, features.ts, features.box = {}, {}, {}, {}
++        recs = [dict(photo_id=i, path='not-used') for i in ('b', 'a')]
++        model = CaptureModel()
++        pub = P.PublicAttrs.__new__(P.PublicAttrs)
++        pub.m = dict(version=P.VERSION, models={'snow': model}, reports={'snow': valid_report()})
++        with patch.object(A, 'box_features', return_value={}):
++            out = pub.tags(recs, features.emb, {}, {}, {})
++        np.testing.assert_array_equal(model.X, features.X(['b', 'a']))
++        self.assertTrue(out['b']['snow'])
++        self.assertFalse(out['a']['snow'])
++        self.assertTrue(np.all(model.X[:, -5:] == 0))
++        for bad_recs, bad_emb in ((recs, {'a': features.emb['a']}),
++                                  ([recs[0], recs[0]], features.emb)):
++            with self.assertRaises(ValueError):
++                pub.tags(bad_recs, bad_emb, {}, {}, {})
++
++    def test_holdout_is_never_used_for_fit_or_threshold(self):
++        # 30の蓋ごとに正例と負例。IDの並びと特徴量の先頭列を対応させる。
++        ids = [f'{i:03}' for i in range(60)]
++        class Features:
++            emb = dict.fromkeys(ids)
++            src = dict.fromkeys(ids)
++            def groups(self, subset):
++                return [int(i) // 2 for i in subset]
++            def X(self, subset):
++                return np.array([[int(i), int(i) % 2] for i in subset], dtype=float)
++        labels = {i: {'snow': bool(int(i) % 2)} for i in ids}
++        calls = {}
++        class Model:
++            def fit(self, X, y):
++                calls['fit'] = X[:, 0].copy()
++                return self
++            def predict_proba(self, X):
++                calls['validation'] = X[:, 0].copy()
++                return np.column_stack([1-X[:,1], X[:,1]])
++        def oof(X, y, groups):
++            calls['threshold'] = X[:, 0].copy()
++            return y * .8 + .1
++        with patch.object(A, 'make', return_value=Model()), patch.object(A, 'oof', side_effect=oof):
++            _, report = P.fit_holdout(Features(), labels, 'snow')
++        self.assertEqual(set(calls['fit']), set(calls['threshold']))
++        self.assertFalse(set(calls['fit']) & set(calls['validation']))
++        self.assertFalse({int(i)//2 for i in calls['fit']} & {int(i)//2 for i in calls['validation']})
++        self.assertEqual(report['precision'], 1.)
++        P.validate_report(report)
++
++    def test_bad_tag_photo_does_not_block_other_database_rows(self):
++        from types import SimpleNamespace
++        from tempfile import TemporaryDirectory
++        from pathlib import Path
++        from unittest.mock import MagicMock
++        import score_incremental as S
++        todo = [('bad', 'bad.jpg', 'm', None, None, None), ('good', 'good.jpg', 'm', None, None, None)]
++        conn = MagicMock()
++        conn.execute.return_value.fetchall.return_value = todo
++        conn.execute.return_value.fetchone.return_value = (1,)
++        context = MagicMock()
++        context.__enter__.return_value = conn
++        def scene_tags(*args):
++            return {'bad': {'model': 'm', 'extra': 'x'*501}, 'good': {'model': 'm'}}
++        scene = SimpleNamespace(tags=scene_tags, pending=[])
++        deps = (SimpleNamespace(analyze=lambda r: {}), lambda paths: np.zeros((len(paths), 2)),
++                ['a', 'b'], 'quality_score/0.12.0',
++                lambda p, f: dict(score=.5, eligible=True, reasons=[]),
++                lambda: SimpleNamespace(predict_proba=lambda E: np.full((len(E), 2), .5)),
++                lambda v: v, scene, SimpleNamespace(score=lambda *a: 1.))
++        status = {}
++        with TemporaryDirectory() as tmp, patch.object(S, 'RUNS_DIR', Path(tmp)), \
++                patch.object(S, 'resolve', side_effect=lambda k: Path(tmp)/k), patch.object(S, 'audit'):
++            updated = S.run_batch(lambda: context, SimpleNamespace(limit=1000, dry_run=False), status, deps)
++            run = json.loads(Path(status['run_file']).read_text())
++        self.assertEqual(updated, 1)
++        sent = next(c.args[1][2] for c in conn.execute.call_args_list if 'apply_photo_scores' in c.args[0])
++        self.assertEqual([row['id'] for row in sent], ['good'])
++        self.assertEqual(status['tag_payload_skipped'], 1)
++        self.assertEqual(run['tag_payload_errors'][0]['photo_id'], 'bad')
++
++    def test_numpy_scalars_and_bad_photo_do_not_block_good_photo(self):
++        errors = []
++        bad = prepare_tags({"model": "m", "unexpected": "x"*501}, "bad", errors)
++        good = prepare_tags({"model": "m", "plush": np.bool_(True), "night": np.bool_(False),
++                             "plush_score": np.float32(.5), "lid_fits": np.bool_(True),
++                             "crop": np.array([.1, .2, .8, .9]).tolist()}, "good", errors)
++        self.assertIsNone(bad)
++        self.assertEqual([e["photo_id"] for e in errors], ["bad"])
++        self.assertIs(type(good["plush"]), bool)
++        self.assertIs(type(good["plush_score"]), float)
++        json.dumps(good, allow_nan=False)
++
++    def test_tag_rounding_and_worst_case_size(self):
++        tags = dict(model='s'*40, attrs_model='a'*40, scene='centered_clean',
++                    plush=True, plush_score=.9999999999, night=False, lid_fits=False,
++                    rep_score=-999.999999999, person=False, snow=False, autumn=False, feet=False)
++        for k in ('crop', 'lid', 'plush_box'):
++            tags[k] = [.15640000000000001, .1234567890123, .9876543210987, .8765432109876]
++        out = normalize_tags(tags)
++        self.assertEqual(out['lid'], [.1564, .1235, .9877, .8765])
++        self.assertLessEqual(len(json.dumps(out).encode()), 500)
++        self.assertNotEqual(tags['lid'], out['lid'])
++        with self.assertRaises(ValueError):
++            normalize_tags({**tags, 'unexpected': 'x'*501})
++        with self.assertRaises(ValueError):
++            normalize_tags({'rep_score': float('nan')})
++
++
++if __name__ == '__main__':
++    unittest.main()

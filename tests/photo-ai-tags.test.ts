@@ -28,7 +28,7 @@ test('周辺（wide_context）と看板（signage_info）はタグにしない',
 });
 
 test('注釈は夜を AI の判定と言わない', () => {
-  assert.match(AI_TAG_HELP, /ぬいぐるみ・風景のタグは AI/);
+  assert.match(AI_TAG_HELP, /ぬいぐるみ・風景.*のタグは AI/);
   assert.match(AI_TAG_HELP, /夜のタグは撮影時刻と場所から/);
 });
 
@@ -143,4 +143,21 @@ test('avatarCropSquare: 正方形から大きく外れた蓋の枠（90° 回っ
   // 300×400 の写真で、横長の写真なら正方形だった枠（縦/横 ≈ 1.78）
   const tags = { lid: [0.1564, 0.0359, 0.7703, 0.8549], crop: [0, 0.0704, 1, 0.8204] };
   assert.deepEqual(avatarCropSquare(tags, 300, 400), { left: 0, top: 50, width: 300, height: 300 });
+});
+
+
+test('追加属性は true のときだけ表示し、未採用の属性は表示しない', () => {
+  assert.deepEqual(labels({ ai_tags: { person: true, snow: true, autumn: true, feet: true } }),
+    ['人物', '雪', '紅葉', '足元']);
+  assert.deepEqual(labels({ ai_tags: { person: 'true', snow: 0.9, autumn: null, feet: false,
+    rain: true, shadow: true, glare: true, cut: true, sakura: true } }), []);
+  assert.ok(photoAiTags({ ai_tags: { person: true, snow: true, autumn: true, feet: true } }).every(t => t.ai));
+});
+
+
+test('小さなタイルでは人物・足元を省き、季節タグと既存タグを残す', () => {
+  const photo = { ai_tags: { plush: true, night: true, scene: 'landscape', person: true, feet: true, snow: true, autumn: true } };
+  assert.deepEqual(photoAiTags(photo, { compact: true }).map(t => t.label), ['ぬいぐるみ', '夜', '風景', '雪', '紅葉']);
+  assert.equal(photoAiTags(photo).length, 7);
+  assert.deepEqual(photoAiTags({ ai_tags: { person: true, feet: true } }, { compact: true }), []);
 });
