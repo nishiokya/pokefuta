@@ -1082,7 +1082,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   type="button"
                   onClick={() => openPhotoAt(index)}
                   aria-label={
-                    `@${userLabel}さんの写真を表示` +
+                    `${userLabel}さんの写真を表示` +
                     (dateLabel ? `（${dateLabel}${dateKind}）` : '') +
                     (photo.is_landscape ? '、周辺の風景' : '') +
                     (comment ? '、コメントあり' : '')
@@ -1098,19 +1098,22 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   />
                 </button>
                 {/*
-                  右上に「コメント・いいね」の行、その下にタグ。左下の名前・日付と重ならないよう
+                  左上にタグ、右上に「コメント・いいね」。左下の名前・日付と重ならないよう
                   操作とタグは上に寄せる。
                   コメントのアイコンを押すと、そのマスの上にコメントを重ねて出す。
                   以前は写真を押すしかなく、ページ上部の拡大表示へスクロールで飛ばされていた。
                   重ねた面を押すと閉じる。
                 */}
-                <div className="pointer-events-none absolute inset-x-1 top-1 z-10 flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1">
+                <div className="pointer-events-none absolute inset-x-1 top-1 z-10 flex items-start justify-between gap-1">
+                  <span className="min-w-0 pt-0.5">
+                    <PhotoOverlayTags photo={photo} />
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
                     {comment && !commentOpen && (
                       <button
                         type="button"
                         onClick={() => setOpenGridCommentPhotoId(photo.id)}
-                        aria-label={`@${userLabel}さんのコメントを読む`}
+                        aria-label={`${userLabel}さんのコメントを読む`}
                         className="pointer-events-auto"
                       >
                         <span className="inline-flex items-center rounded-full bg-black/60 p-1.5 text-white">
@@ -1129,7 +1132,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       </span>
                     )}
                   </div>
-                  <PhotoOverlayTags photo={photo} alignEnd />
                 </div>
                 {commentOpen && (
                   <button
@@ -1153,11 +1155,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                         href={profileHref}
                         className="pointer-events-auto min-w-0 truncate font-pixelJp text-[11px] font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80"
                       >
-                        @{userLabel}
+                        {userLabel}
                       </Link>
                     ) : (
                       <span className="min-w-0 truncate font-pixelJp text-[11px] font-bold">
-                        @{userLabel}
+                        {userLabel}
                       </span>
                     )}
                     <span className="mt-0.5 flex min-w-0 items-center gap-1">
@@ -1272,7 +1274,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             <img
               key={featuredPhoto.id}
               src={`/api/photo/${featuredPhoto.id}?size=large`}
-              alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
+              alt={`${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
               className="absolute inset-0 m-auto max-h-full max-w-full object-contain"
             />
             {viewerHasMany && (
@@ -1350,10 +1352,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
                 className="min-w-0 truncate text-sm font-bold underline"
               >
-                @{getPhotoUserLabel(featuredPhoto)}
+                {getPhotoUserLabel(featuredPhoto)}
               </Link>
             ) : (
-              <span className="min-w-0 truncate text-sm font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
+              <span className="min-w-0 truncate text-sm font-bold">{getPhotoUserLabel(featuredPhoto)}</span>
             )}
             <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
             {featuredPhoto.visit?.shot_at && (
@@ -1655,7 +1657,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 >
                   <img
                     src={`/api/photo/${allDisplayPhotos[0].id}?size=large`}
-                    alt={`@${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
+                    alt={`${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
                     style={{ objectPosition: photoObjectPosition(allDisplayPhotos[0].ai_tags) }}
                   />
@@ -1674,7 +1676,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   </span>
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
                     <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
-                    <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
+                    <span className="min-w-0 truncate text-xs font-bold">{getPhotoUserLabel(allDisplayPhotos[0])}</span>
                     {allDisplayPhotos[0].visit?.shot_at && (
                       <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
                         {formatPhotoDate(allDisplayPhotos[0].visit!.shot_at)}
@@ -1692,7 +1694,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                         key={photo.id}
                         type="button"
                         onClick={() => openPhotoAt(index)}
-                        aria-label={`@${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
+                        aria-label={`${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
                         className={`group relative overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
                           isRepresentative
                             ? 'col-span-2 row-span-2 rounded-l-[16px] lg:rounded-l-[18px]'
@@ -1701,7 +1703,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       >
                         <img
                           src={`/api/photo/${photo.id}?size=${isRepresentative ? 'large' : 'small'}`}
-                          alt={`@${getPhotoUserLabel(photo)}さんのポケふた写真`}
+                          alt={`${getPhotoUserLabel(photo)}さんのポケふた写真`}
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
@@ -1726,7 +1728,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           <span className="flex w-full min-w-0 flex-1 items-center gap-1">
                             <PhotoPosterAvatar photo={photo} size={isRepresentative ? 32 : 26} />
                             <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
-                              @{getPhotoUserLabel(photo)}
+                              {getPhotoUserLabel(photo)}
                             </span>
                           </span>
                           {photo.visit?.shot_at && (
