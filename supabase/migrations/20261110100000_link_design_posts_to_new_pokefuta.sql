@@ -27,12 +27,16 @@
 -- 投稿の中身（投稿者・kind・画像キー・撮影時刻）が期待どおりのときだけ動く。移し済みの行は数えるだけ。
 -- 投稿者がその蓋の visit をすでに持っている・投稿が想定外の状態なら、全体を止める（何も書かない）。
 --
--- ロールバック:
---   DELETE FROM public.photo WHERE storage_key IN (<下の 8 件の画像キー>) AND manhole_id BETWEEN 491 AND 498;
---   DELETE FROM public.visit v WHERE v.manhole_id BETWEEN 491 AND 498
---     AND NOT EXISTS (SELECT 1 FROM public.photo p WHERE p.visit_id = v.id)
---     AND v.created_at IN (SELECT created_at FROM public.design_manhole WHERE id IN (<下の 8 件>));
---   UPDATE public.design_manhole SET status = 'published' WHERE id IN (<下の 8 件>);
+-- ロールバック（移した photo と、それだけを持つ visit を消し、投稿を published に戻す）:
+--   WITH d AS (SELECT id, storage_key FROM public.design_manhole WHERE id IN (
+--          'a0326912-b668-41ee-9a63-c82fedb54136', '202ff606-b1b7-4b9b-bba2-de3092a16a6d',
+--          '66839dc4-9b07-47a7-bfdc-40e5f6f67e5b', '7747f7da-bc6f-4bd4-949f-94f5467d8c21',
+--          '7bf78a32-bbcc-4592-86da-7f2948d689fc', 'afb5e0bf-5259-427d-86f0-9d51534a6229',
+--          '91f132e4-c923-4b66-ae79-a34f89af638b', 'e5efc241-d01d-4024-9667-3c33c23173f4')),
+--        p AS (DELETE FROM public.photo WHERE storage_key IN (SELECT storage_key FROM d) RETURNING visit_id),
+--        v AS (DELETE FROM public.visit WHERE id IN (SELECT visit_id FROM p) RETURNING id)
+--   UPDATE public.design_manhole SET status = 'published' WHERE id IN (SELECT id FROM d);
+--   ※移したあとに付いたいいね・コメントは visit と一緒に消える
 DO $$
 DECLARE
   t record;
