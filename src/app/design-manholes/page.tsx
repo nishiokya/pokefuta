@@ -6,6 +6,7 @@ import { resolveDesignManholePrefectures } from '@/lib/design-manhole-prefecture
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
+import { MovedToPokefutaNotice } from '@/components/DesignManhole/MovedToPokefutaNotice';
 import { PhraseText } from '@/components/PhraseText';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { DesignManhole } from '@/types/database';
@@ -131,6 +132,7 @@ export default async function DesignManholesPage() {
         </div>
 
         <SuspendedNotice />
+        <MovedToPokefutaNotice />
 
         {loadError ? (
           <p className="mt-5 rounded-lg border border-[#B5483C]/30 bg-[#B5483C]/10 p-3 text-sm text-[#B5483C]">
