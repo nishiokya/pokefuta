@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  MapPin, ArrowLeft, Navigation, User,
+  MapPin, ArrowLeft, Navigation, UserRound,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, ExternalLink, BookOpen,
   MessageCircle, Pencil, Check, X,
@@ -107,7 +107,7 @@ function PhotoPosterAvatar({ photo }: { photo: Photo }) {
       key={photo.visit?.public_user_id || photo.id}
       publicUserId={photo.visit?.public_user_id}
       size={20}
-      fallback={<User aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full bg-black/20 p-0.5" />}
+      fallback={<UserRound aria-hidden="true" className="h-5 w-5 shrink-0" />}
     />
   );
 }
@@ -1119,7 +1119,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   </button>
                 )}
                 {/* 名前は写真ボタンと兄弟にして、プロフィールリンクを重ねる。 */}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/[0.85] via-black/[0.45] to-transparent px-1.5 pb-1.5 pt-6 text-white">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/80 via-black/20 to-transparent px-1.5 pb-1 pt-3 text-white">
                   <div className="flex min-w-0 items-center gap-1">
                     <PhotoPosterAvatar photo={photo} />
                     {profileHref ? (
@@ -1134,19 +1134,23 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                         @{userLabel}
                       </span>
                     )}
-                    <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                    <span className="pointer-events-auto inline-flex shrink-0">
+                      <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                    </span>
                   </div>
                   {dateLabel && (
-                    <span title={`${dateLabel}${dateKind}`} className="font-['Outfit'] text-[10px] font-bold text-white/85">
+                    <span title={`${dateLabel}${dateKind}`} className="pointer-events-auto self-start font-['Outfit'] text-[10px] font-bold text-white/85">
                       {dateLabel}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5 px-1.5 py-1">
-                <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                <AiPhotoTags photo={photo} linkFeatures />
-              </div>
+              {(photo.is_landscape || photoAiTags(photo).length > 0) && (
+                <div className="flex flex-col gap-0.5 px-1.5 py-1">
+                  <LandscapePhotoBadge isLandscape={photo.is_landscape} />
+                  <AiPhotoTags photo={photo} linkFeatures />
+                </div>
+              )}
             </div>
           );
         })}
@@ -1677,7 +1681,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        <div className="absolute bottom-9 left-2 z-[2]">
+                        <div className={`absolute left-2 z-[2] ${isRepresentative ? 'bottom-9' : 'bottom-14'}`}>
                           <LandscapePhotoBadge isLandscape={photo.is_landscape} />
                         </div>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
@@ -1692,10 +1696,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                             </span>
                           </span>
                         )}
-                        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
-                          <PhotoPosterAvatar photo={photo} />
-                          <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
-                            @{getPhotoUserLabel(photo)}
+                        <span className={`absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-3 text-left text-white ${isRepresentative ? 'items-center' : 'flex-col items-start'}`}>
+                          <span className="flex w-full min-w-0 flex-1 items-center gap-1">
+                            <PhotoPosterAvatar photo={photo} />
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
+                              @{getPhotoUserLabel(photo)}
+                            </span>
                           </span>
                           {photo.visit?.shot_at && (
                             <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
