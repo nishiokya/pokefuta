@@ -1051,9 +1051,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
-          元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+      {/* 列数はスマホ 2・sm 4・lg 5。写真の上にアイコン・名前・称号・日付・タグ・いいねを
+          重ねているので、スマホの3列では名前がほぼ切れて誰の1枚か読めなかった。 */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {newestFirstPhotos.map(({ photo, index }) => {
           const userLabel = getPhotoUserLabel(photo);
           // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
@@ -1097,33 +1097,40 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     loading="lazy"
                   />
                 </button>
-                {photo.visit?.id && (
-                  <span className="absolute right-1 top-1 z-10">
-                    <PhotoLikeButton
-                      visitId={photo.visit.id}
-                      isLoggedIn={isLoggedIn}
-                      loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
-                      variant="gallery"
-                    />
-                  </span>
-                )}
                 {/*
+                  右上に「コメント・いいね」の行、その下にタグ。左下の名前・日付と重ならないよう
+                  操作とタグは上に寄せる。
                   コメントのアイコンを押すと、そのマスの上にコメントを重ねて出す。
                   以前は写真を押すしかなく、ページ上部の拡大表示へスクロールで飛ばされていた。
                   重ねた面を押すと閉じる。
                 */}
-                {comment && !commentOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setOpenGridCommentPhotoId(photo.id)}
-                    aria-label={`@${userLabel}さんのコメントを読む`}
-                    className="absolute top-0 left-0 z-10 p-1"
-                  >
-                    <span className="inline-flex items-center rounded-full bg-black/60 p-1 text-white">
-                      <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
-                    </span>
-                  </button>
-                )}
+                <div className="pointer-events-none absolute inset-x-1 top-1 z-10 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1">
+                    {comment && !commentOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenGridCommentPhotoId(photo.id)}
+                        aria-label={`@${userLabel}さんのコメントを読む`}
+                        className="pointer-events-auto"
+                      >
+                        <span className="inline-flex items-center rounded-full bg-black/60 p-1.5 text-white">
+                          <MessageCircle className="h-3.5 w-3.5" strokeWidth={2.4} />
+                        </span>
+                      </button>
+                    )}
+                    {photo.visit?.id && (
+                      <span className="pointer-events-auto">
+                        <PhotoLikeButton
+                          visitId={photo.visit.id}
+                          isLoggedIn={isLoggedIn}
+                          loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                          variant="gallery"
+                        />
+                      </span>
+                    )}
+                  </div>
+                  <PhotoOverlayTags photo={photo} alignEnd />
+                </div>
                 {commentOpen && (
                   <button
                     type="button"
@@ -1137,31 +1144,33 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   </button>
                 )}
                 {/* 名前は写真ボタンと兄弟にして、プロフィールリンクを重ねる。 */}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/80 via-black/20 to-transparent px-1.5 pb-1 pt-3 text-white">
-                  <PhotoOverlayTags photo={photo} />
-                  <div className="flex min-w-0 items-center gap-1">
-                    <PhotoPosterAvatar photo={photo} />
+                {/* アイコンの右に「名前」と「称号・日付」の2段。以前は名前と日付が縦に詰まって重なって見えた */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-1.5 pb-1.5 pt-6 text-white">
+                  <PhotoPosterAvatar photo={photo} size={28} />
+                  <div className="flex min-w-0 flex-1 flex-col leading-tight">
                     {profileHref ? (
                       <Link
                         href={profileHref}
-                        className="pointer-events-auto min-w-0 truncate font-pixelJp text-[10.5px] font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80"
+                        className="pointer-events-auto min-w-0 truncate font-pixelJp text-[11px] font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80"
                       >
                         @{userLabel}
                       </Link>
                     ) : (
-                      <span className="min-w-0 truncate font-pixelJp text-[10.5px] font-bold">
+                      <span className="min-w-0 truncate font-pixelJp text-[11px] font-bold">
                         @{userLabel}
                       </span>
                     )}
-                    <span className="pointer-events-auto inline-flex shrink-0">
-                      <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                    <span className="mt-0.5 flex min-w-0 items-center gap-1">
+                      <span className="pointer-events-auto inline-flex shrink-0">
+                        <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                      </span>
+                      {dateLabel && (
+                        <span title={`${dateLabel}${dateKind}`} className="pointer-events-auto truncate font-['Outfit'] text-[10px] font-bold text-white/85">
+                          {dateLabel}
+                        </span>
+                      )}
                     </span>
                   </div>
-                  {dateLabel && (
-                    <span title={`${dateLabel}${dateKind}`} className="pointer-events-auto self-start font-['Outfit'] text-[10px] font-bold text-white/85">
-                      {dateLabel}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
