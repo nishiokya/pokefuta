@@ -28,8 +28,8 @@ const options = [
     label: 'デザインふた',
     description: 'キャラクター・ご当地デザインなど',
     submissionKind: 'design' as const,
-    activeClass: 'border-[#7B63A8] bg-[#F4F0FA] text-[#5E4788] shadow-[0_0_0_1px_rgba(123,99,168,0.12)]',
-    iconClass: 'bg-[#7B63A8] text-white',
+    activeClass: 'border-dm-line bg-dm-tint text-dm-ink shadow-[0_0_0_1px_rgba(123,99,168,0.12)]',
+    iconClass: 'bg-dm-line text-white',
     icon: Sparkles,
   },
 ];
@@ -89,7 +89,7 @@ export default function SubmissionTypeSwitcher({
           <Link
             href="/design-manholes/new?kind=pokefuta"
             onClick={() => trackSubmissionEntry({ submission_kind: 'design', surface: 'submission_type_switcher' })}
-            className="font-bold text-[#7B63A8] underline"
+            className="font-bold text-dm-line underline"
           >
             こちらから投稿
           </Link>

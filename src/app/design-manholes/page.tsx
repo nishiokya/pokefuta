@@ -53,8 +53,8 @@ const WANTED_EXAMPLES = [
 
 function WantedSection() {
   return (
-    <section className="mt-6 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-4 sm:p-5">
-      <h2 className="text-sm font-bold text-[#7B63A8]">こんな1枚を待っています</h2>
+    <section className="mt-6 rounded-lg border border-dm-line/15 bg-white/70 p-4 sm:p-5">
+      <h2 className="text-sm font-bold text-dm-line">こんな1枚を待っています</h2>
       <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
         {WANTED_EXAMPLES.map((example) => (
           <li key={example.title} className="flex items-start gap-2.5">
@@ -67,7 +67,7 @@ function WantedSection() {
         ))}
       </ul>
       <div className="mt-4 text-center">
-        <SubmitCta surface="design_manhole_list_header" className="inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+        <SubmitCta surface="design_manhole_list_header" className="inline-flex items-center gap-1.5 rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
       </div>
     </section>
   );
@@ -123,12 +123,12 @@ export default async function DesignManholesPage() {
               loadPublishedDesignManholes の上限200枚に達したら数え直しが要る。
             */}
             {designManholes.length > 0 && (
-              <p className="mt-2 text-sm font-bold text-[#5E4788]">
+              <p className="mt-2 text-sm font-bold text-dm-ink">
                 いま <span className="text-base">{designManholes.length}</span> 枚集まっています
               </p>
             )}
           </div>
-          <SubmitCta surface="design_manhole_list_toolbar" className="flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
+          <SubmitCta surface="design_manhole_list_toolbar" className="flex items-center gap-1.5 rounded-lg bg-dm-line px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#6A5299]" />
         </div>
 
         <SuspendedNotice />
@@ -139,13 +139,13 @@ export default async function DesignManholesPage() {
             一覧の取得に失敗しました。時間をおいて再度お試しください。
           </p>
         ) : designManholes.length === 0 ? (
-          <div className="mt-5 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-8 text-center">
+          <div className="mt-5 rounded-lg border border-dm-line/15 bg-white/70 p-8 text-center">
             <p className="text-sm text-[#2A2A2A]/70">
               {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
                 ? 'まだ投稿がありません。'
                 : 'まだ投稿がありません。最初の1枚を投稿してみませんか？'}
             </p>
-            <SubmitCta surface="design_manhole_list_empty" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+            <SubmitCta surface="design_manhole_list_empty" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
           </div>
         ) : (
           <>
@@ -158,7 +158,7 @@ export default async function DesignManholesPage() {
                 <Link
                   key={dm.id}
                   href={`/design-manholes/${dm.id}`}
-                  className="overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white shadow-sm transition hover:shadow-md"
+                  className="overflow-hidden rounded-lg border border-dm-line/15 bg-white shadow-sm transition hover:shadow-md"
                 >
                   <div className="aspect-square bg-[#EFE5CE]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

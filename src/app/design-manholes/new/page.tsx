@@ -474,7 +474,7 @@ export default function DesignManholeNewPage() {
             {postedNeedsReview ? (
               <>近くの公式ポケふたとは別の蓋として、確認待ちで受け付けました。確認後に公開されます。</>
             ) : (
-              <>投稿されたデザインマンホールは公開されました。翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-[#7B63A8] underline hover:opacity-80">キャラクターマンホールマップ</a> にも掲載されます。</>
+              <>投稿されたデザインマンホールは公開されました。翌日には <a href="https://data.pokefuta.com/gmanhole_map.html" target="_blank" rel="noopener noreferrer" className="text-dm-line underline hover:opacity-80">キャラクターマンホールマップ</a> にも掲載されます。</>
             )}
           </p>
           {!postedNeedsReview && (
@@ -494,7 +494,7 @@ export default function DesignManholeNewPage() {
               <Link
                 href={`/design-manholes/${postedId}`}
                 onClick={() => trackNavClick('投稿完了:自分の投稿ページを見る')}
-                className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+                className="rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
               >
                 自分の投稿ページを見る
               </Link>
@@ -502,7 +502,7 @@ export default function DesignManholeNewPage() {
               <Link
                 href="/design-manholes"
                 onClick={() => trackNavClick('投稿完了:一覧を見る')}
-                className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+                className="rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
               >
                 一覧を見る
               </Link>
@@ -513,7 +513,7 @@ export default function DesignManholeNewPage() {
                 trackNavClick('投稿完了:続けて投稿する');
                 window.location.reload();
               }}
-              className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+              className="rounded-lg border border-dm-line px-5 py-2.5 text-sm font-bold text-dm-line transition hover:bg-dm-line/10"
             >
               続けて投稿する
             </button>
@@ -549,13 +549,13 @@ export default function DesignManholeNewPage() {
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <Link
               href="/upload"
-              className="rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+              className="rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]"
             >
               ポケふたの写真を投稿する
             </Link>
             <Link
               href="/design-manholes"
-              className="rounded-lg border border-[#7B63A8] px-5 py-2.5 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+              className="rounded-lg border border-dm-line px-5 py-2.5 text-sm font-bold text-dm-line transition hover:bg-dm-line/10"
             >
               みんなのデザインマンホールを見る
             </Link>
@@ -570,8 +570,8 @@ export default function DesignManholeNewPage() {
 
       <main className="mx-auto max-w-read px-4 pb-8 pt-5 sm:pt-8">
         <SubmissionTypeSwitcher current="design" />
-        <div className="mt-4 rounded-xl border border-[#7B63A8]/30 bg-[#F4F0FA] p-4 shadow-sm">
-          <p className="text-sm font-extrabold text-[#5E4788]">ここはデザインマンホールの投稿ページです</p>
+        <div className="mt-4 rounded-xl border border-dm-line/30 bg-dm-tint p-4 shadow-sm">
+          <p className="text-sm font-extrabold text-dm-ink">ここはデザインマンホールの投稿ページです</p>
           <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
             キャラクター・ご当地デザインなどのマンホールが対象です。写真1枚と位置情報が必須です。
           </p>
@@ -595,15 +595,15 @@ export default function DesignManholeNewPage() {
         {/* 写真 */}
         <section className="mt-6">
           <h2 className="flex items-center gap-1.5 text-sm font-bold">
-            <Camera className="h-4 w-4 text-[#7B63A8]" />
+            <Camera className="h-4 w-4 text-dm-line" />
             写真 <span className="text-[#B5483C]">*</span>
           </h2>
           <div
             {...getRootProps()}
             className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
               isDragActive
-                ? 'border-[#7B63A8] bg-[#7B63A8]/10'
-                : 'border-[#7B63A8]/30 bg-white/60 hover:bg-white'
+                ? 'border-dm-line bg-dm-line/10'
+                : 'border-dm-line/30 bg-white/60 hover:bg-white'
             }`}
           >
             <input {...getInputProps()} />
@@ -619,7 +619,7 @@ export default function DesignManholeNewPage() {
               </>
             ) : (
               <>
-                <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-[#7B63A8]' : 'text-[#7B63A8]/50'}`} />
+                <Upload className={`mx-auto mb-2 h-10 w-10 ${isDragActive ? 'text-dm-line' : 'text-dm-line/50'}`} />
                 <p className="text-sm text-[#2A2A2A]/60">
                   {isDragActive ? '写真をドロップ！' : 'タップして写真を選択（またはドラッグ&ドロップ）'}
                 </p>
@@ -632,7 +632,7 @@ export default function DesignManholeNewPage() {
                     e.stopPropagation();
                     captureFromCamera();
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#7B63A8] px-4 py-2 text-xs font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/10"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dm-line px-4 py-2 text-xs font-bold text-dm-line transition hover:bg-dm-line/10"
                 >
                   <Camera className="h-4 w-4" />
                   カメラで撮影
@@ -688,11 +688,11 @@ export default function DesignManholeNewPage() {
           )}
 
           {nearbyOfficialManhole && proximityCheckStatus === 'ready' && (
-            <div className="mt-4 rounded-xl border-2 border-[#7B63A8]/40 bg-white p-4 shadow-sm">
+            <div className="mt-4 rounded-xl border-2 border-dm-line/40 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-[#7B63A8]" />
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-dm-line" />
                 <div>
-                  <p className="text-sm font-bold text-[#7B63A8]">
+                  <p className="text-sm font-bold text-dm-line">
                     近くに公式ポケふたがあります
                   </p>
                   <p className="mt-1 text-sm font-bold">{nearbyOfficialManhole.title}</p>
@@ -705,7 +705,7 @@ export default function DesignManholeNewPage() {
 
               <Link
                 href={`/upload?manhole_id=${nearbyOfficialManhole.id}`}
-                className="mt-4 flex w-full items-center justify-center rounded-lg bg-[#7B63A8] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+                className="mt-4 flex w-full items-center justify-center rounded-lg bg-dm-line px-4 py-3 text-sm font-bold text-white transition hover:bg-[#6A5299]"
               >
                 このポケふたの訪問写真として登録
               </Link>
@@ -720,7 +720,7 @@ export default function DesignManholeNewPage() {
                     );
                     setError(null);
                   }}
-                  className="mt-0.5 h-4 w-4 accent-[#7B63A8]"
+                  className="mt-0.5 h-4 w-4 accent-dm-line"
                 />
                 <span>
                   <span className="block text-sm font-bold">別のマンホールです</span>
@@ -734,7 +734,7 @@ export default function DesignManholeNewPage() {
         </section>
 
         {/* 撮影のコツ（/upload と同じガイド） */}
-        <details className="mt-4 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
+        <details className="mt-4 rounded-lg border border-dm-line/15 bg-white/70 p-3">
           <summary className="cursor-pointer text-sm font-bold">撮影のコツ（OK / NG例）</summary>
 
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -781,7 +781,7 @@ export default function DesignManholeNewPage() {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={100}
               placeholder={isPokefuta ? '例: ○○市のピカチュウのポケふた' : '例: ○○市の花柄マンホール'}
-              className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-dm-line/20 bg-white px-3 py-2.5 text-sm focus:border-dm-line focus:outline-none"
             />
           </div>
           <div>
@@ -795,7 +795,7 @@ export default function DesignManholeNewPage() {
               maxLength={1000}
               rows={3}
               placeholder="デザインの由来や見つけた場所のメモなど"
-              className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-dm-line/20 bg-white px-3 py-2.5 text-sm focus:border-dm-line focus:outline-none"
             />
           </div>
           <div>
@@ -809,7 +809,7 @@ export default function DesignManholeNewPage() {
               onChange={(e) => setSubmitterName(e.target.value)}
               maxLength={50}
               placeholder="投稿者名として表示されます"
-              className="mt-1.5 w-full rounded-lg border border-[#7B63A8]/20 bg-white px-3 py-2.5 text-sm focus:border-[#7B63A8] focus:outline-none"
+              className="mt-1.5 w-full rounded-lg border border-dm-line/20 bg-white px-3 py-2.5 text-sm focus:border-dm-line focus:outline-none"
             />
           </div>
         </section>
@@ -826,7 +826,7 @@ export default function DesignManholeNewPage() {
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="w-full rounded-lg bg-[#7B63A8] py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-lg bg-dm-line py-3 text-sm font-bold text-white transition hover:bg-[#6A5299] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
               ? '投稿中...'
