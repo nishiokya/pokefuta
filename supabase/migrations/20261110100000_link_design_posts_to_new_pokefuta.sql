@@ -47,6 +47,17 @@ DECLARE
   v_already integer := 0;
   v_n integer;
 BEGIN
+  -- 本番のデータを移すだけの作業。8 件の投稿が 1 件も無い DB（ローカルの db reset など）では何もしない。
+  -- 1 件でもあれば、下の検査をすべて通す（一部だけ欠けているのは想定外なので止まる）
+  IF NOT EXISTS (SELECT 1 FROM public.design_manhole WHERE id IN (
+       'a0326912-b668-41ee-9a63-c82fedb54136', '202ff606-b1b7-4b9b-bba2-de3092a16a6d',
+       '66839dc4-9b07-47a7-bfdc-40e5f6f67e5b', '7747f7da-bc6f-4bd4-949f-94f5467d8c21',
+       '7bf78a32-bbcc-4592-86da-7f2948d689fc', 'afb5e0bf-5259-427d-86f0-9d51534a6229',
+       '91f132e4-c923-4b66-ae79-a34f89af638b', 'e5efc241-d01d-4024-9667-3c33c23173f4')) THEN
+    RAISE NOTICE 'link design posts: 対象の投稿が無い DB なので何もしない';
+    RETURN;
+  END IF;
+
   FOR t IN
     SELECT * FROM (VALUES
       -- 投稿, 投稿者の公開ID, 公式の番号, 撮影時刻（EXIF）
