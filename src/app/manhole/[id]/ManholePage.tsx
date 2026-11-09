@@ -101,14 +101,32 @@ const getPhotoUserLabel = (photo: Photo) => {
   return '名無しのトレーナー';
 };
 
-function PhotoPosterAvatar({ photo }: { photo: Photo }) {
+// アイコンは写真の上で誰の1枚か見分ける目印。20px だと顔写真のアイコンが点にしか見えなかったので、
+// 一覧のマスは 26px、大きい写真は 32px にしている。
+function PhotoPosterAvatar({ photo, size = 26 }: { photo: Photo; size?: number }) {
   return (
     <PosterAvatar
       key={photo.visit?.public_user_id || photo.id}
       publicUserId={photo.visit?.public_user_id}
-      size={20}
-      fallback={<UserRound aria-hidden="true" className="h-5 w-5 shrink-0" />}
+      size={size}
+      className="ring-1 ring-white/70"
+      fallback={<UserRound aria-hidden="true" className="shrink-0" style={{ width: size, height: size }} />}
     />
+  );
+}
+
+/**
+ * 写真の上に重ねるタグ（投稿者の「周辺の風景」と自動判定の夜・風景・人物など）。
+ * 以前は写真の下に白い帯を足して出していたが、マスの高さが写真ごとに揃わず、
+ * 写真とタグの対応も読みにくかったので、名前と同じく写真の上に重ねる。
+ */
+function PhotoOverlayTags({ photo, alignEnd = false }: { photo: Photo; alignEnd?: boolean }) {
+  if (!photo.is_landscape && photoAiTags(photo).length === 0) return null;
+  return (
+    <span className={`flex flex-wrap gap-0.5 ${alignEnd ? 'justify-end' : ''}`}>
+      <LandscapePhotoBadge isLandscape={photo.is_landscape} overlay />
+      <AiPhotoTags photo={photo} overlay />
+    </span>
   );
 }
 
@@ -1120,6 +1138,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 )}
                 {/* 名前は写真ボタンと兄弟にして、プロフィールリンクを重ねる。 */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/80 via-black/20 to-transparent px-1.5 pb-1 pt-3 text-white">
+                  <PhotoOverlayTags photo={photo} />
                   <div className="flex min-w-0 items-center gap-1">
                     <PhotoPosterAvatar photo={photo} />
                     {profileHref ? (
@@ -1145,12 +1164,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   )}
                 </div>
               </div>
-              {(photo.is_landscape || photoAiTags(photo).length > 0) && (
-                <div className="flex flex-col gap-0.5 px-1.5 py-1">
-                  <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                  <AiPhotoTags photo={photo} linkFeatures />
-                </div>
-              )}
             </div>
           );
         })}
@@ -1322,7 +1335,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           <div className="flex min-w-0 items-center gap-2">
-            <PhotoPosterAvatar photo={featuredPhoto} />
+            <PhotoPosterAvatar photo={featuredPhoto} size={32} />
             {!featuredPhoto.visit?.is_own && featuredPhoto.visit?.public_user_id ? (
               <Link
                 href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
@@ -1647,8 +1660,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       </span>
                     </span>
                   )}
+                  <span className="absolute right-3 top-3 z-[1] flex max-w-[55%] justify-end">
+                    <PhotoOverlayTags photo={allDisplayPhotos[0]} alignEnd />
+                  </span>
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
-                    <PhotoPosterAvatar photo={allDisplayPhotos[0]} />
+                    <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
                     <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
                     {allDisplayPhotos[0].visit?.shot_at && (
                       <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
@@ -1681,9 +1697,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        <div className={`absolute left-2 z-[2] ${isRepresentative ? 'bottom-9' : 'bottom-14'}`}>
-                          <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                        </div>
+                        {/* 代表写真の左上は「写真 N枚／追加」が重なるので、タグは右上に寄せる */}
+                        <span className={`absolute top-2 z-[2] flex ${isRepresentative ? 'right-2 max-w-[55%] justify-end' : 'left-2 right-2'}`}>
+                          <PhotoOverlayTags photo={photo} alignEnd={isRepresentative} />
+                        </span>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (
@@ -1698,7 +1715,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                         )}
                         <span className={`absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-3 text-left text-white ${isRepresentative ? 'items-center' : 'flex-col items-start'}`}>
                           <span className="flex w-full min-w-0 flex-1 items-center gap-1">
-                            <PhotoPosterAvatar photo={photo} />
+                            <PhotoPosterAvatar photo={photo} size={isRepresentative ? 32 : 26} />
                             <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
                               @{getPhotoUserLabel(photo)}
                             </span>

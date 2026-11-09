@@ -10,6 +10,7 @@ export default function AiPhotoTags({
   photo,
   compact = false,
   linkFeatures = false,
+  overlay = false,
 }: {
   photo: { ai_tags?: unknown; is_landscape?: boolean | null };
   /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰め、人物・足元は表示しない */
@@ -19,16 +20,20 @@ export default function AiPhotoTags({
    * カード全体がリンクやボタンの場所では使わない（リンクの入れ子になる）
    */
   linkFeatures?: boolean;
+  /** 写真の上に重ねる用。文字を詰めて影を付ける（人物・足元も出す） */
+  overlay?: boolean;
 }) {
   const tags = photoAiTags(photo, { compact });
   if (tags.length === 0) return null;
   return (
-    <span className="flex flex-wrap gap-1" title={AI_TAG_HELP}>
+    <span className={`flex flex-wrap ${overlay ? 'gap-0.5' : 'gap-1'}`} title={AI_TAG_HELP}>
       {tags.map((tag) => {
         const chip = (
           <span
             className={`inline-flex items-center gap-1 rounded-full bg-indigo-50 font-bold text-indigo-900 ring-1 ring-indigo-200 ${
-              compact ? 'px-1.5 py-0 text-[9px]' : 'px-2 py-0.5 text-xs'
+              overlay
+                ? 'px-1.5 py-0 text-[10px] leading-4 shadow-sm'
+                : compact ? 'px-1.5 py-0 text-[9px]' : 'px-2 py-0.5 text-xs'
             }`}
             aria-label={tag.ai ? `${tag.label}（AIによる自動判定）` : `${tag.label}（撮影時刻と場所から自動判定）`}
           >
