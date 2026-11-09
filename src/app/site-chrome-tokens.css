@@ -38,6 +38,18 @@
   --chrome-accent-soft: rgba(123, 99, 168, 0.1);
   --chrome-accent-border: #d7d0ef;
 
+  /* デザインふた（キャラクター・ご当地デザインのマンホール）の色。
+     投稿ページの「デザインふた」選択、/design-manholes 一覧・詳細で使う。
+     data.pokefuta.com のキャラふたページ（pokefuta-tracker の apps/web/assets/character-work.css の --dm-*）も
+     同じ名前・同じ値を持つので、変えるときは両方を一緒に変える。
+     Tailwind からは dm-line / dm-tint / dm-ink（/10 などの不透明度つきも可）で使う。 */
+  --dm-line-rgb: 123 99 168;   /* #7b63a8 枠・アイコン地 */
+  --dm-tint-rgb: 244 240 250;  /* #f4f0fa 淡い地 */
+  --dm-ink-rgb: 94 71 136;     /* #5e4788 文字 */
+  --dm-line: rgb(var(--dm-line-rgb));
+  --dm-tint: rgb(var(--dm-tint-rgb));
+  --dm-ink: rgb(var(--dm-ink-rgb));
+
   /* 投稿ボタン（唯一の主要CTA） */
   --chrome-cta: #bf5640;
   --chrome-cta-shadow: #a8462f;

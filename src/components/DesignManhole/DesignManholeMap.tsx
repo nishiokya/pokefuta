@@ -185,5 +185,5 @@ export default function DesignManholeMap({ designManholes, prefectureById }: Des
     refreshLayersRef.current?.();
   }, [designManholes, prefectureById]);
 
-  return <div ref={mapRef} className="h-72 w-full rounded-lg border border-[#7B63A8]/20 sm:h-96" />;
+  return <div ref={mapRef} className="h-72 w-full rounded-lg border border-dm-line/20 sm:h-96" />;
 }

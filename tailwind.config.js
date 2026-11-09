@@ -8,6 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // デザインふたの色。値は site-chrome-tokens.css の --dm-* が正
+        dm: {
+          line: 'rgb(var(--dm-line-rgb) / <alpha-value>)',
+          tint: 'rgb(var(--dm-tint-rgb) / <alpha-value>)',
+          ink: 'rgb(var(--dm-ink-rgb) / <alpha-value>)',
+        },
         pokemon: {
           red: '#ff6b6b',
           blue: '#4ecdc4',

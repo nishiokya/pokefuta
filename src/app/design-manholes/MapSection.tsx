@@ -11,7 +11,7 @@ const DesignManholeMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-72 w-full items-center justify-center rounded-lg bg-[#EFE5CE] sm:h-96">
-        <span className="text-sm text-[#7B63A8]">地図を読み込み中...</span>
+        <span className="text-sm text-dm-line">地図を読み込み中...</span>
       </div>
     ),
   }

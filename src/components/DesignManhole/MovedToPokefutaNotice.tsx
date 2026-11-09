@@ -16,11 +16,11 @@ export function MovedToPokefutaNotice({ className = 'mt-5', now }: { className?:
   return (
     <div
       role="note"
-      className={`${className} flex items-start gap-2 rounded-lg border border-[#7B63A8]/30 bg-white/80 p-3 text-[#2A2A2A]`}
+      className={`${className} flex items-start gap-2 rounded-lg border border-dm-line/30 bg-white/80 p-3 text-[#2A2A2A]`}
     >
-      <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#7B63A8]" aria-hidden="true" />
+      <Info className="mt-0.5 h-5 w-5 shrink-0 text-dm-line" aria-hidden="true" />
       <div>
-        <p className="text-sm font-bold text-[#5E4788]">
+        <p className="text-sm font-bold text-dm-ink">
           デザインふたに投稿されたポケふたを、ポケふたの記録へ移しました
         </p>
         <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/75">

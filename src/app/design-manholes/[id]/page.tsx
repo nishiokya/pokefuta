@@ -40,7 +40,7 @@ const NOT_FOUND_METADATA: Metadata = {
 const displayTitle = (title: string | null) => title || 'デザインマンホール';
 
 const TAG_CLASS =
-  'inline-flex items-center gap-1 rounded-full border border-[#7B63A8]/25 bg-[#7B63A8]/5 px-2.5 py-1 text-xs font-bold text-[#7B63A8]';
+  'inline-flex items-center gap-1 rounded-full border border-dm-line/25 bg-dm-line/5 px-2.5 py-1 text-xs font-bold text-dm-line';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const designManhole = await loadDesignManholeForOgp(params.id);
@@ -180,7 +180,7 @@ export default async function Page({ params }: Props) {
         </nav>
 
         {/* PC は本文が --page-max-wide まで広がるので、写真と説明を横に並べる */}
-        <article className="mt-4 overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+        <article className="mt-4 overflow-hidden rounded-lg border border-dm-line/15 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           <div className="bg-[#EFE5CE]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -194,7 +194,7 @@ export default async function Page({ params }: Props) {
             <p className="mt-1 text-xs text-[#2A2A2A]/50">
               {submitterHref ? (
                 <>
-                  <Link href={submitterHref} className="font-bold text-[#7B63A8] hover:underline">
+                  <Link href={submitterHref} className="font-bold text-dm-line hover:underline">
                     {designManhole.submitter_name || '投稿者'}のスタンプ帳 ›
                   </Link>
                   {' ・ '}
@@ -258,8 +258,8 @@ export default async function Page({ params }: Props) {
               </a>
             </div>
             {submitterProfile && submitterHref && (
-              <section aria-label="投稿者" className="mt-5 rounded-lg border border-[#7B63A8]/15 bg-[#F6EEDC]/60 p-4">
-                <p className="text-xs font-bold tracking-wide text-[#7B63A8]">投稿したトレーナー</p>
+              <section aria-label="投稿者" className="mt-5 rounded-lg border border-dm-line/15 bg-[#F6EEDC]/60 p-4">
+                <p className="text-xs font-bold tracking-wide text-dm-line">投稿したトレーナー</p>
                 <Link href={submitterHref} className="mt-2 flex items-center gap-3 hover:opacity-80">
                   <UserAvatar
                     photoId={submitterProfile.avatarPhotoId}
@@ -282,24 +282,24 @@ export default async function Page({ params }: Props) {
                         .join(' ・ ')}
                     </span>
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#7B63A8]" aria-hidden="true" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-dm-line" aria-hidden="true" />
                 </Link>
               </section>
             )}
             {characterLink && (
               <section
                 aria-labelledby="character-link-heading"
-                className="mt-5 overflow-hidden rounded-lg border border-[#7B63A8]/25 bg-white"
+                className="mt-5 overflow-hidden rounded-lg border border-dm-line/25 bg-white"
               >
                 <div className="flex items-start gap-3 p-4 sm:p-5">
                   <span
                     aria-hidden="true"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-dm-line text-white"
                   >
                     <MapPin className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold tracking-wide text-[#7B63A8]">キャラクターマンホール</p>
+                    <p className="text-xs font-bold tracking-wide text-dm-line">キャラクターマンホール</p>
                     <h2 id="character-link-heading" className="mt-0.5 text-base font-bold sm:text-lg">
                       {characterLink.work_name}のマンホール
                     </h2>
@@ -319,11 +319,11 @@ export default async function Page({ params }: Props) {
                           <span className="font-bold text-[#2A2A2A]">{characterLink.spots_with_photo}枚</span>
                         </p>
                         <div
-                          className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#7B63A8]/15"
+                          className="mt-1 h-1.5 overflow-hidden rounded-full bg-dm-line/15"
                           role="presentation"
                         >
                           <div
-                            className="h-full rounded-full bg-[#7B63A8]"
+                            className="h-full rounded-full bg-dm-line"
                             style={{
                               width: `${Math.min(100, Math.round((characterLink.spots_with_photo / characterLink.spots) * 100))}%`,
                             }}
@@ -333,17 +333,17 @@ export default async function Page({ params }: Props) {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 border-t border-[#7B63A8]/10 bg-[#7B63A8]/5 px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap gap-2 border-t border-dm-line/10 bg-dm-line/5 px-4 py-3 sm:px-5">
                   <a
                     href={characterLink.url}
-                    className="inline-flex items-center gap-1 rounded-lg bg-[#7B63A8] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#6A5299]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-dm-line px-4 py-2 text-sm font-bold text-white transition hover:bg-[#6A5299]"
                   >
                     ポケふた図鑑で設置場所を見る
                     <ChevronRight className="h-4 w-4" />
                   </a>
                   <a
                     href={characterLink.guide_url}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#7B63A8]/30 bg-white px-4 py-2 text-sm font-bold text-[#7B63A8] transition hover:bg-[#7B63A8]/5"
+                    className="inline-flex items-center gap-1 rounded-lg border border-dm-line/30 bg-white px-4 py-2 text-sm font-bold text-dm-line transition hover:bg-dm-line/5"
                   >
                     {characterLink.work_name}のマンホールを巡る
                   </a>
@@ -362,7 +362,7 @@ export default async function Page({ params }: Props) {
             {nearbyPokefutaItems.length > 0 && (
               <section aria-labelledby="nearby-pokefuta-heading">
                 <h2 id="nearby-pokefuta-heading" className="mb-3 flex items-center gap-1.5 text-sm font-bold">
-                  <Navigation className="h-4 w-4 text-[#7B63A8]" aria-hidden="true" />
+                  <Navigation className="h-4 w-4 text-dm-line" aria-hidden="true" />
                   {nearbyIsFallback ? 'いちばん近いポケふた' : '近くのポケふた'}
                 </h2>
                 <NearbyPokefutaList items={nearbyPokefutaItems} />
@@ -371,7 +371,7 @@ export default async function Page({ params }: Props) {
             {nearbyDesignItems.length > 0 && (
               <section aria-labelledby="nearby-design-heading">
                 <h2 id="nearby-design-heading" className="mb-3 flex items-center gap-1.5 text-sm font-bold">
-                  <MapPin className="h-4 w-4 text-[#7B63A8]" aria-hidden="true" />
+                  <MapPin className="h-4 w-4 text-dm-line" aria-hidden="true" />
                   近くのデザインマンホール
                 </h2>
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -379,7 +379,7 @@ export default async function Page({ params }: Props) {
                     <li key={item.id}>
                       <Link
                         href={`/design-manholes/${item.id}`}
-                        className="block overflow-hidden rounded-lg border border-[#7B63A8]/15 bg-white transition hover:shadow-md"
+                        className="block overflow-hidden rounded-lg border border-dm-line/15 bg-white transition hover:shadow-md"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -401,13 +401,13 @@ export default async function Page({ params }: Props) {
           </div>
         )}
 
-        <div className="mt-6 rounded-lg border border-[#7B63A8]/15 bg-white/70 p-5 text-center">
+        <div className="mt-6 rounded-lg border border-dm-line/15 bg-white/70 p-5 text-center">
           <p className="text-sm text-[#2A2A2A]/70">
             {DESIGN_MANHOLE_SUBMISSION_SUSPENDED
               ? '不具合のため、デザインマンホールの投稿を一時停止しています。'
               : 'あなたの街のデザインマンホールも投稿してみませんか？'}
           </p>
-          <SubmitCta surface="design_manhole_detail" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
+          <SubmitCta surface="design_manhole_detail" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-dm-line px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A5299]" />
         </div>
       </main>
 

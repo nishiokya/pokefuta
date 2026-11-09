@@ -39,13 +39,13 @@ export default function NearbyPokefutaList({ items }: { items: Item[] }) {
           <li key={id}>
             <Link
               href={`/manhole/${id}`}
-              className="flex items-center gap-3 rounded-lg border border-[#7B63A8]/15 bg-white px-3 py-2.5 transition hover:bg-[#7B63A8]/5"
+              className="flex items-center gap-3 rounded-lg border border-dm-line/15 bg-white px-3 py-2.5 transition hover:bg-dm-line/5"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EFE5CE]">
                 {photo ? (
                   <StampPhoto src={photo.thumbnail_url} aiTags={photo.lid_crop} />
                 ) : (
-                  <MapPin className="h-4 w-4 text-[#7B63A8]/60" aria-hidden="true" />
+                  <MapPin className="h-4 w-4 text-dm-line/60" aria-hidden="true" />
                 )}
               </span>
               {/* ラベルの末尾のポケモン名が肝なので truncate しない（ポケふた詳細と同じ） */}
