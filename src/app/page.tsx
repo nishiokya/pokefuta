@@ -118,6 +118,7 @@ export default function HomePage() {
   // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
   // 特集は最新の投稿の上に置くので、取り終わるまでは枠を取っておく（後から入って投稿を押し下げない）
+  const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
   const [featureLoadsDone, setFeatureLoadsDone] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
@@ -150,6 +151,7 @@ export default function HomePage() {
     loadCompletion();
     loadDesignFeature();
     loadPlushFeature();
+    loadSnowFeature();
     fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
       setRegularBadges(badges);
       setLegends(loaded);
@@ -221,6 +223,19 @@ export default function HomePage() {
       setPlushFeature({ count: data.count, photos: data.photos });
     } catch {
       // 取れなければ特集にぬいぐるみを出さないだけ
+    } finally {
+      setFeatureLoadsDone((n) => n + 1);
+    }
+  };
+
+  const loadSnowFeature = async () => {
+    try {
+      const response = await fetch('/api/features/snow');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data?.success && typeof data.count === 'number' && Array.isArray(data.photos)) setSnowFeature(data);
+    } catch {
+      // 取得できなければカードを出さない
     } finally {
       setFeatureLoadsDone((n) => n + 1);
     }
@@ -569,19 +584,33 @@ export default function HomePage() {
         </section>
 
         {/*
-          特集（デザインふた・ぬいぐるみ）。2026-11-06 に最新の投稿の後ろからヒーローの直下へ上げた
+          特集（雪景色・デザインふた・ぬいぐるみ）。2026-11-06 に最新の投稿の後ろからヒーローの直下へ上げた
           （ヒーローの中には入れない。ヒーローは行動のカードだけ）。
           投稿より上にあるので、取り終わるまでは同じ高さの枠を出しておき、後から入って投稿を押し下げない。
           写真はスマホでも3枚並べる（縮めた 40px なら 2 列のカードに 3 枚入る）。
-          どちらも取れなければ節ごと出さない
+          どれも取れなければ節ごと出さない
         */}
-        {(featureLoadsDone < 2 || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0)) && (
-          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < 2}>
+        {(featureLoadsDone < 3 || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
+          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < 3}>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
               特集
             </h2>
             <div className="grid grid-cols-2 gap-2">
+            {snowFeature && snowFeature.count > 0 ? (
+              <Link href="/photos/snow" className="group col-span-2 flex min-w-0 items-center gap-3 rounded-lg bg-sky-50 p-3 shadow-sm transition hover:shadow">
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {snowFeature.photos.slice(0, 3).map((photo) => (
+                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
+                  ))}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-sky-950">雪景色のポケふた</p>
+                  <p className="text-xs text-slate-600">写真 {snowFeature.count}枚 <span className="font-bold text-[#7B63A8] group-hover:underline">見る ›</span></p>
+                </div>
+              </Link>
+            ) : featureLoadsDone < 3 && <div className="col-span-2"><FeatureCardPlaceholder /></div>}
+
             {designFeature && designFeature.length > 0 ? (
             <Link
               href="/design-manholes"
@@ -604,7 +633,7 @@ export default function HomePage() {
                 </p>
               </div>
             </Link>
-            ) : featureLoadsDone < 2 && <FeatureCardPlaceholder />}
+            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
             {plushFeature && plushFeature.count > 0 ? (
             <Link
               href="/photos/plush"
@@ -644,7 +673,7 @@ export default function HomePage() {
                 </p>
               </div>
             </Link>
-            ) : featureLoadsDone < 2 && <FeatureCardPlaceholder />}
+            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
             </div>
           </section>
         )}
