@@ -45,6 +45,16 @@ export async function loadPlushPhotos(
   order: 'score' | 'recent' = 'score',
   interleave = true,
 ): Promise<PlushPhoto[]> {
+  return loadTaggedPhotos('plush', limit, order, interleave);
+}
+
+/** 公開写真だけをタグで抽出。雪は投稿の新しい順で、写真全体を表示する。 */
+export async function loadTaggedPhotos(
+  tag: 'plush' | 'snow',
+  limit = PLUSH_PAGE_LIMIT,
+  order: 'score' | 'recent' = 'recent',
+  interleave = false,
+): Promise<PlushPhoto[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return [];
@@ -76,7 +86,7 @@ export async function loadPlushPhotos(
       )
     `)
     .eq('visit.is_public', true)
-    .eq('ai_tags->>plush', 'true');
+    .eq(`ai_tags->>${tag}`, 'true');
   if (order === 'score') {
     // 上限で切る前に DB でスコア順に並べる（新しい順で切ってから並べると、古くてぬいぐるみらしい写真が漏れる）。
     // jsonb の数値どうしは数値として比べられる。同点は新しい順
