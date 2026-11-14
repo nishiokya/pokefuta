@@ -18,6 +18,8 @@ import UserAvatar from '@/components/users/UserAvatar';
 import { formatDistanceKm } from '@/lib/manhole-label';
 import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
 import { loadDesignManholeLink } from '@/lib/design-manhole-link';
+import { loadDesignManholeTagData } from '@/lib/design-manhole-tags';
+import { cardTags, tagHref } from '@/lib/design-manhole-tag-data';
 import { buildXShareUrl, buildLineShareUrl, designManholeShareText } from '@/lib/share';
 import { formatDateJaJst } from '@/lib/date';
 import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -86,10 +88,11 @@ export default async function Page({ params }: Props) {
   // 紐付いたキャラクターマンホール（図鑑が持つ）、近くのポケふた（図鑑のスナップショット）、
   // 近くのデザインマンホール（一覧と同じ公開の全件）も並べて読む。どれも取れなければその節を出さないだけ
   const submitterPublicIdPromise = loadDesignManholeSubmitterPublicId(designManhole.id);
-  const [submitterPublicId, submitterProfile, characterLink, snapshotManholes, allDesignManholes] = await Promise.all([
+  const [submitterPublicId, submitterProfile, characterLink, tagData, snapshotManholes, allDesignManholes] = await Promise.all([
     submitterPublicIdPromise,
     submitterPublicIdPromise.then((id) => (id ? loadDesignManholeSubmitterProfile(id) : null)),
     loadDesignManholeLink(designManhole.id),
+    loadDesignManholeTagData(),
     loadSnapshotManholesForNearby(),
     loadPublishedDesignManholes().catch((error) => {
       console.warn('Failed to load design manholes for nearby:', error);
@@ -98,6 +101,8 @@ export default async function Page({ params }: Props) {
   ]);
   const { nearby: nearbyPokefutaItems, nearbyIsFallback, placeTags } = nearbyPokefuta(designManhole, snapshotManholes);
   const nearbyDesignItems = nearbyDesignManholes(designManhole, allDesignManholes);
+  // タグ（ガンダム・野球など）。押すと同じタグの写真の一覧へ。作品ガイドへは下の紐付けのカードから
+  const groupTags = cardTags(tagData, designManhole.id);
   const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 
   const title = displayTitle(designManhole.title);
@@ -210,7 +215,7 @@ export default async function Page({ params }: Props) {
               </p>
             )}
 
-            {(placeTags.length > 0 || characterLink) && (
+            {(placeTags.length > 0 || characterLink || groupTags.length > 0) && (
               <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="タグ">
                 {placeTags.map((tag) => (
                   <li key={tag.label}>
@@ -227,7 +232,16 @@ export default async function Page({ params }: Props) {
                     )}
                   </li>
                 ))}
-                {characterLink && (
+                {groupTags.map((tag) => (
+                  <li key={tag.slug}>
+                    <Link href={tagHref(tag.slug)} className={TAG_CLASS}>
+                      <Tag className="h-3 w-3" aria-hidden="true" />
+                      {tag.label}
+                    </Link>
+                  </li>
+                ))}
+                {/* タグが取れなかったときは、今までどおり作品ガイドへのタグを出す */}
+                {characterLink && groupTags.length === 0 && (
                   <li>
                     <a href={characterLink.guide_url} className={TAG_CLASS}>
                       <Tag className="h-3 w-3" aria-hidden="true" />
