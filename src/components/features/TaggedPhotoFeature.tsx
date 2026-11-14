@@ -25,17 +25,6 @@ export function featureFeedbackUrl(pageName: string, path: string): string {
   return `https://x.com/intent/post?text=${encodeURIComponent(`@pokemonmanhole ${pageName}の感想: `)}&url=${encodeURIComponent(`https://pokefuta.com${path}`)}`;
 }
 
-/** 撮影日（無ければ投稿日）の新しい順。同じ日時は投稿の新しい順 */
-export function sortByShotAtDesc(photos: PlushPhoto[]): PlushPhoto[] {
-  const time = (value: string | null) => {
-    const t = value ? Date.parse(value) : NaN;
-    return Number.isFinite(t) ? t : 0;
-  };
-  return [...photos].sort(
-    (a, b) => time(b.shotAt ?? b.createdAt) - time(a.shotAt ?? a.createdAt) || time(b.createdAt) - time(a.createdAt),
-  );
-}
-
 export type TaggedPhotoFeatureProps = {
   /** ラボの帯の説明（どう選んでいるか・間違いがあること） */
   labNote: ReactNode;

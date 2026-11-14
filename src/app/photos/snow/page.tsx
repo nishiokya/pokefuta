@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/constants';
-import { loadTaggedPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
-import TaggedPhotoFeature, { featureFeedbackUrl, sortByShotAtDesc } from '@/components/features/TaggedPhotoFeature';
+import { loadTaggedPhotos, PLUSH_PAGE_LIMIT, sortByShotAtDesc } from '@/lib/plush-photos';
+import TaggedPhotoFeature, { featureFeedbackUrl } from '@/components/features/TaggedPhotoFeature';
 
 export const metadata: Metadata = {
   title: `雪景色のポケふた（ベータ） | ${SITE_NAME}`,
@@ -16,7 +16,8 @@ export default async function SnowPhotosPage() {
 
   return (
     <TaggedPhotoFeature
-      labNote="AI が雪の写っている写真を見つけて集めています。まちがいもあります。"
+      // 2026-11-14 までの投稿は人が確かめた判定（20261114120000_snow_tags_from_human_labels.sql）、それより後は AI の判定
+      labNote="雪の写っている写真を集めています。新しい投稿は AI が見つけているので、まちがいもあります。"
       feedbackUrl={featureFeedbackUrl('雪景色のポケふた（ベータ）', '/photos/snow')}
       title="雪景色のポケふた"
       countLabel="雪と一緒に写るポケふたの写真"
