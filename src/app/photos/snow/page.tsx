@@ -1,52 +1,42 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { Snowflake } from 'lucide-react';
 import { SITE_NAME } from '@/lib/constants';
-import { formatDateJaJst } from '@/lib/date';
 import { loadTaggedPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
+import TaggedPhotoFeature, { featureFeedbackUrl, sortByShotAtDesc } from '@/components/features/TaggedPhotoFeature';
 
 export const metadata: Metadata = {
-  title: `雪景色のポケふた | ${SITE_NAME}`,
+  title: `雪景色のポケふた（ベータ） | ${SITE_NAME}`,
   description: '雪と一緒に写るポケふた。みんなが投稿した冬の景色を集めました。',
   robots: { index: false, follow: true },
 };
 export const revalidate = 600;
 
 export default async function SnowPhotosPage() {
-  const photos = await loadTaggedPhotos('snow');
+  // 雪は季節の写真なので、投稿日ではなく撮影日の新しい順に並べる（去年の冬の写真を今年投稿する人がいる）
+  const photos = sortByShotAtDesc(await loadTaggedPhotos('snow'));
+
   return (
-    <div className="min-h-content safe-area-body bg-[#F6EEDC] pb-nav-safe text-[#2A2A2A]">
-      <main className="mx-auto max-w-page px-4 pb-8 pt-3 sm:pt-6 lg:px-8">
-        <Link href="/" className="text-sm text-[#7B63A8] hover:underline">‹ 写真館へ</Link>
-        <header className="my-4 rounded-xl bg-gradient-to-br from-sky-50 to-white p-5 ring-1 ring-sky-200 sm:p-8">
-          <Snowflake className="mb-3 h-7 w-7 text-sky-600" aria-hidden="true" />
-          <h1 className="font-pixelJp text-xl font-bold text-sky-950 sm:text-2xl">雪景色のポケふた</h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">雪に囲まれた一枚、冬の旅で出会った景色。みんなの写真でめぐる、雪の日のポケふた。</p>
-          <p className="mt-3 text-xs text-slate-500">写真 {photos.length}枚{photos.length >= PLUSH_PAGE_LIMIT ? `（${PLUSH_PAGE_LIMIT}枚まで）` : ''} · 新しく投稿された順</p>
-          <p className="mt-2 text-xs text-slate-500">※ 雪の写っている写真を AI で自動判定しています。間違っていたらごめんなさい。</p>
-        </header>
-        {photos.length === 0 ? (
-          <p className="rounded-lg bg-white p-6 text-center text-sm text-slate-600">雪景色の写真は、まだありません。</p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-5">
-            {photos.map((photo, index) => (
-              <li key={photo.id}>
-                <Link href={`/p/${photo.id}`} className="group block overflow-hidden rounded-xl bg-white shadow-sm transition hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
-                  <div className="flex aspect-square items-center justify-center bg-sky-50">
-                    <img src={`/api/photo/${photo.id}?size=medium`} alt={`${photo.manholeName}の雪景色`} width={600} height={600} loading={index < 6 ? 'eager' : 'lazy'} className="h-full w-full object-contain" />
-                  </div>
-                  <div className="p-3">
-                    <h2 className="text-sm font-bold text-[#4F3828] group-hover:underline">{photo.manholeName}</h2>
-                    <p className="mt-1 text-xs text-slate-500">撮影 {formatDateJaJst(photo.shotAt ?? photo.createdAt)}</p>
-                    <p className="mt-1 truncate text-xs text-slate-600">{photo.posterName}</p>
-                    {photo.comment && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600">{photo.comment}</p>}
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
-    </div>
+    <TaggedPhotoFeature
+      labNote="AI が雪の写っている写真を見つけて集めています。まちがいもあります。"
+      feedbackUrl={featureFeedbackUrl('雪景色のポケふた（ベータ）', '/photos/snow')}
+      title="雪景色のポケふた"
+      countLabel="雪と一緒に写るポケふたの写真"
+      sortLabel="撮影日の新しい順"
+      emptyText="雪景色の写真は、まだありません。"
+      photos={photos}
+      limit={PLUSH_PAGE_LIMIT}
+      renderMedia={(photo, index) => (
+        // 雪は蓋のまわりの景色が主役なので、切り抜かずに写真全体を見せる
+        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_30%_20%,#F4F9FD_0,#DCEAF4_75%)]">
+          <img
+            src={`/api/photo/${photo.id}?size=small`}
+            alt=""
+            width={400}
+            height={400}
+            loading={index < 6 ? 'eager' : 'lazy'}
+            className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+          />
+        </div>
+      )}
+    />
   );
 }
