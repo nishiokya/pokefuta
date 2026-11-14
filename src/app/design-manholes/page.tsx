@@ -49,7 +49,15 @@ export function generateMetadata({ searchParams }: PageProps): Metadata {
   // 2ページ目以降はそれぞれを正規URLにする（1ページ目に寄せると2ページ目以降の蓋が辿られなくなる）
   const canonical = page > 1 ? `${PAGE_URL}?page=${page}` : PAGE_URL;
   const title = page > 1 ? `みんなのデザインマンホール（${page}ページ目） | ${SITE_NAME}` : PAGE_TITLE;
-  return { ...metadata, title, alternates: { canonical } };
+  if (page <= 1) return metadata;
+  // 共有したときもページ番号が残るよう、OGP の URL とタイトルもページ別にする
+  return {
+    ...metadata,
+    title,
+    alternates: { canonical },
+    openGraph: { ...metadata.openGraph, title, url: canonical },
+    twitter: { ...metadata.twitter, title },
+  };
 }
 
 const metadata: Metadata = {
