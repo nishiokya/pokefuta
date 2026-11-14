@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import { resolveDesignManholePrefectures } from '@/lib/design-manhole-prefecture';
-import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
+import { loadDesignManholeSubmitterPublicIdCached } from '@/lib/design-manhole-submitter';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
 import { MovedToPokefutaNotice } from '@/components/DesignManhole/MovedToPokefutaNotice';
@@ -123,7 +123,7 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
   const [prefectureById, posterPublicIds] = await Promise.all([
     designManholes.length > 0 ? resolveDesignManholePrefectures(designManholes) : Promise.resolve({}),
     // 投稿者のページへのリンク用。公開スタンプ帳を持たない人は null（カードはマンホールのページへ）
-    Promise.all(pageItems.map((dm) => loadDesignManholeSubmitterPublicId(dm.id))),
+    Promise.all(pageItems.map((dm) => loadDesignManholeSubmitterPublicIdCached(dm.id))),
   ]);
 
   const jsonLd = {

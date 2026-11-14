@@ -43,6 +43,8 @@ export async function loadPublishedDesignManholes(limit = DESIGN_MANHOLE_LOAD_LI
       .select('id, title, description, submitter_name, latitude, longitude, width, height, created_at')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
+      // 一覧はページ送りするので、同じ日時の投稿も毎回同じ順にする（境界で重複・抜けが出ないように）
+      .order('id', { ascending: false })
       .limit(limit);
 
     if (error || !data) {
