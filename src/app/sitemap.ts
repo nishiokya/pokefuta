@@ -1,6 +1,8 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
+import { loadDesignManholeTagData } from '@/lib/design-manhole-tags';
+import { buildTagChips, tagHref } from '@/lib/design-manhole-tag-data';
 
 const baseUrl = (
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -123,6 +125,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   let designManholePages: MetadataRoute.Sitemap = [];
+  let designManholeTagPages: MetadataRoute.Sitemap = [];
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -148,11 +151,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           changeFrequency: 'monthly' as const,
           priority: 0.7,
         }));
+
+        // タグのページ（/design-manholes/tags/<slug>）。公開中の写真が1枚以上あるタグだけ
+        const chips = buildTagChips(
+          await loadDesignManholeTagData(),
+          designManholes.map((dm: { id: string }) => dm.id),
+        );
+        designManholeTagPages = chips.map((chip) => ({
+          url: `${baseUrl}${tagHref(chip.group.slug)}`,
+          lastModified,
+          changeFrequency: 'daily' as const,
+          priority: 0.7,
+        }));
       }
     }
   } catch (error) {
     console.error('Error fetching design manholes for sitemap:', error);
   }
 
-  return [...staticPages, ...dynamicPages, ...designManholePages];
+  return [...staticPages, ...dynamicPages, ...designManholeTagPages, ...designManholePages];
 }

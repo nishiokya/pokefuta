@@ -1,16 +1,16 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
-import { resolveDesignManholePrefectures } from '@/lib/design-manhole-prefecture';
+import { loadDesignManholeTagData } from '@/lib/design-manhole-tags';
+import { buildTagChips, cardTags, topLevelChips } from '@/lib/design-manhole-tag-data';
 import { loadDesignManholeSubmitterPublicIdCached } from '@/lib/design-manhole-submitter';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
 import { MovedToPokefutaNotice } from '@/components/DesignManhole/MovedToPokefutaNotice';
 import { PhraseText } from '@/components/PhraseText';
 import DesignManholeCard from '@/components/DesignManhole/DesignManholeCard';
+import ListPager, { parseListPage } from '@/components/DesignManhole/ListPager';
+import TagChips from '@/components/DesignManhole/TagChips';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { DesignManhole } from '@/types/database';
 
@@ -24,20 +24,15 @@ export const fetchCache = 'force-no-store';
 const PAGE_URL = `${SITE_URL}/design-manholes`;
 const PAGE_TITLE = `みんなのデザインマンホール | ${SITE_NAME}`;
 const PAGE_DESCRIPTION =
-  'ポケふた以外の、オンリーワンなご当地デザインマンホールのコレクション。街のシンボルや市の花のデザイン蓋、カラーマンホールなど、みんなが見つけた1枚を地図と一覧で紹介。あなたの街の蓋も投稿できます。';
+  'ポケふた以外の、オンリーワンなご当地デザインマンホールのコレクション。街のシンボルや市の花のデザイン蓋、カラーマンホールなど、みんなが見つけた1枚を、ガンダムなどの作品や野球のタグからも探せます。あなたの街の蓋も投稿できます。';
 
 // 1ページに並べる枚数。投稿者の公開IDをカードごとに引くので、全件ではなくページ分だけにする
 const PAGE_SIZE = 48;
 
 type PageProps = { searchParams?: { page?: string | string[] } };
 
-/** ?page=N（1始まり）。数字でないものは null（404 にする） */
 function parsePage(searchParams: PageProps['searchParams']): number | null {
-  const raw = searchParams?.page;
-  if (raw === undefined) return 1;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (!/^[1-9][0-9]{0,3}$/.test(value)) return null;
-  return Number(value);
+  return parseListPage(searchParams?.page);
 }
 
 function pageHref(page: number): string {
@@ -117,7 +112,7 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
   let designManholes: DesignManhole[] = [];
   let loadError = false;
   try {
-    // 地図と枚数は全件、カードはページ分だけ並べる
+    // 枚数とタグのチップは全件、カードはページ分だけ並べる
     designManholes = await loadPublishedDesignManholes();
   } catch (error) {
     console.error('Failed to load design manholes for listing:', error);
@@ -127,12 +122,14 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
   if (!loadError && page > totalPages) notFound();
   const pageItems = designManholes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // 地図の初期表示（県ごとの枚数）用。一覧の並びや枚数には使わない
-  const [prefectureById, posterPublicIds] = await Promise.all([
-    designManholes.length > 0 ? resolveDesignManholePrefectures(designManholes) : Promise.resolve({}),
+  const [tagData, posterPublicIds] = await Promise.all([
+    // タグ（ガンダム・野球など）は図鑑が持つ。取れなければチップとカードのタグを出さないだけ
+    loadDesignManholeTagData(),
     // 投稿者のページへのリンク用。公開スタンプ帳を持たない人は null（カードはマンホールのページへ）
     Promise.all(pageItems.map((dm) => loadDesignManholeSubmitterPublicIdCached(dm.id))),
   ]);
+
+  const chips = topLevelChips(buildTagChips(tagData, designManholes.map((dm) => dm.id)));
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -165,7 +162,7 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
               <PhraseText text="ポケふた以外の、オンリーワンなデザインマンホールのコレクション" />
             </p>
             {/*
-              枚数は地図に出している全件の配列の長さを使う。別途数え直すと
+              枚数は読み込んだ全件の配列の長さを使う。別途数え直すと
               一覧と数字がズレうるが、これなら構造上ズレない（追加の問い合わせも無い）。
               DESIGN_MANHOLE_LOAD_LIMIT に近づいたら読み方を変える（design-manhole-ogp.ts）。
             */}
@@ -196,19 +193,22 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
           </div>
         ) : (
           <>
-            <div className="mt-5">
-              <MapSection designManholes={designManholes} prefectureById={prefectureById} />
-            </div>
+            {/* 場所は各マンホールのページの地図と経路案内で見る。一覧は写真とタグで探す */}
+            {chips.length > 0 && (
+              <div className="mt-5">
+                <TagChips chips={chips} all={designManholes.length} label="タグから探す" />
+              </div>
+            )}
 
             {/* 写真と投稿者を押すと投稿者のページへ（/photos/plush と同じ）。名前の行はマンホールのページへ */}
-            <ul id="list" className="mt-6 grid scroll-mt-20 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            <ul id="list" className="mt-4 grid scroll-mt-20 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
               {pageItems.map((dm, index) => (
                 <li key={dm.id}>
-                  <DesignManholeCard designManhole={dm} posterPublicId={posterPublicIds[index] ?? null} eager={index < 6} />
+                  <DesignManholeCard designManhole={dm} posterPublicId={posterPublicIds[index] ?? null} eager={index < 6} tags={cardTags(tagData, dm.id)} />
                 </li>
               ))}
             </ul>
-            <Pager page={page} totalPages={totalPages} />
+            <ListPager page={page} totalPages={totalPages} hrefFor={pageHref} />
           </>
         )}
 
@@ -216,38 +216,5 @@ export default async function DesignManholesPage({ searchParams }: PageProps) {
       </main>
 
     </div>
-  );
-}
-
-function Pager({ page, totalPages }: { page: number; totalPages: number }) {
-  if (totalPages <= 1) return null;
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-  const linkClass = 'inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-full px-3 text-sm font-bold transition';
-  return (
-    <nav aria-label="ページ送り" className="mt-6 flex flex-wrap items-center justify-center gap-2">
-      {page > 1 ? (
-        <Link href={`${pageHref(page - 1)}#list`} rel="prev" className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
-          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          前へ
-        </Link>
-      ) : null}
-      {pages.map((n) =>
-        n === page ? (
-          <span key={n} aria-current="page" className={`${linkClass} bg-dm-line text-white`}>
-            {n}
-          </span>
-        ) : (
-          <Link key={n} href={`${pageHref(n)}#list`} className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
-            {n}
-          </Link>
-        ),
-      )}
-      {page < totalPages ? (
-        <Link href={`${pageHref(page + 1)}#list`} rel="next" className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
-          次へ
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      ) : null}
-    </nav>
   );
 }
