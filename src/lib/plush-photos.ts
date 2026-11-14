@@ -36,6 +36,17 @@ export type PlushPhoto = {
 
 export const PLUSH_PAGE_LIMIT = 300;
 
+/** 撮影日（無ければ投稿日）の新しい順。同じ日時は投稿の新しい順 */
+export function sortByShotAtDesc(photos: PlushPhoto[]): PlushPhoto[] {
+  const time = (value: string | null) => {
+    const t = value ? Date.parse(value) : NaN;
+    return Number.isFinite(t) ? t : 0;
+  };
+  return [...photos].sort(
+    (a, b) => time(b.shotAt ?? b.createdAt) - time(a.shotAt ?? a.createdAt) || time(b.createdAt) - time(a.createdAt),
+  );
+}
+
 /**
  * order: 'score' = ぬいぐるみらしい順、'recent' = 投稿の新しい順。
  * interleave: 投稿者を1枚ずつ順番に回すか（トップの特集カードは回す。特集ページは新しい順そのままで出す）
