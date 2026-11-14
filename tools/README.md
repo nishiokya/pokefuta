@@ -188,30 +188,26 @@ graph LR
 CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
-## � マイグレーション006対応（manhole テーブル拡張）
+## 🗂 manhole テーブルの拡張列（旧マイグレーション 006）
 
-### 実行順序
+旧 `006_extend_manhole_fields.sql` は `database/migrations/archive/` に移してあり、手で流す必要はない。
+列は本番の基準スキーマ `supabase/migrations/20260718000000_prod_baseline.sql` に入っていて、
+ローカルは `supabase start`（`supabase db reset`）で作られる。
 
-1. **マイグレーション 006 実行**
-   ```bash
-   supabase db push
-   # または
-   psql $DATABASE_URL < database/migrations/006_extend_manhole_fields.sql
-   ```
+本番の manhole を変えるときも `psql` で直接流さず、`supabase/migrations/` にマイグレーションを足して適用する
+（リポジトリ直下の `CLAUDE.md`「DB操作」）。
 
-2. **既存データにデータを埋める**
-   ```bash
-   # SQL Editorで実行
-   psql $DATABASE_URL < tools/migrate_manhole_prefecture_ids.sql
-   ```
+### 新しい蓋を足す
 
-3. **新規マンホール追加時は自動的に prefecture_id と prefecture_code が生成される**
-   ```bash
-   python3 tools/generate_manhole_sql.py 2>/dev/null > manhole_update.sql
-   # manhole_update.sql を実行すると、prefecture_id と prefecture_code が自動設定
-   ```
+`tools/generate_manhole_sql.py` で INSERT を作り、DDL を除いてマイグレーションにする。
+prefecture_id と prefecture_code はこのスクリプトが埋める。
+例: `supabase/migrations/20261110090000_add_manholes_487_500.sql`
 
-既存行だけを手動更新する場合は、INSERT/UPSERTではなく `--update-only` を使います。
+```bash
+python3 tools/generate_manhole_sql.py --min-id 487 --max-id 500 2>/dev/null > manhole_insert.sql
+```
+
+既存行だけを更新する場合は、INSERT/UPSERTではなく `--update-only` を使います。
 
 ```bash
 python3 tools/generate_manhole_sql.py --update-only 2>/dev/null > manhole_titles_update.sql
