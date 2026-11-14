@@ -129,6 +129,7 @@ function UploadPageInner() {
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const [isAndroid, setIsAndroid] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const timerRefsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // 蓋の一覧の取得に失敗したか。「まだ読込中」と「もう来ない」を区別する
   const manholesLoadFailedRef = useRef(false);
@@ -181,6 +182,11 @@ function UploadPageInner() {
 
   useEffect(() => {
     setIsAndroid(/Android/i.test(navigator.userAgent));
+    // iPadOS は Mac の UA を名乗るのでタッチ点数で見分ける
+    setIsIOS(
+      /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    );
 
     // ページタイトル設定
     document.title = pageTitle('ポケふたを投稿');
@@ -1028,9 +1034,14 @@ function UploadPageInner() {
           <p className="mt-1 text-xs text-[#2A2A2A]/60">
             位置情報付きの写真（蓋から50m以内）で、訪問記録として図鑑に載ります
           </p>
-          {/* その場で撮るのがいちばん確実（GPS が必ず乗る）なので、撮ってある写真より先に大きく出す。
-              Android は下の枠のタップがそのままカメラなので出さない */}
-          {!isAndroid && !selectedPhoto && !isUploading && (
+          {/* 「その場で撮影する」ボタンは、Android 以外では蓋が決まっている（詳細から来た）ときだけ出す。
+              iPhone の Safari はページから起動したカメラの写真に位置情報を付けず、
+              GA4（2026-08-11〜11-03）で iOS のカメラ経由は 143 回中 137 回が invalid_gps で止まっていた
+              （撮ってある写真は 14%）。詳細から来ていれば位置情報なしでも valid_no_gps で通るので、
+              そのときは残す（11/4〜11/13 の iOS カメラ経由で投稿まで届いたのはほぼこちら）。
+              PC では capture が効かずファイル選択になるだけ。
+              Android は下の枠のタップがそのままカメラ（撮ってある写真は位置情報が外れる） */}
+          {!isAndroid && hintManholeId && !selectedPhoto && !isUploading && (
             <button
               type="button"
               onClick={captureFromCamera}
@@ -1066,9 +1077,7 @@ function UploadPageInner() {
               },
               'aria-label': isAndroid ? 'カメラでポケふたを撮影' : '投稿する写真を選択',
             })}
-            className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed text-center transition ${
-              isAndroid || selectedPhoto ? 'p-6' : 'p-4'
-            } ${
+            className={`mt-2 cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
               isDragActive
                 ? 'border-[#7B63A8] bg-[#7B63A8]/10'
                 : 'border-[#7B63A8]/30 bg-white/60 hover:bg-white'
@@ -1106,7 +1115,9 @@ function UploadPageInner() {
                     ? hintManholeId
                       ? '撮ってある写真は上の「端末の写真から選ぶ」から'
                       : '撮ってある写真は、下の「撮ってある写真を投稿する」から'
-                    : 'JPEG・PNG・HEIC（PC はドラッグ&ドロップも可）'}
+                    : isIOS && !hintManholeId
+                      ? 'カメラアプリで撮ってから選んでください（このページから撮ると位置情報が付きません）'
+                      : 'JPEG・PNG・HEIC（PC はドラッグ&ドロップも可）'}
                 </p>
               </>
             )}
