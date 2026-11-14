@@ -84,14 +84,14 @@ export default async function Page({ params }: Props) {
 
   // 投稿者が公開スタンプ帳を持つ人のときだけ、名前をそのスタンプ帳へのリンクにし、プロフィールのカードを出す
   // 紐付いたキャラクターマンホール（図鑑が持つ）、近くのポケふた（図鑑のスナップショット）、
-  // 近くのデザインマンホール（一覧と同じ公開200件）も並べて読む。どれも取れなければその節を出さないだけ
+  // 近くのデザインマンホール（一覧と同じ公開の全件）も並べて読む。どれも取れなければその節を出さないだけ
   const submitterPublicIdPromise = loadDesignManholeSubmitterPublicId(designManhole.id);
   const [submitterPublicId, submitterProfile, characterLink, snapshotManholes, allDesignManholes] = await Promise.all([
     submitterPublicIdPromise,
     submitterPublicIdPromise.then((id) => (id ? loadDesignManholeSubmitterProfile(id) : null)),
     loadDesignManholeLink(designManhole.id),
     loadSnapshotManholesForNearby(),
-    loadPublishedDesignManholes(200).catch((error) => {
+    loadPublishedDesignManholes().catch((error) => {
       console.warn('Failed to load design manholes for nearby:', error);
       return [];
     }),

@@ -1,13 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import MapSection from './MapSection';
 import { loadPublishedDesignManholes } from '@/lib/design-manhole-ogp';
 import { resolveDesignManholePrefectures } from '@/lib/design-manhole-prefecture';
-import { formatDateJaJst } from '@/lib/date';
+import { loadDesignManholeSubmitterPublicId } from '@/lib/design-manhole-submitter';
 import { OGP_IMAGE_URL, SITE_NAME, SITE_URL } from '@/lib/constants';
 import { SubmitCta, SuspendedNotice } from '@/components/DesignManhole/SubmitCta';
 import { MovedToPokefutaNotice } from '@/components/DesignManhole/MovedToPokefutaNotice';
 import { PhraseText } from '@/components/PhraseText';
+import DesignManholeCard from '@/components/DesignManhole/DesignManholeCard';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import type { DesignManhole } from '@/types/database';
 
@@ -23,7 +26,33 @@ const PAGE_TITLE = `みんなのデザインマンホール | ${SITE_NAME}`;
 const PAGE_DESCRIPTION =
   'ポケふた以外の、オンリーワンなご当地デザインマンホールのコレクション。街のシンボルや市の花のデザイン蓋、カラーマンホールなど、みんなが見つけた1枚を地図と一覧で紹介。あなたの街の蓋も投稿できます。';
 
-export const metadata: Metadata = {
+// 1ページに並べる枚数。投稿者の公開IDをカードごとに引くので、全件ではなくページ分だけにする
+const PAGE_SIZE = 48;
+
+type PageProps = { searchParams?: { page?: string | string[] } };
+
+/** ?page=N（1始まり）。数字でないものは null（404 にする） */
+function parsePage(searchParams: PageProps['searchParams']): number | null {
+  const raw = searchParams?.page;
+  if (raw === undefined) return 1;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!/^[1-9][0-9]{0,3}$/.test(value)) return null;
+  return Number(value);
+}
+
+function pageHref(page: number): string {
+  return page <= 1 ? '/design-manholes' : `/design-manholes?page=${page}`;
+}
+
+export function generateMetadata({ searchParams }: PageProps): Metadata {
+  const page = parsePage(searchParams) ?? 1;
+  // 2ページ目以降はそれぞれを正規URLにする（1ページ目に寄せると2ページ目以降の蓋が辿られなくなる）
+  const canonical = page > 1 ? `${PAGE_URL}?page=${page}` : PAGE_URL;
+  const title = page > 1 ? `みんなのデザインマンホール（${page}ページ目） | ${SITE_NAME}` : PAGE_TITLE;
+  return { ...metadata, title, alternates: { canonical } };
+}
+
+const metadata: Metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
   alternates: { canonical: PAGE_URL },
@@ -73,19 +102,29 @@ function WantedSection() {
   );
 }
 
-export default async function DesignManholesPage() {
+export default async function DesignManholesPage({ searchParams }: PageProps) {
+  const page = parsePage(searchParams);
+  if (page === null) notFound();
+
   let designManholes: DesignManhole[] = [];
   let loadError = false;
   try {
-    designManholes = await loadPublishedDesignManholes(200);
+    // 地図と枚数は全件、カードはページ分だけ並べる
+    designManholes = await loadPublishedDesignManholes();
   } catch (error) {
     console.error('Failed to load design manholes for listing:', error);
     loadError = true;
   }
+  const totalPages = Math.max(1, Math.ceil(designManholes.length / PAGE_SIZE));
+  if (!loadError && page > totalPages) notFound();
+  const pageItems = designManholes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // 地図の初期表示（県ごとの枚数）用。一覧の並びや枚数には使わない
-  const prefectureById = designManholes.length > 0
-    ? await resolveDesignManholePrefectures(designManholes)
-    : {};
+  const [prefectureById, posterPublicIds] = await Promise.all([
+    designManholes.length > 0 ? resolveDesignManholePrefectures(designManholes) : Promise.resolve({}),
+    // 投稿者のページへのリンク用。公開スタンプ帳を持たない人は null（カードはマンホールのページへ）
+    Promise.all(pageItems.map((dm) => loadDesignManholeSubmitterPublicId(dm.id))),
+  ]);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -94,9 +133,9 @@ export default async function DesignManholesPage() {
     description: PAGE_DESCRIPTION,
     url: PAGE_URL,
     numberOfItems: designManholes.length,
-    itemListElement: designManholes.slice(0, 30).map((dm, index) => ({
+    itemListElement: pageItems.slice(0, 30).map((dm, index) => ({
       '@type': 'ListItem',
-      position: index + 1,
+      position: (page - 1) * PAGE_SIZE + index + 1,
       name: dm.title || 'デザインマンホール',
       url: `${PAGE_URL}/${dm.id}`,
     })),
@@ -118,9 +157,9 @@ export default async function DesignManholesPage() {
               <PhraseText text="ポケふた以外の、オンリーワンなデザインマンホールのコレクション" />
             </p>
             {/*
-              枚数は下に並べている配列そのものの長さを使う。別途数え直すと
+              枚数は地図に出している全件の配列の長さを使う。別途数え直すと
               一覧と数字がズレうるが、これなら構造上ズレない（追加の問い合わせも無い）。
-              loadPublishedDesignManholes の上限200枚に達したら数え直しが要る。
+              DESIGN_MANHOLE_LOAD_LIMIT に近づいたら読み方を変える（design-manhole-ogp.ts）。
             */}
             {designManholes.length > 0 && (
               <p className="mt-2 text-sm font-bold text-dm-ink">
@@ -153,34 +192,15 @@ export default async function DesignManholesPage() {
               <MapSection designManholes={designManholes} prefectureById={prefectureById} />
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {designManholes.map((dm) => (
-                <Link
-                  key={dm.id}
-                  href={`/design-manholes/${dm.id}`}
-                  className="overflow-hidden rounded-lg border border-dm-line/15 bg-white shadow-sm transition hover:shadow-md"
-                >
-                  <div className="aspect-square bg-[#EFE5CE]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={dm.photo_url}
-                      alt={dm.title || 'デザインマンホール'}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div className="p-2.5">
-                    <p className="truncate text-sm font-bold">
-                      {dm.title || 'デザインマンホール'}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-[#2A2A2A]/50">
-                      {dm.submitter_name ? `${dm.submitter_name} ・ ` : ''}
-                      {formatDateJaJst(dm.created_at)}
-                    </p>
-                  </div>
-                </Link>
+            {/* 写真と投稿者を押すと投稿者のページへ（/photos/plush と同じ）。名前の行はマンホールのページへ */}
+            <ul id="list" className="mt-6 grid scroll-mt-20 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+              {pageItems.map((dm, index) => (
+                <li key={dm.id}>
+                  <DesignManholeCard designManhole={dm} posterPublicId={posterPublicIds[index] ?? null} eager={index < 6} />
+                </li>
               ))}
-            </div>
+            </ul>
+            <Pager page={page} totalPages={totalPages} />
           </>
         )}
 
@@ -188,5 +208,38 @@ export default async function DesignManholesPage() {
       </main>
 
     </div>
+  );
+}
+
+function Pager({ page, totalPages }: { page: number; totalPages: number }) {
+  if (totalPages <= 1) return null;
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const linkClass = 'inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-full px-3 text-sm font-bold transition';
+  return (
+    <nav aria-label="ページ送り" className="mt-6 flex flex-wrap items-center justify-center gap-2">
+      {page > 1 ? (
+        <Link href={`${pageHref(page - 1)}#list`} rel="prev" className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          前へ
+        </Link>
+      ) : null}
+      {pages.map((n) =>
+        n === page ? (
+          <span key={n} aria-current="page" className={`${linkClass} bg-dm-line text-white`}>
+            {n}
+          </span>
+        ) : (
+          <Link key={n} href={`${pageHref(n)}#list`} className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
+            {n}
+          </Link>
+        ),
+      )}
+      {page < totalPages ? (
+        <Link href={`${pageHref(page + 1)}#list`} rel="next" className={`${linkClass} bg-white text-dm-line ring-1 ring-dm-line/30 hover:bg-[#F3EEFA]`}>
+          次へ
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      ) : null}
+    </nav>
   );
 }

@@ -28,7 +28,12 @@ export function isValidDesignManholeId(id: string): boolean {
 // （exif / storage_key / created_by は絶対に含めない）
 // 全クライアントで失敗した場合は throw する。空配列を返すと障害時に
 // 「まだ投稿がありません」と誤表示してしまうため、失敗と0件を区別する
-export async function loadPublishedDesignManholes(limit = 200): Promise<DesignManhole[]> {
+// 一覧の地図・枚数・ページ送り、詳細の「近くのデザインマンホール」は全件を前提にしている。
+// PostgREST の1回の上限（1000行）に近づいたら、range で分けて読むように直すこと
+// （以前は 200 で切っていて、205 枚になったとき一覧の枚数がトップとずれた）
+export const DESIGN_MANHOLE_LOAD_LIMIT = 1000;
+
+export async function loadPublishedDesignManholes(limit = DESIGN_MANHOLE_LOAD_LIMIT): Promise<DesignManhole[]> {
   const clients = createOgpSupabaseClients();
   let lastError: unknown = new Error('Supabase client is not configured');
 
