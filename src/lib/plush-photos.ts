@@ -59,7 +59,10 @@ export async function loadPlushPhotos(
   return loadTaggedPhotos('plush', limit, order, interleave);
 }
 
-/** 公開写真だけをタグで抽出。雪は投稿の新しい順で、写真全体を表示する。 */
+/**
+ * 公開写真だけをタグで抽出。投稿の新しい順で最大 limit 枚を返す（雪のページは sortByShotAtDesc で撮影日順に並べ直す。
+ * 上限で切ってから並べ直すので、雪が limit 枚を超えたら DB 側で撮影日順に切るように直すこと）。
+ */
 export async function loadTaggedPhotos(
   tag: 'plush' | 'snow',
   limit = PLUSH_PAGE_LIMIT,

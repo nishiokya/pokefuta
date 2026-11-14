@@ -11,6 +11,7 @@
 --
 -- ロールバック（変えた行は NOTICE に出る。snow を元の値に戻す）:
 --   UPDATE public.photo SET ai_tags = ai_tags || jsonb_build_object('snow', <元の値>) WHERE id = '<NOTICE の id>';
+--   元が「なし」（キーが無かった）行は: UPDATE public.photo SET ai_tags = ai_tags - 'snow' WHERE id = '<NOTICE の id>';
 DO $$
 DECLARE
   v_watermark constant timestamptz := '2026-11-14T05:34:37.580735+00:00';
@@ -49,6 +50,9 @@ BEGIN
     SELECT p.id, p.ai_tags -> 'snow' AS old_snow, p.id = ANY (v_snow) AS new_snow
     FROM public.photo AS p
     WHERE p.created_at <= v_watermark
+      -- 人が見られたのは watermark までに採点された写真だけ。watermark 直前に投稿され、その後に採点された
+      -- 写真は人が見ていないので、AI の値のまま残す
+      AND p.quality_scored_at <= v_watermark
       AND p.ai_tags ? 'attrs_model'   -- 雪を判定する版（0.12.0 以降）で採点済みの写真だけ
       AND (p.ai_tags -> 'snow') IS DISTINCT FROM to_jsonb(p.id = ANY (v_snow))
     ORDER BY p.id
