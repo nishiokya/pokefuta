@@ -36,7 +36,14 @@ import { manholePhotoHref } from '@/lib/manhole-photo-link';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import PosterLink from '@/components/PosterLink';
+import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
+import {
+  EMPTY_NEW_POKEFUTA_WANTED,
+  NEW_POKEFUTA_UPLOAD_PATH,
+  fetchNewPokefutaWanted,
+  newPokefutaWantedLabel,
+} from '@/lib/new-pokefuta-wanted';
 
 type FeedVisit = {
   id: string;
@@ -93,8 +100,6 @@ export default function HomePage() {
   const [feedTotal, setFeedTotal] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
-  // 写真のあるポケふたの数（site-stats の manholes_with_photos）。PC のヒーローの数字に使う
-  const [manholesWithPhotos, setManholesWithPhotos] = useState<number | null>(null);
   // PC のヒーロー右に敷く写真。最初のページの投稿から取り、ページ送りでは差し替えない
   const [heroPhotos, setHeroPhotos] = useState<FeedVisit[] | null>(null);
   const [rareManholes, setRareManholes] = useState<Pick<Manhole, 'id' | 'prefecture' | 'municipality' | 'building' | 'title'>[]>([]);
@@ -106,10 +111,15 @@ export default function HomePage() {
   // undefined は取得中（ヒーローに枠を確保しておく）、null は取れなかった・0枚
   // LEGEND の人（ヒーローの「LEGEND を目指そう」のカード）。regulars.json と同じ取得で読む
   const [legends, setLegends] = useState<readonly RegularLegend[]>([]);
+  // 設置が発表されたのに写真がまだ届いていない新しいポケふた（図鑑の provisional-wanted.json）。ヒーローの「募集中」カード
+  const [newWanted, setNewWanted] = useState(EMPTY_NEW_POKEFUTA_WANTED);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
+  // 特集は最新の投稿の上に置くので、取り終わるまでは枠を取っておく（後から入って投稿を押し下げない）
+  const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
+  const [featureLoadsDone, setFeatureLoadsDone] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
@@ -141,10 +151,12 @@ export default function HomePage() {
     loadCompletion();
     loadDesignFeature();
     loadPlushFeature();
+    loadSnowFeature();
     fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
       setRegularBadges(badges);
       setLegends(loaded);
     });
+    fetchNewPokefutaWanted().then(setNewWanted);
   }, []);
 
   useEffect(() => {
@@ -197,7 +209,6 @@ export default function HomePage() {
       // 非公開にした写真まで「集まっています」に含まれて表示と食い違う。
       setTotalPosts(typeof data.public_posts === 'number' ? data.public_posts : null);
       setDesignManholes(typeof data.design_manholes === 'number' ? data.design_manholes : null);
-      setManholesWithPhotos(typeof data.manholes_with_photos === 'number' ? data.manholes_with_photos : null);
     } catch {
       // ignore
     }
@@ -212,6 +223,21 @@ export default function HomePage() {
       setPlushFeature({ count: data.count, photos: data.photos });
     } catch {
       // 取れなければ特集にぬいぐるみを出さないだけ
+    } finally {
+      setFeatureLoadsDone((n) => n + 1);
+    }
+  };
+
+  const loadSnowFeature = async () => {
+    try {
+      const response = await fetch('/api/features/snow');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data?.success && typeof data.count === 'number' && Array.isArray(data.photos)) setSnowFeature(data);
+    } catch {
+      // 取得できなければカードを出さない
+    } finally {
+      setFeatureLoadsDone((n) => n + 1);
     }
   };
 
@@ -224,6 +250,8 @@ export default function HomePage() {
       setDesignFeature(data.design_manholes);
     } catch {
       // ignore
+    } finally {
+      setFeatureLoadsDone((n) => n + 1);
     }
   };
 
@@ -348,28 +376,6 @@ export default function HomePage() {
             </p>
 
             {/*
-              PC だけ、そろった範囲を数字で見せる（2026-10-30）。全部そろうと上の文が枚数だけになり、
-              何がどこまで集まったのかが読めなかった。次の行動（2枚目）にもつなぐ。
-              数字はどちらも取得後に入るので、そろうまでは行ごと出さない（PC はモザイクの高さで行が取ってある）
-            */}
-            {allCollected && manholesWithPhotos != null && manholesWithPhotos > 0 && (
-              <div className="mt-3 hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-[#4A4A4A] lg:flex">
-                <span className="whitespace-nowrap">
-                  <b className="text-xl font-extrabold text-[#7B63A8]">{manholesWithPhotos}</b> か所のポケふた すべてに写真
-                </span>
-                <span className="whitespace-nowrap">
-                  <b className="text-xl font-extrabold text-[#7B63A8]">{completion?.completeCount}</b> 都道府県すべて
-                </span>
-                <Link
-                  href={isLoggedIn ? '/upload' : '/login?redirect=/upload'}
-                  className="whitespace-nowrap text-[#B5483C] hover:underline"
-                >
-                  別の季節・2枚目も募集中 ›
-                </Link>
-              </div>
-            )}
-
-            {/*
               新規登録を主役にする。以前は2つのボタンが同じ大きさ・同じ重みで
               並んでいて、どちらが主かが読めなかった。登録側だけを一段大きくし、
               スタンプ帳は枠線を外して副次的な見た目に落とす。
@@ -404,7 +410,7 @@ export default function HomePage() {
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
               href="/badges"
-              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:hidden sm:gap-3 sm:p-4 lg:flex-1"
+              className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#7B63A8]/20 bg-white p-2.5 shadow-sm transition hover:shadow max-sm:hidden sm:gap-3 sm:p-4 lg:hidden"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7B63A8] text-white sm:h-12 sm:w-12">
                 <Award className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -420,7 +426,7 @@ export default function HomePage() {
             {/*
               「この◯人に続け！」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
               LEGEND のトレーナーを写真と名前で見せ、押すとその人の公開スタンプ帳へ。順位にしないため枚数は出さず名前順。
-              スマホは「バッジを集めよう」を出さず、このカード1枚を横いっぱいに（称号のお知らせのリンクで /badges へ）。
+              スマホと PC は「バッジを集めよう」を出さず（PC は 2026-11-07 に外した）、称号のお知らせのリンクで /badges へ。スマホはこのカード1枚を横いっぱいに。
               タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。どれも3人まで。
               名前と写真は regulars.json から後で入るが、カードの枠は最初から出すので行はずれない（CLS、#338）。
               まだ届いていない（取れなかった）ときは「LEGEND を目指そう」として /badges の説明へ送る
@@ -444,18 +450,24 @@ export default function HomePage() {
                         title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
                       >
                         <span className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-300 via-amber-200 to-sky-300 p-[2px] shadow-sm transition group-hover:scale-105 sm:h-10 sm:w-10">
-                          {legend.photoId ? (
-                            <img
-                              src={`/api/photo/${legend.photoId}?size=small`}
-                              alt=""
-                              width={40}
-                              height={40}
-                              loading="lazy"
-                              className="h-full w-full rounded-full bg-[#EFE4CC] object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm">🏆</span>
-                          )}
+                          {/* 本人が /profile で選んだアイコンを先に。未設定なら今までどおりその人の写真 */}
+                          <PosterAvatar
+                            publicUserId={legend.id}
+                            size={40}
+                            className="!h-full !w-full"
+                            fallback={legend.photoId ? (
+                              <img
+                                src={`/api/photo/${legend.photoId}?size=small`}
+                                alt=""
+                                width={40}
+                                height={40}
+                                loading="lazy"
+                                className="h-full w-full rounded-full bg-[#EFE4CC] object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm">🏆</span>
+                            )}
+                          />
                         </span>
                         <span className="mt-0.5 w-full truncate text-center text-[10px] font-bold text-[#4A4A4A] group-hover:underline">{legend.name}</span>
                       </Link>
@@ -488,7 +500,32 @@ export default function HomePage() {
                 <span className="block h-10 w-10" />
               </div>
             )}
-            {wantedPrefecture && wantedHref && (
+            {/*
+              新しいポケふたの「募集中」（2026-11-07）。公式サイトにまだ載っていない新作は、写真の GPS から図鑑に
+              載せるので、場所の分からない蓋の写真を集めたい。全部の蓋に写真がそろって上の県のカードが出なくなった
+              枠に入る（両方あるときはこちらを先に）。押すとデザインマンホール投稿の「新しいポケふた」へ
+            */}
+            {newWanted.total > 0 && (
+              <Link
+                // 未ログインなら middleware がログインへ送り、?kind=pokefuta ごと戻す
+                href={NEW_POKEFUTA_UPLOAD_PATH}
+                className="group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-[11px] font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xs">
+                  NEW
+                </span>
+                <span className="min-w-0">
+                  {/* PC は3枚が横に並んで幅が狭いので、見出しは短く、県名は下の行に（折り返すと2行になる） */}
+                  <span className="block whitespace-nowrap text-xs font-extrabold text-[#4A4A4A] sm:text-base">
+                    新作を<span className="text-[#B5483C]">募集中</span>
+                  </span>
+                  <span className="block truncate text-[11px] text-[#6A4D36] sm:text-xs">
+                    {newPokefutaWantedLabel(newWanted)} <b className="text-[#B5483C]">{newWanted.total}</b>か所
+                  </span>
+                </span>
+              </Link>
+            )}
+            {!newWanted.total && wantedPrefecture && wantedHref && (
               <a
                 href={wantedHref}
                 className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2`}
@@ -545,6 +582,101 @@ export default function HomePage() {
           </div>
 
         </section>
+
+        {/*
+          特集（雪景色・デザインふた・ぬいぐるみ）。2026-11-06 に最新の投稿の後ろからヒーローの直下へ上げた
+          （ヒーローの中には入れない。ヒーローは行動のカードだけ）。
+          投稿より上にあるので、取り終わるまでは同じ高さの枠を出しておき、後から入って投稿を押し下げない。
+          写真はスマホでも3枚並べる（縮めた 40px なら 2 列のカードに 3 枚入る）。
+          どれも取れなければ節ごと出さない
+        */}
+        {(featureLoadsDone < 3 || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
+          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < 3}>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
+              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
+              特集
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+            {snowFeature && snowFeature.count > 0 ? (
+              <Link href="/photos/snow" className="group col-span-2 flex min-w-0 items-center gap-3 rounded-lg bg-sky-50 p-3 shadow-sm transition hover:shadow">
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {snowFeature.photos.slice(0, 3).map((photo) => (
+                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
+                  ))}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-sky-950">雪景色のポケふた</p>
+                  <p className="text-xs text-slate-600">写真 {snowFeature.count}枚 <span className="font-bold text-[#7B63A8] group-hover:underline">見る ›</span></p>
+                </div>
+              </Link>
+            ) : featureLoadsDone < 3 && <div className="col-span-2"><FeatureCardPlaceholder /></div>}
+
+            {designFeature && designFeature.length > 0 ? (
+            <Link
+              href="/design-manholes"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {designFeature.slice(0, 3).map((d) => (
+                  <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
+                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
+                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
+            {plushFeature && plushFeature.count > 0 ? (
+            <Link
+              href="/photos/plush"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {plushFeature.photos.slice(0, 3).map((photo) => {
+                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                  const src = `/api/photo/${photo.id}?size=small`;
+                  return (
+                    <div key={photo.id} className="relative h-14 w-14">
+                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                        <img src={src} alt="" width={56} height={56} loading="lazy"
+                          className={lidClip ? undefined : 'h-full w-full object-cover'}
+                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                      </div>
+                      {plushClip && (
+                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
+                  ぬいぐるみと旅するポケふた
+                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                </p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  写真 {plushFeature.count}枚
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
+            </div>
+          </section>
+        )}
 
         {/* Loading State */}
         {loading && (
@@ -704,14 +836,14 @@ export default function HomePage() {
                               ariaLabel={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
                               className="mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
                             >
-                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <PosterAvatar publicUserId={visit.public_user_id} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                               <ChevronRight className="h-3 w-3 shrink-0 opacity-80" />
                             </PosterLink>
                           ) : (
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-semibold text-white/85">
-                              <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              <PosterAvatar publicUserId={visit.public_user_id} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
                               <span className="truncate">{posterLabel}</span>
                               {regularTier && <RegularBadge tier={regularTier} />}
                             </div>
@@ -862,85 +994,6 @@ export default function HomePage() {
         {feedSettled && currentPage === 1 && isSp === true && <RecentComments />}
 
         {/*
-          特集（デザインふた・ぬいぐるみ）。ぬいぐるみは 10-18 にここへ下げ、10-22 にヒーローへ戻し、
-          10-24 にヒーローを「この3人に続け！」にしたので、またここ（デザインふたの右）に戻した。
-          PC は写真と説明の横長カード、スマホは写真を減らす。どちらも取れなければ節ごと出さない
-        */}
-        {feedSettled && ((designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0)) && (
-          <section className="mt-8">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold">
-              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
-              特集
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-            {designFeature && designFeature.length > 0 && (
-            <Link
-              href="/design-manholes"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {designFeature.map((d, index) => (
-                  <div key={d.id} className={`h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm ${index === 2 ? 'max-sm:hidden' : ''}`}>
-                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
-                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            )}
-            {plushFeature && plushFeature.count > 0 && (
-            <Link
-              href="/photos/plush"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {plushFeature.photos.map((photo, index) => {
-                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                  const src = `/api/photo/${photo.id}?size=small`;
-                  return (
-                    <div key={photo.id} className={`relative h-14 w-14 ${index === 2 ? 'max-sm:hidden' : ''} ${index > 2 ? 'hidden' : ''}`}>
-                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy"
-                          className={lidClip ? undefined : 'h-full w-full object-cover'}
-                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                      </div>
-                      {plushClip && (
-                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
-                  ぬいぐるみと旅するポケふた
-                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                </p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  写真 {plushFeature.count}枚
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            )}
-            </div>
-          </section>
-        )}
-
-        {/*
           全部そろった後も投稿は集め続けているので、お礼で終わらせず「別の季節・2枚目」へつなぐ
           （北極星は初回投稿→2回目）。行き先は投稿。未ログインはログインを挟んで投稿へ戻す。
           ヒーローは行動のカードだけにしたいので、写真がまだないポケふたと同じく一番下に置く（2026-10-22）
@@ -1007,6 +1060,23 @@ export default function HomePage() {
       </main>
       </PCShell>
 
+    </div>
+  );
+}
+
+// 特集カードを取り終わるまでの枠。本物のカードと同じ並び・同じ文字の大きさで高さをそろえる
+function FeatureCardPlaceholder() {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm sm:flex-row sm:items-center sm:gap-3" aria-hidden="true">
+      <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-14 w-14 animate-pulse rounded-lg border-2 border-white bg-[#EFE4CC]" />
+        ))}
+      </div>
+      <div className="min-w-0">
+        <p className="invisible truncate text-xs font-extrabold sm:text-sm">特集</p>
+        <p className="invisible text-[11px] sm:text-xs">見る</p>
+      </div>
     </div>
   );
 }

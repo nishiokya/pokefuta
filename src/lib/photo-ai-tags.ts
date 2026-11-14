@@ -4,7 +4,7 @@
  * ai_tags は k11 の manhole-score が毎朝の採点で書く（supabase/migrations/20261004100000_photo_ai_tags.sql）。
  * アプリは判定しない。ここは「どれを出すか」だけを決める。
  *
- * 出すのは3つ:
+ * 既存の3つに、人物・雪・紅葉・足元を追加（docs/photo-ai-tags.md）:
  *   ぬいぐるみ … plush（学習した分類器。閾値は k11 側で決めて真偽で入る）
  *   夜         … night（撮影時刻と蓋の位置から求めた太陽高度が −6° 未満）。AI の判定ではないので
  *                「AI」の印を付けない（「AI夜」と並ぶと意味が通らない）
@@ -18,6 +18,12 @@ export type PhotoAiTags = {
   scene?: 'centered_clean' | 'wide_context' | 'signage_info' | 'landscape';
   plush?: boolean;
   plush_score?: number;
+  /** K11 の公開用属性モデル。独立した検証分の適合率 50% 以上で採用 */
+  person?: boolean;
+  snow?: boolean;
+  autumn?: boolean;
+  feet?: boolean;
+  attrs_model?: string;
   night?: boolean | null;
   /** 一覧の正方形の位置 [x0, y0, x1, y1]（0〜1）。蓋の枠に寄せてある。20261004120000 */
   crop?: [number, number, number, number];
@@ -29,7 +35,7 @@ export type PhotoAiTags = {
   plush_box?: [number, number, number, number];
 };
 
-export type AiTagKey = 'plush' | 'night' | 'landscape';
+export type AiTagKey = 'plush' | 'night' | 'landscape' | 'person' | 'snow' | 'autumn' | 'feet';
 
 /** ai: AI が写真から判定したか（「AI」の印を付ける）。夜は撮影時刻と場所から決まるので false */
 export type AiTag = { key: AiTagKey; label: string; ai: boolean };
@@ -37,18 +43,25 @@ export type AiTag = { key: AiTagKey; label: string; ai: boolean };
 // チップには「AI」の印を付けない（かっこ悪いという利用者の声）。代わりにタグを出す画面の下にこの注釈を出す
 // （AiTagNote）。夜は AI ではなく撮影時刻と場所の規則なので、文言で区別する
 export const AI_TAG_HELP =
-  'ぬいぐるみ・風景のタグは AI で、夜のタグは撮影時刻と場所から自動で判定しています。間違っていたらごめんなさい。';
+  'ぬいぐるみ・風景・人物・雪・紅葉・足元のタグは AI で、夜のタグは撮影時刻と場所から自動で判定しています。間違っていたらごめんなさい。';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function photoAiTags(photo: { ai_tags?: unknown; is_landscape?: boolean | null }): AiTag[] {
+export function photoAiTags(
+  photo: { ai_tags?: unknown; is_landscape?: boolean | null },
+  { compact = false }: { compact?: boolean } = {},
+): AiTag[] {
   const tags = photo.ai_tags;
   if (!isRecord(tags)) return [];
   const out: AiTag[] = [];
   if (tags.plush === true) out.push({ key: 'plush', label: 'ぬいぐるみ', ai: true });
   if (tags.night === true) out.push({ key: 'night', label: '夜', ai: false });
   if (tags.scene === 'landscape' && !photo.is_landscape) out.push({ key: 'landscape', label: '風景', ai: true });
+  for (const [key, label] of [['person', '人物'], ['snow', '雪'], ['autumn', '紅葉'], ['feet', '足元']] as const) {
+    if (compact && (key === 'person' || key === 'feet')) continue;
+    if (tags[key] === true) out.push({ key, label, ai: true });
+  }
   return out;
 }
 
@@ -175,4 +188,50 @@ export function photoBoxZoom(
 export function hasPlushClip(aiTags: unknown): boolean {
   const { lid, plush } = photoAiBoxes(aiTags);
   return Boolean(lid && plush && isRecord(aiTags) && unitBox(aiTags.crop));
+}
+
+/** 蓋の枠として信じる縦/横の範囲（ピクセルで）。avatarCropSquare */
+export const LID_SANE_ASPECT: [number, number] = [0.65, 1.5];
+
+export type PixelSquare = { left: number; top: number; width: number; height: number };
+
+/**
+ * アイコン（/api/photo/[id]/avatar）で写真から切り出す正方形（ピクセル）。丸く見せたとき蓋が丸をいっぱいに埋めるようにする。
+ *
+ * ai_tags.lid（蓋の枠）があれば、その長いほうの辺 × 1.04 を一辺にし、蓋の中心に合わせる（photoLidZoom と同じ寄せ方）。
+ * 一辺は写真の短辺まで・短辺の 1/LID_ZOOM_MAX 以上（小さい蓋を拡大しすぎてぼやけさせない）。写真の外が入らないよう端ではずらす。
+ * lid が無ければ一覧の正方形（ai_tags.crop）、それも無ければ真ん中の正方形。
+ *
+ * 蓋の枠がピクセルで見て正方形から大きく外れている（縦/横が LID_SANE_ASPECT の外）ときは、lid も
+ * それから決めた crop も信用せず真ん中で切る。蓋は丸いので枠はほぼ正方形（斜めから撮ると横長になる程度）。
+ * 2026-11 の点検で、縦/横が (4/3)² ≈ 1.78 や (3/4)² ≈ 0.56 の枠が1割弱あった（採点が写真を 90° 回った向きで見た跡）。
+ */
+export function avatarCropSquare(aiTags: unknown, width: number, height: number): PixelSquare {
+  const W = Math.max(1, Math.round(width));
+  const H = Math.max(1, Math.round(height));
+  const short = Math.min(W, H);
+  let lid = isRecord(aiTags) ? unitBox(aiTags.lid) : null;
+  let crop = isRecord(aiTags) ? unitBox(aiTags.crop) : null;
+  if (lid) {
+    const ratio = ((lid[3] - lid[1]) * H) / ((lid[2] - lid[0]) * W);
+    if (ratio < LID_SANE_ASPECT[0] || ratio > LID_SANE_ASPECT[1]) {
+      lid = null;
+      crop = null;
+    }
+  }
+  let side = short;
+  let cx = W / 2;
+  let cy = H / 2;
+  if (lid) {
+    side = Math.max((lid[2] - lid[0]) * W, (lid[3] - lid[1]) * H) * 1.04;
+    side = Math.min(Math.max(side, short / LID_ZOOM_MAX), short);
+    cx = ((lid[0] + lid[2]) / 2) * W;
+    cy = ((lid[1] + lid[3]) / 2) * H;
+  } else if (crop) {
+    cx = ((crop[0] + crop[2]) / 2) * W;
+    cy = ((crop[1] + crop[3]) / 2) * H;
+  }
+  const s = Math.max(1, Math.min(Math.round(side), short));
+  const clamp = (v: number, hi: number) => Math.min(Math.max(Math.round(v), 0), hi);
+  return { left: clamp(cx - s / 2, W - s), top: clamp(cy - s / 2, H - s), width: s, height: s };
 }

@@ -40,7 +40,14 @@ export function generateStorageKey(type: 'original' | 'thumb', size?: number): s
 // photos/original/YYYY/MM/{uuid}.jpg -> photos/small/YYYY/MM/{uuid}.webp
 // Deterministic so the read path can re-derive it without a DB column.
 // Returns null for keys that don't follow the original-photo layout.
+//
+// デザインふた投稿から公式の蓋の訪問へ移した写真（20261110100000）は、画像を動かさずに
+// photos/design/original/ のキーを photo.storage_key に持つ。その縮小版は投稿時に
+// photos/design/small/ に作られているので、そちらを返す。
 export function deriveSmallKey(storageKey: string): string | null {
+  if (storageKey.startsWith('photos/design/original/')) {
+    return deriveDesignSmallKey(storageKey);
+  }
   if (!storageKey.startsWith('photos/original/')) {
     return null;
   }

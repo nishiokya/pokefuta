@@ -22,6 +22,11 @@ DECLARE
   pub_visit uuid := '00000000-0000-0000-0000-00000000ec01';
   priv_visit uuid := '00000000-0000-0000-0000-00000000ec02';
   owner_priv uuid := '00000000-0000-0000-0000-00000000ec03';
+  other_visit uuid := '00000000-0000-0000-0000-00000000ec04';
+  owner_pub_photo  uuid := '00000000-0000-0000-0000-00000000ed01';
+  owner_pub_photo2 uuid := '00000000-0000-0000-0000-00000000ed02';
+  owner_priv_photo uuid := '00000000-0000-0000-0000-00000000ed03';
+  other_photo      uuid := '00000000-0000-0000-0000-00000000ed04';
   target_manhole bigint;
   n int;
   txt text;
@@ -448,6 +453,114 @@ BEGIN
   PERFORM set_config('request.jwt.claims',
                      json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
   RESET ROLE;
+
+  -- ---------------------------------------------------------------------
+  -- 21〜29. アイコン（app_user.avatar_photo_id）
+  --    マイグレーション: 20261106150000_app_user_avatar_photo.sql
+  --    選べるのは本人の公開訪問の写真だけ。保存時と表示時の両方で見る。
+  -- ---------------------------------------------------------------------
+  INSERT INTO public.visit (id, user_id, manhole_id, shot_at, is_public) VALUES
+    (other_visit, other_id, target_manhole, now(), true);
+  INSERT INTO public.photo (id, visit_id, manhole_id, storage_key) VALUES
+    (owner_pub_photo,  pub_visit,   target_manhole, 'photos/original/verify-avatar-pub.jpg'),
+    (owner_pub_photo2, pub_visit,   target_manhole, 'photos/original/verify-avatar-pub2.jpg'),
+    (owner_priv_photo, owner_priv,  target_manhole, 'photos/original/verify-avatar-priv.jpg'),
+    (other_photo,      other_visit, target_manhole, 'photos/original/verify-avatar-other.jpg');
+
+  SET LOCAL ROLE anon;
+  BEGIN
+    PERFORM avatar_photo_id FROM public.app_user WHERE id = owner_app;
+    RAISE EXCEPTION '[21] anon が app_user.avatar_photo_id を直接読めている';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;  -- 期待どおり
+  END;
+  BEGIN
+    PERFORM public.set_own_avatar_photo(owner_pub_photo);
+    RAISE EXCEPTION '[22] anon が set_own_avatar_photo を呼べている';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;  -- 期待どおり
+  END;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+  -- 列を直接書けると、他の検査を通らない値（他人の写真）を置ける
+  BEGIN
+    UPDATE public.app_user SET avatar_photo_id = other_photo WHERE auth_uid = owner_id;
+    RAISE EXCEPTION '[23] authenticated が avatar_photo_id を直接書けている';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;  -- 期待どおり
+  END;
+
+  PERFORM public.set_own_avatar_photo(owner_pub_photo);
+  IF public.get_own_avatar_photo_id() IS DISTINCT FROM owner_pub_photo THEN
+    RAISE EXCEPTION '[24] 公開訪問の写真を選んだのに get_own_avatar_photo_id が返さない';
+  END IF;
+
+  BEGIN
+    PERFORM public.set_own_avatar_photo(owner_priv_photo);
+    RAISE EXCEPTION '[25] 非公開訪問の写真をアイコンにできてしまう';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM <> 'Photo is not available for avatar' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM public.set_own_avatar_photo(other_photo);
+    RAISE EXCEPTION '[26] 他人の写真をアイコンにできてしまう';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM <> 'Photo is not available for avatar' THEN RAISE; END IF;
+  END;
+  IF public.get_own_avatar_photo_id() IS DISTINCT FROM owner_pub_photo THEN
+    RAISE EXCEPTION '[26] 弾かれた保存のあとでアイコンが変わっている';
+  END IF;
+
+  SET LOCAL ROLE anon;
+  IF public.get_public_avatar_photo_id(owner_app) IS DISTINCT FROM owner_pub_photo THEN
+    RAISE EXCEPTION '[27] 公開ページのアイコンが返らない';
+  END IF;
+  IF public.get_public_avatar_photo_id(other_app) IS NOT NULL THEN
+    RAISE EXCEPTION '[27] アイコン未設定のユーザーに写真が返っている';
+  END IF;
+
+  -- 訪問を非公開に戻したら、アイコンも公開ページと /profile から消える
+  RESET ROLE;
+  UPDATE public.visit SET is_public = false WHERE id = pub_visit;
+  SET LOCAL ROLE anon;
+  IF public.get_public_avatar_photo_id(owner_app) IS NOT NULL THEN
+    RAISE EXCEPTION '[28] 非公開にした訪問の写真がアイコンとして公開され続けている';
+  END IF;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+  IF public.get_own_avatar_photo_id() IS NOT NULL THEN
+    RAISE EXCEPTION '[28] 非公開にした訪問の写真が /profile ではアイコンのまま見える';
+  END IF;
+  RESET ROLE;
+  UPDATE public.visit SET is_public = true WHERE id = pub_visit;
+
+  -- 写真を消したらアイコンも外れる（ON DELETE SET NULL）。NULL を渡せば外せる
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+  PERFORM public.set_own_avatar_photo(owner_pub_photo2);
+  RESET ROLE;
+  DELETE FROM public.photo WHERE id = owner_pub_photo2;
+  IF (SELECT avatar_photo_id FROM public.app_user WHERE id = owner_app) IS NOT NULL THEN
+    RAISE EXCEPTION '[29] 写真を消してもアイコンの参照が残っている';
+  END IF;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims',
+                     json_build_object('sub', owner_id, 'role', 'authenticated')::text, true);
+  PERFORM public.set_own_avatar_photo(owner_pub_photo);
+  PERFORM public.set_own_avatar_photo(NULL);
+  IF public.get_own_avatar_photo_id() IS NOT NULL THEN
+    RAISE EXCEPTION '[29] NULL で外したのにアイコンが残っている';
+  END IF;
+  RESET ROLE;
+
+  DELETE FROM public.photo WHERE id IN (owner_pub_photo, owner_priv_photo, other_photo);
+  DELETE FROM public.visit WHERE id = other_visit;
 
   -- 検証行を残さない（この DO は単一文なので、途中で落ちれば自動で巻き戻る）
   DELETE FROM public.visit WHERE id IN (pub_visit, priv_visit, owner_priv);

@@ -31,6 +31,7 @@ import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 import PokemonGoFriendCard from '@/components/users/PokemonGoFriendCard';
 import XLogo from '@/components/XLogo';
 import UserRegularBadge from '@/components/users/UserRegularBadge';
+import UserAvatar from '@/components/users/UserAvatar';
 import HeroStat, { rankRing } from '@/components/users/HeroStat';
 import TitleProgressStat from '@/components/users/TitleProgressStat';
 import {
@@ -202,6 +203,14 @@ export default async function UserVisitsPage({ params }: PageProps) {
               <div className="min-w-0">
                 {/* 本人の X・Instagram は名前の横にロゴだけで置く。名前が長くて入らなければ下へ回る */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  {/* アイコンは本人が選んだときだけ出す。未設定の人に人のマークを足して行を詰まらせない */}
+                  {data.avatarPhotoId && (
+                    <UserAvatar
+                      photoId={data.avatarPhotoId}
+                      size={56}
+                      alt={`${data.displayName}のアイコン`}
+                    />
+                  )}
                   <UserRegularBadge userId={data.userId} />
                   <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
                     {data.displayName}のスタンプ帳
@@ -353,7 +362,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
         <AiTagNote
           className="mt-4"
           show={prefectureGroups.some((group) =>
-            group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }).length > 0))}
+            group.visits.some((visit) => photoAiTags({ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }, { compact: true }).length > 0))}
         />
 
         <section className="mt-10">
@@ -476,7 +485,7 @@ function VisitCard({ visit }: { visit: PublicVisit }) {
       <div className="p-1.5 sm:p-2.5">
         <div className="flex flex-wrap gap-1">
           <LandscapePhotoBadge isLandscape={visit.isLandscape} />
-          <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} />
+          <AiPhotoTags photo={{ ai_tags: visit.aiTags, is_landscape: visit.isLandscape }} compact />
         </div>
         <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">
           {title}

@@ -1,9 +1,13 @@
 import type L from 'leaflet';
 import { pokefutaEvents, type PokefutaEventParams } from '@/lib/analytics/gtag';
 
-/** Googleマップの経路案内（目的地だけ指定。出発地は端末の現在地になる） */
-export function googleMapsRouteUrl(latitude: number | null | undefined, longitude: number | null | undefined): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+/**
+ * 「経路案内」ボタンの行き先。開くのは場所の地図（ピン）で、道順は Google マップの「経路」から出してもらう。
+ * 経路（maps/dir）を直接開くと、スマホでは現在地からのナビがすぐ始まり、下調べの人には大げさだった。
+ * 図鑑（pokefuta-tracker）も同じ形にそろえている。
+ */
+export function googleMapsPlaceUrl(latitude: number | null | undefined, longitude: number | null | undefined): string {
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 /**

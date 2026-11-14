@@ -6,7 +6,7 @@ import { interleaveByGroup } from '@/lib/interleave-by-group';
 
 /**
  * ぬいぐるみと一緒に撮った公開写真（photo.ai_tags.plush = true）。/photos/plush の一覧に使う。
- * ぬいぐるみらしさ（plush_score）の高い順（または新しい順）に最大 limit 枚を取り、投稿者を1枚ずつ順番に回して並べ直す
+ * ぬいぐるみらしさ（plush_score）の高い順または投稿の新しい順に最大 limit 枚を取り、必要なら投稿者を1枚ずつ順番に回して並べ直す
  * （写真の多い人が上を埋めないように。plush_score はほとんどの写真で 0.99 以上なので、順位の意味は薄い）。
  *
  * 判定は k11 の manhole-score（20261004100000_photo_ai_tags.sql）。anon キーで読むので、
@@ -27,6 +27,8 @@ export type PlushPhoto = {
   /** フィードのタグ（幻・夜ふた・撮れたて…）を作るための入力。トップと同じ feedCardTags に渡す */
   visitId: string;
   pokemons: string[];
+  /** 訪問コメント（公開訪問のもの）。カードに投稿者のひとことして1〜2行だけ出す */
+  comment: string | null;
   posterName: string;
   /** 公開訪問を持つ投稿者の公開ID。無ければリンクしない */
   posterPublicId: string | null;
@@ -34,10 +36,24 @@ export type PlushPhoto = {
 
 export const PLUSH_PAGE_LIMIT = 300;
 
-/** order: 'score' = ぬいぐるみらしい順（特集ページ）、'recent' = 新しい順（トップの特集カード。新着が出るように） */
+/**
+ * order: 'score' = ぬいぐるみらしい順、'recent' = 投稿の新しい順。
+ * interleave: 投稿者を1枚ずつ順番に回すか（トップの特集カードは回す。特集ページは新しい順そのままで出す）
+ */
 export async function loadPlushPhotos(
   limit = PLUSH_PAGE_LIMIT,
   order: 'score' | 'recent' = 'score',
+  interleave = true,
+): Promise<PlushPhoto[]> {
+  return loadTaggedPhotos('plush', limit, order, interleave);
+}
+
+/** 公開写真だけをタグで抽出。雪は投稿の新しい順で、写真全体を表示する。 */
+export async function loadTaggedPhotos(
+  tag: 'plush' | 'snow',
+  limit = PLUSH_PAGE_LIMIT,
+  order: 'score' | 'recent' = 'recent',
+  interleave = false,
 ): Promise<PlushPhoto[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,7 +73,8 @@ export async function loadPlushPhotos(
         id,
         user_id,
         shot_at,
-        is_public
+        is_public,
+        comment
       ),
       manhole:manhole_id (
         id,
@@ -69,7 +86,7 @@ export async function loadPlushPhotos(
       )
     `)
     .eq('visit.is_public', true)
-    .eq('ai_tags->>plush', 'true');
+    .eq(`ai_tags->>${tag}`, 'true');
   if (order === 'score') {
     // 上限で切る前に DB でスコア順に並べる（新しい順で切ってから並べると、古くてぬいぐるみらしい写真が漏れる）。
     // jsonb の数値どうしは数値として比べられる。同点は新しい順
@@ -107,8 +124,10 @@ export async function loadPlushPhotos(
       ),
   ]);
 
-  // どちらの順でも投稿者を1枚ずつ順番に回す（トップの特集カードの3枚も同じ人で埋まらないように）
-  const rows = interleaveByGroup(data as any[], (row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id ?? null);
+  // 投稿者を1枚ずつ順番に回す（トップの特集カードの3枚も同じ人で埋まらないように）
+  const rows = interleave
+    ? interleaveByGroup(data as any[], (row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id ?? null)
+    : (data as any[]);
 
   return rows
     .map((row) => {
@@ -126,6 +145,7 @@ export async function loadPlushPhotos(
         manholeName: manholeDisplayName(manhole),
         visitId: visit.id,
         pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
+        comment: typeof visit.comment === 'string' && visit.comment.trim() ? visit.comment.trim() : null,
         posterName: names.get(visit.user_id)?.trim() || '名無しのトレーナー',
         posterPublicId: publicIds.get(visit.user_id) ?? null,
       } satisfies PlushPhoto;

@@ -34,6 +34,12 @@ export const fetchCache = 'force-no-store';
  *           type: string
  *           enum: [small, medium, large]
  *         description: サムネイルサイズ
+ *       - in: query
+ *         name: strict
+ *         schema:
+ *           type: string
+ *           enum: ['1']
+ *         description: size=small のとき、縮小版が無ければ元画像に落とさず 404 を返す
  *     responses:
  *       307:
  *         description: Signed URLにリダイレクト
@@ -83,6 +89,9 @@ export async function GET(
     const photoId = params.id;
     const { searchParams } = new URL(request.url);
     const size = searchParams.get('size'); // 'small', 'medium', 'large', or null for original
+    // strict=1: 縮小版が無いときに元画像へ落とさず 404 にする。プロフィールのアイコン
+    // （48〜56px）で元画像を丸ごと配らないため。呼び出し側は 404 で代わりの表示に切り替える
+    const strictSmall = size === 'small' && searchParams.get('strict') === '1';
 
     const selectPhoto = (client: SupabaseClient<Database>) => client
       .from('photo')
@@ -142,6 +151,11 @@ export async function GET(
       // pipeline (or if generation failed) — fall back to the original.
       if (smallKey && (await storage.exists?.(smallKey))) {
         storageKey = smallKey;
+      } else if (strictSmall) {
+        return NextResponse.json({
+          success: false,
+          error: 'Small variant not found'
+        }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
       }
     }
 

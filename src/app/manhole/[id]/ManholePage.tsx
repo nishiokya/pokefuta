@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  MapPin, ArrowLeft, Navigation,
+  MapPin, ArrowLeft, Navigation, UserRound,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, ExternalLink, BookOpen,
   MessageCircle, Pencil, Check, X,
@@ -19,6 +19,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import PosterAvatar from '@/components/users/PosterAvatar';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
@@ -49,6 +50,7 @@ import { manholeDexUrl, prefectureDexUrl } from '@/lib/prefectureSlug';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import type { ManholeTitle } from '@/types/database';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
+import { googleMapsPlaceUrl } from '@/components/Map/routeLink';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -98,6 +100,35 @@ const getPhotoUserLabel = (photo: Photo) => {
   if (publicId && publicId.length >= 8) return `ユーザー:${publicId.slice(0, 8)}`;
   return '名無しのトレーナー';
 };
+
+// アイコンは写真の上で誰の1枚か見分ける目印。20px だと顔写真のアイコンが点にしか見えなかったので、
+// 一覧のマスは 26px、大きい写真は 32px にしている。
+function PhotoPosterAvatar({ photo, size = 26 }: { photo: Photo; size?: number }) {
+  return (
+    <PosterAvatar
+      key={photo.visit?.public_user_id || photo.id}
+      publicUserId={photo.visit?.public_user_id}
+      size={size}
+      className="ring-1 ring-white/70"
+      fallback={<UserRound aria-hidden="true" className="shrink-0" style={{ width: size, height: size }} />}
+    />
+  );
+}
+
+/**
+ * 写真の上に重ねるタグ（投稿者の「周辺の風景」と自動判定の夜・風景・人物など）。
+ * 以前は写真の下に白い帯を足して出していたが、マスの高さが写真ごとに揃わず、
+ * 写真とタグの対応も読みにくかったので、名前と同じく写真の上に重ねる。
+ */
+function PhotoOverlayTags({ photo, alignEnd = false }: { photo: Photo; alignEnd?: boolean }) {
+  if (!photo.is_landscape && photoAiTags(photo).length === 0) return null;
+  return (
+    <span className={`flex flex-wrap gap-0.5 ${alignEnd ? 'justify-end' : ''}`}>
+      <LandscapePhotoBadge isLandscape={photo.is_landscape} overlay />
+      <AiPhotoTags photo={photo} overlay />
+    </span>
+  );
+}
 
 /** 写真の上に重ねる一言。ゴミ判定を通ったものだけ、改行を空白に畳んで返す */
 const getPhotoCaption = (photo: Photo) =>
@@ -501,7 +532,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     if (manhole?.latitude && manhole?.longitude) {
       trackRouteOpen({ manhole_id: manhole.id, prefecture: manhole.prefecture });
       window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${manhole.latitude},${manhole.longitude}`,
+        googleMapsPlaceUrl(manhole.latitude, manhole.longitude),
         '_blank',
         'noopener,noreferrer'
       );
@@ -1020,9 +1051,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
         </span>
         <span className="font-['Outfit'] text-xs font-bold text-[#8b816f]">{allDisplayPhotos.length}枚</span>
       </div>
-      {/* 列数は 4/5/6 から 3/4/5 に落としてある。撮影者名を入れる帯を敷いたので、
-          元の列数だと名前がほぼ truncate されて誰の1枚か読めなくなる。 */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+      {/* 列数はスマホ 2・sm 4・lg 5。写真の上にアイコン・名前・称号・日付・タグ・いいねを
+          重ねているので、スマホの3列では名前がほぼ切れて誰の1枚か読めなかった。 */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {newestFirstPhotos.map(({ photo, index }) => {
           const userLabel = getPhotoUserLabel(photo);
           // 日付は並べ替えと同じ判定から取る。shot_at が無い写真は created_at で
@@ -1051,7 +1082,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   type="button"
                   onClick={() => openPhotoAt(index)}
                   aria-label={
-                    `@${userLabel}さんの写真を表示` +
+                    `${userLabel}さんの写真を表示` +
                     (dateLabel ? `（${dateLabel}${dateKind}）` : '') +
                     (photo.is_landscape ? '、周辺の風景' : '') +
                     (comment ? '、コメントあり' : '')
@@ -1066,33 +1097,42 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     loading="lazy"
                   />
                 </button>
-                {photo.visit?.id && (
-                  <span className="absolute right-1 top-1 z-10">
-                    <PhotoLikeButton
-                      visitId={photo.visit.id}
-                      isLoggedIn={isLoggedIn}
-                      loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
-                      variant="gallery"
-                    />
-                  </span>
-                )}
                 {/*
+                  左上にタグ、右上に「コメント・いいね」。左下の名前・日付と重ならないよう
+                  操作とタグは上に寄せる。
                   コメントのアイコンを押すと、そのマスの上にコメントを重ねて出す。
                   以前は写真を押すしかなく、ページ上部の拡大表示へスクロールで飛ばされていた。
                   重ねた面を押すと閉じる。
                 */}
-                {comment && !commentOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setOpenGridCommentPhotoId(photo.id)}
-                    aria-label={`@${userLabel}さんのコメントを読む`}
-                    className="absolute bottom-0 left-0 z-10 p-1"
-                  >
-                    <span className="inline-flex items-center rounded-full bg-black/60 p-1 text-white">
-                      <MessageCircle className="h-3 w-3" strokeWidth={2.4} />
-                    </span>
-                  </button>
-                )}
+                <div className="pointer-events-none absolute inset-x-1 top-1 z-10 flex items-start justify-between gap-1">
+                  <span className="min-w-0 pt-0.5">
+                    <PhotoOverlayTags photo={photo} />
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {comment && !commentOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenGridCommentPhotoId(photo.id)}
+                        aria-label={`${userLabel}さんのコメントを読む`}
+                        className="pointer-events-auto"
+                      >
+                        <span className="inline-flex items-center rounded-full bg-black/60 p-1.5 text-white">
+                          <MessageCircle className="h-3.5 w-3.5" strokeWidth={2.4} />
+                        </span>
+                      </button>
+                    )}
+                    {photo.visit?.id && (
+                      <span className="pointer-events-auto">
+                        <PhotoLikeButton
+                          visitId={photo.visit.id}
+                          isLoggedIn={isLoggedIn}
+                          loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                          variant="gallery"
+                        />
+                      </span>
+                    )}
+                  </div>
+                </div>
                 {commentOpen && (
                   <button
                     type="button"
@@ -1105,37 +1145,35 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     </span>
                   </button>
                 )}
-              </div>
-              {/* 帯はボタンの外。中に入れるとアンカーのネストになるので、
-                  投稿者名を素の <Link> にできない（PR #314 で role=link に逃げた形の逆）。 */}
-              <div className="flex flex-col gap-0.5 px-1.5 py-1">
-                <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                <AiPhotoTags photo={photo} linkFeatures />
-                <div className="flex min-w-0 items-center gap-1">
-                  {profileHref ? (
-                    <Link
-                      href={profileHref}
-                      className="truncate font-pixelJp text-[10.5px] font-bold text-[#6f6657] underline decoration-[#c9bfa8] underline-offset-2 hover:text-[#bf5640]"
-                    >
-                      @{userLabel}
-                    </Link>
-                  ) : (
-                    <span className="truncate font-pixelJp text-[10.5px] font-bold text-[#8b816f]">
-                      @{userLabel}
+                {/* 名前は写真ボタンと兄弟にして、プロフィールリンクを重ねる。 */}
+                {/* アイコンの右に「名前」と「称号・日付」の2段。以前は名前と日付が縦に詰まって重なって見えた */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-1.5 pb-1.5 pt-6 text-white">
+                  <PhotoPosterAvatar photo={photo} size={28} />
+                  <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                    {profileHref ? (
+                      <Link
+                        href={profileHref}
+                        className="pointer-events-auto min-w-0 truncate font-pixelJp text-[11px] font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80"
+                      >
+                        {userLabel}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate font-pixelJp text-[11px] font-bold">
+                        {userLabel}
+                      </span>
+                    )}
+                    <span className="mt-0.5 flex min-w-0 items-center gap-1">
+                      <span className="pointer-events-auto inline-flex shrink-0">
+                        <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                      </span>
+                      {dateLabel && (
+                        <span title={`${dateLabel}${dateKind}`} className="pointer-events-auto truncate font-['Outfit'] text-[10px] font-bold text-white/85">
+                          {dateLabel}
+                        </span>
+                      )}
                     </span>
-                  )}
-                  <PosterRegularBadge publicUserId={photo.visit?.public_user_id} size="icon" />
+                  </div>
                 </div>
-                {dateLabel && (
-                  // セルが狭いので帯には日付だけ出す。撮影日かアップロード日かは
-                  // title と aria-label で補う。
-                  <span
-                    title={`${dateLabel}${dateKind}`}
-                    className="font-['Outfit'] text-[10px] font-bold text-[#9b917e]"
-                  >
-                    {dateLabel}
-                  </span>
-                )}
               </div>
             </div>
           );
@@ -1236,7 +1274,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             <img
               key={featuredPhoto.id}
               src={`/api/photo/${featuredPhoto.id}?size=large`}
-              alt={`@${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
+              alt={`${getPhotoUserLabel(featuredPhoto)}さんのポケふた写真`}
               className="absolute inset-0 m-auto max-h-full max-w-full object-contain"
             />
             {viewerHasMany && (
@@ -1308,15 +1346,16 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           <div className="flex min-w-0 items-center gap-2">
+            <PhotoPosterAvatar photo={featuredPhoto} size={32} />
             {!featuredPhoto.visit?.is_own && featuredPhoto.visit?.public_user_id ? (
               <Link
                 href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
                 className="min-w-0 truncate text-sm font-bold underline"
               >
-                @{getPhotoUserLabel(featuredPhoto)}
+                {getPhotoUserLabel(featuredPhoto)}
               </Link>
             ) : (
-              <span className="min-w-0 truncate text-sm font-bold">@{getPhotoUserLabel(featuredPhoto)}</span>
+              <span className="min-w-0 truncate text-sm font-bold">{getPhotoUserLabel(featuredPhoto)}</span>
             )}
             <PosterRegularBadge publicUserId={featuredPhoto.visit?.public_user_id} />
             {featuredPhoto.visit?.shot_at && (
@@ -1618,7 +1657,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 >
                   <img
                     src={`/api/photo/${allDisplayPhotos[0].id}?size=large`}
-                    alt={`@${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
+                    alt={`${getPhotoUserLabel(allDisplayPhotos[0])}さんのポケふた写真`}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
                     style={{ objectPosition: photoObjectPosition(allDisplayPhotos[0].ai_tags) }}
                   />
@@ -1632,8 +1671,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       </span>
                     </span>
                   )}
+                  <span className="absolute right-3 top-3 z-[1] flex max-w-[55%] justify-end">
+                    <PhotoOverlayTags photo={allDisplayPhotos[0]} alignEnd />
+                  </span>
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
-                    <span className="min-w-0 truncate text-xs font-bold">@{getPhotoUserLabel(allDisplayPhotos[0])}</span>
+                    <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
+                    <span className="min-w-0 truncate text-xs font-bold">{getPhotoUserLabel(allDisplayPhotos[0])}</span>
                     {allDisplayPhotos[0].visit?.shot_at && (
                       <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
                         {formatPhotoDate(allDisplayPhotos[0].visit!.shot_at)}
@@ -1651,7 +1694,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                         key={photo.id}
                         type="button"
                         onClick={() => openPhotoAt(index)}
-                        aria-label={`@${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
+                        aria-label={`${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
                         className={`group relative overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
                           isRepresentative
                             ? 'col-span-2 row-span-2 rounded-l-[16px] lg:rounded-l-[18px]'
@@ -1660,14 +1703,15 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       >
                         <img
                           src={`/api/photo/${photo.id}?size=${isRepresentative ? 'large' : 'small'}`}
-                          alt={`@${getPhotoUserLabel(photo)}さんのポケふた写真`}
+                          alt={`${getPhotoUserLabel(photo)}さんのポケふた写真`}
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        <div className="absolute bottom-9 left-2 z-[2]">
-                          <LandscapePhotoBadge isLandscape={photo.is_landscape} />
-                        </div>
+                        {/* 代表写真の左上は「写真 N枚／追加」が重なるので、タグは右上に寄せる */}
+                        <span className={`absolute top-2 z-[2] flex ${isRepresentative ? 'right-2 max-w-[55%] justify-end' : 'left-2 right-2'}`}>
+                          <PhotoOverlayTags photo={photo} alignEnd={isRepresentative} />
+                        </span>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (
@@ -1680,9 +1724,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                             </span>
                           </span>
                         )}
-                        <span className="absolute inset-x-0 bottom-0 flex items-end gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-8 text-left text-white">
-                          <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
-                            @{getPhotoUserLabel(photo)}
+                        <span className={`absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-3 text-left text-white ${isRepresentative ? 'items-center' : 'flex-col items-start'}`}>
+                          <span className="flex w-full min-w-0 flex-1 items-center gap-1">
+                            <PhotoPosterAvatar photo={photo} size={isRepresentative ? 32 : 26} />
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
+                              {getPhotoUserLabel(photo)}
+                            </span>
                           </span>
                           {photo.visit?.shot_at && (
                             <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
@@ -1699,7 +1746,58 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           )}
 
           {/*
-            一覧は代表写真のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
+            住所・経路案内・登場ポケモンを代表写真のすぐ下にも出す（スマホのみ）。
+            スマホの見出しには住所が無く、コメント欄の下の「場所」まで下りないと
+            住所も経路案内も出てこなかったので、現地で探せなかった。
+            「すべての写真」の後ろに置くと、写真の多い蓋（13枚で約1,650px下）では
+            やはり遠いので、一覧より前に置く（#422 の後追い）。
+            PC は見出しに同じものが出ているので重ねない。
+          */}
+          <dl className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] px-4 py-3 font-pixelJp text-xs lg:hidden">
+            <div className="flex items-center gap-3 py-1">
+              <dt className="shrink-0 font-bold text-[#9b917e]">住所</dt>
+              <dd className="min-w-0 flex-1 font-bold leading-snug text-[#2c2a26]">
+                {manhole.address || `${manhole.prefecture}${manhole.city || manhole.municipality || ''}`}
+              </dd>
+              <dd className="shrink-0">
+                <button
+                  type="button"
+                  onClick={openInMaps}
+                  className="inline-flex items-center gap-1 rounded-full bg-[#1f9d63] px-3 py-1.5 font-pixelJp text-[11px] font-bold text-white transition-colors hover:bg-[#1a8a56]"
+                >
+                  <Navigation className="h-3 w-3" strokeWidth={2.6} />
+                  経路案内
+                </button>
+              </dd>
+            </div>
+            {landmarkLabel(manhole) && (
+              <div className="flex gap-3 py-1">
+                <dt className="shrink-0 font-bold text-[#9b917e]">目印</dt>
+                <dd className="font-bold leading-snug text-[#2c2a26]">{landmarkLabel(manhole)}</dd>
+              </div>
+            )}
+            {manhole.pokemons && manhole.pokemons.length > 0 && (
+              <div className="flex items-start gap-3 py-1">
+                <dt className="shrink-0 pt-1 font-bold text-[#9b917e]">登場ポケモン</dt>
+                <dd className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                  {manhole.pokemons.map((pokemon) => (
+                    <a
+                      key={pokemon}
+                      href={pokemonDexUrl(pokemon)}
+                      aria-label={`ポケふた図鑑で${pokemon}を見る`}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] hover:text-[#bf5640]"
+                    >
+                      <span className="text-[10px]">◓</span>
+                      {pokemon}
+                    </a>
+                  ))}
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          {/*
+            一覧は代表写真（スマホは住所の欄）のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
             コメント欄と地図を挟んで2回出ていた。上の枠に全部収まる3枚以下なら出さない。
           */}
           {allPhotosGrid}

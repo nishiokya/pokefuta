@@ -40,13 +40,19 @@
     "verify:photo-visibility": "node tools/verify-photo-visibility.js",
     "verify:photo-landscape": "node tools/verify-photo-landscape.js",
     "verify:photo-scorer": "node tools/verify-photo-scorer.js",
+    "verify:photo-rotation": "node tools/verify-photo-rotation.js",
     "verify:app-user-visibility": "node tools/verify-app-user-visibility.js",
     "verify:comment-guardrails": "node tools/verify-comment-guardrails.js",
     "verify:publish-all-visits": "node tools/verify-publish-all-visits.js",
     "verify:visit-location-source": "node tools/verify-visit-location-source.js",
     "capture": "node tools/capture/capture.js",
     "test:auth-redirect": "tsx --test tests/auth-redirect.test.ts",
-    "test:photo-redirect-cache": "tsx --test tests/photo-redirect-cache.test.ts"
+    "test:photo-redirect-cache": "tsx --test tests/photo-redirect-cache.test.ts",
+    "test:storage-small-key": "tsx --test tests/storage-small-key.test.ts",
+    "test:public-avatars": "tsx --test tests/public-avatars.test.ts",
+    "test:shared-avatar-cookie": "tsx --test tests/shared-avatar-cookie.test.ts tests/own-avatar.test.ts",
+    "test:new-pokefuta-wanted": "tsx --test tests/new-pokefuta-wanted.test.ts",
+    "test:social-url": "tsx --test tests/social-url.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.901.0",
