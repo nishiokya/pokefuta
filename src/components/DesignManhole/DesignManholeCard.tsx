@@ -65,8 +65,9 @@ export default function DesignManholeCard({
           </div>
           {/* スマホの2列だと名前と日付が1行に入らず名前が切れるので、日付は行を分ける */}
           <div className="mt-0.5 text-[11px] text-[#8b816f]">投稿 {formatDateJaJst(dm.created_at)}</div>
+          {/* ひとことは切らずに全部出す（説明文は長くても 120 文字ほど。改行もそのまま） */}
           {dm.description && (
-            <p className="mt-1.5 line-clamp-2 rounded-[6px] bg-[#F6EEDC] px-2 py-1 text-[11px] leading-snug text-[#4F3828]">
+            <p className="mt-1.5 whitespace-pre-wrap break-words rounded-[6px] bg-[#F6EEDC] px-2 py-1 text-[11px] leading-snug text-[#4F3828]">
               {dm.description}
             </p>
           )}
