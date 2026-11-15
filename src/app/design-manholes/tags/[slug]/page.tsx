@@ -203,8 +203,8 @@ export default async function DesignManholeTagPage({ params, searchParams }: Pag
                 designManhole={dm}
                 posterPublicId={posterPublicIds[index] ?? null}
                 eager={index < 6}
-                // このページのタグはカードに重ねて出さない
-                tags={cardTags(tagData, dm.id).filter((tag) => tag.slug !== group.slug)}
+                // タグは一覧と同じくいつも出す（このページのタグでも）
+                tags={cardTags(tagData, dm.id)}
               />
             </li>
           ))}

@@ -96,7 +96,11 @@ test('一覧の先頭は親を持たないタグ、タグのページの2段目�
   assert.deepEqual(relatedChips(chips, 'no-such-tag'), []);
 });
 
-test('カードには子のタグだけ出す（親と並べない）', () => {
+test('カードのタグは1つだけ。子のタグがあれば親でなく子を出す', () => {
+  const two = parseDesignManholeTagData({ ...RAW, posts: { x: { tags: ['gundam', 'carp', 'baseball'] } } })!;
+  assert.deepEqual(cardTags(two, 'x').map((g) => g.label), ['ガンダム']);
+  // 投稿のページは全部（親は出さない）
+  assert.deepEqual(cardTags(two, 'x', 6).map((g) => g.label), ['ガンダム', 'カープ']);
   assert.deepEqual(cardTags(DATA, 'c1').map((g) => g.label), ['カープ']);
   assert.deepEqual(cardTags(DATA, 'g1').map((g) => g.label), ['ガンダム']);
   assert.deepEqual(cardTags(DATA, 'plain'), []);

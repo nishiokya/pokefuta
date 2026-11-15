@@ -148,14 +148,18 @@ export function relatedChips(chips: TagChip[], slug: string): TagChip[] {
   return chips.filter((chip) => chip.group.parent === parent);
 }
 
-/** カードに出すタグ。子のタグがあれば親は出さない（「カープ」と「野球」を並べない）。多くても2つ */
-export function cardTags(data: DesignManholeTagData, id: string): DesignManholeTagGroup[] {
+/**
+ * カードの写真に重ねるタグ。1枚につき1つだけ（2つ目以降は出さない。写真が隠れるので）。
+ * 投稿のページは写真に重ねないので max を渡して全部出す。
+ * 子のタグがあれば親より子を出す（「野球」より「カープ」）。順は図鑑の JSON の順で、設置場所から付いた作品のタグが先。
+ */
+export function cardTags(data: DesignManholeTagData, id: string, max = 1): DesignManholeTagGroup[] {
   const slugs = data.tagsByPost[id] ?? [];
   const groups = slugs
     .map((slug) => data.groups.find((group) => group.slug === slug))
     .filter((group): group is DesignManholeTagGroup => group !== undefined);
   const parents = new Set(groups.map((group) => group.parent).filter(Boolean));
-  return groups.filter((group) => !parents.has(group.slug)).slice(0, 2);
+  return groups.filter((group) => !parents.has(group.slug)).slice(0, max);
 }
 
 export function tagHref(slug: string, page = 1): string {

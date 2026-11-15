@@ -102,7 +102,7 @@ export default async function Page({ params }: Props) {
   const { nearby: nearbyPokefutaItems, nearbyIsFallback, placeTags } = nearbyPokefuta(designManhole, snapshotManholes);
   const nearbyDesignItems = nearbyDesignManholes(designManhole, allDesignManholes);
   // タグ（ガンダム・野球など）。押すと同じタグの写真の一覧へ。作品ガイドへは下の紐付けのカードから
-  const groupTags = cardTags(tagData, designManhole.id);
+  const groupTags = cardTags(tagData, designManhole.id, 6);
   const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
 
   const title = displayTitle(designManhole.title);
