@@ -104,6 +104,7 @@ export function buildPokemonBadges(
  * ステッカー。対象の蓋を1枚でも訪問すればもらえる（全部集めるバッジと分けて、難易度を下げてある）。
  * テーマ（蓋のハッシュタグ）は37種類あるが、ほとんどの蓋に付く大きなテーマは印にならないので、
  * 2026-10-24 にガンダムと東西南北の端だけに絞った。最南と最西は同じ1枚。
+ * 2026-11-15 に、30枚以下で行くこと自体が記念になる元祖・秘境・離島・博物館を足した。
  */
 /** バッジの並び。訪問した枚数の多い順、同じなら全部の枚数の多い順（大きい県・ポケモンを先に） */
 export const byCollected = <T extends { name: string; visited: number; total: number }>(a: T, b: T) =>
@@ -115,6 +116,8 @@ export type ThemeBadgeDef = {
   name: string;
   description: string;
   tag: string;
+  /** tag のほかに、これが付いた蓋も対象にする（秘境 = #秘境ポケふた ＋ #ポツンとポケふた） */
+  alsoTags?: readonly string[];
 };
 
 export const THEME_BADGES: readonly ThemeBadgeDef[] = [
@@ -123,7 +126,19 @@ export const THEME_BADGES: readonly ThemeBadgeDef[] = [
   { key: 'south', icon: '⬇️', name: '日本最南', description: '日本でいちばん南のポケふたを訪問', tag: '#日本最南のポケふた' },
   { key: 'east', icon: '➡️', name: '日本最東', description: '日本でいちばん東のポケふたを訪問', tag: '#日本最東のポケふた' },
   { key: 'west', icon: '⬅️', name: '日本最西', description: '日本でいちばん西のポケふたを訪問', tag: '#日本最西のポケふた' },
+  { key: 'original', icon: '🌱', name: '元祖ポケふた', description: '最初のころに設置された元祖ポケふたを1枚訪問', tag: '#元祖ポケふた' },
+  { key: 'hikyo', icon: '⛰️', name: '秘境', description: '行くのが大変な秘境のポケふたを1枚訪問', tag: '#秘境ポケふた', alsoTags: ['#ポツンとポケふた'] },
+  { key: 'island', icon: '🏝️', name: '島わたり', description: '離島のポケふたを1枚訪問', tag: '#離島ポケふた' },
+  { key: 'museum', icon: '🏛️', name: '博物館', description: '博物館にあるポケふたを1枚訪問', tag: '#博物館ポケふた' },
 ];
+
+/**
+ * 蓋にそのタグが付いているか。離島は「#離島ポケふた #沖縄」のように島の名前と1つの文字列で
+ * 入っているので、空白で区切ってから照らす。
+ */
+export function manholeHasTag(manhole: Pick<BadgeManhole, 'hashtags'>, tag: string): boolean {
+  return (manhole.hashtags ?? []).some((h) => typeof h === 'string' && h.split(/\s+/).includes(tag));
+}
 
 export type ThemeBadgeProgress = ThemeBadgeDef & {
   /** そのテーマの蓋の枚数 */
@@ -138,7 +153,8 @@ export function buildThemeBadges(
   visited: ReadonlySet<number> = new Set(),
 ): ThemeBadgeProgress[] {
   return THEME_BADGES.map((def) => {
-    const ids = manholes.filter((m) => (m.hashtags ?? []).includes(def.tag)).map((m) => m.id);
+    const tags = [def.tag, ...(def.alsoTags ?? [])];
+    const ids = manholes.filter((m) => tags.some((tag) => manholeHasTag(m, tag))).map((m) => m.id);
     const visitedCount = ids.filter((id) => visited.has(id)).length;
     return { ...def, total: ids.length, visited: visitedCount, earned: visitedCount > 0 };
   }).filter((badge) => badge.total > 0);
@@ -173,6 +189,24 @@ export function buildPlushSticker(count: number): ThemeBadgeProgress {
     icon: '🧸',
     name: posted > 1 ? `ぬいぐるみと一緒 ×${posted}` : 'ぬいぐるみと一緒',
     description: 'ぬいぐるみと一緒にポケふたを撮影（写真から自動で判定）',
+    tag: '',
+    total: posted,
+    visited: posted,
+    earned: posted > 0,
+  };
+}
+
+/**
+ * 雪ふたステッカー。雪が写った訪問が1回でもあるともらえる（写真の ai_tags.snow で数える。
+ * 2026-11-14 までの写真は人が確かめた判定、それより後は AI）。ぬいぐるみと同じく2回目からは枚数を添えるだけ。
+ */
+export function buildSnowSticker(count: number): ThemeBadgeProgress {
+  const posted = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return {
+    key: 'snow',
+    icon: '❄️',
+    name: posted > 1 ? `雪ふた ×${posted}` : '雪ふた',
+    description: '雪の中のポケふたを撮影（写真から判定）',
     tag: '',
     total: posted,
     visited: posted,

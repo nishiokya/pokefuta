@@ -15,7 +15,7 @@ import { badgeRank, lidImageUrl } from '@/lib/badge-catalog';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
-import { loadPublicPlushVisitCount } from '@/lib/sticker-counts';
+import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
 import { buildPublicStampbookBadges, type PublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { fetchRegularBadges } from '@/lib/regular-badges';
 import { rankRing } from '@/components/users/HeroStat';
@@ -209,11 +209,15 @@ export async function GET(_request: Request, { params }: RouteContext) {
       });
     }
 
-    const [designManholeCount, plushCount] = progress
-      ? await Promise.all([loadPublicDesignManholeCount(visitsData.userId), loadPublicPlushVisitCount(visitsData.userId)])
-      : [0, 0];
+    const [designManholeCount, plushCount, snowCount] = progress
+      ? await Promise.all([
+          loadPublicDesignManholeCount(visitsData.userId),
+          loadPublicPlushVisitCount(visitsData.userId),
+          loadPublicSnowVisitCount(visitsData.userId),
+        ])
+      : [0, 0, 0];
     const badges = progress
-      ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount, plushCount })
+      ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount, plushCount, snowCount })
       : null;
     const [photoUris, picked] = await Promise.all([
       loadRecentPhotoDataUris(visitsData.visits).catch(() => []),

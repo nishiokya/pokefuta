@@ -33,7 +33,7 @@ import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
-import { buildDesignManholeSticker, buildPlushSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
+import { buildDesignManholeSticker, buildPlushSticker, buildSnowSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -114,6 +114,7 @@ export default function VisitsPage() {
   const [designManholeCount, setDesignManholeCount] = useState(0);
   // 自分の訪問のうちぬいぐるみが写ったものの数。一覧は1000件で切れているのでDBで全件を数える
   const [plushVisitCount, setPlushVisitCount] = useState(0);
+  const [snowVisitCount, setSnowVisitCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -210,9 +211,19 @@ export default function VisitsPage() {
       }, () => {});
   };
 
+  const loadSnowVisitCount = () => {
+    createBrowserClient()
+      .rpc('get_own_snow_visit_count' as never)
+      .then((result: any) => {
+        const count = result?.data;
+        if (!result?.error && typeof count === 'number') setSnowVisitCount(count);
+      }, () => {});
+  };
+
   const loadPassport = async () => {
     loadDesignManholeCount();
     loadPlushVisitCount();
+    loadSnowVisitCount();
     try {
       const [visitsResponse, data] = await Promise.all([
         fetch('/api/visits?limit=1000'),
@@ -489,9 +500,10 @@ export default function VisitsPage() {
     () => [
       ...buildThemeBadges(passportManholes, visitedManholeIds),
       buildPlushSticker(plushVisitCount),
+      buildSnowSticker(snowVisitCount),
       buildDesignManholeSticker(designManholeCount),
     ],
-    [passportManholes, visitedManholeIds, designManholeCount, plushVisitCount]
+    [passportManholes, visitedManholeIds, designManholeCount, plushVisitCount, snowVisitCount]
   );
   const pokemonMedalIds = useMemo(
     () => pokemonBadgeManholeIds(passportManholes, representatives),
