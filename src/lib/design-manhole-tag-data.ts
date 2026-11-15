@@ -135,9 +135,19 @@ export function buildTagChips(data: DesignManholeTagData, publishedIds: string[]
     .map(({ group, photos, coverId }) => ({ group, photos, coverId }));
 }
 
-/** 一覧の先頭に出すチップ（親を持たないタグだけ。子はそのタグのページで出す） */
+/** 一覧の先頭に出すチップの絞り方。写真がこの枚数に満たないタグと、多い順でこの数を超えた分は出さない */
+export const LIST_CHIP_MIN_PHOTOS = 2;
+export const LIST_CHIP_MAX = 8;
+
+/**
+ * 一覧の先頭に出すチップ。親を持たないタグのうち、写真が多い順に絞って出す
+ * （全部並べるとスマホで横に長くなりすぎる）。出さないタグのページへは、カードのタグから行ける。
+ * 子はそのタグのページで出す。chips は buildTagChips の並び（多い順）のまま渡す。
+ */
 export function topLevelChips(chips: TagChip[]): TagChip[] {
-  return chips.filter((chip) => chip.group.parent === null);
+  return chips
+    .filter((chip) => chip.group.parent === null && chip.photos >= LIST_CHIP_MIN_PHOTOS)
+    .slice(0, LIST_CHIP_MAX);
 }
 
 /** タグのページの2段目に出すチップ: 親のページなら子、子のページなら同じ親の子（自分も含む） */
@@ -149,11 +159,10 @@ export function relatedChips(chips: TagChip[], slug: string): TagChip[] {
 }
 
 /**
- * カードの写真に重ねるタグ。1枚につき1つだけ（2つ目以降は出さない。写真が隠れるので）。
- * 投稿のページは写真に重ねないので max を渡して全部出す。
- * 子のタグがあれば親より子を出す（「野球」より「カープ」）。順は図鑑の JSON の順で、設置場所から付いた作品のタグが先。
+ * カードの写真に重ねるタグ。多くても2つ。投稿のページは写真に重ねないので max を渡して全部出す。
+ * 子のタグがあれば親は出さない（「カープ」と「野球」を並べない）。
  */
-export function cardTags(data: DesignManholeTagData, id: string, max = 1): DesignManholeTagGroup[] {
+export function cardTags(data: DesignManholeTagData, id: string, max = 2): DesignManholeTagGroup[] {
   const slugs = data.tagsByPost[id] ?? [];
   const groups = slugs
     .map((slug) => data.groups.find((group) => group.slug === slug))

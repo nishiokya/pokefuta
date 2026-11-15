@@ -96,11 +96,26 @@ test('一覧の先頭は親を持たないタグ、タグのページの2段目�
   assert.deepEqual(relatedChips(chips, 'no-such-tag'), []);
 });
 
-test('カードのタグは1つだけ。子のタグがあれば親でなく子を出す', () => {
-  const two = parseDesignManholeTagData({ ...RAW, posts: { x: { tags: ['gundam', 'carp', 'baseball'] } } })!;
-  assert.deepEqual(cardTags(two, 'x').map((g) => g.label), ['ガンダム']);
+test('一覧の先頭のチップは、写真2枚以上のタグを多い順に8つまで', () => {
+  const groups = Array.from({ length: 12 }, (_, i) => ({ slug: `t${i}`, label: `T${i}`, name: `T${i}`, kind: 'open' }));
+  const posts: Record<string, { tags: string[] }> = {};
+  // t0 は12枚、t1 は11枚 … t10 は2枚、t11 は1枚
+  groups.forEach((g, i) => {
+    for (let n = 0; n < 12 - i; n += 1) posts[`${g.slug}-${n}`] = { tags: [g.slug] };
+  });
+  const data = parseDesignManholeTagData({ success: true, groups, posts })!;
+  const chips = buildTagChips(data, Object.keys(posts));
+  assert.equal(chips.length, 12);
+  assert.deepEqual(topLevelChips(chips).map((c) => c.group.slug), ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7']);
+  // 1枚だけのタグは、数に余裕があっても出さない
+  assert.deepEqual(topLevelChips(chips.slice(9)).map((c) => c.group.slug), ['t9', 't10']);
+});
+
+test('カードのタグは2つまで。子のタグがあれば親は出さない', () => {
+  const two = parseDesignManholeTagData({ ...RAW, posts: { x: { tags: ['gundam', 'carp', 'baseball', 'tigers'] } } })!;
+  assert.deepEqual(cardTags(two, 'x').map((g) => g.label), ['ガンダム', 'カープ']);
   // 投稿のページは全部（親は出さない）
-  assert.deepEqual(cardTags(two, 'x', 6).map((g) => g.label), ['ガンダム', 'カープ']);
+  assert.deepEqual(cardTags(two, 'x', 6).map((g) => g.label), ['ガンダム', 'カープ', '阪神']);
   assert.deepEqual(cardTags(DATA, 'c1').map((g) => g.label), ['カープ']);
   assert.deepEqual(cardTags(DATA, 'g1').map((g) => g.label), ['ガンダム']);
   assert.deepEqual(cardTags(DATA, 'plain'), []);
