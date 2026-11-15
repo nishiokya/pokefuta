@@ -6,6 +6,7 @@ import {
   badgeRankThresholds,
   buildDesignManholeSticker,
   buildPlushSticker,
+  buildSnowSticker,
   buildPokemonBadges,
   THEME_BADGES,
   buildThemeBadges,
@@ -100,4 +101,25 @@ test('ぬいぐるみステッカーはぬいぐるみが写った訪問が1回�
   assert.equal(buildPlushSticker(1).name, 'ぬいぐるみと一緒');
   assert.equal(buildPlushSticker(4).name, 'ぬいぐるみと一緒 ×4');
   assert.equal(buildPlushSticker(Number.NaN).earned, false);
+});
+
+test('離島は「#離島ポケふた #沖縄」のように島の名前と1つの文字列でも数え、秘境はポツンも含める', () => {
+  const manholes = [
+    { id: 1, prefecture: '沖縄県', pokemons: [], hashtags: ['#離島ポケふた #沖縄'] },
+    { id: 2, prefecture: '東京都', pokemons: [], hashtags: ['#離島ポケふた #小笠原諸島', '#秘境ポケふた'] },
+    { id: 3, prefecture: '北海道', pokemons: [], hashtags: ['#ポツンとポケふた'] },
+    { id: 4, prefecture: '北海道', pokemons: [], hashtags: ['#離島ポケふたではない'] },
+  ];
+  const byKey = new Map(buildThemeBadges(manholes, new Set([3])).map((s) => [s.key, s]));
+  assert.equal(byKey.get('island')?.total, 2);
+  assert.equal(byKey.get('island')?.earned, false);
+  assert.equal(byKey.get('hikyo')?.total, 2);
+  assert.equal(byKey.get('hikyo')?.earned, true);
+});
+
+test('雪ふたステッカーは雪が写った訪問が1回でもあればもらえ、2回目から回数を添える', () => {
+  assert.equal(buildSnowSticker(0).earned, false);
+  assert.equal(buildSnowSticker(1).name, '雪ふた');
+  assert.equal(buildSnowSticker(3).name, '雪ふた ×3');
+  assert.equal(buildSnowSticker(Number.NaN).earned, false);
 });
