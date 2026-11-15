@@ -30,7 +30,15 @@ export type StampbookOgpProps = {
   moreMedals: number;
   stickers: readonly { key: string; icon: string; name: string }[];
   photos: readonly string[];
+  /**
+   * 絵文字を出さずに描く。絵文字の画像は描画のたびに CDN から取るので、取れなかったときの描き直し用
+   * （称号・ステッカーの絵文字と、メダルの金銀銅の印を省く。輪の色で段は分かる）。
+   */
+  plain?: boolean;
 };
+
+/** 文字から絵文字を除く（'🌱 ROOKIE' → 'ROOKIE'） */
+export const withoutEmoji = (text: string) => text.replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D]/gu, '').trim();
 
 const INK = '#4F3828';
 const INK_SOFT = '#6A4D36';
@@ -130,6 +138,7 @@ export default function StampbookOgpCard({
   moreMedals,
   stickers,
   photos,
+  plain = false,
 }: StampbookOgpProps) {
   const title = stampbookTitle(displayName);
   const shownStickers = fitStickers(stickers);
@@ -183,7 +192,7 @@ export default function StampbookOgpCard({
                   ...TIER_PILL[tier],
                 }}
               >
-                {REGULAR_BADGE_LABEL[tier]}
+                {plain ? withoutEmoji(REGULAR_BADGE_LABEL[tier]) : REGULAR_BADGE_LABEL[tier]}
               </div>
             )}
             <div style={{ display: 'flex', fontSize: 22, fontWeight: 800, color: RED }}>{SITE_NAME}</div>
@@ -215,7 +224,7 @@ export default function StampbookOgpCard({
           {medals.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
               {medals.map((medal) => (
-                <Medal key={medal.key} medal={medal} />
+                <Medal key={medal.key} medal={medal} plain={plain} />
               ))}
               {moreMedals > 0 && (
                 <div style={{ display: 'flex', fontSize: 24, fontWeight: 900, color: '#8C6A4A' }}>{`+${moreMedals}`}</div>
@@ -242,7 +251,7 @@ export default function StampbookOgpCard({
                     ...STICKER_COLORS[i % STICKER_COLORS.length],
                   }}
                 >
-                  <span>{sticker.icon}</span>
+                  {!plain && <span>{sticker.icon}</span>}
                   <span>{sticker.name}</span>
                 </div>
               ))}
@@ -382,7 +391,7 @@ function StatBox({ stat }: { stat: OgpStat }) {
   );
 }
 
-function Medal({ medal }: { medal: OgpMedal }) {
+function Medal({ medal, plain }: { medal: OgpMedal; plain: boolean }) {
   const size = OGP_MEDAL_SIZE;
   const ringColors: RingColors = [medal.rank ? RANK_COLOR[medal.rank] : '#7B63A8'];
   const inner = size - 16;
@@ -415,7 +424,7 @@ function Medal({ medal }: { medal: OgpMedal }) {
           <img src={medal.image} alt="" width={inner} height={inner} style={{ width: inner, height: inner, objectFit: 'cover', opacity: medal.rank ? 1 : 0.6 }} />
         ) : null}
       </div>
-      {medal.rank && (
+      {medal.rank && !plain && (
         <div style={{ position: 'absolute', top: -6, right: -6, display: 'flex', fontSize: medal.rank === 'gold' ? 24 : 18 }}>
           {RANK_ICON[medal.rank]}
         </div>

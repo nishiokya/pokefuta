@@ -32,6 +32,7 @@ const CHECKS = [
   'get_own_design_manholes: 他人の投稿は返らない',
   'get_own_design_manholes: 隠しただけの hidden は返らず、移した hidden は moved_manhole_id 付きで返る',
   'get_own_design_manholes: anon は実行できない',
+  'get_own_design_manhole_count: anon は実行できない',
 ];
 
 try {

@@ -3,7 +3,7 @@
 --   1. 本人の needs_review が返る（近接トリガで needs_review になった投稿）
 --   2. 他人の投稿は返らない
 --   3. 隠しただけの hidden は返らない／公式の訪問記録へ移した hidden は moved_manhole_id 付きで返る
---   4. anon は実行できない
+--   4. anon は実行できない（get_own_design_manhole_count も。20261116130000 で外す）
 --
 -- 全体が1つの DO ブロック = 1トランザクション。どれか1つでも期待と違えば EXCEPTION で落ちる。検証行は最後に消す。
 -- 検証用の2人目のユーザーは auth.users に作って、最後に消す。
@@ -96,6 +96,13 @@ BEGIN
   EXCEPTION
     WHEN insufficient_privilege THEN
       RAISE NOTICE '4. anon → 実行できない  OK';
+  END;
+  BEGIN
+    PERFORM public.get_own_design_manhole_count();
+    RAISE EXCEPTION 'anon が get_own_design_manhole_count() を実行できた';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE '5. anon → get_own_design_manhole_count も実行できない  OK';
   END;
   RESET ROLE;
 

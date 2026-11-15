@@ -25,6 +25,7 @@ import StampbookOgpCard, {
   OGP_MEDAL_SIZE,
   OGP_PHOTO_COUNT,
   OGP_PHOTO_SIZE,
+  withoutEmoji,
   type OgpMedal,
   type OgpStat,
 } from './StampbookOgpCard';
@@ -249,34 +250,52 @@ export async function GET(_request: Request, { params }: RouteContext) {
         : []),
     ];
 
-    return new ImageResponse(
-      (
-        <StampbookOgpCard
-          displayName={visitsData.displayName}
-          tier={title ? title.current : awarded}
-          stats={stats}
-          medals={picked.medals}
-          moreMedals={picked.more}
-          stickers={(badges?.stickers ?? []).map(({ key, icon, name }) => ({ key, icon, name }))}
-          photos={photoUris}
-        />
-      ),
-      {
-        ...size,
-        fonts: [
-          {
-            name: 'NotoSansCJK',
-            data: fontData,
-            weight: 700 as const,
-          },
-        ],
-        // 称号・メダル・ステッカーの絵文字（🌱🥇⬆️ など）。CJK フォントには入っていない
-        emoji: 'twemoji',
+    const card = (plain: boolean) => (
+      <StampbookOgpCard
+        displayName={plain ? withoutEmoji(visitsData.displayName) : visitsData.displayName}
+        tier={title ? title.current : awarded}
+        stats={stats}
+        medals={picked.medals}
+        moreMedals={picked.more}
+        stickers={(badges?.stickers ?? []).map(({ key, icon, name }) => ({ key, icon, name }))}
+        photos={photoUris}
+        plain={plain}
+      />
+    );
+    const options = {
+      ...size,
+      fonts: [
+        {
+          name: 'NotoSansCJK',
+          data: fontData,
+          weight: 700 as const,
+        },
+      ],
+    };
+
+    // ImageResponse は遅延描画（本体のストリームを読むときに描く）なので、ここで try/catch しても
+    // 描画の失敗は拾えず、200 を返したあとに本体が途中で切れる。先に arrayBuffer() で実体化して失敗を拾う。
+    // 絵文字（🌱🥇 など。CJK フォントには入っていない）は描画のたびに CDN から画像を取るので、
+    // CDN が落ちるとここで落ちる。その場合は絵文字なしで描き直す。
+    try {
+      const png = await new ImageResponse(card(false), { ...options, emoji: 'twemoji' }).arrayBuffer();
+      return new Response(png, {
         headers: {
+          'Content-Type': 'image/png',
           'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
         },
-      }
-    );
+      });
+    } catch (err) {
+      console.error('[OGP] users visits render with emoji failed, retrying without emoji:', err);
+    }
+    // 絵文字なしの描き直し。壊れた見た目（絵文字が無い）を1時間配らないよう、短いキャッシュにする
+    const png = await new ImageResponse(card(true), options).arrayBuffer();
+    return new Response(png, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=60',
+      },
+    });
   } catch (err) {
     console.error('[OGP] users visits render failed:', err);
     return new Response('Internal Server Error', {
