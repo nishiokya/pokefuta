@@ -345,6 +345,10 @@ export async function POST(request: NextRequest) {
  *       - in: query
  *         name: limit
  *         schema: { type: integer, maximum: 200, default: 100 }
+ *       - in: query
+ *         name: offset
+ *         description: 新しい順で何枚目から返すか（0始まり）。200枚を超える分は offset を進めて読む
+ *         schema: { type: integer, minimum: 0, default: 0 }
  *     responses:
  *       200: { description: 一覧 }
  */
@@ -358,6 +362,10 @@ export async function GET(request: NextRequest) {
     const limit = Number.isInteger(limitParam) && limitParam > 0
       ? Math.min(limitParam, 200)
       : 100;
+    // 1回は200枚まで。それより多い分は offset を進めて読む（図鑑の取り込みが全件を読む）。
+    // 以前は offset が無く、200枚を超えた古い投稿を図鑑が読めなかった
+    const offsetParam = searchParams.get('offset') ?? '';
+    const offset = /^[0-9]{1,6}$/.test(offsetParam) ? Number(offsetParam) : 0;
 
     // 公開カラムのみ返す（exif / storage_key / created_by は絶対に含めない）
     const { data, error } = await supabase
@@ -365,7 +373,9 @@ export async function GET(request: NextRequest) {
       .select('id, title, description, submitter_name, latitude, longitude, width, height, created_at')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
-      .limit(limit);
+      // ページを分けて読むので、同じ日時の投稿も毎回同じ順にする（境界で重複・抜けが出ないように）
+      .order('id', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new Error(error.message);
