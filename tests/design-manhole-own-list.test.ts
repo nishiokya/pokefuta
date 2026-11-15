@@ -19,6 +19,8 @@ const body = migration.replace(/^--.*$/gm, '');
 test('自分の投稿一覧: 本人の行だけを返す', () => {
   assert.match(body, /d\.created_by = auth\.uid\(\)/);
   assert.match(body, /v\.user_id = auth\.uid\(\)/);
+  // 移した先の訪問は hidden の行だけ引く
+  assert.match(body, /WHERE d\.status = 'hidden'\s+AND p\.storage_key = d\.storage_key/);
   assert.match(body, /ORDER BY d\.created_at DESC\s+LIMIT 500/);
 });
 
@@ -93,6 +95,8 @@ test('自分の投稿一覧 API: 応答は private, no-store で、共有キャ�
   assert.match(route, /'Cache-Control': 'private, no-store'/);
   assert.doesNotMatch(route, /Access-Control-Allow-Origin/);
   assert.doesNotMatch(route, /s-maxage/);
+  // exists() が投げても全体を落とさない（try の中で呼ぶ）
+  assert.match(route, /try \{\s+if \(await storage\.exists\?\.\(smallKey\)\)/);
   assert.match(route, /export const dynamic = 'force-dynamic'/);
   assert.match(route, /export const fetchCache = 'force-no-store'/);
   // 401・500 を含め、NextResponse.json はすべて headers を付ける

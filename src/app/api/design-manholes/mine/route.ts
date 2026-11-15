@@ -19,9 +19,12 @@ const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
 async function signedUrlFor(storageKey: string): Promise<string | null> {
   const smallKey = deriveDesignSmallKey(storageKey);
   // サムネイル生成に失敗している投稿は original にフォールバック（[id]/photo と同じ）
-  if (smallKey && (await storage.exists?.(smallKey))) {
+  // exists() や署名が投げても（R2 の一時的な失敗）全体は落とさず、original を試す
+  if (smallKey) {
     try {
-      return (await storage.getSignedUrl(smallKey, 3600)).url;
+      if (await storage.exists?.(smallKey)) {
+        return (await storage.getSignedUrl(smallKey, 3600)).url;
+      }
     } catch {
       // original を試す
     }

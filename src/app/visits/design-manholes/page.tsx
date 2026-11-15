@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import PCShell from '@/components/PCShell';
 import OwnDesignManholeCard from '@/components/DesignManhole/OwnDesignManholeCard';
 import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
@@ -12,13 +13,14 @@ import type { OwnDesignManhole } from '@/lib/own-design-manholes';
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'loggedOut' }
   | { kind: 'error' }
   | { kind: 'ready'; items: OwnDesignManhole[] };
 
 // スタンプ帳から辿る「投稿したデザインマンホール」。タブは増やさず、スタンプ帳（/visits）へ戻るリンクを置く。
+// 未ログインは badges・trip と同じく、紹介画面を持たずにログインへ送る。
 // /visits 配下は robots.txt で巡回拒否している（robots.ts）ので、このページ個別の noindex は付けない。
 export default function VisitsDesignManholesPage() {
+  const router = useRouter();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const { trackView } = useAnalytics();
 
@@ -30,12 +32,12 @@ export default function VisitsDesignManholesPage() {
         const loggedIn = Boolean(session?.user);
         trackView('/visits/design-manholes', '投稿したデザインマンホール', 'visits_design_manholes', loggedIn);
         if (!loggedIn) {
-          setState({ kind: 'loggedOut' });
+          router.replace('/login?redirect=/visits/design-manholes');
           return;
         }
         const res = await fetch('/api/design-manholes/mine', { cache: 'no-store' });
         if (res.status === 401) {
-          setState({ kind: 'loggedOut' });
+          router.replace('/login?redirect=/visits/design-manholes');
           return;
         }
         const body = res.ok ? await res.json() : null;
@@ -69,18 +71,6 @@ export default function VisitsDesignManholesPage() {
 
           {state.kind === 'loading' && (
             <div className="py-10 text-center font-pixelJp text-[#6A4D36]">読み込み中<span className="rpg-loading" /></div>
-          )}
-
-          {state.kind === 'loggedOut' && (
-            <div className="rounded-[12px] border border-[#e9dfc7] bg-[#fffdf7] p-5 text-center">
-              <p className="font-pixelJp text-sm text-[#4F3828]">投稿を見るにはログインしてください。</p>
-              <Link
-                href="/login?redirect=/visits/design-manholes"
-                className="mt-3 inline-flex items-center rounded-lg bg-[#7B63A8] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90"
-              >
-                ログインする
-              </Link>
-            </div>
           )}
 
           {state.kind === 'error' && (

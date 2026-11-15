@@ -5,6 +5,7 @@
 -- （hidden のうち、同じ storage_key の photo が本人の visit に付いているもの。20261110100000 / 20261110110000）を見せる。
 -- 重複などで隠した hidden は出さない。
 --
+-- 移した先の訪問は hidden の行だけ引く（公開中・確認待ちでは photo を見ない。photo.storage_key には idx_photo_storage_key がある）。
 -- 読むだけの関数を1つ足すだけで、表・既存の関数・権限は変えない。
 -- created_by・exif・緯度経度は返さない。移した先の蓋は moved_manhole_id（公式の番号）で返す。
 --
@@ -32,7 +33,8 @@ AS $function$
     SELECT v.manhole_id
     FROM public.photo p
     JOIN public.visit v ON v.id = p.visit_id
-    WHERE p.storage_key = d.storage_key
+    WHERE d.status = 'hidden'
+      AND p.storage_key = d.storage_key
       AND v.user_id = auth.uid()
     LIMIT 1
   ) mv ON true
