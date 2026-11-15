@@ -7,7 +7,10 @@ import {
   REGULAR_TIER_MIN_MANHOLES,
   REGULAR_BADGE_NAME,
   REGULAR_BADGE_LABEL,
+  REGULAR_EXCLUDED_PUBLIC_IDS,
   STATIC_REGULARS_URL,
+  countDistinctManholes,
+  ownRegularTier,
   fetchRegularBadges,
   fetchRegularSnapshot,
   parseRegularLegends,
@@ -105,4 +108,20 @@ test('LEGEND の公開ID と名前を読む。壊れた項目は捨て、無け�
   assert.equal(loaded.badges.get('pub-e'), 'legend');
   assert.deepEqual(loaded.legends.map((l) => l.id), ['pub-e', 'pub-f']);
   assert.deepEqual((await fetchRegularSnapshot(async () => { throw new Error('offline'); })).legends, []);
+});
+
+test('本人の枚数は同じ蓋を1枚、蓋の無い訪問は数えない（tracker と同じ）', () => {
+  assert.equal(countDistinctManholes([{ manhole_id: 1 }, { manhole_id: 1 }, { manhole_id: 2 }, { manhole_id: null }]), 2);
+  assert.equal(countDistinctManholes([]), 0);
+});
+
+test('本人の札はその場の枚数で決め、線ちょうどで上がる', () => {
+  assert.equal(ownRegularTier('pub-me', 0), null);
+  assert.equal(ownRegularTier('pub-me', 9), 'rookie');
+  assert.equal(ownRegularTier('pub-me', 10), 'regular');
+  assert.equal(ownRegularTier('pub-me', REGULAR_TIER_MIN_MANHOLES.legend), 'legend');
+});
+
+test('tracker が称号を付けない人には、その場の枚数でも付けない', () => {
+  for (const id of REGULAR_EXCLUDED_PUBLIC_IDS) assert.equal(ownRegularTier(id, 500), null);
 });
