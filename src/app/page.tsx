@@ -38,6 +38,7 @@ import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
 import PosterLink from '@/components/PosterLink';
 import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
+import { otherFeature, pickRotatingFeature, type RotatingFeature } from '@/lib/top-feature-rotation';
 import {
   EMPTY_NEW_POKEFUTA_WANTED,
   NEW_POKEFUTA_UPLOAD_PATH,
@@ -119,6 +120,7 @@ export default function HomePage() {
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
   // 特集は最新の投稿の上に置くので、取り終わるまでは枠を取っておく（後から入って投稿を押し下げない）
   const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
+  // 取り終わった特集の数（デザインふたと、雪景色・ぬいぐるみの交互の枠）。FEATURE_LOADS に届くまで枠を出しておく
   const [featureLoadsDone, setFeatureLoadsDone] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
@@ -150,8 +152,7 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadDesignFeature();
-    loadPlushFeature();
-    loadSnowFeature();
+    loadRotatingFeature();
     fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
       setRegularBadges(badges);
       setLegends(loaded);
@@ -214,30 +215,35 @@ export default function HomePage() {
     }
   };
 
-  const loadPlushFeature = async () => {
+  // 雪景色とぬいぐるみは1回ごとに交互に1枚だけ出し、出す方だけ読む（写真3枚と API 1本を減らしてフィードの写真を先に出す）。
+  // 選んだ方が取れない・0枚なら、もう一方を出す
+  const loadRotatingFeature = async () => {
+    let storage: Storage | null = null;
     try {
-      const response = await fetch('/api/features/plush');
-      if (!response.ok) return;
-      const data = await response.json();
-      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos)) return;
-      setPlushFeature({ count: data.count, photos: data.photos });
+      storage = window.localStorage;
     } catch {
-      // 取れなければ特集にぬいぐるみを出さないだけ
+      storage = null;
+    }
+    const first = pickRotatingFeature(storage);
+    try {
+      if (!(await loadFeatureCard(first))) await loadFeatureCard(otherFeature(first));
     } finally {
       setFeatureLoadsDone((n) => n + 1);
     }
   };
 
-  const loadSnowFeature = async () => {
+  // 取れて1枚以上あれば true
+  const loadFeatureCard = async (feature: RotatingFeature): Promise<boolean> => {
     try {
-      const response = await fetch('/api/features/snow');
-      if (!response.ok) return;
+      const response = await fetch(`/api/features/${feature}`);
+      if (!response.ok) return false;
       const data = await response.json();
-      if (data?.success && typeof data.count === 'number' && Array.isArray(data.photos)) setSnowFeature(data);
+      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos) || data.count <= 0) return false;
+      if (feature === 'plush') setPlushFeature({ count: data.count, photos: data.photos });
+      else setSnowFeature({ count: data.count, photos: data.photos });
+      return true;
     } catch {
-      // 取得できなければカードを出さない
-    } finally {
-      setFeatureLoadsDone((n) => n + 1);
+      return false;
     }
   };
 
@@ -590,51 +596,33 @@ export default function HomePage() {
           写真はスマホでも3枚並べる（縮めた 40px なら 2 列のカードに 3 枚入る）。
           どれも取れなければ節ごと出さない
         */}
-        {(featureLoadsDone < 3 || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
-          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < 3}>
+        {(featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
+          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < FEATURE_LOADS}>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
               特集
             </h2>
             <div className="grid grid-cols-2 gap-2">
+            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる */}
             {snowFeature && snowFeature.count > 0 ? (
-              <Link href="/photos/snow" className="group col-span-2 flex min-w-0 items-center gap-3 rounded-lg bg-sky-50 p-3 shadow-sm transition hover:shadow">
+              <Link
+                href="/photos/snow"
+                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+              >
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
                   {snowFeature.photos.slice(0, 3).map((photo) => (
                     <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
                   ))}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-sky-950">雪景色のポケふた</p>
-                  <p className="text-xs text-slate-600">写真 {snowFeature.count}枚 <span className="font-bold text-[#7B63A8] group-hover:underline">見る ›</span></p>
+                  <p className="truncate text-xs font-extrabold text-sky-950 sm:text-sm">雪景色のポケふた</p>
+                  <p className="text-[11px] text-slate-600 sm:text-xs">
+                    写真 {snowFeature.count}枚
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
                 </div>
               </Link>
-            ) : featureLoadsDone < 3 && <div className="col-span-2"><FeatureCardPlaceholder /></div>}
-
-            {designFeature && designFeature.length > 0 ? (
-            <Link
-              href="/design-manholes"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {designFeature.slice(0, 3).map((d) => (
-                  <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
-                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
-                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
-            {plushFeature && plushFeature.count > 0 ? (
+            ) : plushFeature && plushFeature.count > 0 ? (
             <Link
               href="/photos/plush"
               className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
@@ -673,7 +661,31 @@ export default function HomePage() {
                 </p>
               </div>
             </Link>
-            ) : featureLoadsDone < 3 && <FeatureCardPlaceholder />}
+            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
+
+            {designFeature && designFeature.length > 0 ? (
+            <Link
+              href="/design-manholes"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {designFeature.slice(0, 3).map((d) => (
+                  <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
+                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
+                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
             </div>
           </section>
         )}
@@ -1063,6 +1075,9 @@ export default function HomePage() {
     </div>
   );
 }
+
+// 特集で取り終わるのを待つ数（デザインふたと、雪景色・ぬいぐるみの交互の枠）
+const FEATURE_LOADS = 2;
 
 // 特集カードを取り終わるまでの枠。本物のカードと同じ並び・同じ文字の大きさで高さをそろえる
 function FeatureCardPlaceholder() {

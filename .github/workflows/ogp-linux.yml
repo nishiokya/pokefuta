@@ -48,6 +48,7 @@ jobs:
       - run: npm run test:public-avatars
       - run: npm run test:shared-avatar-cookie
       - run: npm run test:new-pokefuta-wanted
+      - run: npm run test:top-feature-rotation
       - run: npm run type-check
       - run: npm run build
       - run: npm run verify:ogp-linux
