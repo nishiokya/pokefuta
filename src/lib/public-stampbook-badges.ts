@@ -4,6 +4,7 @@ import {
   buildPokemonBadges,
   buildDesignManholeSticker,
   buildPlushSticker,
+  buildSnowSticker,
   buildThemeBadges,
   pokemonBadgeManholeIds,
   type BadgeManhole,
@@ -24,6 +25,7 @@ export function buildPublicStampbookBadges({
   representatives,
   designManholeCount = 0,
   plushCount = 0,
+  snowCount = 0,
 }: {
   userId: string;
   progress: PublicUserPrefectureProgress;
@@ -33,6 +35,8 @@ export function buildPublicStampbookBadges({
   designManholeCount?: number;
   /** ぬいぐるみが写った公開訪問の数（各訪問の最新の写真のタグで数える）。1以上でステッカーが付く */
   plushCount?: number;
+  /** 雪が写った公開訪問の数。1以上でステッカーが付く */
+  snowCount?: number;
 }) {
   // ステッカーの判定に蓋のテーマ（hashtags）が要る
   const hashtagsById = new Map((snapshot?.manholes ?? []).map((m) => [m.id, Array.isArray(m.hashtags) ? m.hashtags : null]));
@@ -64,7 +68,7 @@ export function buildPublicStampbookBadges({
       .filter((p) => p.visited > 0)
       .sort(byCollected)
       .map((p) => ({ ...p, manholeId: medalIds.get(p.name) })),
-    stickers: [...buildThemeBadges(manholes, visited), buildPlushSticker(plushCount), buildDesignManholeSticker(designManholeCount)].filter((s) => s.earned),
+    stickers: [...buildThemeBadges(manholes, visited), buildPlushSticker(plushCount), buildSnowSticker(snowCount), buildDesignManholeSticker(designManholeCount)].filter((s) => s.earned),
   };
 }
 
