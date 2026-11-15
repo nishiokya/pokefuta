@@ -11,7 +11,8 @@ import type { DesignManhole } from '@/types/database';
  * （写真の正方形・その下に名前・投稿者・投稿日・ひとこと）。
  * 写真と投稿者の欄を押すと投稿者のページへ。公開IDの無い投稿者はそのマンホールのページへ。
  * マンホールのページへのリンクは名前の行に別に置く（詳細ページを一覧から辿れるようにしておく。検索用）。
- * タグ（ガンダム・野球など）があれば名前の下に出し、押すとそのタグのページへ。
+ * タグ（ガンダム・野球など）があれば写真の左上に重ねて出し、押すとそのタグのページへ。
+ * 写真はそれ自体がリンクなので、タグは写真のリンクの中に入れず、同じ枠の上に並べて重ねる（リンクの入れ子にしない）。
  */
 export default function DesignManholeCard({
   designManhole: dm,
@@ -39,19 +40,35 @@ export default function DesignManholeCard({
 
   return (
     <div className="group overflow-hidden rounded-[10px] bg-[#FFF8EB] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus-within:ring-2 focus-within:ring-[#FFB347]">
-      <Link href={href} aria-label={ariaLabel} className="block focus:outline-none">
-        <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={dm.photo_url}
-            alt=""
-            width={400}
-            height={400}
-            loading={eager ? 'eager' : 'lazy'}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-          />
-        </div>
-      </Link>
+      <div className="relative">
+        <Link href={href} aria-label={ariaLabel} className="block focus:outline-none">
+          <div className="relative aspect-square overflow-hidden bg-[#EFE4CC]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={dm.photo_url}
+              alt=""
+              width={400}
+              height={400}
+              loading={eager ? 'eager' : 'lazy'}
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            />
+          </div>
+        </Link>
+        {tags.length > 0 && (
+          <ul className="pointer-events-none absolute left-1.5 top-1.5 right-1.5 flex flex-wrap gap-1" aria-label="タグ">
+            {tags.map((tag) => (
+              <li key={tag.slug}>
+                <Link
+                  href={tagHref(tag.slug)}
+                  className="pointer-events-auto inline-flex items-center rounded-full bg-dm-line px-2 py-0.5 text-[11px] font-bold text-white shadow-sm ring-1 ring-white/70 transition hover:bg-[#6A5299] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
+                >
+                  {tag.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="px-2.5 py-2 sm:px-3">
         <Link
           href={detailHref}
@@ -61,20 +78,6 @@ export default function DesignManholeCard({
           <span className="line-clamp-1">{title}</span>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#8b816f]" aria-hidden="true" />
         </Link>
-        {tags.length > 0 && (
-          <ul className="mt-1 flex flex-wrap gap-1" aria-label="タグ">
-            {tags.map((tag) => (
-              <li key={tag.slug}>
-                <Link
-                  href={tagHref(tag.slug)}
-                  className="inline-flex items-center rounded-full bg-dm-line/10 px-2 py-0.5 text-[11px] font-bold text-dm-line hover:bg-dm-line/20"
-                >
-                  {tag.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
         <Link href={href} tabIndex={-1} aria-hidden="true" className="block">
           <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-semibold text-[#6A4D36]">
             <PosterAvatar publicUserId={posterPublicId} size={14} fallback={<UserRound className="h-3.5 w-3.5 shrink-0" />} />
