@@ -32,6 +32,7 @@ import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
+import OwnDesignManholesStrip from '@/components/DesignManhole/OwnDesignManholesStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildDesignManholeSticker, buildPlushSticker, buildSnowSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
@@ -961,6 +962,9 @@ export default function VisitsPage() {
             </div>
             </div>
           )}
+
+          {/* 投稿したデザインマンホール（1枚以上あるときだけ出る） */}
+          {isLoggedIn && <OwnDesignManholesStrip />}
         </div>
         {isLoggedIn && (
           <div className="hidden lg:block">
