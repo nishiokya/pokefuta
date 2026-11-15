@@ -35,6 +35,7 @@ import { manholeDisplayName } from '@/lib/manhole-label';
 import { manholePhotoHref } from '@/lib/manhole-photo-link';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
+import NearViewportImg from '@/components/NearViewportImg';
 import PosterLink from '@/components/PosterLink';
 import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
@@ -603,7 +604,8 @@ export default function HomePage() {
               特集
             </h2>
             <div className="grid grid-cols-2 gap-2">
-            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる */}
+            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる。
+                特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
             {snowFeature && snowFeature.count > 0 ? (
               <Link
                 href="/photos/snow"
@@ -611,7 +613,7 @@ export default function HomePage() {
               >
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
                   {snowFeature.photos.slice(0, 3).map((photo) => (
-                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
+                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" fetchPriority="low" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
                   ))}
                 </div>
                 <div className="min-w-0">
@@ -637,13 +639,13 @@ export default function HomePage() {
                   return (
                     <div key={photo.id} className="relative h-14 w-14">
                       <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy"
+                        <img src={src} alt="" width={56} height={56} loading="lazy" fetchPriority="low"
                           className={lidClip ? undefined : 'h-full w-full object-cover'}
                           style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
                       </div>
                       {plushClip && (
                         <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" style={plushClip} />
+                          <img src={src} alt="" width={26} height={26} loading="lazy" fetchPriority="low" style={plushClip} />
                         </div>
                       )}
                     </div>
@@ -672,7 +674,7 @@ export default function HomePage() {
               <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
                 {designFeature.slice(0, 3).map((d) => (
                   <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
-                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
+                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" fetchPriority="low" className="h-full w-full object-cover" />
                   </div>
                 ))}
               </div>
@@ -746,7 +748,7 @@ export default function HomePage() {
                           {/* 畳んだ写真を2x2で敷き、暗く落として文字を載せる */}
                           <div className="grid h-full w-full grid-cols-2 grid-rows-2 opacity-45">
                             {hiddenPhotos.map((url) => (
-                              <img key={url} src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                              <NearViewportImg key={url} src={url} alt="" className="h-full w-full object-cover" />
                             ))}
                           </div>
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center text-white">
@@ -800,14 +802,24 @@ export default function HomePage() {
                     const cardContent = (
                       <>
                         {photo?.thumbnail_url ? (
-                          <img
-                            src={photo.thumbnail_url}
-                            alt=""
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
-                            loading={currentPage === 1 && index < 4 ? 'eager' : 'lazy'}
-                            fetchPriority={currentPage === 1 && index < 4 ? 'high' : undefined}
-                          />
+                          // 1ページ目の先頭4枚は LCP なのですぐ読む。残りは画面の近くに来てから読む（NearViewportImg）
+                          currentPage === 1 && index < 4 ? (
+                            <img
+                              src={photo.thumbnail_url}
+                              alt=""
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
+                              loading="eager"
+                              fetchPriority="high"
+                            />
+                          ) : (
+                            <NearViewportImg
+                              src={photo.thumbnail_url}
+                              alt=""
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
+                            />
+                          )
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-[#FFF8EB] text-[#7B63A8]">
                             <MapPin className="h-8 w-8 opacity-80" />
