@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { FEATURE_CARD_CACHE_CONTROL } from '@/lib/feature-card-cache';
 import { interleaveByGroup } from '@/lib/interleave-by-group';
 import { loadTaggedPhotos, sortByShotAtDesc } from '@/lib/plush-photos';
 
-export const revalidate = 600;
+export const revalidate = 3600;
 
 export async function GET() {
   // トップの特集カードの3枚も、特集ページと同じ撮影日の新しい順から取る。
@@ -12,5 +13,5 @@ export async function GET() {
     success: true,
     count: photos.length,
     photos: photos.slice(0, 3).map((p) => ({ id: p.id })),
-  }, { headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' } });
+  }, { headers: { 'Cache-Control': FEATURE_CARD_CACHE_CONTROL } });
 }
