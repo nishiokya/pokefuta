@@ -217,7 +217,7 @@ export default function StampbookOgpCard({
 
           <div style={{ display: 'flex', gap: 14, marginTop: 18 }}>
             {stats.map((stat) => (
-              <StatBox key={stat.label} stat={stat} />
+              <StatBox key={stat.label} stat={stat} plain={plain} />
             ))}
           </div>
 
@@ -252,7 +252,7 @@ export default function StampbookOgpCard({
                   }}
                 >
                   {!plain && <span>{sticker.icon}</span>}
-                  <span>{sticker.name}</span>
+                  <span>{plain ? withoutEmoji(sticker.name) : sticker.name}</span>
                 </div>
               ))}
               {moreStickers > 0 && (
@@ -345,12 +345,14 @@ function Ring({ size, ratio, colors, id }: { size: number; ratio: number; colors
   );
 }
 
-function StatBox({ stat }: { stat: OgpStat }) {
+function StatBox({ stat, plain }: { stat: OgpStat; plain: boolean }) {
   const ringSize = 112;
   const ratio = stat.total ? Math.min(stat.value / stat.total, 1) : 0;
   // 画面の欄は「今の段・次の段まで」の2つだが、今の称号は上の札に出ているので次の段までだけ
   const last = stat.note?.[stat.note.length - 1];
-  const note = last === undefined ? null : typeof last === 'string' ? last : last.join('');
+  const noteText = last === undefined ? null : typeof last === 'string' ? last : last.join('');
+  // 注記には称号の絵文字（⭐RANGER など）が入る。絵文字なしの描き直しでは外す（残すとまた CDN を引いて落ちる）
+  const note = noteText && plain ? withoutEmoji(noteText) : noteText;
   return (
     <div
       style={{
