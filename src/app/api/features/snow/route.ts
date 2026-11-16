@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { FEATURE_CARD_CACHE_CONTROL } from '@/lib/feature-card-cache';
+import { featureCardCacheControl } from '@/lib/feature-card-cache';
 import { interleaveByGroup } from '@/lib/interleave-by-group';
 import { loadTaggedPhotos, sortByShotAtDesc } from '@/lib/plush-photos';
 
-export const revalidate = 3600;
+// ISR にしない。DB のタイムアウトで取れなかった 0 枚の結果が ISR キャッシュに残り、トップの特集が両方消えた（2026-11-16）。
+// キャッシュは CloudFront への Cache-Control（featureCardCacheControl。0 枚はキャッシュしない）に任せる
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   // トップの特集カードの3枚も、特集ページと同じ撮影日の新しい順から取る。
@@ -13,5 +15,5 @@ export async function GET() {
     success: true,
     count: photos.length,
     photos: photos.slice(0, 3).map((p) => ({ id: p.id })),
-  }, { headers: { 'Cache-Control': FEATURE_CARD_CACHE_CONTROL } });
+  }, { headers: { 'Cache-Control': featureCardCacheControl(photos.length) } });
 }
