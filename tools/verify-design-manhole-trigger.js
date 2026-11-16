@@ -17,7 +17,10 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 
-const SQL_FILE = path.join(__dirname, 'verify-design-manhole-trigger.sql');
+const SQL_FILES = [
+  path.join(__dirname, 'verify-design-manhole-trigger.sql'),
+  path.join(__dirname, 'verify-own-design-manholes.sql'),
+];
 
 // SQL 側は期待と違えば EXCEPTION で落ちる。正常終了＝全項目合格。
 const CHECKS = [
@@ -25,14 +28,21 @@ const CHECKS = [
   '50m圏外/published → published のまま、近接情報は NULL',
   'hidden/authenticated → RLS が拒否する',
   '50m以内/hidden（所有者） → hidden のまま、近接情報は入る',
+  'get_own_design_manholes: 本人の needs_review が返る',
+  'get_own_design_manholes: 他人の投稿は返らない',
+  'get_own_design_manholes: 隠しただけの hidden は返らず、移した hidden は moved_manhole_id 付きで返る',
+  'get_own_design_manholes: anon は実行できない',
+  'get_own_design_manhole_count: anon は実行できない',
 ];
 
 try {
-  execFileSync(
-    'supabase',
-    ['db', 'query', '--local', '--file', SQL_FILE],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-  );
+  for (const file of SQL_FILES) {
+    execFileSync(
+      'supabase',
+      ['db', 'query', '--local', '--file', file],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+  }
 } catch (error) {
   const detail = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim();
   console.error('verify-design-manhole-trigger: 失敗\n');

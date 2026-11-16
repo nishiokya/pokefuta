@@ -3,21 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bookmark,
-  Calendar,
   Camera,
-  CircleDot,
-  Heart,
   MapPin,
   Navigation,
   PlusCircle,
   Sparkles,
   Stamp,
   Target,
-  Trash2,
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ja } from 'date-fns/locale';
 import { Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
@@ -26,19 +19,18 @@ import StampPhoto from '@/components/StampPhoto';
 import AiTagNote from '@/components/AiTagNote';
 import { photoAiTags } from '@/lib/photo-ai-tags';
 import DeletePhotoModal from '@/components/DeletePhotoModal';
-import ShareButtons from '@/components/ShareButtons';
 import ProfileCard from '@/components/users/ProfileCard';
 import VisitsSwitcher from '@/components/visits/VisitsSwitcher';
 import MyBadgesPanel from '@/components/visits/MyBadgesPanel';
 import CollectionStampShelf from '@/components/visits/CollectionStampShelf';
 import StickerStrip from '@/components/visits/StickerStrip';
+import OwnDesignManholesStrip from '@/components/DesignManhole/OwnDesignManholesStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildDesignManholeSticker, buildPlushSticker, buildSnowSticker, buildThemeBadges, byCollected, pokemonBadgeManholeIds } from '@/lib/badge-catalog';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
-import { visitsShareText } from '@/lib/share';
 import { pageTitle } from '@/lib/constants';
 import { manholeDisplayName } from '@/lib/manhole-label';
 
@@ -96,12 +88,6 @@ type HashtagProgress = {
 };
 
 const TOTAL_MANHOLES = 482;
-
-const formatVisitDate = (date: string, pattern = 'yyyy/MM/dd') => {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return '日付なし';
-  return format(parsed, pattern, { locale: ja });
-};
 
 const getManholeName = (manhole: Manhole) => manhole.name || manhole.title || 'ポケふた';
 const getMunicipality = (manhole: Manhole) => manhole.city || manhole.municipality || '場所未設定';
@@ -336,18 +322,6 @@ export default function VisitsPage() {
   const privateVisitCount = useMemo(() => visits.filter((v) => !v.is_public).length, [visits]);
   const completionRate = (visitedManholesCount / TOTAL_MANHOLES) * 100;
 
-  const visitedMunicipalityCount = useMemo(() => {
-    return new Set(
-      visits
-        .map((visit) => {
-          const prefecture = visit.manhole?.prefecture?.trim();
-          const municipality = getMunicipality(visit.manhole).trim();
-          return prefecture && municipality ? `${prefecture}-${municipality}` : null;
-        })
-        .filter((value): value is string => Boolean(value))
-    ).size;
-  }, [visits]);
-
   const passportManholes = useMemo(() => {
     const byId = new Map<number, Manhole>();
 
@@ -468,7 +442,6 @@ export default function VisitsPage() {
 
   const visitedPokemonSpecies = pokemonProgress.filter((p) => p.visitedManholes > 0).length;
   const totalPokemonSpecies = pokemonProgress.length;
-  const pokemonCompletionRate = totalPokemonSpecies > 0 ? (visitedPokemonSpecies / totalPokemonSpecies) * 100 : 0;
 
   const [hashtagProgress, totalAllHashtags] = useMemo<[HashtagProgress[], number]>(() => {
     const progress = new Map<string, { totalIds: Set<number>; visitedIds: Set<number> }>();
@@ -523,19 +496,6 @@ export default function VisitsPage() {
     [passportManholes, visitSummaryByManholeId]
   );
 
-  const thisMonthVisitedCount = useMemo(() => {
-    const now = new Date();
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const seen = new Set<number>();
-    sortedVisits.forEach((v) => {
-      const d = new Date(v.visited_at);
-      if (isNaN(d.getTime())) return;
-      const vym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (vym === ym) seen.add(v.manhole.id);
-    });
-    return seen.size;
-  }, [sortedVisits]);
-
   const visitedPrefectureCount = prefectureProgress.filter((p) => p.visited > 0).length;
   const visitedFeaturesCount = hashtagProgress.length;
 
@@ -589,80 +549,6 @@ export default function VisitsPage() {
     setDeleteModalOpen(false);
     setSelectedPhotoId(null);
     setSelectedVisitId(null);
-  };
-
-  const handleLikeToggle = async (visitId: string) => {
-    const visit = visits.find((target) => target.id === visitId);
-    if (!visit) return;
-
-    const isLiked = visit.is_liked;
-    const method = isLiked ? 'DELETE' : 'POST';
-
-    setVisits((prevVisits) => prevVisits.map((target) =>
-      target.id === visitId
-        ? {
-            ...target,
-            is_liked: !isLiked,
-            likes_count: isLiked ? target.likes_count - 1 : target.likes_count + 1,
-          }
-        : target
-    ));
-
-    try {
-      const response = await fetch(`/api/visits/${visitId}/like`, { method });
-
-      if (!response.ok) {
-        setVisits((prevVisits) => prevVisits.map((target) =>
-          target.id === visitId
-            ? {
-                ...target,
-                is_liked: isLiked,
-                likes_count: isLiked ? target.likes_count + 1 : target.likes_count - 1,
-              }
-            : target
-        ));
-        console.error('Failed to toggle like');
-      }
-    } catch (error) {
-      setVisits((prevVisits) => prevVisits.map((target) =>
-        target.id === visitId
-          ? {
-              ...target,
-              is_liked: isLiked,
-              likes_count: isLiked ? target.likes_count + 1 : target.likes_count - 1,
-            }
-          : target
-      ));
-      console.error('Error toggling like:', error);
-    }
-  };
-
-  const handleBookmarkToggle = async (visitId: string) => {
-    const visit = visits.find((target) => target.id === visitId);
-    if (!visit) return;
-
-    const isBookmarked = visit.is_bookmarked;
-    const method = isBookmarked ? 'DELETE' : 'POST';
-
-    setVisits((prevVisits) => prevVisits.map((target) =>
-      target.id === visitId ? { ...target, is_bookmarked: !isBookmarked } : target
-    ));
-
-    try {
-      const response = await fetch(`/api/visits/${visitId}/bookmark`, { method });
-
-      if (!response.ok) {
-        setVisits((prevVisits) => prevVisits.map((target) =>
-          target.id === visitId ? { ...target, is_bookmarked: isBookmarked } : target
-        ));
-        console.error('Failed to toggle bookmark');
-      }
-    } catch (error) {
-      setVisits((prevVisits) => prevVisits.map((target) =>
-        target.id === visitId ? { ...target, is_bookmarked: isBookmarked } : target
-      ));
-      console.error('Error toggling bookmark:', error);
-    }
   };
 
   if (loading) {
@@ -961,6 +847,9 @@ export default function VisitsPage() {
             </div>
             </div>
           )}
+
+          {/* 投稿したデザインマンホール（1枚以上あるときだけ出る） */}
+          {isLoggedIn && <OwnDesignManholesStrip />}
         </div>
         {isLoggedIn && (
           <div className="hidden lg:block">
@@ -995,75 +884,6 @@ export default function VisitsPage() {
         />
       )}
     </div>
-  );
-}
-
-function StampCard({ manhole, summary }: { manhole: Manhole; summary?: VisitSummary }) {
-  const isVisited = Boolean(summary);
-
-  return (
-    <Link
-      href={`/manhole/${manhole.id}`}
-      className={`relative flex aspect-[4/5] flex-col justify-between rounded-md border-2 p-1.5 shadow-sm transition-transform hover:-translate-y-0.5 ${
-        isVisited
-          ? 'border-[#B5483C]/45 bg-[#FFF7E5]'
-          : 'border-dashed border-[#8C6A4A]/25 bg-[#E9DEC9]/75'
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <span className={`rounded-full px-1 py-0.5 font-pixelJp text-[8px] font-bold leading-none ${
-          isVisited ? 'bg-[#D94D3F] text-white' : 'bg-[#D5C8B3] text-[#7D715F]'
-        }`}>
-          {isVisited ? '済' : '未'}
-        </span>
-        <div className="flex items-center gap-0.5">
-          {summary?.hasPhotos && <Camera className="h-3 w-3 text-[#B5483C]" />}
-          {summary && summary.count > 1 && (
-            <span className="rounded-full bg-[#4F3828] px-1 py-0.5 font-pixel text-[7px] leading-none text-white">
-              x{summary.count}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-1 items-center justify-center">
-        {isVisited ? (
-          <div className="relative aspect-square w-3/4 overflow-hidden rounded-full border-[3px] border-[#D94D3F] bg-[#E9DEC9] shadow-[inset_0_2px_8px_rgba(181,72,60,0.18)]">
-            {summary?.latestVisit.photos[0]?.thumbnail_url ? (
-              <img
-                src={summary.latestVisit.photos[0].thumbnail_url}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle,#6F6658_0_18%,#B9AA91_19%_29%,#6F6658_30%_33%,#D7C9AF_34%_48%,#8B7D67_49%_52%,#CFC0A5_53%)]">
-                <CircleDot className="h-4 w-4 text-[#4F3828]/70" />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex aspect-square w-3/4 rotate-[-8deg] items-center justify-center rounded-full border-[3px] border-[#B8AB96] text-center text-[#A39580]">
-            <div>
-              <Stamp className="mx-auto h-4 w-4" />
-              <p className="font-pixel text-[7px] leading-none">NEXT</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <p className="truncate font-pixelJp text-[9px] font-bold leading-tight text-[#4F3828]">
-          {manholeDisplayName(manhole)}
-        </p>
-        {summary && (
-          <p className="font-pixel text-[8px] text-[#B5483C]">{formatVisitDate(summary.latestVisit.visited_at, 'yyyy/M')}</p>
-        )}
-      </div>
-    </Link>
   );
 }
 

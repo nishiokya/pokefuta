@@ -23,3 +23,12 @@ test('デザインマンホールの公開面: 自分の枚数は anon に渡さ
   assert.match(migration, /get_own_design_manhole_count\(\) TO authenticated, service_role/);
   assert.doesNotMatch(migration, /get_own_design_manhole_count\(\) TO anon/);
 });
+
+test('自分のデザインマンホール枚数: anon の実行権限を別のマイグレーションで外す', () => {
+  const revoke = readFileSync(
+    fileURLToPath(new URL('../supabase/migrations/20261116130000_revoke_anon_own_design_manhole_count.sql', import.meta.url)),
+    'utf8'
+  );
+  assert.match(revoke, /REVOKE ALL ON FUNCTION public\.get_own_design_manhole_count\(\) FROM anon;/);
+  assert.doesNotMatch(revoke.replace(/^--.*$/gm, ''), /GRANT/);
+});
