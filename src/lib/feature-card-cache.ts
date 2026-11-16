@@ -3,3 +3,10 @@
 // 期限切れのあとも1日は古い応答を返しながら裏で取り直す（SSR の起動待ちを利用者に見せない）。
 // 中身は anon で読む公開データだけ（クッキーを読むクライアントを作らない）
 export const FEATURE_CARD_CACHE_CONTROL = 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400';
+
+// 0 枚の応答はキャッシュさせない。DB の statement timeout などで取れなかったときも、ローダーは空配列を返して 0 枚になる。
+// それを CDN に1時間〜1日置くと、トップの特集が消えたままになる（2026-11-16 に雪・ぬいぐるみが両方消えた）。
+// 本当に 0 枚（雪の季節の外など）のときは、トップがもう一方の特集を出す
+export function featureCardCacheControl(count: number): string {
+  return count > 0 ? FEATURE_CARD_CACHE_CONTROL : 'no-store';
+}

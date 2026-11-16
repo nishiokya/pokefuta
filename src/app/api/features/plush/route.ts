@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
-import { FEATURE_CARD_CACHE_CONTROL } from '@/lib/feature-card-cache';
+import { featureCardCacheControl } from '@/lib/feature-card-cache';
 import { hasPlushClip } from '@/lib/photo-ai-tags';
 import { loadPlushPhotos } from '@/lib/plush-photos';
 
 // トップの特集カード用。ぬいぐるみの写真の新しい数枚と、特集ページにある枚数を返す。
-// 判定は毎朝書かれるので、CDN に1時間置いてよい（FEATURE_CARD_CACHE_CONTROL）
-export const revalidate = 3600;
+// 判定は毎朝書かれるので、CDN に1時間置いてよい。
+// ISR にしない。DB のタイムアウトで取れなかった 0 枚の結果が ISR キャッシュに残り、トップの特集が両方消えた（2026-11-16）。
+// キャッシュは CloudFront への Cache-Control（featureCardCacheControl。0 枚はキャッシュしない）に任せる
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   // 枚数は特集ページと同じ集合（蓋とぬいぐるみを切り抜ける写真だけ）、カードの3枚は新着
@@ -21,6 +23,6 @@ export async function GET() {
         return { id: p.id, manhole_name: p.manholeName, ai_tags: { crop: tags.crop, lid: tags.lid, plush_box: tags.plush_box } };
       }),
     },
-    { headers: { 'Cache-Control': FEATURE_CARD_CACHE_CONTROL } },
+    { headers: { 'Cache-Control': featureCardCacheControl(photos.length) } },
   );
 }
