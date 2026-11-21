@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { hasPlushClip, photoAiBoxes, photoBoxZoom } from '@/lib/photo-ai-tags';
 import { SITE_NAME } from '@/lib/constants';
-import { loadPlushPhotos, PLUSH_PAGE_LIMIT } from '@/lib/plush-photos';
+import { PLUSH_PAGE_LIMIT, type PlushPhoto } from '@/lib/plush-photos';
+import { loadTaggedPhotosForPage } from '@/lib/tagged-photos-page';
 import TaggedPhotoFeature, { featureFeedbackUrl } from '@/components/features/TaggedPhotoFeature';
 
 // ベータ。中身（AI の判定）と見せ方を確かめてから検索に出す
@@ -11,13 +12,21 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-// 判定は毎朝書かれる。数分古くてよいので都度の読み込みは避ける
-export const revalidate = 600;
+// ISR にしない（ビルド時に 0 枚で焼き込まれ、画面遷移で 0 枚が出た。tagged-photos-page.ts）。
+// 判定は毎朝書かれるので、DB への問い合わせだけを10分持つ
+export const dynamic = 'force-dynamic';
 
 export default async function PlushPhotosPage() {
   // 蓋とぬいぐるみをそれぞれ切り抜ける写真だけを出す（AI がぬいぐるみの枠を見つけられなかった写真は外す）。
   // 投稿の新しい順そのまま（新しく上がった写真が上に来るように。投稿者は回さない）
-  const photos = (await loadPlushPhotos(PLUSH_PAGE_LIMIT, 'recent', false)).filter((photo) => hasPlushClip(photo.aiTags));
+  let photos: PlushPhoto[] = [];
+  let failed = false;
+  try {
+    photos = (await loadTaggedPhotosForPage('plush', PLUSH_PAGE_LIMIT, 'recent', false)).filter((photo) => hasPlushClip(photo.aiTags));
+  } catch (error) {
+    console.error('Failed to load plush photos:', error instanceof Error ? error.message : error);
+    failed = true;
+  }
 
   return (
     <TaggedPhotoFeature
@@ -26,7 +35,7 @@ export default async function PlushPhotosPage() {
       title="ぬいぐるみと旅するポケふた"
       countLabel="ぬいぐるみと一緒に撮られたポケふたの写真"
       sortLabel="新しく投稿された順"
-      emptyText="まだ写真がありません。"
+      emptyText={failed ? '写真を読み込めませんでした。少し待ってから開き直してください。' : 'まだ写真がありません。'}
       photos={photos}
       limit={PLUSH_PAGE_LIMIT}
       renderMedia={(photo, index) => {
