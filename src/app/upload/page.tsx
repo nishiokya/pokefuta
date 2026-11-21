@@ -29,6 +29,7 @@ import SubmissionTypeSwitcher from '@/components/SubmissionTypeSwitcher';
 import { makeErrorRef, withErrorRef } from '@/lib/error-ref';
 import StampPhoto from '@/components/StampPhoto';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
+import { fetchCoverPhotos } from '@/lib/manhole-cover-photos-client';
 
 /**
  * 蓋一覧の問題をこのタブで既に通知したか。
@@ -848,13 +849,13 @@ function UploadPageInner() {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/manholes/cover-photos?ids=${coverMissingIds}`, { signal: controller.signal });
-        if (!response.ok) return;
-        const data = await response.json();
-        const photos = (data.photos ?? {}) as Record<string, CoverPhoto>;
+        const { photos, failedIds } = await fetchCoverPhotos(coverMissingIds.split(',').map(Number), { signal: controller.signal });
         setLidCovers(prev => {
           const next = { ...prev };
-          for (const id of coverMissingIds.split(',')) next[id] = photos[id] ?? null;
+          // 取れなかった蓋は「写真なし」と確定させない（次に候補が変わったときに取り直す）
+          for (const id of coverMissingIds.split(',')) {
+            if (!failedIds.has(id)) next[id] = photos[id] ?? null;
+          }
           return next;
         });
       } catch (error) {

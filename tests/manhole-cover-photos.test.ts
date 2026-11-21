@@ -59,3 +59,29 @@ test('丸い切り抜きでは、ひとこと付きでもスコアの高い写�
   ]);
   assert.equal(result['1'].photo_id, 'best');
 });
+
+test('バケツは蓋 id 100 枚ずつの固定の区切り', async () => {
+  const { coverPhotoBucketOf, coverPhotoBucketRange, coverPhotoBucketsFor } = await import('../src/lib/manhole-cover-photos');
+  assert.equal(coverPhotoBucketOf(1), 0);
+  assert.equal(coverPhotoBucketOf(100), 0);
+  assert.equal(coverPhotoBucketOf(101), 1);
+  assert.deepEqual(coverPhotoBucketRange(4), { from: 401, to: 500 });
+  assert.deepEqual(coverPhotoBucketsFor([404, 1, 405, 250, 0, -3, 1.5]), [0, 2, 4]);
+});
+
+test('列を絞って読んだ行から ai_tags を組み立て直し、選び方と切り抜きに使う', async () => {
+  const { coverPhotoCandidateFromRow } = await import('../src/lib/manhole-cover-photos');
+  const base = {
+    manhole_id: 7, created_at: '2026-10-01T00:00:00Z', quality_score: null, quality_eligible: null, is_landscape: false,
+    ai_scene: null, ai_lid_fits: null, ai_rep_score: null, ai_lid: null, ai_crop: null,
+  };
+  const plain = coverPhotoCandidateFromRow({ ...base, id: 'plain', quality_score: 0.9, created_at: '2026-10-09T00:00:00Z' });
+  assert.equal(plain.ai_tags, null);
+  const centered = coverPhotoCandidateFromRow({
+    ...base, id: 'centered', quality_score: 0.5, ai_scene: 'centered_clean', ai_lid_fits: true, ai_lid: { x: 1 }, ai_crop: { y: 2 },
+  });
+  assert.deepEqual(centered.ai_tags, { scene: 'centered_clean', lid_fits: true, lid: { x: 1 }, crop: { y: 2 } });
+  const result = pickCoverPhotos([plain, centered]);
+  assert.equal(result['7'].photo_id, 'centered');
+  assert.deepEqual(result['7'].lid_crop, { lid: { x: 1 }, crop: { y: 2 } });
+});
