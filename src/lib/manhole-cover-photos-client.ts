@@ -13,7 +13,11 @@ const bucketCache = new Map<number, { request: Promise<CoverPhotoMap>; fetchedAt
 const fetchBucket = (bucket: number): Promise<CoverPhotoMap> => {
   const cached = bucketCache.get(bucket);
   if (cached && Date.now() - cached.fetchedAt < BUCKET_TTL_MS) return cached.request;
-  const request = fetch(`/api/manholes/cover-photos?bucket=${bucket}`)
+  const entry: { request: Promise<CoverPhotoMap>; fetchedAt: number } = {
+    request: Promise.resolve({}),
+    fetchedAt: Date.now(),
+  };
+  entry.request = fetch(`/api/manholes/cover-photos?bucket=${bucket}`)
     .then(async (response) => {
       if (!response.ok) throw new Error(`cover-photos bucket ${bucket}: HTTP ${response.status}`);
       const data = (await response.json()) as { success?: boolean; photos?: CoverPhotoMap };
@@ -21,11 +25,12 @@ const fetchBucket = (bucket: number): Promise<CoverPhotoMap> => {
       return data.photos ?? {};
     })
     .catch((error: unknown) => {
-      bucketCache.delete(bucket);
+      // 期限切れで後から別のリクエストに差し替わっていたら、そちらは消さない
+      if (bucketCache.get(bucket) === entry) bucketCache.delete(bucket);
       throw error;
     });
-  bucketCache.set(bucket, { request, fetchedAt: Date.now() });
-  return request;
+  bucketCache.set(bucket, entry);
+  return entry.request;
 };
 
 export type CoverPhotosResult = {
