@@ -22,7 +22,7 @@ export default function NearbyPokefutaList({ items }: { items: Item[] }) {
     if (!ids) return;
     let cancelled = false;
     fetchCoverPhotos(ids.split(',').map(Number))
-      .then((result) => {
+      .then(({ photos: result }) => {
         if (!cancelled) setPhotos(result);
       })
       .catch(() => {});

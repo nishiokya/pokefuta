@@ -849,10 +849,13 @@ function UploadPageInner() {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const photos = await fetchCoverPhotos(coverMissingIds.split(',').map(Number), { signal: controller.signal });
+        const { photos, failedIds } = await fetchCoverPhotos(coverMissingIds.split(',').map(Number), { signal: controller.signal });
         setLidCovers(prev => {
           const next = { ...prev };
-          for (const id of coverMissingIds.split(',')) next[id] = photos[id] ?? null;
+          // 取れなかった蓋は「写真なし」と確定させない（次に候補が変わったときに取り直す）
+          for (const id of coverMissingIds.split(',')) {
+            if (!failedIds.has(id)) next[id] = photos[id] ?? null;
+          }
           return next;
         });
       } catch (error) {

@@ -183,7 +183,7 @@ export default function NearbyPage() {
    */
   const attachCoverPhotos = async (manholes: ManholeWithDistance[]) => {
     const ids = manholes.filter((m) => !m.visit?.photos?.length).map((m) => m.id);
-    const photos = await fetchCoverPhotos(ids);
+    const { photos } = await fetchCoverPhotos(ids);
     return manholes.map((m) => (photos[m.id] ? { ...m, cover_photo: photos[m.id] } : m));
   };
 
