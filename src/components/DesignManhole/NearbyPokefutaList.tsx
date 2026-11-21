@@ -6,6 +6,7 @@ import { MapPin } from 'lucide-react';
 import StampPhoto from '@/components/StampPhoto';
 import { formatDistanceKm } from '@/lib/manhole-label';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
+import { fetchCoverPhotos } from '@/lib/manhole-cover-photos-client';
 
 type Item = { id: number; label: string; distanceKm: number };
 
@@ -20,10 +21,9 @@ export default function NearbyPokefutaList({ items }: { items: Item[] }) {
   useEffect(() => {
     if (!ids) return;
     let cancelled = false;
-    fetch(`/api/manholes/cover-photos?ids=${ids}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { success?: boolean; photos?: Record<string, CoverPhoto> } | null) => {
-        if (!cancelled && data?.success && data.photos) setPhotos(data.photos);
+    fetchCoverPhotos(ids.split(',').map(Number))
+      .then((result) => {
+        if (!cancelled) setPhotos(result);
       })
       .catch(() => {});
     return () => {

@@ -21,6 +21,7 @@ import { pageTitle } from '@/lib/constants';
 import { PhraseText } from '@/components/PhraseText';
 import { manholeHeadingPlace } from '@/lib/manhole-label';
 import type { CoverPhoto } from '@/lib/manhole-cover-photos';
+import { fetchCoverPhotos } from '@/lib/manhole-cover-photos-client';
 import { nearbyArea } from '@/lib/nearby-area';
 import { matchesManholeQuery } from '@/lib/manhole-search';
 
@@ -46,8 +47,6 @@ type OwnVisit = NonNullable<ManholeWithDistance['visit']>;
 
 /** 一覧に並べる蓋の数。/api/manholes から100件取り、近い順にここまで出す */
 const NEARBY_DISPLAY_LIMIT = 50;
-/** /api/manholes/cover-photos が1回に受け付ける蓋の数 */
-const COVER_PHOTO_CHUNK = 100;
 
 /**
  * 「近く」と「一覧」の2つ。以前は「未訪問」も別タブだったが、近くの結果を絞り込むだけの同じ一覧で、
@@ -184,24 +183,7 @@ export default function NearbyPage() {
    */
   const attachCoverPhotos = async (manholes: ManholeWithDistance[]) => {
     const ids = manholes.filter((m) => !m.visit?.photos?.length).map((m) => m.id);
-    const chunks: number[][] = [];
-    for (let i = 0; i < ids.length; i += COVER_PHOTO_CHUNK) {
-      chunks.push(ids.slice(i, i + COVER_PHOTO_CHUNK));
-    }
-    const results = await Promise.all(
-      chunks.map(async (chunk) => {
-        try {
-          const response = await fetch(`/api/manholes/cover-photos?ids=${chunk.join(',')}`);
-          if (!response.ok) return {};
-          const data = await response.json();
-          return (data.photos ?? {}) as Record<string, CoverPhoto>;
-        } catch (error) {
-          console.error('Failed to load cover photos:', error);
-          return {};
-        }
-      })
-    );
-    const photos: Record<string, CoverPhoto> = Object.assign({}, ...results);
+    const photos = await fetchCoverPhotos(ids);
     return manholes.map((m) => (photos[m.id] ? { ...m, cover_photo: photos[m.id] } : m));
   };
 
