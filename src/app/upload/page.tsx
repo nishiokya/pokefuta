@@ -167,7 +167,7 @@ function UploadPageInner() {
   // マンホール詳細から来ていない（どの蓋か分からない）ときだけ出る。詳細から来ていれば valid_no_gps で通す
   const missingGpsMessage = isAndroid
     ? '写真に位置情報がありません。撮ってある写真は、下の「撮ってある写真を投稿する」でポケふたを選ぶと投稿できます。'
-    : '写真に位置情報がありません。マンホールの詳細ページの投稿ボタンからなら、位置情報が無くても投稿できます。';
+    : '写真に位置情報がありません。下で、どのポケふたの写真か選ぶと投稿できます。';
 
   // ✅ タイマークリーンアップ（コンポーネントアンマウント時）
   useEffect(() => {
@@ -1454,12 +1454,13 @@ function UploadPageInner() {
         {(!selectedPhoto || !!selectedPhoto.error) && (
           <>
         {/* Android の撮ってある写真: ブラウザで選ぶと位置情報が消えるので、先に蓋を選んでもらい
-            その蓋の投稿画面（?manhole_id=）へ切り替える。位置情報なしで受け付けるのはそこだけ */}
-        {isAndroid && !hintManholeId && (
+            その蓋の投稿画面（?manhole_id=）へ切り替える。位置情報なしで受け付けるのはそこだけ。
+            iPhone などでも、位置情報の無い写真を選んだら同じ蓋選びを出す（選ぶと写真ごと受け付け直す） */}
+        {!hintManholeId && (isAndroid || selectedPhoto?.photoStatus === 'invalid_gps') && (
           <section className="mt-6 rounded-lg border-2 border-[#7B63A8]/40 bg-white p-4">
             <h2 className="flex items-center gap-1.5 text-sm font-bold">
               <Upload className="h-4 w-4 text-[#7B63A8]" />
-              撮ってある写真を投稿する
+              {isAndroid ? '撮ってある写真を投稿する' : 'どのポケふたの写真か選ぶ'}
               <span className="rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white">ベータ</span>
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/70">
@@ -1487,7 +1488,7 @@ function UploadPageInner() {
                       <button
                         type="button"
                         onClick={() => {
-                          trackNavClick('投稿:Androidの写真の蓋を選ぶ');
+                          trackNavClick(isAndroid ? '投稿:Androidの写真の蓋を選ぶ' : '投稿:位置情報なしの写真の蓋を選ぶ');
                           router.replace(`/upload?manhole_id=${m.id}`);
                         }}
                         className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
