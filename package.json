@@ -31,7 +31,7 @@
     "test:design-submitter": "tsx --test tests/design-manhole-submitter-policy.test.ts",
     "test:japanese-phrases": "tsx --test tests/japanese-phrases.test.ts",
     "test:site-nav": "tsx --test tests/site-nav.test.ts",
-    "test:bulk-upload": "tsx --test tests/bulk-upload.test.ts",
+    "test:bulk-upload": "tsx --test tests/bulk-upload.test.ts tests/upload-nearby-candidates.test.ts",
     "test:image-sniff": "tsx --test tests/image-sniff.test.ts",
     "test:trip-activity": "tsx --test tests/trip-activity.test.ts",
     "verify:ogp-linux": "node tools/verify-ogp-linux.js",

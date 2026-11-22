@@ -9,7 +9,8 @@ import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import sharp from 'sharp';
 import { sniffImageFormat } from '@/lib/image-sniff';
 import { storage, generateStorageKey, deriveSmallKey } from '@/lib/storage';
-import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM, extractCoordinatesFromWKB } from '@/lib/location';
+import { calculateDistance, isValidCoordinates, extractCoordinatesFromWKB } from '@/lib/location';
+import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 
@@ -79,6 +80,12 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *                   写真に位置情報が無く、マンホール詳細から選んだ manhole_id の写真として投稿する。
  *                   緯度経度が無いときだけ効き、距離の確認を飛ばす。visit_id（既存の訪問への追加）とは併用できない。
  *                   visit.location_source は DB が 'none' にし、運営が目で確かめる
+ *               nearby_pick:
+ *                 type: string
+ *                 enum: ['true']
+ *                 description: >-
+ *                   50m 以内に蓋が無く、投稿者が近くの候補から manhole_id を選んだ投稿。
+ *                   距離の上限を 300m に広げる。visit_id（既存の訪問への追加）とは併用できない
  *               metadata:
  *                 type: string
  *                 description: 追加メタデータ（JSON文字列）
@@ -190,6 +197,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'is_landscape must be true or false' }, { status: 400 });
     }
     const isLandscape = landscapeValue === 'true';
+    // 50m 以内に蓋が無く、近くの候補（300m 以内）から投稿者が蓋を選んだ投稿。一括投稿は付けない
+    const nearbyPick = formData.get('nearby_pick') === 'true' && !existingVisitId;
 
     let photoExif: Record<string, any> | undefined;
     if (exifStr) {
@@ -310,16 +319,17 @@ export async function POST(request: NextRequest) {
     const manholeLatitude = manholeCoords.lat;
     const manholeLongitude = manholeCoords.lng;
 
-    // ✅ マンホール位置との距離チェック（50m以内）。位置情報なしの投稿は確かめる位置が無い
+    // ✅ マンホール位置との距離チェック（50m以内）。位置情報なしの投稿は確かめる位置が無い。
+    // 50m 以内に蓋が無く、投稿者が近くの候補から自分で選んだ投稿（nearby_pick）だけ 300m まで許す
     const distance = hasCoordinates
       ? calculateDistance(lat!, lng!, manholeLatitude, manholeLongitude)
       : 0;
-    const distanceThreshold = MAX_DISTANCE_KM; // 50m
+    const distanceThreshold = allowedUploadDistanceKm(nearbyPick);
     if (distance > distanceThreshold) {
       const distanceM = Math.round(distance * 1000);
       return NextResponse.json({
         success: false,
-        error: `Location too far from manhole - ${distanceM}m away (max 50m allowed)`
+        error: `Location too far from manhole - ${distanceM}m away (max ${Math.round(distanceThreshold * 1000)}m allowed)`
       }, { status: 400 });
     }
 
