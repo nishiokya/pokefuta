@@ -62,6 +62,7 @@ export async function loadPlushPhotos(
 /**
  * 公開写真だけをタグで抽出。投稿の新しい順で最大 limit 枚を返す（雪のページは sortByShotAtDesc で撮影日順に並べ直す。
  * 上限で切ってから並べ直すので、雪が limit 枚を超えたら DB 側で撮影日順に切るように直すこと）。
+ * 取れなかったときは空配列を返す（トップの特集カードの API 用。0 枚の応答はキャッシュさせない）。
  */
 export async function loadTaggedPhotos(
   tag: 'plush' | 'snow',
@@ -69,9 +70,27 @@ export async function loadTaggedPhotos(
   order: 'score' | 'recent' = 'recent',
   interleave = false,
 ): Promise<PlushPhoto[]> {
+  try {
+    return await fetchTaggedPhotos(tag, limit, order, interleave);
+  } catch (error) {
+    console.error('Failed to load plush photos:', error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+/**
+ * loadTaggedPhotos と同じ。ただし取れなかったときは空配列ではなく例外を投げる。
+ * 特集ページ（/photos/plush・/photos/snow）はこちらを使い、失敗を「0 枚」としてキャッシュしない。
+ */
+export async function fetchTaggedPhotos(
+  tag: 'plush' | 'snow',
+  limit = PLUSH_PAGE_LIMIT,
+  order: 'score' | 'recent' = 'recent',
+  interleave = false,
+): Promise<PlushPhoto[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return [];
+  if (!url || !anonKey) throw new Error('Supabase URL / anon key is not set');
   const supabase = createClient<Database>(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -110,10 +129,8 @@ export async function loadTaggedPhotos(
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error || !data) {
-    if (error) console.error('Failed to load plush photos:', error.message);
-    return [];
-  }
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('No data');
 
   const authUids = Array.from(new Set((data as any[])
     .map((row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id)

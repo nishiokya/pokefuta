@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/constants';
-import { loadTaggedPhotos, PLUSH_PAGE_LIMIT, sortByShotAtDesc } from '@/lib/plush-photos';
+import { PLUSH_PAGE_LIMIT, sortByShotAtDesc, type PlushPhoto } from '@/lib/plush-photos';
+import { loadTaggedPhotosForPage } from '@/lib/tagged-photos-page';
 import TaggedPhotoFeature, { featureFeedbackUrl } from '@/components/features/TaggedPhotoFeature';
 
 export const metadata: Metadata = {
@@ -8,11 +9,19 @@ export const metadata: Metadata = {
   description: '雪と一緒に写るポケふた。みんなが投稿した冬の景色を集めました。',
   robots: { index: false, follow: true },
 };
-export const revalidate = 600;
+// ISR にしない（ビルド時に 0 枚で焼き込まれ、画面遷移で 0 枚が出た。tagged-photos-page.ts）
+export const dynamic = 'force-dynamic';
 
 export default async function SnowPhotosPage() {
   // 雪は季節の写真なので、投稿日ではなく撮影日の新しい順に並べる（去年の冬の写真を今年投稿する人がいる）
-  const photos = sortByShotAtDesc(await loadTaggedPhotos('snow'));
+  let photos: PlushPhoto[] = [];
+  let failed = false;
+  try {
+    photos = sortByShotAtDesc(await loadTaggedPhotosForPage('snow', PLUSH_PAGE_LIMIT, 'recent', false));
+  } catch (error) {
+    console.error('Failed to load snow photos:', error instanceof Error ? error.message : error);
+    failed = true;
+  }
 
   return (
     <TaggedPhotoFeature
@@ -22,7 +31,7 @@ export default async function SnowPhotosPage() {
       title="雪景色のポケふた"
       countLabel="雪と一緒に写るポケふたの写真"
       sortLabel="撮影日の新しい順"
-      emptyText="雪景色の写真は、まだありません。"
+      emptyText={failed ? '写真を読み込めませんでした。少し待ってから開き直してください。' : '雪景色の写真は、まだありません。'}
       photos={photos}
       limit={PLUSH_PAGE_LIMIT}
       renderMedia={(photo, index) => (
