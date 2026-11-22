@@ -925,12 +925,14 @@ function UploadPageInner() {
     setVisitNote(buildAutoVisitNote(selectedPhoto.metadata, manhole));
   };
 
-  // 候補から選んだ蓋を取り消して、候補の一覧に戻す
+  // 候補から選んだ蓋を取り消して、候補の一覧に戻す。投稿ボタンがまた押せなくなるので、
+  // 計測も blocked に戻す（同じ写真で同じ理由なので、新しい詰まりとしては数えられない）
   const unpickNearbyManhole = () => {
     if (!selectedPhoto || selectedPhoto.uploading) return;
     const photoId = selectedPhoto.id;
+    const ref = funnel.blocked('no_nearby_manhole', 'photo');
     setPhotos(prev => prev.map(p => p.id === photoId
-      ? { ...p, photoStatus: 'no_nearby_manhole', matchedManhole: undefined, nearbyPicked: false, error: PICK_NEARBY_MESSAGE }
+      ? { ...p, photoStatus: 'no_nearby_manhole', matchedManhole: undefined, nearbyPicked: false, error: withErrorRef(PICK_NEARBY_MESSAGE, ref) }
       : p));
     setVisitNote(buildAutoVisitNote(selectedPhoto.metadata, undefined));
   };
