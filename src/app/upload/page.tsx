@@ -12,6 +12,7 @@ import { matchesManholeQuery } from '@/lib/manhole-search';
 import { manholeHeadingPlace, pokemonText } from '@/lib/manhole-label';
 import { activeSeasonalCall, type SeasonalCall } from '@/lib/seasonal-call';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
+import { findNearbyPickCandidates, NEARBY_PICK_MAX_KM, type NearbyCandidate } from '@/lib/upload-nearby-candidates';
 import { buildAutoVisitNote, extractPhotoMetadata, type PhotoMetadata } from '@/lib/photo-exif';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -95,7 +96,14 @@ interface UploadedPhoto {
   error?: string;
   // valid_no_gps: 位置情報の無い写真を、マンホール詳細から来た蓋（manhole_id）の写真として受け付けた
   photoStatus: 'waiting_manhole' | 'invalid_gps' | 'no_nearby_manhole' | 'valid' | 'valid_no_gps';
+  // 50m 以内に蓋が無いとき、300m 以内の蓋を近い順に（投稿者に選んでもらう）
+  nearbyCandidates?: NearbyCandidate<Manhole>[];
+  // nearbyCandidates から投稿者が選んだ蓋。サーバーへ nearby_pick を付けて送り、300m まで許してもらう
+  nearbyPicked?: boolean;
 }
+
+const NO_NEARBY_MESSAGE = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
+const PICK_NEARBY_MESSAGE = '50m以内にマンホールが見つかりません。近くのマンホールから、撮った蓋を選んでください。';
 
 interface AlertMessage {
   type: 'error' | 'success' | 'warning';
@@ -352,12 +360,18 @@ function UploadPageInner() {
         return { ...photo, photoStatus: 'valid', matchedManhole, error: undefined };
       }
 
+      const nearbyCandidates = findNearbyPickCandidates(
+        photo.metadata.latitude as number,
+        photo.metadata.longitude as number,
+        manholes
+      );
       const ref = makeErrorRef('no_nearby_manhole');
       blockReasons.push({ reason: 'no_nearby_manhole', ref });
       return {
         ...photo,
         photoStatus: 'no_nearby_manhole',
-        error: withErrorRef('50m以内にマンホールが見つかりません。位置情報を確認してください。', ref)
+        nearbyCandidates,
+        error: withErrorRef(nearbyCandidates.length ? PICK_NEARBY_MESSAGE : NO_NEARBY_MESSAGE, ref)
       };
     };
 
@@ -448,6 +462,7 @@ function UploadPageInner() {
     let matchedManhole: Manhole | undefined;
     let distanceError: string | undefined;
     let photoStatus: UploadedPhoto['photoStatus'];
+    let nearbyCandidates: NearbyCandidate<Manhole>[] | undefined;
 
     const hint = findHintManhole();
     if (!isValidCoordinates(metadata.latitude, metadata.longitude) && hint) {
@@ -475,8 +490,13 @@ function UploadPageInner() {
         photoStatus = 'valid';
       } else {
         photoStatus = 'no_nearby_manhole';
+        nearbyCandidates = findNearbyPickCandidates(
+          metadata.latitude as number,
+          metadata.longitude as number,
+          manholes
+        );
         distanceError = withErrorRef(
-          '50m以内にマンホールが見つかりません。位置情報を確認してください。',
+          nearbyCandidates.length ? PICK_NEARBY_MESSAGE : NO_NEARBY_MESSAGE,
           funnel.blocked('no_nearby_manhole', 'photo')
         );
       }
@@ -501,7 +521,8 @@ function UploadPageInner() {
       uploaded: false,
       isLandscape: false,
       error: distanceError,
-      photoStatus
+      photoStatus,
+      nearbyCandidates
     }]);
 
     // 写真を差し替えたとき前の写真の自動メモが残らないよう、空でも毎回更新する
@@ -598,10 +619,11 @@ function UploadPageInner() {
       photo.matchedManhole.longitude
     );
 
-    if (distance > MAX_DISTANCE_KM) {
+    const maxDistanceKm = photo.nearbyPicked ? NEARBY_PICK_MAX_KM : MAX_DISTANCE_KM;
+    if (distance > maxDistanceKm) {
       const distanceM = Math.round(distance * 1000);
       const errorRef = makeErrorRef('too_far');
-      const errorMsg = withErrorRef(`マンホール位置から${distanceM}m離れています。50m以内で撮影した写真を登録してください。`, errorRef);
+      const errorMsg = withErrorRef(`マンホール位置から${distanceM}m離れています。${Math.round(maxDistanceKm * 1000)}m以内で撮影した写真を登録してください。`, errorRef);
       setPhotos(prev => prev.map(p =>
         p.id === photoId ? {
           ...p,
@@ -678,6 +700,10 @@ function UploadPageInner() {
       if (isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
         formData.append('latitude', String(photo.metadata.latitude));
         formData.append('longitude', String(photo.metadata.longitude));
+        if (photo.nearbyPicked) {
+          // 50m 以内に蓋が無く、近くの候補から選んだ蓋。API はこれが無いと 50m を超える投稿を断る
+          formData.append('nearby_pick', 'true');
+        }
       } else if (photo.photoStatus === 'valid_no_gps') {
         // 位置情報なしで、マンホール詳細の蓋に投稿する（API はこれが無いと位置情報必須で返す）
         formData.append('no_gps', 'true');
@@ -837,6 +863,7 @@ function UploadPageInner() {
   const coverIds = [
     ...(hintManholeId && Number.isSafeInteger(hintManholeId) && hintManholeId > 0 ? [hintManholeId] : []),
     ...pickerShown.map(m => m.id),
+    ...(selectedPhoto?.nearbyCandidates ?? []).map(c => c.manhole.id),
   ];
   const coverMissingIds = coverIds.filter(id => !(String(id) in lidCovers)).join(',');
   // 撮影対象マンホールの絵柄。風景しか無い蓋は蓋が写っていないので見比べに使えない
@@ -885,6 +912,30 @@ function UploadPageInner() {
       cancelled = true;
     };
   }, [matchedManholeId]);
+
+  // 50m 以内に蓋が無かった写真を、近くの候補（300m 以内）から選んだ蓋の写真として受け付ける
+  const pickNearbyManhole = (manhole: Manhole) => {
+    if (!selectedPhoto || selectedPhoto.uploading) return;
+    const photoId = selectedPhoto.id;
+    setPhotos(prev => prev.map(p => p.id === photoId
+      ? { ...p, photoStatus: 'valid', matchedManhole: manhole, nearbyPicked: true, error: undefined }
+      : p));
+    funnel.unblocked();
+    trackNavClick('投稿:近くの候補から蓋を選ぶ');
+    setVisitNote(buildAutoVisitNote(selectedPhoto.metadata, manhole));
+  };
+
+  // 候補から選んだ蓋を取り消して、候補の一覧に戻す。投稿ボタンがまた押せなくなるので、
+  // 計測も blocked に戻す（同じ写真で同じ理由なので、新しい詰まりとしては数えられない）
+  const unpickNearbyManhole = () => {
+    if (!selectedPhoto || selectedPhoto.uploading) return;
+    const photoId = selectedPhoto.id;
+    const ref = funnel.blocked('no_nearby_manhole', 'photo');
+    setPhotos(prev => prev.map(p => p.id === photoId
+      ? { ...p, photoStatus: 'no_nearby_manhole', matchedManhole: undefined, nearbyPicked: false, error: withErrorRef(PICK_NEARBY_MESSAGE, ref) }
+      : p));
+    setVisitNote(buildAutoVisitNote(selectedPhoto.metadata, undefined));
+  };
 
   // プレビューURLは差し替え時・アンマウント時に解放する
   const previewUrlToRevoke = selectedPhoto?.preview;
@@ -1185,6 +1236,24 @@ function UploadPageInner() {
                 </div>
               );
             }
+            if (selectedPhoto.nearbyPicked) {
+              return (
+                <div className="mt-2 rounded-lg border border-[#B07818]/30 bg-[#FAF0DC] p-3 text-xs leading-relaxed text-[#5C4410]">
+                  <p className="font-bold">
+                    選んだ蓋の写真として投稿します：{m.name}（{m.city}{distanceM != null ? `・約${distanceM}m` : ''}）
+                  </p>
+                  <p className="mt-1">撮った場所から少し離れています。違う蓋なら選び直してください。</p>
+                  <button
+                    type="button"
+                    onClick={unpickNearbyManhole}
+                    disabled={selectedPhoto.uploading}
+                    className="mt-2 min-h-[44px] rounded-lg border border-[#B07818]/40 bg-white px-3 text-xs font-bold text-[#5C4410] hover:bg-[#FFF8EA] disabled:opacity-50"
+                  >
+                    蓋を選び直す
+                  </button>
+                </div>
+              );
+            }
             return (
               <p className={`mt-2 text-xs ${isHintMismatch ? 'text-[#8A5E10]' : 'text-[#4C9A57]'}`}>
                 {isHintMismatch ? '別のマンホールが検出されました' : 'マンホールを検出しました'}:
@@ -1195,6 +1264,35 @@ function UploadPageInner() {
           {selectedPhoto && !loading && selectedPhoto.error && (
             <div className="mt-2 text-xs text-[#B5483C]">
               <p>{selectedPhoto.error}</p>
+              {selectedPhoto.photoStatus === 'no_nearby_manhole' && !!selectedPhoto.nearbyCandidates?.length && (
+                <ul className="mt-2 divide-y divide-[#7B63A8]/10 overflow-hidden rounded-lg border border-[#7B63A8]/20 bg-white text-[#2A2A2A]">
+                  {selectedPhoto.nearbyCandidates.map(({ manhole: m, distanceM }) => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => pickNearbyManhole(m)}
+                        className="flex min-h-[44px] w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#7B63A8]/5"
+                      >
+                        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#7B63A8]/10">
+                          {lidCovers[String(m.id)] && (
+                            <StampPhoto
+                              src={lidCovers[String(m.id)]!.thumbnail_url}
+                              aiTags={lidCovers[String(m.id)]!.lid_crop}
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-bold">{manholeHeadingPlace(m)}</span>
+                          <span className="block text-xs text-[#2A2A2A]/60">
+                            {m.prefecture}{pokemonText(m.pokemons) ? `・${pokemonText(m.pokemons)}` : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs font-bold text-[#2A2A2A]/60">約{distanceM}m</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {selectedPhoto.photoStatus === 'no_nearby_manhole' &&
                 (DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
                   <p className="mt-1 text-[#2A2A2A]/50">
