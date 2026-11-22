@@ -383,7 +383,12 @@ function UploadPageInner() {
     setPhotos(reevaluated);
     // 位置情報を使わないと決まった写真は、自動メモから緯度経度を外す
     const ignored = reevaluated.find(photo => photo.gpsIgnored);
-    if (ignored) setVisitNote(buildAutoVisitNote(withoutGps(ignored.metadata), ignored.matchedManhole));
+    // 一覧を待つ間に利用者がメモを書き換えていたら触らない（自動メモのままのときだけ差し替える）
+    if (ignored) {
+      const waitingNote = buildAutoVisitNote(ignored.metadata, undefined);
+      const nextNote = buildAutoVisitNote(withoutGps(ignored.metadata), ignored.matchedManhole);
+      setVisitNote(prev => (prev === waitingNote ? nextNote : prev));
+    }
     blockReasons.forEach(({ reason, ref }) => funnel.blocked(reason, 'photo', undefined, ref));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAndroid, manholes]);
