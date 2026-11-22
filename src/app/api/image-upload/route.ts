@@ -77,7 +77,8 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *                 type: string
  *                 enum: ['true']
  *                 description: >-
- *                   写真に位置情報が無く、マンホール詳細から選んだ manhole_id の写真として投稿する。
+ *                   写真に位置情報が無い（または投稿者が古い位置情報を使わないと選んだ）とき、
+ *                   マンホール詳細から選んだ manhole_id の写真として投稿する。
  *                   緯度経度が無いときだけ効き、距離の確認を飛ばす。visit_id（既存の訪問への追加）とは併用できない。
  *                   visit.location_source は DB が 'none' にし、運営が目で確かめる
  *               nearby_pick:

@@ -15,6 +15,7 @@ const PREFIX: Record<SubmissionBlockReason | SubmissionErrorType, string> = {
   // 送信前に止まった（block_reason）
   invalid_gps: 'GPS',
   no_nearby_manhole: 'NEAR',
+  hint_gps_mismatch: 'PICK',
   too_far: 'FAR',
   manhole_location_missing: 'LOC',
   manholes_unavailable: 'LIST',

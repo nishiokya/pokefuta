@@ -46,6 +46,7 @@ export type SubmissionKind = 'character' | 'design';
 export const SUBMISSION_BLOCK_REASONS = [
   'invalid_gps',              // 写真にGPSが無い
   'no_nearby_manhole',        // 50m以内に登録済みの蓋が無い
+  'hint_gps_mismatch',        // マンホール詳細から来たが、写真の位置が50m以内の別の蓋を指している（どちらか選ぶまで止まる）
   'too_far',                  // 蓋から50m以上離れている
   'manhole_location_missing', // 蓋側に座標が無い
   'manholes_unavailable',     // 蓋の一覧を取得できなかった
@@ -90,6 +91,7 @@ export const SUBMISSION_BLOCK_CLASS_BY_REASON: Record<SubmissionBlockReason, Sub
   invalid_gps: 'photo',
   unsupported_format: 'photo',
   no_nearby_manhole: 'proximity',
+  hint_gps_mismatch: 'proximity',
   too_far: 'proximity',
   official_manhole_nearby: 'proximity',
   manhole_location_missing: 'catalog',
@@ -106,6 +108,7 @@ export const SUBMISSION_BLOCK_REASONS_BY_KIND: Record<SubmissionKind, readonly S
   character: [
     'invalid_gps',
     'no_nearby_manhole',
+    'hint_gps_mismatch',
     'too_far',
     'manhole_location_missing',
     'manholes_unavailable',
