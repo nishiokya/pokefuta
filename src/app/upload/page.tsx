@@ -463,7 +463,10 @@ function UploadPageInner() {
     if (hint) {
       // マンホール詳細から来ていて、50m 以内に別の蓋も無い。選ばせずにその蓋の写真として受け付ける。
       // 300m 以内なら位置情報付き（nearby_pick）、それより遠ければ位置情報を使わず運営が目で確かめる
-      return nearbyCandidates.some(c => c.manhole.id === hint.id)
+      // 候補の一覧は件数を絞っているので、一覧に入っているかでなく距離で決める
+      const hintWithinPick = hint.latitude != null && hint.longitude != null &&
+        calculateDistance(lat, lng, hint.latitude, hint.longitude) <= NEARBY_PICK_MAX_KM;
+      return hintWithinPick
         ? { photoStatus: 'valid', matchedManhole: hint, nearbyPicked: true, gpsIgnored: false }
         : { photoStatus: 'valid_no_gps', matchedManhole: hint, nearbyPicked: false, gpsIgnored: true };
     }
