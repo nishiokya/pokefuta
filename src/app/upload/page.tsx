@@ -108,7 +108,7 @@ interface UploadedPhoto {
   gpsIgnored?: boolean;
 }
 
-type GpsJudgement = Pick<UploadedPhoto, 'photoStatus' | 'matchedManhole' | 'nearbyCandidates' | 'gpsNearestManhole'> & {
+type GpsJudgement = Pick<UploadedPhoto, 'photoStatus' | 'matchedManhole' | 'nearbyCandidates' | 'gpsNearestManhole' | 'nearbyPicked' | 'gpsIgnored'> & {
   blockReason?: 'no_nearby_manhole' | 'hint_gps_mismatch';
   message?: string;
 };
@@ -118,8 +118,8 @@ const HINT_MISMATCH_MESSAGE = '写真の位置情報は、開いていた蓋と�
 // 位置情報を使わないと決めた写真の、自動メモ用のメタデータ（古い緯度経度をメモに残さない）
 const withoutGps = (metadata: PhotoMetadata): PhotoMetadata => ({ ...metadata, latitude: undefined, longitude: undefined });
 
-const NO_NEARBY_MESSAGE = '50m以内にマンホールが見つかりません。位置情報を確認してください。';
-const PICK_NEARBY_MESSAGE = '50m以内にマンホールが見つかりません。近くのマンホールから、撮った蓋を選んでください。';
+const NO_NEARBY_MESSAGE = '撮った場所の近くにポケふたが登録されていません。蓋のページの「写真を投稿」から開くと、その蓋の写真として投稿できます。';
+const PICK_NEARBY_MESSAGE = '撮った場所の50m以内に蓋がありません。下の候補から、撮った蓋を選んでください。';
 
 interface AlertMessage {
   type: 'error' | 'success' | 'warning';
@@ -381,6 +381,14 @@ function UploadPageInner() {
     // 2回呼ばれうるので、その中でイベントを送ると二重に数える。
     const reevaluated = photos.map(reevaluate);
     setPhotos(reevaluated);
+    // 位置情報を使わないと決まった写真は、自動メモから緯度経度を外す
+    const ignored = reevaluated.find(photo => photo.gpsIgnored);
+    // 一覧を待つ間に利用者がメモを書き換えていたら触らない（自動メモのままのときだけ差し替える）
+    if (ignored) {
+      const waitingNote = buildAutoVisitNote(ignored.metadata, undefined);
+      const nextNote = buildAutoVisitNote(withoutGps(ignored.metadata), ignored.matchedManhole);
+      setVisitNote(prev => (prev === waitingNote ? nextNote : prev));
+    }
     blockReasons.forEach(({ reason, ref }) => funnel.blocked(reason, 'photo', undefined, ref));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAndroid, manholes]);
@@ -455,14 +463,24 @@ function UploadPageInner() {
         message: HINT_MISMATCH_MESSAGE,
       };
     }
-    if (nearest) return { photoStatus: 'valid', matchedManhole: nearest };
+    if (nearest) return { photoStatus: 'valid', matchedManhole: nearest, nearbyPicked: false, gpsIgnored: false };
     const nearbyCandidates = findNearbyPickCandidates(lat, lng, manholes);
+    if (hint) {
+      // マンホール詳細から来ていて、50m 以内に別の蓋も無い。選ばせずにその蓋の写真として受け付ける。
+      // 300m 以内なら位置情報付き（nearby_pick）、それより遠ければ位置情報を使わず運営が目で確かめる
+      // 候補の一覧は件数を絞っているので、一覧に入っているかでなく距離で決める
+      const hintWithinPick = hint.latitude != null && hint.longitude != null &&
+        calculateDistance(lat, lng, hint.latitude, hint.longitude) <= NEARBY_PICK_MAX_KM;
+      return hintWithinPick
+        ? { photoStatus: 'valid', matchedManhole: hint, nearbyPicked: true, gpsIgnored: false }
+        : { photoStatus: 'valid_no_gps', matchedManhole: hint, nearbyPicked: false, gpsIgnored: true };
+    }
     return {
       photoStatus: 'no_nearby_manhole',
       matchedManhole: undefined,
       nearbyCandidates,
       blockReason: 'no_nearby_manhole',
-      message: nearbyCandidates.length || hint ? PICK_NEARBY_MESSAGE : NO_NEARBY_MESSAGE,
+      message: nearbyCandidates.length ? PICK_NEARBY_MESSAGE : NO_NEARBY_MESSAGE,
     };
   }, [findNearestManhole, findHintManhole, manholes]);
 
@@ -497,6 +515,8 @@ function UploadPageInner() {
     let photoStatus: UploadedPhoto['photoStatus'];
     let nearbyCandidates: NearbyCandidate<Manhole>[] | undefined;
     let gpsNearestManhole: Manhole | undefined;
+    let nearbyPicked = false;
+    let gpsIgnored = false;
 
     const hint = findHintManhole();
     if (!isValidCoordinates(metadata.latitude, metadata.longitude) && hint) {
@@ -521,6 +541,8 @@ function UploadPageInner() {
       matchedManhole = judged.matchedManhole;
       nearbyCandidates = judged.nearbyCandidates;
       gpsNearestManhole = judged.gpsNearestManhole;
+      nearbyPicked = !!judged.nearbyPicked;
+      gpsIgnored = !!judged.gpsIgnored;
       if (judged.blockReason) {
         distanceError = withErrorRef(judged.message as string, blockGpsJudgement(judged.blockReason));
       }
@@ -547,11 +569,13 @@ function UploadPageInner() {
       error: distanceError,
       photoStatus,
       nearbyCandidates,
-      gpsNearestManhole
+      gpsNearestManhole,
+      nearbyPicked,
+      gpsIgnored
     }]);
 
     // 写真を差し替えたとき前の写真の自動メモが残らないよう、空でも毎回更新する
-    setVisitNote(buildAutoVisitNote(metadata, matchedManhole));
+    setVisitNote(buildAutoVisitNote(gpsIgnored ? withoutGps(metadata) : metadata, matchedManhole));
 
     setLoading(false);
   }, [isAndroid, manholes, findHintManhole, hintManholeId, judgeByGps]);
@@ -992,7 +1016,7 @@ function UploadPageInner() {
     );
     const error = blockReason ? withErrorRef(message as string, blockGpsJudgement(blockReason)) : undefined;
     setPhotos(prev => prev.map(p => p.id === photoId
-      ? { ...p, ...judged, nearbyPicked: false, gpsIgnored: false, error }
+      ? { ...p, nearbyPicked: false, gpsIgnored: false, ...judged, error }
       : p));
     setVisitNote(buildAutoVisitNote(selectedPhoto.metadata, judged.matchedManhole));
   };
@@ -1125,9 +1149,6 @@ function UploadPageInner() {
                   右の絵柄と、投稿する写真の蓋が同じか確かめてください
                 </p>
               )}
-              <p className="mt-1 text-xs text-[#2A2A2A]/60">
-                位置情報のある写真はGPS位置でマンホールを確認します。位置情報の無い写真は、このマンホールの写真として投稿できます
-              </p>
             </div>
             {hintLidCover && (
               <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-[#7B63A8]/30 bg-[#7B63A8]/10">
@@ -1143,9 +1164,12 @@ function UploadPageInner() {
             <Camera className="h-4 w-4 text-[#7B63A8]" />
             {isAndroid && !hintManholeId ? '蓋の前にいるなら、その場で撮影' : <>写真 <span className="text-[#B5483C]">*</span></>}
           </h2>
-          <p className="mt-1 text-xs text-[#2A2A2A]/60">
-            位置情報付きの写真（蓋から50m以内）で、訪問記録として図鑑に載ります
-          </p>
+          {/* 詳細から来たときは位置情報が無くても合わなくてもその蓋に投稿できるので、条件を書かない */}
+          {!hintManhole && (
+            <p className="mt-1 text-xs text-[#2A2A2A]/60">
+              位置情報付きの写真（蓋から50m以内）で、訪問記録として図鑑に載ります
+            </p>
+          )}
           {/* 「その場で撮影する」ボタンは、Android 以外では蓋が決まっている（詳細から来た）ときだけ出す。
               iPhone の Safari はページから起動したカメラの写真に位置情報を付けず、
               GA4（2026-08-11〜11-03）で iOS のカメラ経由は 143 回中 137 回が invalid_gps で止まっていた
@@ -1281,21 +1305,18 @@ function UploadPageInner() {
                   ) * 1000)
                 : null;
             if (selectedPhoto.photoStatus === 'valid_no_gps') {
+              const awayText = distanceM == null ? null
+                : distanceM >= 1000 ? `約${Math.round(distanceM / 100) / 10}km` : `約${distanceM}m`;
               return (
                 <div className="mt-2 rounded-lg border border-[#B07818]/30 bg-[#FAF0DC] p-3 text-xs leading-relaxed text-[#5C4410]">
-                  <p className="font-bold">
-                    この蓋の写真として投稿します：{m.name}（{m.city}）
-                    <span className="ml-2 rounded-full bg-[#7B63A8] px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-white">ベータ</span>
-                  </p>
+                  <p className="font-bold">{m.name}（{m.city}）の写真として投稿します</p>
                   <p className="mt-1">
-                    {selectedPhoto.gpsIgnored
-                      ? '写真の位置情報はこの蓋から離れているので使いません。運営が写真を目で確かめます。この蓋の写真でないものは削除することがあります。'
-                      : '写真に位置情報が無いため、運営が写真を目で確かめます。この蓋の写真でないものは削除することがあります。'}
+                    {selectedPhoto.gpsIgnored && awayText
+                      ? `撮った場所がこの蓋から${awayText}離れているので、運営が写真で確かめます。`
+                      : '写真に位置情報が無いので、運営が写真で確かめます。'}
                   </p>
-                  <p className="mt-1">
-                    位置情報なしの投稿は試験中の機能です。使われ方を見て、仕様を見直すことがあります。
-                  </p>
-                  {selectedPhoto.gpsIgnored && (
+                  {/* 50m 以内の別の蓋と二択にしたときだけ戻れるようにする（それ以外は戻っても同じ判定になる） */}
+                  {selectedPhoto.gpsIgnored && selectedPhoto.gpsNearestManhole && (
                     <button
                       type="button"
                       onClick={unpickNearbyManhole}
@@ -1305,6 +1326,15 @@ function UploadPageInner() {
                       蓋を選び直す
                     </button>
                   )}
+                </div>
+              );
+            }
+            if (selectedPhoto.nearbyPicked && hintManhole && m.id === hintManhole.id && !selectedPhoto.nearbyCandidates?.length) {
+              // マンホール詳細の蓋が 50〜300m にあり、選ばせずに受け付けた
+              return (
+                <div className="mt-2 rounded-lg border border-[#B07818]/30 bg-[#FAF0DC] p-3 text-xs leading-relaxed text-[#5C4410]">
+                  <p className="font-bold">{m.name}（{m.city}）の写真として投稿します</p>
+                  <p className="mt-1">撮った場所がこの蓋から{distanceM != null ? `約${distanceM}m` : '少し'}離れています。</p>
                 </div>
               );
             }
@@ -1388,19 +1418,6 @@ function UploadPageInner() {
                     </li>
                   ))}
                 </ul>
-              )}
-              {/* マンホール詳細から来て、その蓋が候補（300m 以内）にも無い＝写真の位置情報が古い・ずれている。
-                  位置情報を使わずにその蓋の写真として出せるようにする */}
-              {selectedPhoto.photoStatus === 'no_nearby_manhole' && hintManhole &&
-                !selectedPhoto.nearbyCandidates?.some(c => c.manhole.id === hintManhole.id) && (
-                <button
-                  type="button"
-                  onClick={postHintWithoutGps}
-                  className="mt-2 min-h-[44px] w-full rounded-lg border border-[#7B63A8]/30 bg-white px-3 py-2 text-left text-sm text-[#2A2A2A] hover:bg-[#7B63A8]/5"
-                >
-                  <span className="block font-bold">{manholeHeadingPlace(hintManhole)}の写真として投稿する</span>
-                  <span className="block text-xs text-[#2A2A2A]/60">写真の位置情報は使わず、運営が写真を目で確かめます</span>
-                </button>
               )}
               {selectedPhoto.photoStatus === 'no_nearby_manhole' &&
                 (DESIGN_MANHOLE_SUBMISSION_SUSPENDED ? (
