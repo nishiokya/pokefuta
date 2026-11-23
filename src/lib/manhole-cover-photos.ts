@@ -84,6 +84,44 @@ const lidCropOf =(aiTags: unknown): CoverPhoto['lid_crop'] => {
   return lid === undefined && crop === undefined ? null : { lid, crop };
 };
 
+const isUnitBox = (value: unknown): value is [number, number, number, number] =>
+  Array.isArray(value) &&
+  value.length === 4 &&
+  value.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1);
+
+/**
+ * 図鑑の `manholes.json` の `cover`（{ photo_id, lid, crop }）から代表写真を作る。
+ *
+ * 代表写真は図鑑が日次で `latest-manhole-photos.json` から写している（pokefuta-tracker #893）。
+ * 2026-11-23 に、写真のある 492枚すべてで `/api/manholes/cover-photos` と photo_id・lid・crop が
+ * 一致することを確かめた。これを使うと、代表写真のために Supabase を読まなくてよい。
+ *
+ * どの蓋にも `cover` が無いとき（#893 より前のスナップショット・`/api/manholes` 経由）は null を返し、
+ * 呼び出し側は今までの API に戻る。`cover` を持つ蓋が1枚でもあれば、無い蓋は「写真が無い」とみなす。
+ * 図鑑の代表写真はいつも縦長なので `is_landscape` は false。
+ */
+export function coverPhotosFromSnapshot(
+  manholes: Array<{ id: number; cover?: unknown }>
+): Record<string, CoverPhoto> | null {
+  if (!manholes.some((m) => m && Object.prototype.hasOwnProperty.call(m, 'cover'))) return null;
+  const result: Record<string, CoverPhoto> = {};
+  for (const manhole of manholes) {
+    const cover = manhole?.cover;
+    if (!cover || typeof cover !== 'object') continue;
+    const { photo_id: photoId, lid, crop } = cover as { photo_id?: unknown; lid?: unknown; crop?: unknown };
+    if (typeof photoId !== 'string' || !photoId) continue;
+    const lidBox = isUnitBox(lid) ? lid : undefined;
+    const cropBox = isUnitBox(crop) ? crop : undefined;
+    result[String(manhole.id)] = {
+      photo_id: photoId,
+      thumbnail_url: `/api/photo/${photoId}?size=small`,
+      is_landscape: false,
+      lid_crop: lidBox === undefined && cropBox === undefined ? null : { lid: lidBox, crop: cropBox },
+    };
+  }
+  return result;
+}
+
 /**
  * 蓋ごとに代表写真を1枚選ぶ。並びは詳細ページの代表写真と同じ rankManholePhotos
  * （風景は後ろ。風景しか無い蓋は風景を出す）。ただし、ひとこと付きを先にする決まりは外す。

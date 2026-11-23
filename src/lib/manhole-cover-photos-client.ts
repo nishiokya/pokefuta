@@ -1,6 +1,43 @@
-import { coverPhotoBucketOf, coverPhotoBucketsFor, type CoverPhoto } from './manhole-cover-photos';
+import {
+  coverPhotoBucketOf,
+  coverPhotoBucketsFor,
+  coverPhotosFromSnapshot,
+  type CoverPhoto,
+} from './manhole-cover-photos';
+import { fetchAllManholes } from './manhole-list-client';
 
 type CoverPhotoMap = Record<string, CoverPhoto>;
+
+/**
+ * 図鑑の manholes.json に載った代表写真（cover）。ページ内で1時間持つ。
+ * manholes.json はブラウザにも max-age=600 で残り、同じ画面の蓋一覧と同じファイルなので、
+ * ほとんどの場合は取り直しにならない。cover が載っていない・取れないときは null で、
+ * 下のバケツ API に戻る。
+ */
+const SNAPSHOT_TTL_MS = 60 * 60 * 1000;
+let snapshotCovers: { request: Promise<CoverPhotoMap | null>; fetchedAt: number } | null = null;
+
+const loadSnapshotCovers = (): Promise<CoverPhotoMap | null> => {
+  if (snapshotCovers && Date.now() - snapshotCovers.fetchedAt < SNAPSHOT_TTL_MS) return snapshotCovers.request;
+  const entry = {
+    request: fetchAllManholes()
+      .then((payload) => (payload?.source === 'static' ? coverPhotosFromSnapshot(payload.manholes) : null))
+      .catch(() => null),
+    fetchedAt: Date.now(),
+  };
+  // 取れなかったときは覚えない（次に頼まれたら取り直す）
+  entry.request.then((covers) => {
+    if (covers === null && snapshotCovers === entry) snapshotCovers = null;
+  });
+  snapshotCovers = entry;
+  return entry.request;
+};
+
+/** テスト用。覚えている代表写真とバケツを捨てる */
+export function resetCoverPhotoCacheForTest() {
+  snapshotCovers = null;
+  bucketCache.clear();
+}
 
 /**
  * 取りに行ったバケツの結果をページ内で持つ。打つたびに候補が変わる /upload でも、
@@ -50,6 +87,19 @@ export async function fetchCoverPhotos(
   { signal }: { signal?: AbortSignal } = {}
 ): Promise<CoverPhotosResult> {
   const wanted = new Set(manholeIds.filter((id) => Number.isInteger(id) && id > 0));
+
+  // まず図鑑のスナップショット。載っていれば Supabase を読む API は呼ばない
+  const fromSnapshot = await loadSnapshotCovers();
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  if (fromSnapshot) {
+    const photos: CoverPhotoMap = {};
+    for (const id of wanted) {
+      const photo = fromSnapshot[String(id)];
+      if (photo) photos[String(id)] = photo;
+    }
+    return { photos, failedIds: new Set() };
+  }
+
   const buckets = coverPhotoBucketsFor(Array.from(wanted));
   const results = await Promise.all(
     buckets.map((bucket) =>

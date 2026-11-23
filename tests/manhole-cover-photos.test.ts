@@ -85,3 +85,30 @@ test('列を絞って読んだ行から ai_tags を組み立て直し、選び�
   assert.equal(result['7'].photo_id, 'centered');
   assert.deepEqual(result['7'].lid_crop, { lid: { x: 1 }, crop: { y: 2 } });
 });
+
+test('図鑑の manholes.json の cover から代表写真を作る', async () => {
+  const { coverPhotosFromSnapshot } = await import('../src/lib/manhole-cover-photos');
+  const result = coverPhotosFromSnapshot([
+    { id: 1, cover: { photo_id: 'p1', lid: [0.1, 0.2, 0.9, 0.8], crop: [0, 0, 1, 1] } },
+    { id: 2, cover: { photo_id: 'p2', lid: null, crop: null } },
+    { id: 3, cover: { photo_id: 'p3', lid: [0, 0, 1.5, 1], crop: 'x' } },
+    { id: 4 },
+    { id: 5, cover: { photo_id: '' } },
+  ]);
+  assert.deepEqual(result, {
+    '1': {
+      photo_id: 'p1',
+      thumbnail_url: '/api/photo/p1?size=small',
+      is_landscape: false,
+      lid_crop: { lid: [0.1, 0.2, 0.9, 0.8], crop: [0, 0, 1, 1] },
+    },
+    '2': { photo_id: 'p2', thumbnail_url: '/api/photo/p2?size=small', is_landscape: false, lid_crop: null },
+    '3': { photo_id: 'p3', thumbnail_url: '/api/photo/p3?size=small', is_landscape: false, lid_crop: null },
+  });
+});
+
+test('cover を持つ蓋が1枚も無いスナップショット（古い形）は null で、API に戻る', async () => {
+  const { coverPhotosFromSnapshot } = await import('../src/lib/manhole-cover-photos');
+  assert.equal(coverPhotosFromSnapshot([{ id: 1 }, { id: 2 }]), null);
+  assert.equal(coverPhotosFromSnapshot([]), null);
+});
