@@ -11,8 +11,8 @@ import {
   type PublicProfileRow,
 } from '@/lib/user-prefecture-progress';
 import {
-  fetchDesignManholeSnapshot,
-  fetchManholeSnapshot,
+  loadCachedDesignManholeSnapshot,
+  loadCachedManholes,
   type SnapshotManhole,
 } from '@/lib/manhole-snapshot';
 import type { SnapshotDesignManhole } from '@/lib/design-manhole-snapshot-parse';
@@ -31,64 +31,21 @@ export const NEARBY_DESIGN_MANHOLE_LIMIT = 6;
 
 type Point = { latitude: number; longitude: number };
 
-const SNAPSHOT_TTL_MS = 60 * 60 * 1000;
-const SNAPSHOT_RETRY_MS = 60 * 1000;
+/** 図鑑が遅い・落ちているときは 1.5 秒で見切り、近くの節を出さないだけでページは待たせない */
 const SNAPSHOT_TIMEOUT_MS = 1500;
 
-/**
- * 図鑑のスナップショットをサーバのメモリに持つ読み込み口を作る。
- *
- * 投稿詳細は `fetchCache = 'force-no-store'` なので、スナップショットの revalidate が効かず
- * 毎回取り直すことになる。サーバのメモリに1時間持つ（design-manhole-link.ts と同じ考え）。
- * 図鑑が遅い・落ちているときは 1.5 秒で見切り、近くの節を出さないだけでページは待たせない。
- * 取れなかったときも1分は覚えて、落ちている間に毎回待たせない。
- */
-function memoizedSnapshot<T>(fetcher: () => Promise<T[] | null>): () => Promise<T[]> {
-  let cache: { at: number; ttl: number; rows: T[] } | null = null;
-  let inflight: Promise<T[] | null> | null = null;
-
-  return async () => {
-    const now = Date.now();
-    if (cache && now - cache.at < cache.ttl) return cache.rows;
-
-    inflight ??= fetcher()
-      .catch(() => null)
-      .then((rows) => {
-        cache = rows
-          ? { at: Date.now(), ttl: SNAPSHOT_TTL_MS, rows }
-          : { at: Date.now(), ttl: SNAPSHOT_RETRY_MS, rows: cache?.rows ?? [] };
-        return rows;
-      })
-      .finally(() => {
-        inflight = null;
-      });
-
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), SNAPSHOT_TIMEOUT_MS);
-    });
-    try {
-      const rows = await Promise.race([inflight, timeout]);
-      // 時間切れでも取り込みは裏で続き、終われば次のリクエストから使われる
-      return rows ?? cache?.rows ?? [];
-    } finally {
-      clearTimeout(timer);
-    }
-  };
-}
-
 /** 近くのポケふたを出すための蓋の一覧（図鑑のスナップショット、全件で約720KB） */
-export const loadSnapshotManholesForNearby = memoizedSnapshot<SnapshotManhole>(() =>
-  fetchManholeSnapshot().then((snapshot) => snapshot?.manholes ?? null)
-);
+export async function loadSnapshotManholesForNearby(): Promise<SnapshotManhole[]> {
+  return (await loadCachedManholes({ timeoutMs: SNAPSHOT_TIMEOUT_MS })) ?? [];
+}
 
 /**
  * 近くのデザインマンホールを出すための公開中の一覧（図鑑のスナップショット、日次）。
  * 以前は公開の全件を Supabase から毎回読んでいて、Egress のいちばん大きな塊だった。
  */
-export const loadSnapshotDesignManholesForNearby = memoizedSnapshot<SnapshotDesignManhole>(
-  fetchDesignManholeSnapshot
-);
+export async function loadSnapshotDesignManholesForNearby(): Promise<SnapshotDesignManhole[]> {
+  return (await loadCachedDesignManholeSnapshot({ timeoutMs: SNAPSHOT_TIMEOUT_MS })) ?? [];
+}
 
 export type NearbyPokefuta = { id: number; label: string; distanceKm: number };
 
