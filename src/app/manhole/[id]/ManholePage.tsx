@@ -23,6 +23,7 @@ import PosterAvatar from '@/components/users/PosterAvatar';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
+import ManholeGiftSection from '@/components/manhole/ManholeGiftSection';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
   orderManholePhotosNewestFirst,
@@ -1793,6 +1794,24 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             )}
           </dl>
 
+          {manhole && <ManholeGiftSection manholeId={manhole.id} isLoggedIn={authChecked && currentUserId !== null} />}
+
+          {/*
+            ── Comments ──
+            写真のひとことと掲示板を1本にした欄。写真一覧より前に置き、
+            現地の案内を写真を見る前に確認できるようにする。
+          */}
+          {manhole && (
+            <ManholeCommentThread
+              manholeId={manhole.id}
+              isLoggedIn={authChecked ? currentUserId !== null : null}
+              surface="manhole_detail"
+              photoComments={photoCommentEntries}
+              viewerHasVisited={myPhotos.length > 0}
+              photosLoading={photosLoading}
+            />
+          )}
+
           {/*
             一覧は代表写真（スマホは住所の欄）のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
             コメント欄と地図を挟んで2回出ていた。上の枠に全部収まる3枚以下なら出さない。
@@ -1850,23 +1869,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             );
           })()}
-
-          {/*
-            ── Comments ──
-            写真のひとことと掲示板を1本にした欄。写真の直下に置く: 中身の多くは
-            「道の駅の入り口にありました」「駐車場は無料」のような現地の案内で、
-            写真を見た流れのまま地図の手前で読めるのが自然。
-          */}
-          {manhole && (
-            <ManholeCommentThread
-              manholeId={manhole.id}
-              isLoggedIn={authChecked ? currentUserId !== null : null}
-              surface="manhole_detail"
-              photoComments={photoCommentEntries}
-              viewerHasVisited={myPhotos.length > 0}
-              photosLoading={photosLoading}
-            />
-          )}
 
           {/* ── PromptCard (SP only — lg:hidden) ── */}
           {!photosLoading && !photoLoadError && photoState === 'none' && <div className="lg:hidden">{promptCardContent}</div>}

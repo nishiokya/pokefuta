@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
+import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
 
 /**
  * @swagger
@@ -11,7 +12,7 @@ import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
  *   patch:
  *     summary: 訪問記録の公開設定・ひとことを変更
  *     tags: [visits]
- *     description: 自分の訪問記録の is_public / comment を更新します（どちらか一方だけでもよい）。他人の記録は変更できません。
+ *     description: 自分の訪問記録の is_public / comment / gift を更新します（どれか1つだけでもよい）。他人の記録は変更できません。
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -37,11 +38,14 @@ import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
  *                 nullable: true
  *                 maxLength: 500
  *                 description: 次に来る人へのひとこと。空文字または null で消す
+ *               gift:
+ *                 type: boolean
+ *                 description: true で「このポケふたのギフトを配れます」（期限は撮影日から10日）、false で外す
  *     responses:
  *       200:
  *         description: 更新成功
  *       400:
- *         description: 更新項目が無い、is_public が boolean でない、comment が文字列でないか500文字を超える
+ *         description: 更新項目が無い、is_public / gift が boolean でない、comment が文字列でないか500文字を超える、撮影から10日を過ぎた・公式ポケふたでない記録に gift を付けようとした
  *       401:
  *         description: 認証が必要
  *       403:
@@ -76,14 +80,22 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    const payload = (body ?? {}) as { is_public?: unknown; comment?: unknown };
+    const payload = (body ?? {}) as { is_public?: unknown; comment?: unknown; gift?: unknown };
     const hasIsPublic = payload.is_public !== undefined;
     const hasComment = payload.comment !== undefined;
+    const hasGift = payload.gift !== undefined;
 
-    if (!hasIsPublic && !hasComment) {
+    if (!hasIsPublic && !hasComment && !hasGift) {
       return NextResponse.json({
         success: false,
-        error: 'is_public or comment is required'
+        error: 'is_public, comment or gift is required'
+      }, { status: 400 });
+    }
+
+    if (hasGift && typeof payload.gift !== 'boolean') {
+      return NextResponse.json({
+        success: false,
+        error: 'gift must be a boolean'
       }, { status: 400 });
     }
 
@@ -116,7 +128,7 @@ export async function PATCH(
 
     const { data: visit, error: visitError } = await supabase
       .from('visit')
-      .select('id, user_id')
+      .select('id, user_id, manhole_id, shot_at')
       .eq('id', visitId)
       .single();
 
@@ -134,6 +146,32 @@ export async function PATCH(
       }, { status: 403 });
     }
 
+    // 「このポケふたのギフトを配れます」。期限はサーバが撮影日から決める（クライアントの値は受けない）。
+    // DB の CHECK（visit_gift_until_window）と同じ条件をここで先に見て、分かる言葉で断る。
+    let giftUntil: string | null | undefined;
+    if (hasGift) {
+      if (payload.gift === true) {
+        if (visit.manhole_id == null) {
+          return NextResponse.json({
+            success: false,
+            code: 'gift_not_pokefuta',
+            error: 'Gift can only be offered for an official pokefuta visit'
+          }, { status: 400 });
+        }
+        const until = canOfferGift(visit.shot_at) ? giftUntilFor(visit.shot_at) : null;
+        if (!until) {
+          return NextResponse.json({
+            success: false,
+            code: 'gift_window_passed',
+            error: 'Gift can only be offered within 10 days of the shot'
+          }, { status: 400 });
+        }
+        giftUntil = until.toISOString();
+      } else {
+        giftUntil = null;
+      }
+    }
+
     // visit には updated_at トリガーが無いので明示的に更新する。
     // RLS(users_update_own_visits) に加えて user_id でも絞り、DELETE と同じ多層防御にする。
     const { data: updated, error: updateError } = await supabase
@@ -141,11 +179,12 @@ export async function PATCH(
       .update({
         ...(hasIsPublic ? { is_public: payload.is_public as boolean } : {}),
         ...(hasComment ? { comment } : {}),
+        ...(hasGift ? { gift_until: giftUntil } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', visitId)
       .eq('user_id', session.user.id)
-      .select('id, is_public, comment')
+      .select('id, is_public, comment, gift_until')
       .single();
 
     if (updateError || !updated) {
@@ -161,7 +200,8 @@ export async function PATCH(
       success: true,
       visit_id: updated.id,
       is_public: updated.is_public,
-      comment: updated.comment
+      comment: updated.comment,
+      gift_until: updated.gift_until ?? null
     });
   } catch (error: any) {
     console.error('Unexpected error updating visit visibility:', error);

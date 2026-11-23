@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { pokefutaEvents } from '@/lib/analytics/gtag';
 import { formatFriendCode, normalizeFriendCode } from '@/lib/pokemon-go-friend-code';
+import { copyText } from '@/lib/copy-text';
 
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 
@@ -22,30 +23,6 @@ type Props = {
  * ゲーム内の「プロフィール → フレンド → フレンド追加」に貼る流れになるので、
  * コピーを一番押しやすいところに置く。
  */
-/**
- * `navigator.clipboard` が無い / 権限で拒否される環境（古い WebView、
- * SNS アプリ内ブラウザ、非セキュアコンテキスト）向けの退避路。
- * 見えない textarea を選択して execCommand('copy') に落とす。
- */
-function copyViaSelection(text: string): boolean {
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.top = '-1000px';
-  area.style.opacity = '0';
-  document.body.appendChild(area);
-  try {
-    area.select();
-    area.setSelectionRange(0, text.length);
-    return document.execCommand('copy');
-  } catch {
-    return false;
-  } finally {
-    document.body.removeChild(area);
-  }
-}
-
 export default function PokemonGoFriendCard({ code, note, displayName }: Props) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const formatted = formatFriendCode(code);
@@ -63,16 +40,7 @@ export default function PokemonGoFriendCard({ code, note, displayName }: Props) 
 
   const handleCopy = async () => {
     // ゲームの入力欄は数字だけを受け付ける。表示は4桁区切りでも、コピーは正規化した12桁。
-    const raw = normalizeFriendCode(code);
-    try {
-      await navigator.clipboard.writeText(raw);
-      setCopyState('copied');
-      pokefutaEvents.goFriendCodeCopy({ surface: 'user_visits' });
-      return;
-    } catch {
-      // ここで諦めない。コピーがこのカードの用件なので、無反応は失敗と区別できない。
-    }
-    if (copyViaSelection(raw)) {
+    if (await copyText(normalizeFriendCode(code))) {
       setCopyState('copied');
       pokefutaEvents.goFriendCodeCopy({ surface: 'user_visits' });
     } else {

@@ -253,6 +253,8 @@ export interface Database {
           is_public: boolean;  // 公開/非公開フラグ
           // 撮影位置の有無（shot_location から DB が決める生成列）。anon / authenticated からは読めない
           location_source: 'gps' | 'none';
+          // 「このポケふたのギフトを配れます」の期限（撮影日から10日まで、本人の申告）。NULL は印なし
+          gift_until: string | null;
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Insert: {
@@ -274,6 +276,7 @@ export interface Database {
           note?: string | null;
           comment?: string | null;  // 訪問コメント（公開可能）
           is_public?: boolean;  // 公開/非公開フラグ
+          gift_until?: string | null;  // 撮影日から10日まで（CHECK visit_gift_until_window）
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Relationships: [];
