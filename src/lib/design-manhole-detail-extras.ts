@@ -11,11 +11,13 @@ import {
   type PublicProfileRow,
 } from '@/lib/user-prefecture-progress';
 import {
+  loadCachedAvatars,
   loadCachedDesignManholeSnapshot,
   loadCachedManholes,
   type SnapshotManhole,
 } from '@/lib/manhole-snapshot';
 import type { SnapshotDesignManhole } from '@/lib/design-manhole-snapshot-parse';
+import { avatarsFor } from '@/lib/avatar-snapshot';
 
 /**
  * デザインマンホールの詳細ページに足す「投稿者」「近くのポケふた」「近くのデザインマンホール」「場所のタグ」。
@@ -127,6 +129,24 @@ export function nearbyDesignManholes(
  * 公開スタンプ帳と同じ RPC・公開ビューから数えるので、リンク先の数字と食い違わない。
  * 訪問カード（最大500件）は読まない。
  */
+/**
+ * 投稿者のアイコン。図鑑の avatars.json（日次）から引き、取れないときだけ RPC。
+ * 投稿詳細はクローラーも多く、1枚ごとに RPC を呼ぶと Supabase へのリクエストが増える。
+ */
+async function loadSubmitterAvatar(
+  client: NonNullable<ReturnType<typeof getPublicLiveClient>>,
+  publicId: string
+): Promise<string | null> {
+  const snapshot = await loadCachedAvatars({ timeoutMs: SNAPSHOT_TIMEOUT_MS });
+  if (snapshot) return avatarsFor([publicId], snapshot)[publicId] ?? null;
+  return client
+    .rpc('get_public_avatar_photo_id' as never, { p_user_id: publicId } as never)
+    .then(
+      (r: { data: unknown; error: unknown }) => (r.error || typeof r.data !== 'string' ? null : r.data),
+      () => null
+    );
+}
+
 export async function loadDesignManholeSubmitterProfile(
   publicId: string
 ): Promise<DesignManholeSubmitterProfile | null> {
@@ -135,12 +155,7 @@ export async function loadDesignManholeSubmitterProfile(
   try {
     const [profile, avatar, stats, designManholeCount] = await Promise.all([
       client.rpc('get_public_profile' as never, { p_user_id: publicId } as never),
-      client
-        .rpc('get_public_avatar_photo_id' as never, { p_user_id: publicId } as never)
-        .then(
-          (r: { data: unknown; error: unknown }) => (r.error || typeof r.data !== 'string' ? null : r.data),
-          () => null
-        ),
+      loadSubmitterAvatar(client, publicId),
       loadPublicVisitStats(client, publicId).catch(() => null),
       loadPublicDesignManholeCount(publicId),
     ]);

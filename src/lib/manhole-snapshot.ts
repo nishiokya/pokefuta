@@ -1,5 +1,6 @@
 import 'server-only';
 import { memoizedSnapshot } from '@/lib/memoized-snapshot';
+import { parseAvatarSnapshot } from '@/lib/avatar-snapshot';
 import type { ManholeTitle } from '@/types/database';
 import {
   parseDesignManholeNdjson,
@@ -164,6 +165,14 @@ export function withSnapshotName<T extends { id?: number | null }>(
 /** 蓋の全件（`/api/manholes.json`）をメモリに持って返す */
 export const loadCachedManholes = memoizedSnapshot<SnapshotManhole>(() =>
   fetchManholeSnapshot().then((snapshot) => snapshot?.manholes ?? null)
+);
+
+/**
+ * 投稿者のアイコン（`/api/avatars.json`、公開ID → 写真ID）をメモリに持って返す。
+ * `success` が付いていないファイルは fetchSnapshotJson が捨てる。中身の検査は parseAvatarSnapshot
+ */
+export const loadCachedAvatars = memoizedSnapshot<[string, string]>(() =>
+  fetchSnapshotJson<{ success: boolean }>('/api/avatars.json').then((data) => parseAvatarSnapshot(data))
 );
 
 /** 公開中のデザインマンホール（`design_manholes.ndjson`）をメモリに持って返す */
