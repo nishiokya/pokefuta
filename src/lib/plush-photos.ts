@@ -1,37 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { manholeDisplayName } from '@/lib/manhole-label';
-import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import { interleaveByGroup } from '@/lib/interleave-by-group';
 
 /**
- * ぬいぐるみと一緒に撮った公開写真（photo.ai_tags.plush = true）。/photos/plush の一覧に使う。
+ * トップの特集カード用に、ぬいぐるみや雪景色の公開写真を読む。
  * ぬいぐるみらしさ（plush_score）の高い順または投稿の新しい順に最大 limit 枚を取り、必要なら投稿者を1枚ずつ順番に回して並べ直す
  * （写真の多い人が上を埋めないように。plush_score はほとんどの写真で 0.99 以上なので、順位の意味は薄い）。
  *
  * 判定は k11 の manhole-score（20261004100000_photo_ai_tags.sql）。anon キーで読むので、
  * 返るのは RLS が許す公開訪問の写真だけ。
- * 投稿者は公開名と公開ID（app_user.id、/users/<id>/visits）だけを返す。auth の user_id は
- * 名前と公開IDを引くためだけに使い、戻り値には入れない（蓋詳細の /api/image-upload と同じ RPC）。
+ * auth の user_id は投稿者ごとの並べ替えにだけ使う。
  */
 export type PlushPhoto = {
   id: string;
   aiTags: unknown;
-  isLandscape: boolean;
-  /** ぬいぐるみらしさ 0..1（k11 の分類器）。並べ替えに使う */
-  plushScore: number;
   createdAt: string;
   shotAt: string | null;
-  manholeId: number;
   manholeName: string;
-  /** フィードのタグ（幻・夜ふた・撮れたて…）を作るための入力。トップと同じ feedCardTags に渡す */
   visitId: string;
-  pokemons: string[];
-  /** 訪問コメント（公開訪問のもの）。カードに投稿者のひとことして1〜2行だけ出す */
-  comment: string | null;
-  posterName: string;
-  /** 公開訪問を持つ投稿者の公開ID。無ければリンクしない */
-  posterPublicId: string | null;
 };
 
 export const PLUSH_PAGE_LIMIT = 300;
@@ -49,7 +36,7 @@ export function sortByShotAtDesc(photos: PlushPhoto[]): PlushPhoto[] {
 
 /**
  * order: 'score' = ぬいぐるみらしい順、'recent' = 投稿の新しい順。
- * interleave: 投稿者を1枚ずつ順番に回すか（トップの特集カードは回す。特集ページは新しい順そのままで出す）
+ * interleave: 投稿者を1枚ずつ順番に回すか。
  */
 export async function loadPlushPhotos(
   limit = PLUSH_PAGE_LIMIT,
@@ -60,7 +47,7 @@ export async function loadPlushPhotos(
 }
 
 /**
- * 公開写真だけをタグで抽出。投稿の新しい順で最大 limit 枚を返す（雪のページは sortByShotAtDesc で撮影日順に並べ直す。
+ * 公開写真だけをタグで抽出。投稿の新しい順で最大 limit 枚を返す（雪のカードは sortByShotAtDesc で撮影日順に並べ直す。
  * 上限で切ってから並べ直すので、雪が limit 枚を超えたら DB 側で撮影日順に切るように直すこと）。
  * 取れなかったときは空配列を返す（トップの特集カードの API 用。0 枚の応答はキャッシュさせない）。
  */
@@ -78,11 +65,7 @@ export async function loadTaggedPhotos(
   }
 }
 
-/**
- * loadTaggedPhotos と同じ。ただし取れなかったときは空配列ではなく例外を投げる。
- * 特集ページ（/photos/plush・/photos/snow）はこちらを使い、失敗を「0 枚」としてキャッシュしない。
- */
-export async function fetchTaggedPhotos(
+async function fetchTaggedPhotos(
   tag: 'plush' | 'snow',
   limit = PLUSH_PAGE_LIMIT,
   order: 'score' | 'recent' = 'recent',
@@ -101,21 +84,17 @@ export async function fetchTaggedPhotos(
       id,
       created_at,
       ai_tags,
-      is_landscape,
       visit:visit_id!inner (
         id,
         user_id,
         shot_at,
-        is_public,
-        comment
+        is_public
       ),
       manhole:manhole_id (
-        id,
         title,
         prefecture,
         municipality,
-        building,
-        pokemons
+        building
       )
     `)
     .eq('visit.is_public', true)
@@ -132,29 +111,6 @@ export async function fetchTaggedPhotos(
   if (error) throw new Error(error.message);
   if (!data) throw new Error('No data');
 
-  const authUids = Array.from(new Set((data as any[])
-    .map((row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0)));
-  const [names, publicIds] = await Promise.all([
-    loadPublicDisplayNameMap(supabase, authUids),
-    supabase
-      .rpc('get_public_user_ids' as never, { p_auth_uids: authUids } as never)
-      .then(
-        (result: any) => {
-          const map = new Map<string, string | null>();
-          if (result?.error) {
-            console.warn('Failed to load public_user_id for plush photos:', result.error);
-          } else {
-            ((result?.data as any[]) || []).forEach((r: any) => {
-              if (r?.auth_uid) map.set(r.auth_uid, r.public_user_id ?? null);
-            });
-          }
-          return map;
-        },
-        () => new Map<string, string | null>(),
-      ),
-  ]);
-
   // 投稿者を1枚ずつ順番に回す（トップの特集カードの3枚も同じ人で埋まらないように）
   const rows = interleave
     ? interleaveByGroup(data as any[], (row) => (Array.isArray(row.visit) ? row.visit[0] : row.visit)?.user_id ?? null)
@@ -168,17 +124,10 @@ export async function fetchTaggedPhotos(
       return {
         id: row.id,
         aiTags: row.ai_tags ?? null,
-        isLandscape: row.is_landscape === true,
-        plushScore: typeof row.ai_tags?.plush_score === 'number' ? row.ai_tags.plush_score : 0,
         createdAt: row.created_at,
         shotAt: visit.shot_at ?? null,
-        manholeId: manhole.id,
         manholeName: manholeDisplayName(manhole),
         visitId: visit.id,
-        pokemons: Array.isArray(manhole.pokemons) ? manhole.pokemons : [],
-        comment: typeof visit.comment === 'string' && visit.comment.trim() ? visit.comment.trim() : null,
-        posterName: names.get(visit.user_id)?.trim() || '名無しのトレーナー',
-        posterPublicId: publicIds.get(visit.user_id) ?? null,
       } satisfies PlushPhoto;
     })
     .filter((p): p is PlushPhoto => p !== null);
