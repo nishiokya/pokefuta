@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 type PageProps = {
   params: {
@@ -9,5 +9,5 @@ type PageProps = {
 export const dynamic = 'force-dynamic';
 
 export default function UserPrefecturesPage({ params }: PageProps) {
-  redirect(`/users/${encodeURIComponent(params.userId)}/visits`);
+  permanentRedirect(`/users/${encodeURIComponent(params.userId)}`);
 }
