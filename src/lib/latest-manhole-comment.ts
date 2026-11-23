@@ -60,7 +60,8 @@ export function pickLatestComments(
   const previews = new Map<number, LatestManholeComment | null>();
   const refetch: number[] = [];
   for (const id of manholeIds) {
-    const preview = toLatestCommentPreview(byManhole.get(id) ?? []);
+    // 蓋ごとに読む経路（従来・読み直し）と同じく、新しい LOOKBACK 件だけを見る（経路で結果を変えない）
+    const preview = toLatestCommentPreview((byManhole.get(id) ?? []).slice(0, LATEST_COMMENT_LOOKBACK));
     if (preview || !truncated) previews.set(id, preview);
     else refetch.push(id);
   }
