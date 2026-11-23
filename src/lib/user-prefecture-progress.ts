@@ -239,8 +239,14 @@ async function loadManholeCatalog(
   return (data || []) as ManholeProgressRow[];
 }
 
+/**
+ * onlyPrefecture を渡すと、訪問カードをその県（`manhole_prefecture`）だけに絞って読む。
+ * そのときの戻り値は**その県の数字だけが正しい**（ほかの県の visited・制覇数・図鑑の数は数えていない）。
+ * 外へは loadPublicUserPrefectureBadge 経由でその県だけを渡す。
+ */
 async function loadPublicUserPrefectureProgressImpl(
-  userId: string
+  userId: string,
+  onlyPrefecture?: string
 ): Promise<PublicUserPrefectureProgress | null> {
   // プロフィールと訪問は常に取り直し、カタログだけキャッシュに載せる
   const liveClient = getPublicLiveClient();
@@ -309,7 +315,7 @@ async function loadPublicUserPrefectureProgressImpl(
   // 公開IDで直接引く。auth_uid は使わない（ビューの内側で結合に使われるだけ）。
   // 最新写真が要るのでカード用ビュー。集計だけなら base を使うこと。
   // 非公開に戻した訪問が残らないよう live 側で取る（キャッシュしない）。
-  const { data: visits, error: visitsError } = await liveClient
+  let visitsQuery = liveClient
     .from('public_user_visit_card')
     .select(
       'manhole_id, shot_at, created_at, manhole_prefecture,' +
@@ -317,12 +323,19 @@ async function loadPublicUserPrefectureProgressImpl(
     )
     .eq('public_user_id', trimmedUserId)
     .not('manhole_id', 'is', null);
+  if (onlyPrefecture !== undefined) {
+    // 県別のページ・OGP はその県しか見せないので、全県の訪問を読まない。
+    // 県ごとの集計は訪問の manhole_prefecture で分けているので、その県の数字は全件で読んだときと同じ
+    visitsQuery = visitsQuery.eq('manhole_prefecture', onlyPrefecture);
+  }
+  const { data: visits, error: visitsError } = await visitsQuery;
 
   if (visitsError) {
     throw new Error(visitsError.message);
   }
 
-  if (!visits || visits.length === 0) {
+  // 県で絞ったときは、その県の訪問が0件でも「0枚訪問」の県として返す（下の集計に進む）
+  if (onlyPrefecture === undefined && (!visits || visits.length === 0)) {
     return {
       userId: trimmedUserId,
       displayName,
@@ -464,4 +477,28 @@ async function loadPublicUserPrefectureProgressImpl(
   };
 }
 
-export const loadPublicUserPrefectureProgress = cache(loadPublicUserPrefectureProgressImpl);
+export const loadPublicUserPrefectureProgress = cache(
+  (userId: string) => loadPublicUserPrefectureProgressImpl(userId)
+);
+
+export type PublicUserPrefectureBadge = {
+  userId: string;
+  displayName: string;
+  prefecture: PublicPrefectureProgress;
+};
+
+/**
+ * 県別のバッジページ（/users/[id]/prefectures/[県]）とその OGP 用。その県の進捗と表示名だけを返す。
+ *
+ * 以前は全県の訪問カードを読んでから1県を選んでいた。利用者ごとに県の数だけ URL があり、
+ * 1日 約3,300回 × 19KB を Supabase から出していた（2026-11-23 の edge_logs）。訪問カードを
+ * その県に絞って読む。その県が無い（ポケふたの無い県・不正な名前）・利用者がいないときは null。
+ */
+export const loadPublicUserPrefectureBadge = cache(
+  async (userId: string, prefectureName: string): Promise<PublicUserPrefectureBadge | null> => {
+    const progress = await loadPublicUserPrefectureProgressImpl(userId, prefectureName);
+    const prefecture = progress?.prefectures.find((item) => item.name === prefectureName);
+    if (!progress || !prefecture) return null;
+    return { userId: progress.userId, displayName: progress.displayName, prefecture };
+  }
+);

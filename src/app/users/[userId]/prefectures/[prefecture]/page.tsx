@@ -11,7 +11,7 @@ import { prefectureBadgeShareText } from '@/lib/share';
 import {
   PublicPrefectureManhole,
   PublicPrefectureProgress,
-  loadPublicUserPrefectureProgress,
+  loadPublicUserPrefectureBadge,
 } from '@/lib/user-prefecture-progress';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
 
@@ -36,15 +36,13 @@ function decodePrefectureParam(value: string): string {
   }
 }
 
+// この県の分の訪問だけを読む（全県の訪問カードは読まない。loadPublicUserPrefectureBadge）
 async function loadBadge(userId: string, prefectureParam: string) {
-  const progress = await loadPublicUserPrefectureProgress(userId).catch(() => null);
-  if (!progress) return null;
-
   const name = decodePrefectureParam(prefectureParam);
-  const prefecture = progress.prefectures.find((item) => item.name === name);
-  if (!prefecture) return null;
+  const badge = await loadPublicUserPrefectureBadge(userId, name).catch(() => null);
+  if (!badge) return null;
 
-  return { progress, prefecture };
+  return { progress: { userId: badge.userId, displayName: badge.displayName }, prefecture: badge.prefecture };
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

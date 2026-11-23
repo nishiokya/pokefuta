@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
 import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
-import { loadPublicUserPrefectureProgress } from '@/lib/user-prefecture-progress';
+import { loadPublicUserPrefectureBadge } from '@/lib/user-prefecture-progress';
 import { SITE_NAME } from '@/lib/constants';
 
 export const runtime = 'nodejs';
@@ -36,13 +36,15 @@ function decodePrefectureParam(value: string): string {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
-    const [progress, fontData] = await Promise.all([
-      loadPublicUserPrefectureProgress(params.userId).catch(() => null),
+    const prefectureName = decodePrefectureParam(params.prefecture);
+    // この県の分の訪問だけを読む（全県の訪問カードは読まない）
+    const [badge, fontData] = await Promise.all([
+      loadPublicUserPrefectureBadge(params.userId, prefectureName).catch(() => null),
       loadNotoSansCjk(),
     ]);
 
-    const prefectureName = decodePrefectureParam(params.prefecture);
-    const prefecture = progress?.prefectures.find((item) => item.name === prefectureName) ?? null;
+    const progress = badge ? { userId: badge.userId, displayName: badge.displayName } : null;
+    const prefecture = badge?.prefecture ?? null;
 
     if (!progress || !prefecture) {
       return new Response('Not found', {
