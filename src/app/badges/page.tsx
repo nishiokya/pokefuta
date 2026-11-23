@@ -223,7 +223,7 @@ export default async function BadgesPage() {
                 {regulars.legends.map((legend) => (
                   <li key={legend.id}>
                     <Link
-                      href={`/users/${encodeURIComponent(legend.id)}/visits`}
+                      href={`/users/${encodeURIComponent(legend.id)}`}
                       className="inline-flex items-center gap-1.5 rounded-full border border-violet-300/60 bg-white px-3 py-1.5 text-xs font-bold text-[#4F3828] hover:bg-[#FBF6EA]"
                     >
                       <RegularBadge tier="legend" size="icon" />

@@ -99,7 +99,7 @@ export default async function SharedPhotoPage({ params }: PageProps) {
     undefined,
   );
   const comment = isMeaningfulVisitComment(photo.visit.comment) ? normalizeVisitComment(photo.visit.comment) : null;
-  const posterHref = extras.posterPublicId ? `/users/${encodeURIComponent(extras.posterPublicId)}/visits` : null;
+  const posterHref = extras.posterPublicId ? `/users/${encodeURIComponent(extras.posterPublicId)}` : null;
   const manholeHref = `/manhole/${photo.manhole.id}`;
 
   return (

@@ -27,7 +27,7 @@ export default function DesignManholeCard({
   const title = dm.title || 'デザインマンホール';
   const posterName = dm.submitter_name || '投稿者';
   const detailHref = `/design-manholes/${dm.id}`;
-  const href = posterPublicId ? `/users/${encodeURIComponent(posterPublicId)}/visits` : detailHref;
+  const href = posterPublicId ? `/users/${encodeURIComponent(posterPublicId)}` : detailHref;
   // カード（写真と投稿者の欄）に aria-label を張るので、中の文字は読み上げられない。同じ内容をここに書く
   const ariaLabel = [
     title,

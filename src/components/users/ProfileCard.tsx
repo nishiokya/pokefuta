@@ -119,7 +119,7 @@ export default function ProfileCard({
           )}
           {profile.publicUserId && (
             <Link
-              href={`/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+              href={`/users/${encodeURIComponent(profile.publicUserId)}`}
               className="inline-flex items-center gap-1.5 rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-3 py-1 font-pixelJp text-[11px] font-bold text-[#bf5640]"
             >
               <ExternalLink className="h-3 w-3" />
@@ -132,7 +132,7 @@ export default function ProfileCard({
               className="ml-auto"
               label="自慢する"
               shareText={userVisitsShareText(profile.displayName, shareStats.totalVisits, shareStats.prefectureCount)}
-              shareUrl={`${SITE_URL}/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+              shareUrl={`${SITE_URL}/users/${encodeURIComponent(profile.publicUserId)}`}
               hashtags={['ポケふたスタンプ帳']}
             />
           )}

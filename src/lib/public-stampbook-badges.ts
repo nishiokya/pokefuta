@@ -15,7 +15,7 @@ import type { PublicUserPrefectureProgress } from '@/lib/user-prefecture-progres
 
 /**
  * 公開スタンプ帳の都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。
- * ページ（/users/[userId]/visits）と、その OGP 画像で同じものを出すため1か所で組み立てる。
+ * ページ（/users/[userId]）と、その OGP 画像で同じものを出すため1か所で組み立てる。
  * 数えるのは公開の訪問の蓋だけ（再訪は1枚）。
  */
 export function buildPublicStampbookBadges({
