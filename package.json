@@ -26,7 +26,7 @@
     "test:prefecture-earned": "tsx --test tests/prefecture-earned.test.ts",
     "test:dex-url": "tsx --test tests/dex-url.test.ts tests/nearby-area.test.ts tests/prefecture-param.test.ts tests/pokemon-dex-url.test.ts",
     "test:manhole-detail": "tsx --test tests/manhole-detail.test.ts",
-    "test:manhole-list": "tsx --test tests/manhole-list-client.test.ts",
+    "test:manhole-list": "tsx --test tests/manhole-list-client.test.ts tests/manhole-catalog-sort.test.ts tests/memoized-snapshot.test.ts",
     "test:regular-badges": "tsx --test tests/regular-badges.test.ts tests/badge-catalog.test.ts tests/plush-visit-count-policy.test.ts tests/snow-visit-count-policy.test.ts tests/stampbook-ogp-plain.test.ts",
     "test:design-submitter": "tsx --test tests/design-manhole-submitter-policy.test.ts",
     "test:japanese-phrases": "tsx --test tests/japanese-phrases.test.ts",
