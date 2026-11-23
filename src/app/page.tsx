@@ -16,7 +16,7 @@ import {
   TrendingUp,
   UserRound,
 } from 'lucide-react';
-import { Manhole } from '@/types/database';
+import type { Database, Manhole } from '@/types/database';
 import PCShell from '@/components/PCShell';
 import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import RegularBadge from '@/components/RegularBadge';
@@ -25,7 +25,6 @@ import AiTagNote from '@/components/AiTagNote';
 import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
-import { prefectureDexUrl } from '@/lib/prefectureSlug';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -48,6 +47,8 @@ import {
   fetchNewPokefutaWanted,
   newPokefutaWantedLabel,
 } from '@/lib/new-pokefuta-wanted';
+
+type GiftManhole = Database['public']['Functions']['get_home_gift_manholes']['Returns'][number];
 
 type FeedVisit = {
   id: string;
@@ -102,6 +103,7 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   // フィードのページ送りに使う数。totalPosts（写真の総数）は撮影位置の無い投稿も含むので使わない
+  const [giftManholes, setGiftManholes] = useState<GiftManhole[]>([]);
   const [feedTotal, setFeedTotal] = useState<number | null>(null);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
@@ -122,7 +124,6 @@ export default function HomePage() {
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
   // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
-  // 特集は最新の投稿の上に置くので、取り終わるまでは枠を取っておく（後から入って投稿を押し下げない）
   const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
   // 取り終わった特集の数（デザインふたと、雪景色・ぬいぐるみの交互の枠）。FEATURE_LOADS に届くまで枠を出しておく
   const [featureLoadsDone, setFeatureLoadsDone] = useState(0);
@@ -152,6 +153,12 @@ export default function HomePage() {
       }
     })();
 
+    fetch('/api/features/gifts', { credentials: 'omit' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (Array.isArray(data?.manholes)) setGiftManholes(data.manholes);
+      })
+      .catch(() => {});
     loadSiteStats();
     loadRareManholes();
     loadCompletion();
@@ -292,10 +299,8 @@ export default function HomePage() {
     }
   };
 
-  // 募集カードは、写真の無い蓋が一番多い県を1つ（incomplete は残りの少ない順なので末尾）。枚数は公開写真で数えた completion
-  const wantedPrefecture = completion?.incomplete.length ? completion.incomplete[completion.incomplete.length - 1] : null;
-  const wantedHref = wantedPrefecture ? prefectureDexUrl(wantedPrefecture.prefecture) : null;
   // 全部の蓋に写真が届いたら、ページ下（写真がまだないポケふたの場所）にお礼を出す。新しい蓋が設置されれば incomplete に戻り、ヒーローに募集カードが出る
+  const activeGiftManholes = giftManholes.filter((manhole) => isGiftActive(manhole.available_until));
   const allCollected = completion != null && completion.completeCount > 0 && completion.incompleteCount === 0;
 
   const sortedFeed = [...feed].sort(
@@ -414,8 +419,6 @@ export default function HomePage() {
             行動のカード（＋ぬいぐるみの特集）。左は「写真を登録してバッジを集める」（/badges）。
             2026-10-24 に「近くを探す」（/nearby）から差し替えた。写真が集まったので、最初からやりたかった
             スタンプ（バッジ集め）を入口にする。「近くを探す」は下タブの「探す」と同じ先なので、最新の投稿の下へ下げた。
-            「◯◯で募集中」は見出しの「写真で埋めよう」の残りを、写真の無い蓋が一番多い県で具体的に見せる。
-            completion の応答を待って PC は右、スマホは次の行に横いっぱいで現れるので、左のカードは動かない。県の地図と一覧は図鑑の県ページが持っている
           */}
           <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:flex">
             <Link
@@ -501,20 +504,6 @@ export default function HomePage() {
                 </span>
               </Link>
             )}
-            {/*
-              スマホでは「募集中」が2行目に1枚で現れ、行ごと増える。取得中は同じ高さ（丸の分）の枠で行を取っておく。
-              PC は「近くを探す」の右に入るだけで行は増えないので枠は要らない。
-            */}
-            {!completionLoaded && (
-              <div className={`rounded-[8px] border border-transparent p-2.5 sm:hidden max-sm:col-span-2`} aria-hidden="true">
-                <span className="block h-10 w-10" />
-              </div>
-            )}
-            {/*
-              新しいポケふたの「募集中」（2026-11-07）。公式サイトにまだ載っていない新作は、写真の GPS から図鑑に
-              載せるので、場所の分からない蓋の写真を集めたい。全部の蓋に写真がそろって上の県のカードが出なくなった
-              枠に入る（両方あるときはこちらを先に）。押すとデザインマンホール投稿の「新しいポケふた」へ
-            */}
             {newWanted.total > 0 && (
               <Link
                 // 未ログインなら middleware がログインへ送り、?kind=pokefuta ごと戻す
@@ -534,25 +523,6 @@ export default function HomePage() {
                   </span>
                 </span>
               </Link>
-            )}
-            {!newWanted.total && wantedPrefecture && wantedHref && (
-              <a
-                href={wantedHref}
-                className={`group flex min-w-0 items-center gap-2 rounded-[8px] border border-[#B5483C]/25 bg-white p-2.5 shadow-sm transition hover:shadow sm:gap-3 sm:p-4 lg:flex-1 max-sm:col-span-2`}
-              >
-                {/* 写真の無い蓋は図鑑にも蓋の画像が無い（切り抜きは投稿写真から作る）ので、「？」の丸で見せる */}
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#B5483C]/50 bg-[#FFF3EF] text-lg font-extrabold text-[#B5483C] sm:h-12 sm:w-12 sm:text-xl">
-                  ？
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-extrabold text-[#4A4A4A] sm:text-base">
-                    {wantedPrefecture.prefecture.replace(/[県府都]$/, '')}で<span className="text-[#B5483C]">募集中</span>
-                  </span>
-                  <span className="block whitespace-nowrap text-[11px] text-[#6A4D36] sm:text-xs">
-                    <span className="max-sm:hidden">写真が無いポケふた </span>あと<b className="text-[#B5483C]">{wantedPrefecture.missing}</b>枚
-                  </span>
-                </span>
-              </a>
             )}
           </div>
           </div>
@@ -593,105 +563,32 @@ export default function HomePage() {
 
         </section>
 
-        {/*
-          特集（雪景色・デザインふた・ぬいぐるみ）。2026-11-06 に最新の投稿の後ろからヒーローの直下へ上げた
-          （ヒーローの中には入れない。ヒーローは行動のカードだけ）。
-          投稿より上にあるので、取り終わるまでは同じ高さの枠を出しておき、後から入って投稿を押し下げない。
-          写真はスマホでも3枚並べる（縮めた 40px なら 2 列のカードに 3 枚入る）。
-          どれも取れなければ節ごと出さない
-        */}
-        {(featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
-          <section className="mt-4 sm:mt-6" aria-busy={featureLoadsDone < FEATURE_LOADS}>
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
-              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
-              特集
+        {activeGiftManholes.length > 0 && (
+          <section aria-labelledby="home-gift-heading" className="mt-4 sm:mt-6">
+            <h2 id="home-gift-heading" className="mb-3 flex items-center gap-2 text-lg font-extrabold">
+              <Gift aria-hidden="true" className="h-5 w-5 text-[#B5483C]" />
+              ギフト配布中のポケふた
             </h2>
-            <div className="grid grid-cols-2 gap-2">
-            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる。
-                特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
-            {snowFeature && snowFeature.count > 0 ? (
-              <Link
-                href="/photos/snow"
-                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-              >
-                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                  {snowFeature.photos.slice(0, 3).map((photo) => (
-                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" fetchPriority="low" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
-                  ))}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-extrabold text-sky-950 sm:text-sm">雪景色のポケふた</p>
-                  <p className="text-[11px] text-slate-600 sm:text-xs">
-                    写真 {snowFeature.count}枚
-                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                  </p>
-                </div>
-              </Link>
-            ) : plushFeature && plushFeature.count > 0 ? (
-            <Link
-              href="/photos/plush"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {plushFeature.photos.slice(0, 3).map((photo) => {
-                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                  const src = `/api/photo/${photo.id}?size=small`;
-                  return (
-                    <div key={photo.id} className="relative h-14 w-14">
-                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy" fetchPriority="low"
-                          className={lidClip ? undefined : 'h-full w-full object-cover'}
-                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                      </div>
-                      {plushClip && (
-                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" fetchPriority="low" style={plushClip} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
-                  ぬいぐるみと旅するポケふた
-                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                </p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  写真 {plushFeature.count}枚
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
-
-            {designFeature && designFeature.length > 0 ? (
-            <Link
-              href="/design-manholes"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {designFeature.slice(0, 3).map((d) => (
-                  <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
-                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" fetchPriority="low" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
-                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
-            </div>
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {activeGiftManholes.map((manhole) => (
+                <li key={manhole.id}>
+                  <Link
+                    href={`/manhole/${manhole.id}#gift-heading`}
+                    className="group flex h-full items-center gap-2 rounded-lg border border-[#e9dfc7] bg-[#fffdf7] p-2.5 text-[#4F3828] shadow-sm transition hover:border-[#B5483C]/45 sm:gap-3"
+                  >
+                    {manhole.photo_id ? (
+                      <img src={`/api/photo/${manhole.photo_id}?size=small`} alt="" width={48} height={48} loading="lazy" className="h-12 w-12 shrink-0 rounded-md bg-[#EFE4CC] object-cover" />
+                    ) : (
+                      <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#fdf1ec] text-[#B5483C]">
+                        <Gift className="h-5 w-5" />
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 text-xs font-bold sm:text-sm">{manholeDisplayName(manhole)}</span>
+                    <ChevronRight aria-hidden="true" className="hidden h-4 w-4 shrink-0 text-[#B5483C] sm:block" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
@@ -1092,6 +989,100 @@ export default function HomePage() {
                 ? 'タップすると、その場所の投稿画面へ進みます'
                 : 'ログインすると、ここから写真を投稿できます'}
             </p>
+          </section>
+        )}
+        {feedSettled && (featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
+          <section className="mt-8" aria-busy={featureLoadsDone < FEATURE_LOADS}>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
+              <Sparkles className="h-5 w-5 text-[#7B63A8]" />
+              特集
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる。
+                特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
+            {snowFeature && snowFeature.count > 0 ? (
+              <Link
+                href="/photos/snow"
+                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+              >
+                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                  {snowFeature.photos.slice(0, 3).map((photo) => (
+                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" fetchPriority="low" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
+                  ))}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-extrabold text-sky-950 sm:text-sm">雪景色のポケふた</p>
+                  <p className="text-[11px] text-slate-600 sm:text-xs">
+                    写真 {snowFeature.count}枚
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
+                </div>
+              </Link>
+            ) : plushFeature && plushFeature.count > 0 ? (
+            <Link
+              href="/photos/plush"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {plushFeature.photos.slice(0, 3).map((photo) => {
+                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
+                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
+                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
+                  const src = `/api/photo/${photo.id}?size=small`;
+                  return (
+                    <div key={photo.id} className="relative h-14 w-14">
+                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
+                        <img src={src} alt="" width={56} height={56} loading="lazy" fetchPriority="low"
+                          className={lidClip ? undefined : 'h-full w-full object-cover'}
+                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
+                      </div>
+                      {plushClip && (
+                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
+                          <img src={src} alt="" width={26} height={26} loading="lazy" fetchPriority="low" style={plushClip} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
+                  ぬいぐるみと旅するポケふた
+                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
+                </p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  写真 {plushFeature.count}枚
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
+
+            {designFeature && designFeature.length > 0 ? (
+            <Link
+              href="/design-manholes"
+              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+            >
+              {/* デザインふたは枠の判定が無いので、新着の写真をそのまま角丸の正方形で並べる */}
+              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
+                {designFeature.slice(0, 3).map((d) => (
+                  <div key={d.id} className="h-14 w-14 overflow-hidden rounded-lg border-2 border-white bg-[#EFE4CC] shadow-sm">
+                    <img src={d.photo_url} alt={d.title ?? ''} width={56} height={56} loading="lazy" fetchPriority="low" className="h-full w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">みんなのデザインふた</p>
+                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                  <span className="hidden sm:inline">投稿されたデザインマンホール </span>
+                  {designManholes != null && designManholes > 0 ? `${designManholes}枚` : ''}
+                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                </p>
+              </div>
+            </Link>
+            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
+            </div>
           </section>
         )}
       </main>

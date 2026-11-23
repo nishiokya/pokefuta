@@ -756,6 +756,18 @@ export interface Database {
       };
     };
     Functions: {
+      get_home_gift_manholes: {
+        Args: Record<string, never>;
+        Returns: {
+          id: number;
+          title: string;
+          prefecture: string;
+          municipality: string | null;
+          building: string | null;
+          photo_id: string | null;
+          available_until: string;
+        }[];
+      };
       get_manhole_gift_availability: {
         Args: { p_manhole_ids: number[] };
         Returns: { manhole_id: number; available_until: string }[];
