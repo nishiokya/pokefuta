@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { createOgpSupabaseClients } from '@/lib/manhole-ogp';
 import { storage } from '@/lib/storage';
 import type { DesignManhole } from '@/types/database';
@@ -60,6 +61,15 @@ export async function loadPublishedDesignManholes(limit = DESIGN_MANHOLE_LOAD_LI
 
   throw lastError;
 }
+
+/**
+ * 詳細ページ用。同じ描画の中（generateMetadata と本文）で同じ1件を2回読まないよう、
+ * React の cache() で1回にまとめる。2026-11-23 の edge_logs で、この1件読みが
+ * 1日 約4,000回（＝表示 約2,000回 × 2）出ていた。署名付き URL は付けない（OGP 画像は下を直接呼ぶ）。
+ */
+export const loadDesignManholeForPage = cache(
+  (id: string): Promise<DesignManholeForOgp | null> => loadDesignManholeForOgp(id)
+);
 
 export async function loadDesignManholeForOgp(
   id: string,
