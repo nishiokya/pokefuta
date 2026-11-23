@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
 import { findEarnedCompletion } from '@/lib/prefecture-earned';
+import { loadCachedManholes } from '@/lib/manhole-snapshot';
+import { sortCatalog } from '@/lib/manhole-catalog-sort';
 
 export type PublicPrefectureProgress = {
   name: string;
@@ -199,6 +201,44 @@ export function getPublicCatalogClient(): SupabaseClient<Database> | null {
   }));
 }
 
+/**
+ * 蓋のカタログ（全件）。図鑑のスナップショット（data.pokefuta.com、日次）から作り、
+ * 取れなかったときだけ Supabase から読む。
+ *
+ * 以前は毎回 Supabase から全件（約93KB）を読んでいて、Amplify では Data Cache が当たらず
+ * 1日 約1,300回 = Egress の2番目に大きな塊だった（2026-11-23 の edge_logs で確認）。
+ * スナップショットと DB は 496枚すべてで id・title・prefecture・pokemons・created_at が一致する
+ * （municipality だけ図鑑が直した1枚がある）。
+ */
+async function loadManholeCatalog(
+  catalogClient: SupabaseClient<Database>
+): Promise<ManholeProgressRow[]> {
+  const snapshot = await loadCachedManholes({ timeoutMs: 1500 });
+  if (snapshot && snapshot.length > 0) {
+    return sortCatalog(
+      snapshot.map((m) => ({
+        id: m.id,
+        title: m.title ?? null,
+        prefecture: m.prefecture ?? null,
+        municipality: m.municipality ?? null,
+        pokemons: Array.isArray(m.pokemons) ? m.pokemons : null,
+        created_at: typeof m.created_at === 'string' ? m.created_at : null,
+      }))
+    );
+  }
+
+  const { data, error } = await catalogClient
+    .from('manhole')
+    .select('id, title, prefecture, municipality, pokemons, created_at')
+    .order('prefecture', { ascending: true })
+    .order('municipality', { ascending: true })
+    .order('id', { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data || []) as ManholeProgressRow[];
+}
+
 async function loadPublicUserPrefectureProgressImpl(
   userId: string
 ): Promise<PublicUserPrefectureProgress | null> {
@@ -213,16 +253,10 @@ async function loadPublicUserPrefectureProgressImpl(
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const [profileResult, { data: manholes, error: manholesError }] =
-    await Promise.all([
-      liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
-      catalogClient
-        .from('manhole')
-        .select('id, title, prefecture, municipality, pokemons, created_at')
-        .order('prefecture', { ascending: true })
-        .order('municipality', { ascending: true })
-        .order('id', { ascending: true }),
-    ]);
+  const [profileResult, manholeRows] = await Promise.all([
+    liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
+    loadManholeCatalog(catalogClient),
+  ]);
 
   if (profileResult.error) {
     throw new Error(profileResult.error.message);
@@ -232,12 +266,6 @@ async function loadPublicUserPrefectureProgressImpl(
   if (!appUserRow) {
     return null;
   }
-
-  if (manholesError) {
-    throw new Error(manholesError.message);
-  }
-
-  const manholeRows = (manholes || []) as ManholeProgressRow[];
   const totalIdsByPrefecture = new Map<string, Set<number>>();
   const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();
   const pokemonsByManhole = new Map<number, string[]>();
