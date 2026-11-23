@@ -219,18 +219,27 @@ async function loadLidDataUri(manholeId: number, timings: Timings): Promise<stri
 const rate = (visited: number, total: number) => (total > 0 ? Math.min((visited / total) * 100, 100) : 0);
 
 // ページのバッジの棚と同じ並び（集めた順）から、都道府県とポケモンを合わせて OGP_MEDAL_COUNT 個
-async function pickMedals(badges: PublicStampbookBadges, timings: Timings): Promise<{ medals: OgpMedal[]; more: number }> {
+async function pickMedals(
+  badges: PublicStampbookBadges,
+  timings: Timings
+): Promise<{ medals: OgpMedal[]; more: number; lidFailures: number }> {
   const prefSlots = Math.max(PREFECTURE_MEDAL_SLOTS, OGP_MEDAL_COUNT - badges.pokemon.length);
   const prefectures = badges.prefectures.slice(0, prefSlots);
   const pokemon = badges.pokemon.slice(0, OGP_MEDAL_COUNT - prefectures.length);
+  // 蓋が無いポケモン（manholeId なし）は元から空の丸。取りに行って取れなかった数だけを失敗として数える
+  let lidFailures = 0;
   const pokemonMedals = await Promise.all(
-    pokemon.map(async (p): Promise<OgpMedal> => ({
-      kind: 'pokemon',
-      key: `pokemon-${p.name}`,
-      image: p.manholeId !== undefined ? await loadLidDataUri(p.manholeId, timings) : null,
-      rank: badgeRank(p.visited, p.total),
-      rate: rate(p.visited, p.total),
-    }))
+    pokemon.map(async (p): Promise<OgpMedal> => {
+      const image = p.manholeId !== undefined ? await loadLidDataUri(p.manholeId, timings) : null;
+      if (p.manholeId !== undefined && image === null) lidFailures += 1;
+      return {
+        kind: 'pokemon',
+        key: `pokemon-${p.name}`,
+        image,
+        rank: badgeRank(p.visited, p.total),
+        rate: rate(p.visited, p.total),
+      };
+    })
   );
   const medals: OgpMedal[] = [
     ...prefectures.map((p): OgpMedal => ({
@@ -242,7 +251,7 @@ async function pickMedals(badges: PublicStampbookBadges, timings: Timings): Prom
     })),
     ...pokemonMedals,
   ];
-  return { medals, more: badges.prefectures.length + badges.pokemon.length - medals.length };
+  return { medals, more: badges.prefectures.length + badges.pokemon.length - medals.length, lidFailures };
 }
 
 export async function GET(request: Request, { params }: RouteContext) {
@@ -305,22 +314,22 @@ export async function GET(request: Request, { params }: RouteContext) {
       : null;
     const [photoResult, picked] = await timed(timings, 'stage3', Promise.all([
       timed(timings, 'photos', loadRecentPhotoDataUris(visitsData.visits, timings).catch(() => ({ uris: [] as string[], expected: -1 }))),
-      timed(timings, 'medals', badges ? pickMedals(badges, timings) : Promise.resolve({ medals: [], more: 0 })),
+      timed(timings, 'medals', badges ? pickMedals(badges, timings) : Promise.resolve({ medals: [], more: 0, lidFailures: 0 })),
     ]));
 
     const photoUris = photoResult.uris;
     // 一部の入力が取れずに欠けた描画は R2 に保存しない（取れなかった形のまま固定されるのを防ぐ）。
-    // 取得関数のうち representatives / 称号は失敗しても空の Map を返すだけなので、空なら欠けとみなす。
+    // representatives は失敗しても空の Map を返すだけなので、空なら欠けとみなす（全ポケモン分あるはずの表）。
+    // 称号（regularBadges）は見ない: 正しく空のこともあり、使うのは progress が取れないとき（＝既に欠け扱い）だけ。
     // デザインマンホール・ステッカーの件数は失敗時に 0 を返す実装で見分けられず、ここでは検出できない
     // （その古さは R2 の寿命 24h で収まる）。
     const degraded =
       !progress ||
       !snapshot ||
       representatives.size === 0 ||
-      regularBadges.size === 0 ||
       photoResult.expected < 0 ||
       photoUris.length < photoResult.expected ||
-      picked.medals.some((m) => m.kind === 'pokemon' && m.image === null);
+      picked.lidFailures > 0;
 
     // ページの上の3つの輪と同じ中身。progress が取れなければ訪問の件数と都道府県だけ
     const totalPrefectures =
