@@ -23,6 +23,7 @@ import PosterAvatar from '@/components/users/PosterAvatar';
 import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
+import ManholeGiftSection from '@/components/manhole/ManholeGiftSection';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
   orderManholePhotosNewestFirst,
@@ -1850,6 +1851,8 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             );
           })()}
+
+          {manhole && <ManholeGiftSection manholeId={manhole.id} isLoggedIn={authChecked && currentUserId !== null} />}
 
           {/*
             ── Comments ──

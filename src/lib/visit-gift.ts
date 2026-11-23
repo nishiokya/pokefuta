@@ -23,7 +23,8 @@ export function giftUntilFor(shotAt: string | Date): Date | null {
 /** まだ印を付けられるか（撮影日から10日以内か）。 */
 export function canOfferGift(shotAt: string | Date, now: Date = new Date()): boolean {
   const until = giftUntilFor(shotAt);
-  return until !== null && until.getTime() > now.getTime();
+  const shotTime = new Date(shotAt).getTime();
+  return until !== null && shotTime <= now.getTime() && until.getTime() > now.getTime();
 }
 
 /** 印が今も有効か。 */
