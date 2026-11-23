@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   MapPin, ArrowLeft, Navigation, UserRound,
   Flag, Users, Trophy, Lock, Plus, Image as ImageIcon,
   Sparkles, ChevronLeft, ChevronRight, Eye, EyeOff, Heart, ExternalLink, BookOpen,
-  MessageCircle, Pencil, Check, X,
+  MessageCircle, Pencil, Check, X, Gift,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { SnapshotManhole } from '@/lib/manhole-snapshot';
@@ -293,6 +293,10 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
     samePokemon: RelatedManhole[];
   }>(derivedOf(initial));
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [giftAvailableManholeId, setGiftAvailableManholeId] = useState<number | null>(null);
+  const updateGiftAvailability = useCallback((manholeId: number, available: boolean) => {
+    setGiftAvailableManholeId(available ? manholeId : null);
+  }, []);
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1646,6 +1650,15 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   <Plus className="h-3 w-3" strokeWidth={2.6} />追加
                 </button>
               </div>
+              {giftAvailableManholeId === manhole.id && (
+                <a
+                  href="#gift-heading"
+                  className="absolute left-2.5 top-11 z-[3] inline-flex items-center gap-1 rounded-full bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#723928] shadow-sm"
+                >
+                  <Gift aria-hidden="true" className="h-3 w-3" />
+                  フレンド募集中
+                </a>
+              )}
               {allDisplayPhotos.length === 1 ? (
                 <button
                   type="button"
@@ -1794,7 +1807,14 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             )}
           </dl>
 
-          {manhole && <ManholeGiftSection manholeId={manhole.id} isLoggedIn={authChecked && currentUserId !== null} />}
+          {manhole && (
+            <ManholeGiftSection
+              key={manhole.id}
+              manholeId={manhole.id}
+              isLoggedIn={authChecked && currentUserId !== null}
+              onAvailabilityChange={updateGiftAvailability}
+            />
+          )}
 
           {/*
             ── Comments ──

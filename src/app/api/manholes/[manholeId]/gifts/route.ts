@@ -13,7 +13,7 @@ import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
  *     description: |
  *       「このポケふたのギフトを配れます」の印が期限内で、トレーナーコードを公開している人を
  *       撮影日の新しい順に5人まで返す（get_manhole_gift_givers）。
- *       ログイン中なら、この蓋の自分の最新の記録と、印を付けられるか（own）も返す。
+ *       ログイン中なら、この蓋の自分の配布中の記録（なければ最新の記録）も返す。
  *     parameters:
  *       - in: path
  *         name: manholeId
@@ -25,6 +25,20 @@ import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
  *         description: 一覧（0件なら空配列）
  *       400:
  *         description: manholeId が数でない
+ *   delete:
+ *     summary: このポケふたでの自分のギフト配布を終了
+ *     tags: [manholes]
+ *     parameters:
+ *       - in: path
+ *         name: manholeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 自分の期限内の配布設定を解除
+ *       401:
+ *         description: 認証が必要
  */
 
 // 見ている人ごとに own が変わり、クッキー付きのクライアントはトークン更新の Set-Cookie を
@@ -97,18 +111,25 @@ export async function GET(
     } | null = null;
 
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const [{ data: visits }, { data: profile }] = await Promise.all([
-        supabase
-          .from('visit')
-          .select('id, shot_at, gift_until, is_public')
-          .eq('user_id', session.user.id)
-          .eq('manhole_id', manholeId)
-          .order('shot_at', { ascending: false })
-          .limit(1),
+    const userId = session?.user.id;
+    if (userId) {
+      const ownVisits = () => supabase
+        .from('visit')
+        .select('id, shot_at, gift_until, is_public')
+        .eq('user_id', userId)
+        .eq('manhole_id', manholeId)
+        .order('shot_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1);
+      const [{ data: visits }, { data: activeVisits }, { data: profile }] = await Promise.all([
+        ownVisits(),
+        // 新しい写真に印がなくても、以前の公開記録で配布中なら停止できるようにする。
+        ownVisits()
+          .eq('is_public', true)
+          .gt('gift_until', new Date().toISOString()),
         supabase.rpc('get_own_profile' as never),
       ]);
-      const latest = (visits as Array<{ id: string; shot_at: string; gift_until: string | null; is_public: boolean | null }> | null)?.[0];
+      const latest = activeVisits?.[0] ?? visits?.[0];
       if (latest) {
         const profileRow = (Array.isArray(profile) ? profile[0] : profile) as { pokemon_go_friend_open?: boolean } | null;
         own = {
@@ -127,4 +148,34 @@ export async function GET(
     console.error('Unexpected error loading gift givers:', error);
     return NextResponse.json({ success: false, error: 'Unexpected error' }, { status: 500, headers: NO_STORE });
   }
+}
+
+// このポケふたでの自分の配布を終了する。古い訪問に付いた印もまとめて解除する。
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { manholeId: string } }
+) {
+  const manholeId = Number(params.manholeId);
+  if (!Number.isInteger(manholeId) || manholeId <= 0) {
+    return NextResponse.json({ success: false }, { status: 400, headers: NO_STORE });
+  }
+
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ success: false }, { status: 401, headers: NO_STORE });
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('visit')
+    .update({ gift_until: null, updated_at: now })
+    .eq('manhole_id', manholeId)
+    .eq('user_id', user.id)
+    .gt('gift_until', now);
+  if (error) {
+    console.error('Failed to stop offering gifts:', error);
+    return NextResponse.json({ success: false }, { status: 500, headers: NO_STORE });
+  }
+  return NextResponse.json({ success: true }, { headers: NO_STORE });
 }
