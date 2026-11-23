@@ -29,11 +29,11 @@ type Profile = {
 // OGP 画像の URL は訪問が増えるたびに変わるので、投稿した直後の共有はいつも冷えている。
 // そこで持ち主本人がスタンプ帳を開いたとき、公開ページから現在の og:image を読んで一度取りに行き、
 // 共有される前に CDN へ載せておく。失敗は黙って捨てる（共有そのものには影響しない）。
-const warmedOgpUserIds = new Set<string>();
+// 温め済みの画像URL。訪問を足すと ?v= が変わるので、ユーザー単位ではなく URL 単位で覚える
+const warmedOgpImageUrls = new Set<string>();
 
 async function warmPublicOgpImage(userId: string, signal: AbortSignal): Promise<void> {
-  if (warmedOgpUserIds.has(userId)) return;
-  warmedOgpUserIds.add(userId);
+  let imageUrl: string | null = null;
   try {
     const pageRes = await fetch(`/users/${encodeURIComponent(userId)}`, { credentials: 'omit', signal });
     if (!pageRes.ok) return;
@@ -44,12 +44,15 @@ async function warmPublicOgpImage(userId: string, signal: AbortSignal): Promise<
     const url = new URL(content.replace(/&amp;/g, '&'), window.location.origin);
     // 同一オリジンの OGP 画像だけを取りに行く
     if (url.origin !== window.location.origin && url.pathname !== `/users/${encodeURIComponent(userId)}/opengraph-image`) return;
-    const imageUrl = `${window.location.origin}${url.pathname}${url.search}`;
+    imageUrl = `${window.location.origin}${url.pathname}${url.search}`;
+    if (warmedOgpImageUrls.has(imageUrl)) return;
+    warmedOgpImageUrls.add(imageUrl);
     const imgRes = await fetch(imageUrl, { credentials: 'omit', signal });
     await imgRes.arrayBuffer();
+    if (!imgRes.ok) warmedOgpImageUrls.delete(imageUrl);
   } catch {
     // 温めは補助。失敗しても何も出さない。中断・失敗なら次回また試せるようにする
-    warmedOgpUserIds.delete(userId);
+    if (imageUrl) warmedOgpImageUrls.delete(imageUrl);
   }
 }
 

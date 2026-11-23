@@ -282,8 +282,10 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return new Response(png, {
         headers: {
           'Content-Type': 'image/png',
-          // URL の ?v= に公開内容の印が入るので、同じ URL の中身は変わらない。CDN に長く載せてよい
-          'Cache-Control': 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=2592000',
+          // URL の ?v= に公開内容の印が入るので、訪問・写真・表示名が変われば URL ごと変わる。
+          // ただし CDN は1日まで: 非公開に戻した写真が配られ続けないように、
+          // また印に入れていない入力（デザインマンホール・ステッカー数、図鑑の総数）のずれも1〜2日で解消する
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
         },
       });
     } catch (err) {
