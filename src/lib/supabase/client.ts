@@ -1,5 +1,4 @@
 import { createBrowserClient as createSSRBrowserClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
 import { authCookieOptions } from './cookies';
 
 // ==========================================
@@ -41,25 +40,3 @@ export const createBrowserClient = () => {
   });
 };
 
-// ==========================================
-// サーバーサイド用クライアント (Admin)
-// ==========================================
-// ⚠️ RLSをバイパスするため、API Routeでのみ使用
-// ⚠️ 絶対にフロントエンドに露出させない
-const createAdminClient = () => {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('⚠️ Supabase Admin設定エラー: SERVICE_ROLE_KEYが未設定です');
-    return null;
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-};
-
-export const supabaseAdmin = createAdminClient();

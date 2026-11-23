@@ -6,7 +6,7 @@ import { getOgpFontPath } from '@/lib/pokefuta-ogp-template';
 import { deriveSmallKey, storage } from '@/lib/storage';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
-  getProgressClient,
+  createPublicReadClient,
   loadPublicUserPrefectureProgress,
 } from '@/lib/user-prefecture-progress';
 import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
@@ -75,7 +75,7 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[]): Promise<string[]>
 
   if (photoIds.length === 0) return [];
 
-  const supabase = getProgressClient();
+  const supabase = createPublicReadClient();
   if (!supabase) return [];
 
   // photoIds は公開訪問由来だが、直接クエリでも is_public を再確認して二重に守る

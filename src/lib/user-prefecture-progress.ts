@@ -1,7 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { supabaseAdmin } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
 import { findEarnedCompletion } from '@/lib/prefecture-earned';
 import { loadCachedManholes } from '@/lib/manhole-snapshot';
@@ -137,21 +136,15 @@ export function createPublicReadClient(): SupabaseClient<Database> | null {
   });
 }
 
-export function getProgressClient(): SupabaseClient<Database> | null {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const hasUsableServiceRoleKey =
-    serviceRoleKey.length > 100 && !serviceRoleKey.toLowerCase().includes('placeholder');
-
-  return hasUsableServiceRoleKey ? supabaseAdmin : createPublicReadClient();
-}
 
 /**
  * 公開ページ用のクライアントを、鮮度の要件ごとに分けて作る。
  *
  * **service_role を使わない。** 公開ページが読むのは公開プロフィールRPCと
  * 公開訪問ビューとマンホールカタログだけで、いずれも anon に GRANT してある。
- * `getProgressClient()` のように「service_role が無ければ anon へ黙って落ちる」形は
- * 新経路へ持ち込まない。落ちた先で挙動が変わると、開発環境で見えていたものが
+ * 「service_role が無ければ anon へ黙って落ちる」形は持ち込まない
+ * （以前の getProgressClient がそうだった。本番では鍵が使えず常に anon だったので 2026-11-23 に削除）。
+ * 落ちた先で挙動が変わると、開発環境で見えていたものが
  * 本番で違う、という切り分け不能な差になる。
  *
  * キャッシュを用途で分ける理由:
