@@ -213,7 +213,7 @@ export function getPublicCatalogClient(): SupabaseClient<Database> | null {
 async function loadManholeCatalog(
   catalogClient: SupabaseClient<Database>
 ): Promise<ManholeProgressRow[]> {
-  const snapshot = await loadCachedManholes();
+  const snapshot = await loadCachedManholes({ timeoutMs: 1500 });
   if (snapshot && snapshot.length > 0) {
     return sortCatalog(
       snapshot.map((m) => ({

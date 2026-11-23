@@ -36,7 +36,7 @@ const getTopTitlePriority = (titles?: ManholeTitle[] | null) =>
  * 3枚出すために全件（約270KB）を読むので、以前は1日 約150回で 40MB を Supabase から出していた。
  */
 async function loadTitledManholes(): Promise<RarePreviewManhole[]> {
-  const snapshot = await loadCachedManholes();
+  const snapshot = await loadCachedManholes({ timeoutMs: 1500 });
   if (snapshot && snapshot.length > 0) {
     return snapshot
       .filter((m) => Array.isArray(m.title_tags) && m.title_tags.some((tag) => PREVIEW_TITLE_KEYS.includes(tag as string)))
