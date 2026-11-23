@@ -401,7 +401,6 @@ export async function POST(request: NextRequest) {
     // Create visit and image records
     let visitId: string | null = null;
     let imageId: string | null = null;
-    let giftUntil: string | null = null;
 
     try {
       if (reusedVisitId) {
@@ -445,19 +444,6 @@ export async function POST(request: NextRequest) {
         }
         // is_public: デフォルトはtrue、明示的にfalseが送られた場合のみfalseにする
         visitInsert.is_public = isPublic === 'false' ? false : true;
-
-        if (wantsGift && visitInsert.is_public && typeof shotAt === 'string' && canOfferGift(shotAt)) {
-          const { data: profile, error: profileError } = await supabase.rpc('get_own_profile' as never);
-          if (profileError) {
-            console.warn('Failed to check gift eligibility during upload:', profileError);
-          } else {
-            const row = (profile as { pokemon_go_friend_open: boolean; pokemon_go_friend_code: string | null }[] | null)?.[0];
-            if (row?.pokemon_go_friend_open && row.pokemon_go_friend_code) {
-              giftUntil = giftUntilFor(shotAt)?.toISOString() ?? null;
-              if (giftUntil) visitInsert.gift_until = giftUntil;
-            }
-          }
-        }
 
         const { data: visitData, error: visitError } = await supabase
           .from('visit')
@@ -517,6 +503,34 @@ export async function POST(request: NextRequest) {
         code,
         error: 'Database operation failed'
       }, { status: 500 });
+    }
+
+    let giftUntil: string | null = null;
+    // 写真が登録できた新規訪問だけを配布一覧に載せる。配布設定が失敗しても投稿は成功とする。
+    if (wantsGift && !reusedVisitId && visitId && isPublic !== 'false' && typeof shotAt === 'string' && canOfferGift(shotAt)) {
+      try {
+        const { data: profile, error: profileError } = await supabase.rpc('get_own_profile');
+        if (profileError) throw profileError;
+
+        const row = profile?.[0];
+        if (row?.pokemon_go_friend_open && row.pokemon_go_friend_code && canOfferGift(shotAt)) {
+          const until = giftUntilFor(shotAt)?.toISOString();
+          if (until) {
+            const { data, error } = await supabase
+              .from('visit')
+              .update({ gift_until: until })
+              .eq('id', visitId)
+              .eq('is_public', true)
+              .is('gift_until', null)
+              .select('gift_until')
+              .maybeSingle();
+            if (error) throw error;
+            giftUntil = data?.gift_until ?? null;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to set gift availability after upload:', error);
+      }
     }
 
     return NextResponse.json({
