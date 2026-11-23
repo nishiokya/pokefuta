@@ -66,20 +66,27 @@ const serverTiming = (timings: Timings) =>
 // 掃除は後回し。ライフサイクルルール（ogp/ プレフィックスを N 日で削除）を入れる案がある。
 const OGP_OBJECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const R2_READ_TIMEOUT_MS = 2000;
+// バージョンに入らない入力（デザインマンホール・ステッカー数、カタログの総数、バッジ）は変わり得るので、
+// R2 のオブジェクトにも寿命を持たせる。1日を過ぎたら作り直して同じキーに上書きする。
+// これで古さは最大およそ1日に収まり、CDN の s-maxage（1日）と揃う。Last-Modified が無ければ古いものとして扱う。
+const OGP_R2_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-async function readCachedPng(key: string): Promise<ArrayBuffer | null> {
+async function readCachedPng(key: string): Promise<{ png: ArrayBuffer | null; stale: boolean }> {
   try {
     const signed = await storage.getSignedUrl(key, 60);
     const response = await fetch(signed.url, { signal: AbortSignal.timeout(R2_READ_TIMEOUT_MS) });
-    if (!response.ok) return null;
+    if (!response.ok) return { png: null, stale: false };
     const body = await response.arrayBuffer();
-    return sniffImageFormat(body) === 'png' ? body : null;
+    if (sniffImageFormat(body) !== 'png') return { png: null, stale: false };
+    const modified = Date.parse(response.headers.get('last-modified') ?? '');
+    if (!Number.isFinite(modified) || Date.now() - modified > OGP_R2_MAX_AGE_MS) return { png: null, stale: true };
+    return { png: body, stale: false };
   } catch {
-    return null;
+    return { png: null, stale: false };
   }
 }
 
-function successHeaders(timings: Timings, cacheStatus: string): Record<string, string> {
+function successHeaders(timings: Timings, cacheStatus: string, degraded: boolean): Record<string, string> {
   return {
     'Content-Type': 'image/png',
     'Server-Timing': serverTiming(timings),
@@ -87,7 +94,10 @@ function successHeaders(timings: Timings, cacheStatus: string): Record<string, s
     // URL の ?v= に公開内容の印が入るので、訪問・写真・表示名が変われば URL ごと変わる。
     // ただし CDN は1日まで: 非公開に戻した写真が配られ続けないように、
     // また印に入れていない入力（デザインマンホール・ステッカー数、図鑑の総数）のずれも1〜2日で解消する
-    'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
+    // 一部の入力が取れずに欠けた描画（degraded）は CDN にも長く載せない
+    'Cache-Control': degraded
+      ? 'public, max-age=60, s-maxage=300'
+      : 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
   };
 }
 
@@ -113,7 +123,7 @@ async function loadNotoSansCjk(): Promise<ArrayBuffer | null> {
 
 // 最新の公開訪問写真を最大3枚、data URI(JPEG)にして返す。
 // 1枚でも失敗したら写真なしレイアウトに落とすのではなく、取れた分だけ使う。
-async function loadRecentPhotoDataUris(visits: PublicVisit[], timings: Timings): Promise<string[]> {
+async function loadRecentPhotoDataUris(visits: PublicVisit[], timings: Timings): Promise<{ uris: string[]; expected: number }> {
   const photoIds = visits
     // このOGPは投稿単体ではなくスタンプ帳の代表画像。風景を蓋の代表に見せない。
     // 風景投稿そのものはプロフィール本文と写真単体共有でラベル付き表示を続ける。
@@ -122,10 +132,11 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[], timings: Timings):
     .filter((id): id is string => Boolean(id))
     .slice(0, OGP_PHOTO_COUNT);
 
-  if (photoIds.length === 0) return [];
+  if (photoIds.length === 0) return { uris: [], expected: 0 };
 
+  const expected = photoIds.length;
   const supabase = getProgressClient();
-  if (!supabase) return [];
+  if (!supabase) return { uris: [], expected };
 
   // photoIds は公開訪問由来だが、直接クエリでも is_public を再確認して二重に守る
   const { data, error } = await timed(timings, 'photo_select', async () =>
@@ -138,7 +149,7 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[], timings: Timings):
 
   if (error || !data) {
     if (error) console.error('[OGP] users visits photo select failed:', error.message);
-    return [];
+    return { uris: [], expected };
   }
 
   const keyById = new Map(
@@ -187,7 +198,7 @@ async function loadRecentPhotoDataUris(visits: PublicVisit[], timings: Timings):
     })
   );
 
-  return results.filter((uri): uri is string => Boolean(uri));
+  return { uris: results.filter((uri): uri is string => Boolean(uri)), expected };
 }
 
 // ポケモンのメダルに入れる蓋の切り抜き（data.pokefuta.com の静的画像）。取れなければ空の丸
@@ -250,13 +261,15 @@ export async function GET(request: Request, { params }: RouteContext) {
     // リクエストの ?v= では引かない（古い版は配らず、任意の ?v= でオブジェクトも増やせない）
     const version = stampbookOgpVersion(visitsData);
     const cacheKey = /^[A-Za-z0-9-]+$/.test(version) ? `ogp/users/${visitsData.userId}/${version}.png` : null;
+    let r2Stale = false;
     if (cacheKey) {
-      const cached = await timed(timings, 'r2_read', readCachedPng(cacheKey));
+      const { png: cached, stale } = await timed(timings, 'r2_read', readCachedPng(cacheKey));
+      r2Stale = stale;
       if (cached) {
         timings.set('r2_hit', 1);
         timings.set('total', performance.now() - startedAt);
         console.log(`[OGP] users visits timing: ${serverTiming(timings)}`);
-        return new Response(cached, { headers: successHeaders(timings, 'r2-hit') });
+        return new Response(cached, { headers: successHeaders(timings, 'r2-hit', false) });
       }
     }
 
@@ -290,10 +303,24 @@ export async function GET(request: Request, { params }: RouteContext) {
     const badges = progress
       ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount, plushCount, snowCount })
       : null;
-    const [photoUris, picked] = await timed(timings, 'stage3', Promise.all([
-      timed(timings, 'photos', loadRecentPhotoDataUris(visitsData.visits, timings).catch(() => [])),
+    const [photoResult, picked] = await timed(timings, 'stage3', Promise.all([
+      timed(timings, 'photos', loadRecentPhotoDataUris(visitsData.visits, timings).catch(() => ({ uris: [] as string[], expected: -1 }))),
       timed(timings, 'medals', badges ? pickMedals(badges, timings) : Promise.resolve({ medals: [], more: 0 })),
     ]));
+
+    const photoUris = photoResult.uris;
+    // 一部の入力が取れずに欠けた描画は R2 に保存しない（取れなかった形のまま固定されるのを防ぐ）。
+    // 取得関数のうち representatives / 称号は失敗しても空の Map を返すだけなので、空なら欠けとみなす。
+    // デザインマンホール・ステッカーの件数は失敗時に 0 を返す実装で見分けられず、ここでは検出できない
+    // （その古さは R2 の寿命 24h で収まる）。
+    const degraded =
+      !progress ||
+      !snapshot ||
+      representatives.size === 0 ||
+      regularBadges.size === 0 ||
+      photoResult.expected < 0 ||
+      photoUris.length < photoResult.expected ||
+      picked.medals.some((m) => m.kind === 'pokemon' && m.image === null);
 
     // ページの上の3つの輪と同じ中身。progress が取れなければ訪問の件数と都道府県だけ
     const totalPrefectures =
@@ -350,18 +377,19 @@ export async function GET(request: Request, { params }: RouteContext) {
     try {
       const png = await timed(timings, 'render', new ImageResponse(card(false), { ...options, emoji: 'twemoji' }).arrayBuffer());
       // 描画した ?v= がいまの版と一致するときだけ保存する。Lambda はレスポンス後に凍結され得るので await する
-      let cacheStatus = 'miss';
-      if (cacheKey && new URL(request.url).searchParams.get('v') === version) {
+      const prefix = r2Stale ? 'stale' : 'miss';
+      let cacheStatus = degraded ? `${prefix}-degraded` : prefix;
+      if (!degraded && cacheKey && new URL(request.url).searchParams.get('v') === version) {
         try {
           await timed(timings, 'r2_write', storage.put(cacheKey, Buffer.from(png), { contentType: 'image/png', cacheControl: OGP_OBJECT_CACHE_CONTROL }));
-          cacheStatus = 'miss-stored';
+          cacheStatus = `${prefix}-stored`;
         } catch (err) {
           console.error('[OGP] users visits R2 write failed:', err instanceof Error ? err.message : err);
         }
       }
       timings.set('total', performance.now() - startedAt);
       console.log(`[OGP] users visits timing: ${serverTiming(timings)}`);
-      return new Response(png, { headers: successHeaders(timings, cacheStatus) });
+      return new Response(png, { headers: successHeaders(timings, cacheStatus, degraded) });
     } catch (err) {
       console.error('[OGP] users visits render with emoji failed, retrying without emoji:', err);
     }
