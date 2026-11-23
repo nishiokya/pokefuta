@@ -12,7 +12,11 @@
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** avatars.json の中身を [公開ID（小文字）, 写真ID] の組にする。形が違えば null */
+/**
+ * avatars.json の中身を [公開ID（小文字）, 写真ID] の組にする。形が違えば null。
+ * 0人のときも null にする。生成側の不具合で空のファイルが出たときに、全員を「未設定」として
+ * 1時間覚えてしまわず、RPC に戻すため（2026-11-23 時点で 14人。本当に0人になっても RPC で正しく出る）。
+ */
 export function parseAvatarSnapshot(data: unknown): Array<[string, string]> | null {
   if (!data || typeof data !== 'object') return null;
   const body = data as { success?: unknown; avatars?: unknown };
@@ -24,7 +28,7 @@ export function parseAvatarSnapshot(data: unknown): Array<[string, string]> | nu
     if (typeof photoId !== 'string' || !UUID_RE.test(photoId)) continue;
     entries.push([publicId.toLowerCase(), photoId]);
   }
-  return entries;
+  return entries.length > 0 ? entries : null;
 }
 
 /** 頼まれた公開ID それぞれのアイコン（無ければ null）。公開ID は小文字で引く */

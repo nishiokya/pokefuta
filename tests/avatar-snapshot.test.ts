@@ -22,6 +22,11 @@ test('success が無い・avatars が無いものは null（呼び出し側は R
   assert.equal(parseAvatarSnapshot({ success: true, avatars: [] }), null);
 });
 
+test('0人（空・全部が形違い）も null。全員を未設定として覚えず RPC に戻す', () => {
+  assert.equal(parseAvatarSnapshot({ success: true, avatars: {} }), null);
+  assert.equal(parseAvatarSnapshot({ success: true, avatars: { 'not-a-uuid': P1 } }), null);
+});
+
 test('表に無い人は null（アイコン未設定）、大文字の公開ID でも引ける', () => {
   assert.deepEqual(avatarsFor([A.toUpperCase(), B], [[A, P1]]), { [A.toUpperCase()]: P1, [B]: null });
 });
