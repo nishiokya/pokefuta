@@ -756,6 +756,10 @@ export interface Database {
       };
     };
     Functions: {
+      get_manhole_gift_availability: {
+        Args: { p_manhole_ids: number[] };
+        Returns: { manhole_id: number; available_until: string }[];
+      };
       get_unvisited_manholes: {
         Args: {
           user_uuid: string;

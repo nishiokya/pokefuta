@@ -40,6 +40,12 @@ export default function ManholeGiftSection({ manholeId, isLoggedIn, onAvailabili
     onAvailabilityChange(manholeId, data.givers.length > 0);
   }, [manholeId, onAvailabilityChange]);
   useEffect(() => { void reload().catch(() => setLoaded(true)); }, [reload]);
+  // トップからのリンクは、非同期でギフト欄が出た後に見出しへ移動する。
+  useEffect(() => {
+    if (loaded && window.location.hash === '#gift-heading') {
+      document.getElementById('gift-heading')?.scrollIntoView();
+    }
+  }, [loaded]);
   const toggle = async () => {
     if (!own || saving) return;
     setSaving(true); setMessage('');
@@ -72,7 +78,7 @@ export default function ManholeGiftSection({ manholeId, isLoggedIn, onAvailabili
   if (!loaded || (!givers.length && !own)) return null;
   const otherGivers = givers.filter((giver) => !giver.is_own);
   return <section className="my-5 rounded-2xl border border-[#e9dfc7] bg-[#fffdf7] p-4" aria-labelledby="gift-heading">
-    <h2 id="gift-heading" className="flex items-center gap-2 font-pixelJp text-base font-bold text-[#6A4D36]"><Gift className="h-5 w-5 text-[#bf5640]"/>このポケふたのギフト</h2>
+    <h2 id="gift-heading" className="flex scroll-mt-24 items-center gap-2 font-pixelJp text-base font-bold text-[#6A4D36]"><Gift className="h-5 w-5 text-[#bf5640]"/>このポケふたのギフト</h2>
     {otherGivers.length > 0 && (
       <>
         <p className="mt-1 text-sm font-bold text-[#6A4D36]">Pokémon GOのギフトを配布できるトレーナーがいます</p>

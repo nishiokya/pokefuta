@@ -1656,7 +1656,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                   className="absolute left-2.5 top-11 z-[3] inline-flex items-center gap-1 rounded-full bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#723928] shadow-sm"
                 >
                   <Gift aria-hidden="true" className="h-3 w-3" />
-                  フレンド募集中
+                  ギフト配布中
                 </a>
               )}
               {allDisplayPhotos.length === 1 ? (
