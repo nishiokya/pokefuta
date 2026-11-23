@@ -60,12 +60,45 @@ export const dynamic = 'force-dynamic';
 // 代わりに取得ごとに分けてある（`getPublicProfileClient` / `getPublicCatalogClient`）。
 // 即時反映が要るのはプロフィールRPCだけで、訪問一覧は数分遅れて構わない。
 
-const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(userId)}/visits`;
-// OGP 画像のキャッシュキー。この画像だけの版にして、中身を変えたら上げる（共通の OGP_IMAGE_VERSION は他のページも巻き込む）
+const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(userId)}`;
+// OGP 画像のキャッシュキー。テンプレートを変えたら TEMPLATE_VERSION を上げる。
+// 画像の生成は CDN が冷えていると 9〜12 秒かかり、X のクローラーが待ちきれずカードが出ない。
+// そこで URL に「公開内容の印」を載せ、内容が変わらない間は同じ URL を長く CDN に載せる
+// （route 側で s-maxage を長くしてある）。内容が変われば URL が変わり、古い画像は自然に使われなくなる。
 // 20261028: 称号・3つの輪・バッジのメダル・ステッカーをページと同じ見た目で載せた
-const STAMPBOOK_OGP_VERSION = '20261028-stampbook-card';
-const getOgpImageUrl = (userId: string) =>
-  `${getPageUrl(userId)}/opengraph-image?v=${STAMPBOOK_OGP_VERSION}`;
+// 20261123: URL を /users/<id> に移し、印つきの長期キャッシュにした
+const STAMPBOOK_OGP_TEMPLATE_VERSION = '20261123-userurl';
+
+// 画像に効く公開内容（件数・最新の公開訪問・表示名）から短い印を作る。
+// すでに generateMetadata が取っているデータだけで作るので、追加のクエリは打たない。
+function stampbookOgpStamp(data: {
+  totalVisits: number;
+  prefectureCount: number;
+  displayName: string;
+  visits: { createdAt: string | null; shotAt: string | null }[];
+}): string {
+  let latest = 0;
+  for (const visit of data.visits) {
+    for (const value of [visit.createdAt, visit.shotAt]) {
+      const t = value ? Date.parse(value) : NaN;
+      if (Number.isFinite(t) && t > latest) latest = t;
+    }
+  }
+  // 表示名の変更も印に反映する（djb2）
+  let hash = 5381;
+  for (let i = 0; i < data.displayName.length; i += 1) {
+    hash = ((hash * 33) ^ data.displayName.charCodeAt(i)) >>> 0;
+  }
+  return [
+    Math.floor(latest / 1000).toString(36),
+    data.totalVisits.toString(36),
+    data.prefectureCount.toString(36),
+    hash.toString(36),
+  ].join('');
+}
+
+const getOgpImageUrl = (data: Parameters<typeof stampbookOgpStamp>[0] & { userId: string }) =>
+  `${getPageUrl(data.userId)}/opengraph-image?v=${STAMPBOOK_OGP_TEMPLATE_VERSION}-${stampbookOgpStamp(data)}`;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const data = await loadPublicUserVisits(params.userId);
@@ -77,7 +110,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const pageUrl = getPageUrl(data.userId);
-  const ogpImageUrl = getOgpImageUrl(data.userId);
+  const ogpImageUrl = getOgpImageUrl(data);
   const title = `${data.displayName}のスタンプ帳 | ${SITE_NAME}`;
   const description = `${data.displayName}さんが公開している訪問記録${data.totalVisits}件、${data.prefectureCount}都道府県分のポケふたスタンプ帳です。`;
 
