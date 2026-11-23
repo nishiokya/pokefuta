@@ -13,6 +13,7 @@ import { calculateDistance, isValidCoordinates, extractCoordinatesFromWKB } from
 import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
+import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
 
 /**
  * @swagger
@@ -60,6 +61,10 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *                 enum: ['true', 'false']
  *                 default: 'true'
  *                 description: 公開設定（true=他のユーザーもcommentを閲覧可能、false=自分だけが閲覧可能、デフォルト：公開）
+ *               gift:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 description: 条件を満たす新規の公開訪問に「ギフトを配れます」の印を付ける
  *               is_landscape:
  *                 type: string
  *                 enum: ['true', 'false']
@@ -188,6 +193,7 @@ export async function POST(request: NextRequest) {
     const note = formData.get('note');
     const comment = formData.get('comment');  // 訪問コメント
     const isPublic = formData.get('is_public');  // 公開設定
+    const wantsGift = formData.get('gift') === 'true';
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
     const exifStr = formData.get('exif');
@@ -499,10 +505,41 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    let giftUntil: string | null = null;
+    // 写真が登録できた新規訪問だけを配布一覧に載せる。配布設定が失敗しても投稿は成功とする。
+    if (wantsGift && !reusedVisitId && visitId && isPublic !== 'false' && typeof shotAt === 'string' && canOfferGift(shotAt)) {
+      try {
+        const { data: profile, error: profileError } = await supabase.rpc('get_own_profile');
+        if (profileError) throw profileError;
+
+        const row = profile?.[0];
+        if (row?.pokemon_go_friend_open && row.pokemon_go_friend_code && canOfferGift(shotAt)) {
+          const until = giftUntilFor(shotAt)?.toISOString();
+          if (until) {
+            const { data, error } = await supabase
+              .from('visit')
+              .update({ gift_until: until })
+              .eq('id', visitId)
+              .eq('user_id', userId)
+              .eq('manhole_id', manholeIdInt)
+              .eq('is_public', true)
+              .is('gift_until', null)
+              .select('gift_until')
+              .maybeSingle();
+            if (error) throw error;
+            giftUntil = data?.gift_until ?? null;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to set gift availability after upload:', error);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Image uploaded successfully',
       visit_id: visitId,
+      gift_until: giftUntil,
       image: {
         id: imageId,
         is_landscape: isLandscape,

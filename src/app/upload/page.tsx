@@ -22,6 +22,7 @@ import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
 import SuggestionChips from '@/components/comments/SuggestionChips';
 import { collectVisitComments } from '@/lib/visit-comment-quality';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
+import { canOfferGift } from '@/lib/visit-gift';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
 import { DesignManholeAfterUploadLink } from '@/components/DesignManhole/SubmitCta';
@@ -147,8 +148,10 @@ function UploadPageInner() {
   // 同じ蓋に前の人が残したひとこと（最新の1件）。何を書けばいいかの手本として見せる
   const [previousTip, setPreviousTip] = useState<string | null>(null);
   // 完了画面で「ひとことを後から残す」ための訪問ID
-  const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number } | null>(null);
+  const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number; giftStatus: 'published' | 'skipped' | null } | null>(null);
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
+  const [giftPreferenceKey, setGiftPreferenceKey] = useState<string | null>(null);
+  const [offerGift, setOfferGift] = useState(false);
   const [alerts, setAlerts] = useState<AlertMessage[]>([]); // アラートメッセージ
   const [isAndroid, setIsAndroid] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -172,6 +175,25 @@ function UploadPageInner() {
       timerRefsRef.current.forEach(timerId => clearTimeout(timerId));
       timerRefsRef.current.clear();
     };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadGiftPreference() {
+      const response = await fetch('/api/user/profile', { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) return;
+      const { profile } = await response.json();
+      if (controller.signal.aborted || !profile?.publicUserId || !profile.pokemonGoFriendOpen || !profile.pokemonGoFriendCode) return;
+      const key = `pokefuta:upload-gift:${profile.publicUserId}`;
+      try {
+        setOfferGift(localStorage.getItem(key) === 'true');
+      } catch {
+        // ストレージが使えなくても、この投稿での選択はできる。
+      }
+      setGiftPreferenceKey(key);
+    }
+    void loadGiftPreference().catch(() => {});
+    return () => controller.abort();
   }, []);
 
   // ✅ アラートを追加する関数（crypto.randomUUID()で衝突回避）
@@ -741,7 +763,8 @@ function UploadPageInner() {
       }
 
       // Add visit metadata
-      formData.append('shot_at', photo.metadata.datetime || new Date().toISOString());
+      const shotAt = photo.metadata.datetime || new Date().toISOString();
+      formData.append('shot_at', shotAt);
 
       // Add location data if available (0も有効値なのでisValidCoordinatesで判定)
       if (!photo.gpsIgnored && isValidCoordinates(photo.metadata.latitude, photo.metadata.longitude)) {
@@ -768,6 +791,8 @@ function UploadPageInner() {
 
       // Add is_public setting
       formData.append('is_public', isPublic.toString());
+      const wantsGift = Boolean(giftPreferenceKey && offerGift && isPublic && canOfferGift(shotAt));
+      if (wantsGift) formData.append('gift', 'true');
 
       if (photo.metadata.exifPayload) {
         // 位置情報を使わないと選んだ印を、運営の確認用に残す（exif は公開しない列）
@@ -828,7 +853,11 @@ function UploadPageInner() {
         });
       }
       if (typeof uploadResult.visit_id === 'string') {
-        setCompletedVisit({ visitId: uploadResult.visit_id, manholeId: photo.matchedManhole?.id });
+        setCompletedVisit({
+          visitId: uploadResult.visit_id,
+          manholeId: photo.matchedManhole?.id,
+          giftStatus: wantsGift ? (uploadResult.gift_until ? 'published' : 'skipped') : null,
+        });
       }
 
       setPhotos(prev => prev.map(p =>
@@ -907,6 +936,8 @@ function UploadPageInner() {
 
   // 1枚のみ投稿なので先頭が選択中の写真
   const selectedPhoto = photos[0];
+  const selectedShotAt = selectedPhoto?.metadata.datetime;
+  const giftDateEligible = !selectedShotAt || canOfferGift(selectedShotAt);
 
   // Android の蓋選びの候補（全件でも約480枚なので毎回絞ってよい）
   const pickerHits = pickerQuery.trim() ? manholes.filter(m => matchesManholeQuery(m, pickerQuery)) : [];
@@ -1042,6 +1073,19 @@ function UploadPageInner() {
           <p className="mt-2 text-sm text-[#2A2A2A]/70">
             写真を訪問記録に登録しました。
           </p>
+          {completedVisit?.giftStatus === 'published' && completedVisit.manholeId != null && (
+            <p className="mt-2 text-sm font-bold text-[#4F3828]">
+              <Link href={`/manhole/${completedVisit.manholeId}#gift-heading`} className="underline underline-offset-2">
+                ポケふた詳細
+              </Link>
+              に「ギフトを配れます」を設定しました。
+            </p>
+          )}
+          {completedVisit?.giftStatus === 'skipped' && (
+            <p className="mt-2 text-sm text-amber-900">
+              写真の投稿は完了しました。ギフトの公開設定は反映されなかったため、ポケふた詳細で確認してください。
+            </p>
+          )}
           {/*
             投稿時にひとことを書かなかった人（約87%）にだけ、もう一度だけ頼む。
             書き込み先はこの訪問のひとことなので、蓋の詳細のコメント欄に写真付きで並ぶ。
@@ -1527,8 +1571,8 @@ function UploadPageInner() {
               交換の希望があれば「ひとこと」に書けます。
             </li>
             <li>
-              写真を公開で投稿したあと、そのポケふたの詳細ページの「このポケふたのギフト」欄で
-              <strong>「配れます」</strong>を押します。
+              写真を公開で投稿するときに<strong>「ギフトを配れます」</strong>にチェックします。
+              投稿後もポケふた詳細の「このポケふたのギフト」欄で設定できます。
             </li>
           </ol>
           <p className="mt-2 text-xs leading-relaxed text-[#2A2A2A]/75">「配れます」は撮影から10日以内の記録に設定できます。</p>
@@ -1649,6 +1693,35 @@ function UploadPageInner() {
                   </div>
                 )}
               </div>
+
+              {giftPreferenceKey && (
+                <div className="rounded-lg border border-[#7B63A8]/15 bg-white/70 p-3">
+                  <label className="flex items-center gap-2.5 text-sm font-bold">
+                    <input
+                      type="checkbox"
+                      checked={isPublic && giftDateEligible && offerGift}
+                      disabled={!isPublic || !giftDateEligible || selectedPhoto?.uploading}
+                      aria-describedby="upload-gift-preference"
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setOfferGift(checked);
+                        try {
+                          localStorage.setItem(giftPreferenceKey, String(checked));
+                        } catch {
+                          // 保存できない環境でも、この投稿には反映する。
+                        }
+                      }}
+                      className="h-4 w-4 shrink-0 accent-[#7B63A8]"
+                    />
+                    Pokémon GOでこのポケふたのギフトを配れます
+                  </label>
+                  <p id="upload-gift-preference" className="mt-1 text-xs leading-relaxed text-[#2A2A2A]/75">
+                    {!isPublic ? '訪問記録を公開にすると選べます。'
+                      : !giftDateEligible ? '撮影から10日以内の記録で選べます。'
+                        : 'トレーナーコードがポケふた詳細に表示されます。この選択は同じブラウザで次回も引き継ぎます。'}
+                  </p>
+                </div>
+              )}
 
               {/* 使う人が少ないので畳んでおく */}
               <details open={visitNote.length > 0}>
