@@ -1,5 +1,6 @@
 import 'server-only';
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { storage } from '@/lib/storage';
 import type { Database, ManholeTitle } from '@/types/database';
 
@@ -31,20 +32,11 @@ export type SharedPhoto = {
   };
 };
 
-function createShareSupabaseClients() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const keys = [serviceRoleKey, anonKey].filter((key): key is string => Boolean(key));
-
-  if (!url || keys.length === 0) return [];
-
-  return keys.map((key) => createClient<Database>(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }));
+// 公開写真しか返さないので anon だけで読む。以前は service role → anon の順に試していたが、
+// 本番では service role の呼び出しが毎回 401 になり、1回の表示で無駄なリクエストが2本出ていた（2026-11-23）。
+function createShareSupabaseClients(): SupabaseClient<Database>[] {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return [];
+  return [createAnonClient()];
 }
 
 export function getSortedTitles(titles?: ManholeTitle[] | null): ManholeTitle[] {
