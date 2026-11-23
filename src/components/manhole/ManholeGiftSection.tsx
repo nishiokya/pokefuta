@@ -39,6 +39,7 @@ export default function ManholeGiftSection({ manholeId, isLoggedIn }: { manholeI
   return <section className="my-5 rounded-2xl border border-[#e9dfc7] bg-[#fffdf7] p-4" aria-labelledby="gift-heading">
     <h2 id="gift-heading" className="flex items-center gap-2 font-pixelJp text-base font-bold text-[#6A4D36]"><Gift className="h-5 w-5 text-[#bf5640]"/>このポケふたのギフト</h2>
     <p className="mt-1 text-xs text-[#887760]">Pokémon GOでこのポケふたのギフトを配れる人</p>
+    <p className="mt-1 text-xs text-[#887760]">コードをコピーして Pokémon GO でフレンド申請すると、このポケふたのギフトを送ってもらえます。</p>
     {givers.length > 0 && <ul className="mt-3 grid gap-2 sm:grid-cols-2">{givers.map(g => <li key={g.visit_id} className="rounded-xl border border-[#eee4d3] bg-white p-3">
       <div className="flex items-center justify-between gap-2"><strong className="truncate font-pixelJp text-sm text-[#4F3828]">{g.display_name || 'トレーナー'}</strong><span className="shrink-0 text-xs text-[#bf5640]">あと {giftDaysLeft(g.gift_until)}日</span></div>
       {g.friend_note && <p className="mt-1 text-xs text-[#6A4D36]">{g.friend_note}</p>}
