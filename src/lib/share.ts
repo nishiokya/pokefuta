@@ -1,4 +1,6 @@
 const DEFAULT_HASHTAGS = ['ポケふた', 'ポケモンマンホール'];
+// サイト名のタグ。ポケふた以外の文脈（デザインマンホール等）でも、X のシェアには必ず付ける
+const SITE_HASHTAG = 'ポケふた写真館';
 
 function normalizeHashtag(tag: string): string {
   return tag.replace(/^#+/, '').trim();
@@ -11,11 +13,15 @@ export function buildXShareUrl(
   options: { includeDefaultHashtags?: boolean } = {}
 ): string {
   // デザインマンホール等ポケふた以外の文脈では includeDefaultHashtags: false で
-  // 「ポケふた」タグの強制付与を外せる
+  // 「ポケふた」タグの強制付与を外せる。サイト名のタグ（SITE_HASHTAG）は外さない
   const includeDefaults = options.includeDefaultHashtags ?? true;
-  const mergedHashtags = [...hashtags, ...(includeDefaults ? DEFAULT_HASHTAGS : [])]
-    .map(normalizeHashtag)
-    .filter(Boolean);
+  const mergedHashtags = Array.from(
+    new Set(
+      [...hashtags, ...(includeDefaults ? DEFAULT_HASHTAGS : []), SITE_HASHTAG]
+        .map(normalizeHashtag)
+        .filter(Boolean)
+    )
+  );
 
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}&hashtags=${encodeURIComponent(mergedHashtags.join(','))}`;
 }
