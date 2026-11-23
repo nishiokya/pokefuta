@@ -520,6 +520,8 @@ export async function POST(request: NextRequest) {
               .from('visit')
               .update({ gift_until: until })
               .eq('id', visitId)
+              .eq('user_id', userId)
+              .eq('manhole_id', manholeIdInt)
               .eq('is_public', true)
               .is('gift_until', null)
               .select('gift_until')
