@@ -19,11 +19,13 @@ const MAX_PAGES = 20;
 const MAX_BUCKET = 50;
 
 /**
- * 代表写真は数時間遅れても困らない（新しい写真が代表に上がるのが遅れるだけ）ので長めに持たせる。
+ * 代表写真は1日遅れても困らない（新しい写真が代表に上がるのが遅れるだけ。図鑑の代表写真も日次）ので長めに持たせる。
  * 写真が非公開に切り替わっても、画像そのものは /api/photo/{id} が公開か確かめて配るので、
  * ここが古くても非公開の画像は出ない（丸がプレースホルダーになるだけ）。
+ * CDN の拠点ごと × バケツ6本ずつ取り直すので、6時間だと 1日 約190回 × 350KB（gzip 64KB）を
+ * Supabase から出していた（2026-11-23 の edge_logs）。24時間にして約4分の1にする。
  */
-const CACHE_CONTROL = 'public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400';
+const CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400';
 
 /**
  * 蓋ごとの代表写真（公開訪問のみ）を、蓋 id の固定の区切り（バケツ）単位で返す。

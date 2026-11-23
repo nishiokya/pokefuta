@@ -51,6 +51,7 @@ import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import type { ManholeTitle } from '@/types/database';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { googleMapsPlaceUrl } from '@/components/Map/routeLink';
+import { loadVisitLikeState } from '@/lib/visit-likes';
 
 const MapComponent = dynamic(
   () => import('@/components/Map/MapComponent'),
@@ -174,15 +175,13 @@ function PhotoLikeButton({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch(`/api/visits/${visitId}/social`)
-      .then(async (response) => response.ok ? response.json() : Promise.reject(new Error('social fetch failed')))
-      .then((data) => {
-        if (!active) return;
-        setLikes(Number(data.likes) || 0);
-        setUserLiked(Boolean(data.userLiked));
-      })
-      .catch(() => {
-        // いいね取得失敗で写真自体を壊さない。
+    // 写真ごとに取ると1枚で Supabase へ数本出るので、同じ描画の間の写真はまとめて1回で取る
+    loadVisitLikeState(visitId)
+      .then((state) => {
+        // 取れなくても写真自体は壊さない（0 のまま見せる）
+        if (!active || !state) return;
+        setLikes(state.likes);
+        setUserLiked(state.userLiked);
       })
       .finally(() => {
         if (active) setLoading(false);
