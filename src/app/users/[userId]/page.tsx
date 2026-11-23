@@ -69,13 +69,13 @@ const getPageUrl = (userId: string) => `${SITE_URL}/users/${encodeURIComponent(u
 // 20261123: URL を /users/<id> に移し、印つきの長期キャッシュにした
 const STAMPBOOK_OGP_TEMPLATE_VERSION = '20261123-userurl';
 
-// 画像に効く公開内容（件数・最新の公開訪問・表示名）から短い印を作る。
+// 画像に効く公開内容（件数・最新の公開訪問・表示名・代表写真）から短い印を作る。
 // すでに generateMetadata が取っているデータだけで作るので、追加のクエリは打たない。
 function stampbookOgpStamp(data: {
   totalVisits: number;
   prefectureCount: number;
   displayName: string;
-  visits: { createdAt: string | null; shotAt: string | null }[];
+  visits: { createdAt: string | null; shotAt: string | null; photoIds: string[] }[];
 }): string {
   let latest = 0;
   for (const visit of data.visits) {
@@ -84,10 +84,12 @@ function stampbookOgpStamp(data: {
       if (Number.isFinite(t) && t > latest) latest = t;
     }
   }
-  // 表示名の変更も印に反映する（djb2）
+  // 表示名と各訪問の代表写真も印に反映する（djb2）。
+  // 既存の訪問に写真を足すと代表写真だけが変わり、日時・件数は変わらないため（PR #490 Codex 指摘）
+  const source = [data.displayName, ...data.visits.map((visit) => visit.photoIds.join(','))].join('\n');
   let hash = 5381;
-  for (let i = 0; i < data.displayName.length; i += 1) {
-    hash = ((hash * 33) ^ data.displayName.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash * 33) ^ source.charCodeAt(i)) >>> 0;
   }
   return [
     Math.floor(latest / 1000).toString(36),
