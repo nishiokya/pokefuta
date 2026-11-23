@@ -6,11 +6,58 @@ import { loadOwnVisitNotes } from '@/lib/own-visit-notes';
 import { loadPublicDisplayNameMap } from '@/lib/public-display-names';
 import { fetchSnapshotNames, withSnapshotName } from '@/lib/manhole-snapshot';
 import {
+  LATEST_COMMENT_BATCH_LIMIT,
   LATEST_COMMENT_LOOKBACK,
   LATEST_COMMENT_MAX_MANHOLES,
+  pickLatestComments,
   toLatestCommentPreview,
   type LatestManholeComment,
 } from '@/lib/latest-manhole-comment';
+
+/**
+ * 蓋ごとの最新の口コミの抜粋。蓋をまたいで新しい順に1回で読み、上限で切られて
+ * 抜粋を作れなかった蓋だけ蓋ごとに読み直す（pickLatestComments）。抜粋は飾りなので、
+ * 取れなかった蓋は null にして一覧は返す。
+ */
+async function loadLatestManholeComments(
+  supabase: ReturnType<typeof createRouteHandlerClient>,
+  manholeIds: number[]
+): Promise<Array<readonly [number, LatestManholeComment | null]>> {
+  if (manholeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('manhole_comment')
+    .select('manhole_id, content, created_at')
+    .in('manhole_id', manholeIds)
+    .is('parent_comment_id', null)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(LATEST_COMMENT_BATCH_LIMIT);
+  if (error) {
+    console.warn('Failed to load latest manhole comments:', error);
+    return manholeIds.map((id) => [id, null] as const);
+  }
+
+  const rows = (data || []) as Array<{ manhole_id: number | null; content: string | null; created_at: string | null }>;
+  const { previews, refetch } = pickLatestComments(rows, manholeIds, rows.length >= LATEST_COMMENT_BATCH_LIMIT);
+
+  await Promise.all(
+    refetch.map(async (manholeId) => {
+      const { data: one, error: oneError } = await supabase
+        .from('manhole_comment')
+        .select('content, created_at')
+        .eq('manhole_id', manholeId)
+        .is('parent_comment_id', null)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(LATEST_COMMENT_LOOKBACK);
+      if (oneError) console.warn('Failed to load latest manhole comment:', manholeId, oneError);
+      previews.set(manholeId, oneError ? null : toLatestCommentPreview(one || []));
+    })
+  );
+
+  return manholeIds.map((id) => [id, previews.get(id) ?? null] as const);
+}
 
 /**
  * @swagger
@@ -321,24 +368,7 @@ export async function GET(request: NextRequest) {
           .in('manhole_id', manholeIds)
         : Promise.resolve({ data: [] as any[] }),
       withLatestComment
-        ? Promise.all(
-          manholeIds.slice(0, LATEST_COMMENT_MAX_MANHOLES).map(async (manholeId) => {
-            const { data, error } = await supabase
-              .from('manhole_comment')
-              .select('content, created_at')
-              .eq('manhole_id', manholeId)
-              .is('parent_comment_id', null)
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: false })
-              .limit(LATEST_COMMENT_LOOKBACK);
-            if (error) {
-              // 抜粋は飾り。取れなくても一覧は返す
-              console.warn('Failed to load latest manhole comment:', manholeId, error);
-              return [manholeId, null] as const;
-            }
-            return [manholeId, toLatestCommentPreview(data || [])] as const;
-          })
-        )
+        ? loadLatestManholeComments(supabase, manholeIds.slice(0, LATEST_COMMENT_MAX_MANHOLES))
         : Promise.resolve([] as Array<readonly [number, LatestManholeComment | null]>),
       viewerUserId
         ? supabase
