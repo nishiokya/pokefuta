@@ -1516,15 +1516,23 @@ function UploadPageInner() {
           </section>
         )}
 
-        <div className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
-          <p className="text-sm font-extrabold text-[#8A5A12]">Pokémon GOのギフトを配れる方へ</p>
-          <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-            プロフィールでトレーナーコードを登録・公開すると、訪問後にマンホール詳細で「ギフトできます」と表示できます。
-          </p>
-          <Link href="/profile" className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#8A5A12] underline decoration-[#C9822B]/50 underline-offset-2">
-            プロフィールで設定
-          </Link>
-        </div>
+        <section aria-labelledby="upload-gift-heading" className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
+          <h2 id="upload-gift-heading" className="text-sm font-extrabold text-[#8A5A12]">
+            Pokémon GOのギフトを配れる方へ
+          </h2>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-[#2A2A2A]">
+            <li>
+              <Link href="/profile" className="font-bold text-[#8A5A12] underline underline-offset-2">プロフィール</Link>
+              でトレーナーコードを入力し、「フレンド募集中」の公開設定をオンにして保存します。
+              交換の希望があれば「ひとこと」に書けます。
+            </li>
+            <li>
+              写真を公開で投稿したあと、そのポケふたの詳細ページの「このポケふたのギフト」欄で
+              <strong>「配れます」</strong>を押します。
+            </li>
+          </ol>
+          <p className="mt-2 text-xs leading-relaxed text-[#2A2A2A]/75">「配れます」は撮影から10日以内の記録に設定できます。</p>
+        </section>
 
         {/* 撮ってある写真をまとめて投稿する入口。Android のスマホはブラウザで選ぶと GPS が消えるので、
             まとめて投稿は PC から、と伝えて写真の移し方へ案内する */}
