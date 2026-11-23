@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { canOfferGift, isGiftActive } from '@/lib/visit-gift';
+import { INSTAGRAM_HOSTS, X_HOSTS, safeSocialUrl } from '@/lib/social-url';
 
 /**
  * @swagger
@@ -62,9 +63,16 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Failed to load gift givers' }, { status: 500, headers: NO_STORE });
     }
 
-    const givers = ((giverData as GiverRow[] | null) || [])
-      .filter((row) => row.pokemon_go_friend_code)
-      .map((row) => ({
+    const giverRows = ((giverData as GiverRow[] | null) || [])
+      .filter((row) => row.pokemon_go_friend_code);
+    // 最大5人の公開プロフィールからSNSリンクだけを取得する。
+    const givers = await Promise.all(giverRows.map(async (row) => {
+      const { data: profile, error: profileError } = row.public_user_id
+        ? await supabase.rpc('get_public_profile', { p_user_id: row.public_user_id })
+        : { data: null, error: null };
+      if (profileError) console.warn('Failed to load gift giver social links:', profileError);
+
+      return {
         visit_id: row.visit_id,
         public_user_id: row.public_user_id,
         display_name: row.display_name,
@@ -73,7 +81,10 @@ export async function GET(
         shot_at: row.shot_at,
         gift_until: row.gift_until,
         is_own: Boolean(row.is_own),
-      }));
+        x_url: safeSocialUrl(profile?.[0]?.x_url, X_HOSTS),
+        instagram_url: safeSocialUrl(profile?.[0]?.instagram_url, INSTAGRAM_HOSTS),
+      };
+    }));
 
     // 自分の記録。印を付ける・外すボタンと「コードを公開すると載ります」の案内に使う。
     let own: {
