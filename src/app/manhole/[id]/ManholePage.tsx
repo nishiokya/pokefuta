@@ -1794,10 +1794,12 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             )}
           </dl>
 
+          {manhole && <ManholeGiftSection manholeId={manhole.id} isLoggedIn={authChecked && currentUserId !== null} />}
+
           {/*
             ── Comments ──
             写真のひとことと掲示板を1本にした欄。写真一覧より前に置き、
-            現地の案内やギフト募集を先に見つけられるようにする。
+            現地の案内を写真を見る前に確認できるようにする。
           */}
           {manhole && (
             <ManholeCommentThread
@@ -1809,8 +1811,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               photosLoading={photosLoading}
             />
           )}
-
-          {manhole && <ManholeGiftSection manholeId={manhole.id} isLoggedIn={authChecked && currentUserId !== null} />}
 
           {/*
             一覧は代表写真（スマホは住所の欄）のすぐ下。以前は地図の下にあり、上の3枚と同じ写真が
