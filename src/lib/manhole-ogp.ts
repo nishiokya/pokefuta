@@ -1,5 +1,6 @@
 import 'server-only';
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { storage } from '@/lib/storage';
 import type { Database, ManholeTitle } from '@/types/database';
 
@@ -18,20 +19,11 @@ export type PhotoForOgp = {
   signed_url?: string;
 };
 
-export function createOgpSupabaseClients() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const keys = [serviceRoleKey, anonKey].filter((key): key is string => Boolean(key));
-
-  if (!url || keys.length === 0) return [];
-
-  return keys.map((key) => createClient<Database>(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }));
+// OGP は公開データしか使わないので anon だけで読む。以前は service role → anon の順に試していたが、
+// 本番では service role の呼び出しが毎回 401 になり、無駄なリクエストが1本ずつ出ていた（2026-11-23）。
+export function createOgpSupabaseClients(): SupabaseClient<Database>[] {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return [];
+  return [createAnonClient()];
 }
 
 export async function loadManholeForOgp(id: number): Promise<ManholeForOgp | null> {
