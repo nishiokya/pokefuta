@@ -37,3 +37,43 @@ test('使える行が無ければ null', () => {
   assert.equal(toLatestCommentPreview([]), null);
   assert.equal(toLatestCommentPreview([{ content: ' ', created_at: '2026-09-01T00:00:00+00:00' }]), null);
 });
+
+test('まとめて読んだ口コミから蓋ごとの抜粋を作る（上限に届かなければ読み直さない）', async () => {
+  const { pickLatestComments } = await import('../src/lib/latest-manhole-comment.ts');
+  const rows = [
+    { manhole_id: 2, content: '  ', created_at: '2026-11-03T00:00:00Z' },
+    { manhole_id: 1, content: '新しい', created_at: '2026-11-02T00:00:00Z' },
+    { manhole_id: 2, content: '空白の次', created_at: '2026-11-01T00:00:00Z' },
+    { manhole_id: 1, content: '古い', created_at: '2026-10-01T00:00:00Z' },
+  ];
+  const { previews, refetch } = pickLatestComments(rows, [1, 2, 3], false);
+  assert.equal(previews.get(1)?.content, '新しい');
+  assert.equal(previews.get(2)?.content, '空白の次');
+  assert.equal(previews.get(3), null);
+  assert.deepEqual(refetch, []);
+});
+
+test('上限で切られたときは、抜粋を作れなかった蓋だけ読み直しに回す', async () => {
+  const { pickLatestComments } = await import('../src/lib/latest-manhole-comment.ts');
+  const rows = [
+    { manhole_id: 1, content: 'ある', created_at: '2026-11-02T00:00:00Z' },
+    { manhole_id: 2, content: ' ', created_at: '2026-11-01T00:00:00Z' },
+  ];
+  const { previews, refetch } = pickLatestComments(rows, [1, 2, 3], true);
+  assert.equal(previews.get(1)?.content, 'ある');
+  assert.deepEqual(refetch, [2, 3]);
+  assert.equal(previews.has(2), false);
+});
+
+test('まとめ読みでも蓋ごとに新しい LOOKBACK 件だけを見る（蓋ごとの読み方と同じ結果）', async () => {
+  const { pickLatestComments, LATEST_COMMENT_LOOKBACK } = await import('../src/lib/latest-manhole-comment.ts');
+  const blanks = Array.from({ length: LATEST_COMMENT_LOOKBACK }, (_, i) => ({
+    manhole_id: 1,
+    content: ' ',
+    created_at: `2026-11-0${9 - i}T00:00:00Z`,
+  }));
+  const rows = [...blanks, { manhole_id: 1, content: '4件目', created_at: '2026-10-01T00:00:00Z' }];
+  const { previews, refetch } = pickLatestComments(rows, [1], false);
+  assert.equal(previews.get(1), null);
+  assert.deepEqual(refetch, []);
+});

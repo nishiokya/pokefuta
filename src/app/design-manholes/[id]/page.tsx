@@ -5,7 +5,7 @@ import { ChevronRight, MapPin, Navigation, Share2, Tag } from 'lucide-react';
 import MapSection from '../MapSection';
 import { SubmitCta } from '@/components/DesignManhole/SubmitCta';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
-import { loadDesignManholeForOgp } from '@/lib/design-manhole-ogp';
+import { loadDesignManholeForPage } from '@/lib/design-manhole-ogp';
 import {
   loadDesignManholeSubmitterProfile,
   loadSnapshotDesignManholesForNearby,
@@ -46,7 +46,7 @@ const TAG_CLASS =
   'inline-flex items-center gap-1 rounded-full border border-dm-line/25 bg-dm-line/5 px-2.5 py-1 text-xs font-bold text-dm-line';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const designManhole = await loadDesignManholeForOgp(params.id);
+  const designManhole = await loadDesignManholeForPage(params.id);
   if (!designManhole) {
     return NOT_FOUND_METADATA;
   }
@@ -80,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
-  const designManhole = await loadDesignManholeForOgp(params.id);
+  const designManhole = await loadDesignManholeForPage(params.id);
   if (!designManhole) {
     notFound();
   }

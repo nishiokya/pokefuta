@@ -625,24 +625,15 @@ export async function GET(request: NextRequest) {
       // Build query based on filters
       // 返す列を明示する。`select=*` は photo の全列に展開され、anon/authenticated へ
       // GRANT していない exif まで要求するため 42501 で落ちる（一覧が全 caller で失敗する）。
-      // 下の列挙は photo の全列から exif と採点の管理列（quality_score_version / quality_scored_at。
-      // anon に GRANT していない）を除いたもの。ai_tags は AI の判定タグ（20261004100000）。
+      // 画面（蓋の詳細の写真一覧・投稿画面の前のひとこと）が使う列だけを読む。
+      // 以前は photo のほぼ全列（storage_key・original_name・sha256・thumbnail_* など）を読んで
+      // そのまま返していて、1日 約800回 × 31KB を Supabase から出していた（2026-11-23 の edge_logs）。
+      // 画像は /api/photo/{id} が配るので storage_key は要らない。ai_tags は AI の判定タグ（20261004100000）。
       let query = supabase
         .from('photo')
         .select(`
           id,
-          visit_id,
           manhole_id,
-          storage_key,
-          original_name,
-          file_size,
-          content_type,
-          width,
-          height,
-          sha256,
-          thumbnail_320,
-          thumbnail_800,
-          thumbnail_1600,
           created_at,
           quality_score,
           quality_eligible,

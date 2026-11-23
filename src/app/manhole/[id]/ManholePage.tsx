@@ -70,8 +70,6 @@ interface Photo {
   is_landscape?: boolean;
   // AI の判定タグ（k11 が毎朝書く）。/api/image-upload が返す。表示は src/lib/photo-ai-tags.ts
   ai_tags?: PhotoAiTags | null;
-  storage_key: string;
-  content_type: string;
   created_at: string;
   // 代表写真の並び（src/lib/manhole-photo-ranking.ts）に使う。/api/image-upload が返す。
   // 採点後に投稿された写真は NULL で、ひとこと付き → 新しい順に落ちる。
