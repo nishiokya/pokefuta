@@ -14,6 +14,6 @@ export async function GET() {
   }
 
   return NextResponse.json({ manholes: data ?? [] }, {
-    headers: { 'Cache-Control': 'public, s-maxage=30' },
+    headers: { 'Cache-Control': 'public, s-maxage=3600' },
   });
 }

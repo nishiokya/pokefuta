@@ -112,6 +112,16 @@ const nextConfig = {
       destination: 'https://data.pokefuta.com/',
       permanent: true,
     },
+    {
+      source: '/photos/snow',
+      destination: 'https://data.pokefuta.com/gallery/snow/',
+      permanent: true,
+    },
+    {
+      source: '/photos/plush',
+      destination: 'https://data.pokefuta.com/gallery/plush/',
+      permanent: true,
+    },
     // 開発用の Swagger UI（/api-docs）は撤去した。本番では元から中身が出ていなかった
     {
       source: '/api-docs',

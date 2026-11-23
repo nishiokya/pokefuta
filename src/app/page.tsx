@@ -122,7 +122,7 @@ export default function HomePage() {
   const [newWanted, setNewWanted] = useState(EMPTY_NEW_POKEFUTA_WANTED);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
-  // 特集のぬいぐるみ（/photos/plush）。ヒーローから外したあと（2026-10-24）、特集の2枚目に戻した
+  // 図鑑のぬいぐるみ特集へのカードに表示する写真
   const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
   const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
   // 取り終わった特集の数（デザインふたと、雪景色・ぬいぐるみの交互の枠）。FEATURE_LOADS に届くまで枠を出しておく
@@ -437,7 +437,7 @@ export default function HomePage() {
               </span>
             </Link>
             {/*
-              「この◯人に続け！」。2026-10-24 にぬいぐるみの特集（/photos/plush は残す）から差し替えた。
+              「この◯人に続け！」。2026-10-24 にぬいぐるみの特集から差し替えた。
               LEGEND のトレーナーを写真と名前で見せ、押すとその人の公開スタンプ帳へ。順位にしないため枚数は出さず名前順。
               スマホと PC は「バッジを集めよう」を出さず（PC は 2026-11-07 に外した）、称号のお知らせのリンクで /badges へ。スマホはこのカード1枚を横いっぱいに。
               タブレットは2枚の下に横いっぱい（sm:order-last）、PC は横1列で広め。どれも3人まで。
@@ -1002,7 +1002,7 @@ export default function HomePage() {
                 特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
             {snowFeature && snowFeature.count > 0 ? (
               <Link
-                href="/photos/snow"
+                href="https://data.pokefuta.com/gallery/snow/"
                 className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
               >
                 <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
@@ -1020,7 +1020,7 @@ export default function HomePage() {
               </Link>
             ) : plushFeature && plushFeature.count > 0 ? (
             <Link
-              href="/photos/plush"
+              href="https://data.pokefuta.com/gallery/plush/"
               className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
             >
               {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}

@@ -7,8 +7,7 @@ import { tagHref, type DesignManholeTagGroup } from '@/lib/design-manhole-tag-da
 import type { DesignManhole } from '@/types/database';
 
 /**
- * /design-manholes の一覧のカード。/photos/plush・/photos/snow の TaggedPhotoFeature のカードと同じ作り
- * （写真の正方形・その下に名前・投稿者・投稿日・ひとこと）。
+ * /design-manholes の一覧のカード。正方形の写真の下に名前・投稿者・投稿日・ひとことを表示する。
  * 写真と投稿者の欄を押すと投稿者のページへ。公開IDの無い投稿者はそのマンホールのページへ。
  * マンホールのページへのリンクは名前の行に別に置く（詳細ページを一覧から辿れるようにしておく。検索用）。
  * タグ（ガンダム・野球など）があれば写真の左上に重ねて出し、押すとそのタグのページへ。

@@ -16,7 +16,7 @@ export default function AiPhotoTags({
   /** 小さなタイル用（訪問一覧の見本など）。文字と余白を詰め、人物・足元は表示しない */
   compact?: boolean;
   /**
-   * ぬいぐるみのチップを特集ページ（/photos/plush）へのリンクにする。
+   * ぬいぐるみのチップを図鑑の特集ページへのリンクにする。
    * カード全体がリンクやボタンの場所では使わない（リンクの入れ子になる）
    */
   linkFeatures?: boolean;
@@ -42,7 +42,7 @@ export default function AiPhotoTags({
         );
         if (linkFeatures && tag.key === 'plush') {
           return (
-            <Link key={tag.key} href="/photos/plush" aria-label="ぬいぐるみと一緒の写真をもっと見る" className="hover:opacity-80">
+            <Link key={tag.key} href="https://data.pokefuta.com/gallery/plush/" aria-label="ぬいぐるみと一緒の写真をもっと見る" className="hover:opacity-80">
               {chip}
             </Link>
           );
