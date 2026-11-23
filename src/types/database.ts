@@ -266,6 +266,7 @@ export interface Database {
           note?: string | null;
           comment?: string | null;  // 訪問コメント（公開可能）
           is_public?: boolean;  // 公開/非公開フラグ（デフォルト: true）
+          gift_until?: string | null;
           // Removed fields that don't exist in actual schema: with_family, tags, weather, rating
         };
         Update: {

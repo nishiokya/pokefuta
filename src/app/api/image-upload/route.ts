@@ -13,6 +13,7 @@ import { calculateDistance, isValidCoordinates, extractCoordinatesFromWKB } from
 import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
+import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
 
 /**
  * @swagger
@@ -60,6 +61,10 @@ import { classifySubmissionError } from '@/lib/api-error-code';
  *                 enum: ['true', 'false']
  *                 default: 'true'
  *                 description: 公開設定（true=他のユーザーもcommentを閲覧可能、false=自分だけが閲覧可能、デフォルト：公開）
+ *               gift:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 description: 条件を満たす新規の公開訪問に「ギフトを配れます」の印を付ける
  *               is_landscape:
  *                 type: string
  *                 enum: ['true', 'false']
@@ -188,6 +193,7 @@ export async function POST(request: NextRequest) {
     const note = formData.get('note');
     const comment = formData.get('comment');  // 訪問コメント
     const isPublic = formData.get('is_public');  // 公開設定
+    const wantsGift = formData.get('gift') === 'true';
     const latitude = formData.get('latitude');
     const longitude = formData.get('longitude');
     const exifStr = formData.get('exif');
@@ -395,6 +401,7 @@ export async function POST(request: NextRequest) {
     // Create visit and image records
     let visitId: string | null = null;
     let imageId: string | null = null;
+    let giftUntil: string | null = null;
 
     try {
       if (reusedVisitId) {
@@ -438,6 +445,19 @@ export async function POST(request: NextRequest) {
         }
         // is_public: デフォルトはtrue、明示的にfalseが送られた場合のみfalseにする
         visitInsert.is_public = isPublic === 'false' ? false : true;
+
+        if (wantsGift && visitInsert.is_public && typeof shotAt === 'string' && canOfferGift(shotAt)) {
+          const { data: profile, error: profileError } = await supabase.rpc('get_own_profile' as never);
+          if (profileError) {
+            console.warn('Failed to check gift eligibility during upload:', profileError);
+          } else {
+            const row = (profile as { pokemon_go_friend_open: boolean; pokemon_go_friend_code: string | null }[] | null)?.[0];
+            if (row?.pokemon_go_friend_open && row.pokemon_go_friend_code) {
+              giftUntil = giftUntilFor(shotAt)?.toISOString() ?? null;
+              if (giftUntil) visitInsert.gift_until = giftUntil;
+            }
+          }
+        }
 
         const { data: visitData, error: visitError } = await supabase
           .from('visit')
@@ -503,6 +523,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Image uploaded successfully',
       visit_id: visitId,
+      gift_until: giftUntil,
       image: {
         id: imageId,
         is_landscape: isLandscape,
