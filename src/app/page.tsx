@@ -6,6 +6,7 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Gift,
   Heart,
   Award,
   MapPin,
@@ -35,6 +36,7 @@ import { manholeDisplayName } from '@/lib/manhole-label';
 import { manholePhotoHref } from '@/lib/manhole-photo-link';
 import { collapseByPoster, feedCardTags, sameDayVisitorCounts } from '@/lib/feed-card-tags';
 import { FEED_CHIP_CLASS } from '@/lib/feed-chip-class';
+import { isGiftActive } from '@/lib/visit-gift';
 import NearViewportImg from '@/components/NearViewportImg';
 import PosterLink from '@/components/PosterLink';
 import PosterAvatar from '@/components/users/PosterAvatar';
@@ -65,6 +67,7 @@ type FeedVisit = {
   comments_count: number;
   manhole_comments_count?: number;
   latest_manhole_comment?: LatestManholeComment | null;
+  manhole_gift_available_until?: string | null;
   display_name?: string | null;
 };
 
@@ -178,7 +181,7 @@ export default function HomePage() {
     try {
       const offset = (currentPage - 1) * feedPerPage;
       const response = await fetch(
-        `/api/visits?with_photos=true&with_location=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true`,
+        `/api/visits?with_photos=true&with_location=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true&with_gift_availability=true`,
         { credentials: 'omit' }
       );
       if (!response.ok) throw new Error('Failed to load feed');
@@ -777,6 +780,7 @@ export default function HomePage() {
                     const photo = visit.photos?.[0];
                     const locationLabel = visit.manhole ? manholeDisplayName(visit.manhole) : visit.shot_location || '';
                     const manholeId = visit.manhole?.id ?? visit.manhole_id;
+                    const hasGift = Boolean(manholeId) && isGiftActive(visit.manhole_gift_available_until);
                     const canNavigate = Boolean(manholeId);
                     const to = manholeId ? manholePhotoHref(manholeId, photo?.id) : '';
                     const commentCount = visit.manhole_comments_count ?? visit.comments_count;
@@ -827,8 +831,17 @@ export default function HomePage() {
                         )}
 
                         {/* タグは口コミ件数と同じく写真の上に置く。右上の口コミバッジと重ならないよう右を空ける */}
-                        {(chips.length > 0 || photo?.is_landscape || (photo && photoAiTags(photo).length > 0)) && (
+                        {(hasGift || chips.length > 0 || photo?.is_landscape || (photo && photoAiTags(photo).length > 0)) && (
                           <div className="absolute left-2 right-14 top-2 flex flex-wrap gap-1">
+                            {hasGift && (
+                              <Link
+                                href={`/manhole/${manholeId}#gift-heading`}
+                                aria-label={`${locationLabel || 'ポケふた'}のギフト配布を見る`}
+                                className="relative z-[2] inline-flex items-center gap-1 rounded-full bg-[#fffdf7] px-2 py-1 text-xs font-bold leading-none text-[#723928] shadow-sm"
+                              >
+                                <Gift aria-hidden="true" className="h-3 w-3" />ギフト配布中
+                              </Link>
+                            )}
                             <LandscapePhotoBadge isLandscape={photo?.is_landscape} />
                             {photo && <AiPhotoTags photo={photo} />}
                             {chips.map((chip) => (

@@ -183,6 +183,7 @@ export async function GET(request: NextRequest) {
     const includeManholeTags = searchParams.get('include_manhole_tags') === 'true';
     // 蓋1つにつき1問い合わせ増えるので、トップのフィードだけが明示して求める
     const withLatestComment = searchParams.get('with_latest_comment') === 'true';
+    const withGiftAvailability = searchParams.get('with_gift_availability') === 'true';
     // トップのフィードは撮影位置（写真の GPS）がある投稿だけにする。位置の無い写真は
     // まとめて上げられることが多く、新着の大半を埋めてしまう
     const withLocation = searchParams.get('with_location') === 'true';
@@ -346,6 +347,7 @@ export async function GET(request: NextRequest) {
       { data: commentCounts },
       { data: manholeCommentStats },
       latestManholeCommentEntries,
+      giftAvailability,
       { data: bookmarks },
       displayNameMap,
       publicUserIdsResult,
@@ -370,6 +372,9 @@ export async function GET(request: NextRequest) {
       withLatestComment
         ? loadLatestManholeComments(supabase, manholeIds.slice(0, LATEST_COMMENT_MAX_MANHOLES))
         : Promise.resolve([] as Array<readonly [number, LatestManholeComment | null]>),
+      withGiftAvailability && manholeIds.length > 0
+        ? supabase.rpc('get_manhole_gift_availability', { p_manhole_ids: manholeIds.slice(0, 24) })
+        : null,
       viewerUserId
         ? supabase
           .from('visit_bookmark')
@@ -400,6 +405,12 @@ export async function GET(request: NextRequest) {
       manholeCommentsMap.set(row.manhole_id, Number(row.comment_count) || 0);
     });
     const latestManholeCommentMap = new Map(latestManholeCommentEntries);
+    if (giftAvailability?.error) {
+      console.warn('Failed to load gift availability:', giftAvailability.error);
+    }
+    const giftAvailabilityMap = new Map(
+      giftAvailability?.data?.map((row) => [row.manhole_id, row.available_until])
+    );
     const bookmarksSet = new Set<string>();
 
     visitIds.forEach(id => {
@@ -489,6 +500,11 @@ export async function GET(request: NextRequest) {
         latest_manhole_comment: typeof visit.manhole_id === 'number'
           ? latestManholeCommentMap.get(visit.manhole_id) ?? null
           : null,
+        ...(withGiftAvailability && {
+          manhole_gift_available_until: visit.manhole_id == null
+            ? null
+            : giftAvailabilityMap.get(visit.manhole_id) ?? null,
+        }),
         is_bookmarked: isBookmarked
       };
     });
@@ -574,7 +590,7 @@ export async function GET(request: NextRequest) {
         // セッション更新の Set-Cookie が共有キャッシュに乗ると別人に配られる。
         'Cache-Control': viewerUserId || hasSupabaseAuthCookie()
           ? 'private, no-store'
-          : 'public, s-maxage=60, stale-while-revalidate=300',
+          : withGiftAvailability ? 'public, s-maxage=30' : 'public, s-maxage=60, stale-while-revalidate=300',
       },
     });
 
