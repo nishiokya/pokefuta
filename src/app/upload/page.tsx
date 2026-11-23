@@ -10,7 +10,6 @@ import { Manhole } from '@/types/database';
 import { fetchAllManholes } from '@/lib/manhole-list-client';
 import { matchesManholeQuery } from '@/lib/manhole-search';
 import { manholeHeadingPlace, pokemonText } from '@/lib/manhole-label';
-import { activeSeasonalCall, type SeasonalCall } from '@/lib/seasonal-call';
 import { calculateDistance, isValidCoordinates, MAX_DISTANCE_KM } from '@/lib/location';
 import { findNearbyPickCandidates, NEARBY_PICK_MAX_KM, type NearbyCandidate } from '@/lib/upload-nearby-candidates';
 import { buildAutoVisitNote, extractPhotoMetadata, type PhotoMetadata } from '@/lib/photo-exif';
@@ -132,8 +131,6 @@ function UploadPageInner() {
   const router = useRouter();
   const hintManholeId = searchParams.get('manhole_id') ? Number(searchParams.get('manhole_id')) : null;
   // 日付で出し分けるので、サーバー描画とずれないよう画面ができてから決める
-  const [seasonalCall, setSeasonalCall] = useState<SeasonalCall | null>(null);
-  useEffect(() => setSeasonalCall(activeSeasonalCall()), []);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [manholes, setManholes] = useState<Manhole[]>([]);
   const [hintManhole, setHintManhole] = useState<Manhole | null>(null);
@@ -1519,17 +1516,23 @@ function UploadPageInner() {
           </section>
         )}
 
-        {/* 季節の写真の呼びかけ。終わりの日を過ぎると自動で消える（src/lib/seasonal-call.ts） */}
-        {seasonalCall && (
-          <div className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
-            <p className="text-sm font-extrabold text-[#8A5A12]">
-              {seasonalCall.icon} {seasonalCall.name}のポケふた、募集中です
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-[#2A2A2A]/75">
-              {seasonalCall.name}をはじめ、桜・雪など季節感のある写真があれば、ぜひ投稿してください。
-            </p>
-          </div>
-        )}
+        <section aria-labelledby="upload-gift-heading" className="mt-3 rounded-xl border border-[#C9822B]/30 bg-[#FFF6E3] p-4">
+          <h2 id="upload-gift-heading" className="text-sm font-extrabold text-[#8A5A12]">
+            Pokémon GOのギフトを配れる方へ
+          </h2>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-[#2A2A2A]">
+            <li>
+              <Link href="/profile" className="font-bold text-[#8A5A12] underline underline-offset-2">プロフィール</Link>
+              でトレーナーコードを入力し、「フレンド募集中」の公開設定をオンにして保存します。
+              交換の希望があれば「ひとこと」に書けます。
+            </li>
+            <li>
+              写真を公開で投稿したあと、そのポケふたの詳細ページの「このポケふたのギフト」欄で
+              <strong>「配れます」</strong>を押します。
+            </li>
+          </ol>
+          <p className="mt-2 text-xs leading-relaxed text-[#2A2A2A]/75">「配れます」は撮影から10日以内の記録に設定できます。</p>
+        </section>
 
         {/* 撮ってある写真をまとめて投稿する入口。Android のスマホはブラウザで選ぶと GPS が消えるので、
             まとめて投稿は PC から、と伝えて写真の移し方へ案内する */}
