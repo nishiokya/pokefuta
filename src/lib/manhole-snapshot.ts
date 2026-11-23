@@ -1,5 +1,11 @@
 import 'server-only';
 import type { ManholeTitle } from '@/types/database';
+import {
+  parseDesignManholeNdjson,
+  type SnapshotDesignManhole,
+} from '@/lib/design-manhole-snapshot-parse';
+
+export type { SnapshotDesignManhole };
 
 /**
  * data.pokefuta.com (GitHub Pages) が日次で配信する静的スナップショットを読む。
@@ -156,4 +162,31 @@ export function withSnapshotName<T extends { id?: number | null }>(
 
 export function fetchSiteStatsSnapshot(): Promise<SiteStatsSnapshot | null> {
   return fetchSnapshotJson<SiteStatsSnapshot>('/api/site-stats.json');
+}
+
+/**
+ * 公開中のデザインマンホールの一覧（図鑑のスナップショット）。
+ *
+ * pokefuta-tracker の update-design-manholes.yml が毎日 /api/design-manholes を読んで
+ * `design_manholes.ndjson` に書き出している。新しい投稿・非公開にした投稿が反映されるのは翌日。
+ * 詳細ページの「近くのデザインマンホール」がここを読み、公開の全件を Supabase から毎回読まない
+ * （全件で約70KB × 1日2千回が Egress のいちばん大きな塊だった。2026-11-23 の edge_logs で確認）。
+ * 取れなければ null。
+ */
+export async function fetchDesignManholeSnapshot(): Promise<SnapshotDesignManhole[] | null> {
+  for (const base of [STATIC_BASE, FALLBACK_BASE]) {
+    try {
+      const res = await fetch(`${base}/design_manholes.ndjson`, {
+        next: { revalidate: REVALIDATE_SECONDS },
+      });
+      if (!res.ok) {
+        console.error(`Design manhole snapshot fetch failed (${res.status}): ${base}`);
+        continue;
+      }
+      return parseDesignManholeNdjson(await res.text());
+    } catch (error) {
+      console.error(`Design manhole snapshot fetch error: ${base}`, error);
+    }
+  }
+  return null;
 }
