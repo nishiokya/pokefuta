@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { withoutEmoji } from '../src/app/users/[userId]/visits/opengraph-image/StampbookOgpCard';
+import { withoutEmoji } from '../src/app/users/[userId]/opengraph-image/StampbookOgpCard';
 import { titleProgress } from '../src/components/users/title-progress';
 import { REGULAR_TIER_MIN_MANHOLES } from '../src/lib/regular-badges';
 

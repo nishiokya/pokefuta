@@ -24,6 +24,38 @@ type Profile = {
   publicUserId: string | null;
 };
 
+// 公開スタンプ帳の OGP 画像を先に温める（ベストエフォート）。
+// 画像の生成は CDN が冷えていると 9〜12 秒かかり、X のクローラーは待ちきれずカードを出さない。
+// OGP 画像の URL は訪問が増えるたびに変わるので、投稿した直後の共有はいつも冷えている。
+// そこで持ち主本人がスタンプ帳を開いたとき、公開ページから現在の og:image を読んで一度取りに行き、
+// 共有される前に CDN へ載せておく。失敗は黙って捨てる（共有そのものには影響しない）。
+// 温め済みの画像URL。訪問を足すと ?v= が変わるので、ユーザー単位ではなく URL 単位で覚える
+const warmedOgpImageUrls = new Set<string>();
+
+async function warmPublicOgpImage(userId: string, signal: AbortSignal): Promise<void> {
+  let imageUrl: string | null = null;
+  try {
+    const pageRes = await fetch(`/users/${encodeURIComponent(userId)}`, { credentials: 'omit', signal });
+    if (!pageRes.ok) return;
+    const html = await pageRes.text();
+    const tag = html.match(/<meta[^>]+property=["']og:image["'][^>]*>/i)?.[0];
+    const content = tag?.match(/content=["']([^"']+)["']/i)?.[1];
+    if (!content) return;
+    const url = new URL(content.replace(/&amp;/g, '&'), window.location.origin);
+    // 同一オリジンの OGP 画像だけを取りに行く
+    if (url.origin !== window.location.origin && url.pathname !== `/users/${encodeURIComponent(userId)}/opengraph-image`) return;
+    imageUrl = `${window.location.origin}${url.pathname}${url.search}`;
+    if (warmedOgpImageUrls.has(imageUrl)) return;
+    warmedOgpImageUrls.add(imageUrl);
+    const imgRes = await fetch(imageUrl, { credentials: 'omit', signal });
+    await imgRes.arrayBuffer();
+    if (!imgRes.ok) warmedOgpImageUrls.delete(imageUrl);
+  } catch {
+    // 温めは補助。失敗しても何も出さない。中断・失敗なら次回また試せるようにする
+    if (imageUrl) warmedOgpImageUrls.delete(imageUrl);
+  }
+}
+
 const ROUND = '"M PLUS Rounded 1c", system-ui, sans-serif';
 
 // showShare を付けると、公開スタンプ帳を共有するボタンを出す（スタンプ帳から）。
@@ -68,6 +100,23 @@ export default function ProfileCard({
         // 数字が取れなければ共有ボタンを出さない（ずれた数字で共有させない）
       });
     return () => { cancelled = true; };
+  }, [showShare, publicUserId]);
+
+  // 共有される前に OGP 画像を温める（理由は warmPublicOgpImage のコメント）
+  useEffect(() => {
+    if (!showShare || !publicUserId) return;
+    const controller = new AbortController();
+    const run = () => { void warmPublicOgpImage(publicUserId, controller.signal); };
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run);
+      return () => { controller.abort(); w.cancelIdleCallback?.(id); };
+    }
+    const timer = window.setTimeout(run, 1500);
+    return () => { controller.abort(); window.clearTimeout(timer); };
   }, [showShare, publicUserId]);
 
   if (!profile) return null;
@@ -119,7 +168,7 @@ export default function ProfileCard({
           )}
           {profile.publicUserId && (
             <Link
-              href={`/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+              href={`/users/${encodeURIComponent(profile.publicUserId)}`}
               className="inline-flex items-center gap-1.5 rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-3 py-1 font-pixelJp text-[11px] font-bold text-[#bf5640]"
             >
               <ExternalLink className="h-3 w-3" />
@@ -132,7 +181,7 @@ export default function ProfileCard({
               className="ml-auto"
               label="自慢する"
               shareText={userVisitsShareText(profile.displayName, shareStats.totalVisits, shareStats.prefectureCount)}
-              shareUrl={`${SITE_URL}/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+              shareUrl={`${SITE_URL}/users/${encodeURIComponent(profile.publicUserId)}`}
               hashtags={['ポケふたスタンプ帳']}
             />
           )}

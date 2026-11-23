@@ -38,7 +38,7 @@ export const contentType = 'image/png';
 
 // satori は1倍でラスタライズするので描画サイズちょうどでよい
 const PHOTO_RENDER_SIZE = OGP_PHOTO_SIZE;
-const PHOTO_FETCH_TIMEOUT_MS = 4000;
+const PHOTO_FETCH_TIMEOUT_MS = 2500; // 最悪ケースを抑える（4000 から短縮）
 // メダルの段のうち都道府県に使う数。残りをポケモンで埋める（どちらかが足りなければもう片方で埋める）
 const PREFECTURE_MEDAL_SLOTS = 4;
 
@@ -282,7 +282,10 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return new Response(png, {
         headers: {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+          // URL の ?v= に公開内容の印が入るので、訪問・写真・表示名が変われば URL ごと変わる。
+          // ただし CDN は1日まで: 非公開に戻した写真が配られ続けないように、
+          // また印に入れていない入力（デザインマンホール・ステッカー数、図鑑の総数）のずれも1〜2日で解消する
+          'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
         },
       });
     } catch (err) {

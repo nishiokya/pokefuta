@@ -97,7 +97,7 @@ export default async function UserPrefectureBadgePage({ params }: PageProps) {
 
   const { progress, prefecture } = found;
   const pageUrl = getPageUrl(progress.userId, prefecture.name);
-  const stampBookUrl = `/users/${encodeURIComponent(progress.userId)}/visits`;
+  const stampBookUrl = `/users/${encodeURIComponent(progress.userId)}`;
   const earned = Boolean(prefecture.earnedAt);
   const shareText = prefectureBadgeShareText(
     prefecture.name,

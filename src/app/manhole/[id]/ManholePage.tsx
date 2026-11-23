@@ -1072,7 +1072,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
           // 拡大表示側（:941）と同じくリンクにしない。
           const profileHref =
             !photo.visit?.is_own && photo.visit?.public_user_id
-              ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
+              ? `/users/${encodeURIComponent(photo.visit.public_user_id)}`
               : null;
           return (
             <div
@@ -1202,7 +1202,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
       publicUserId: photo.visit?.public_user_id ?? null,
       profileHref:
         !photo.visit?.is_own && photo.visit?.public_user_id
-          ? `/users/${encodeURIComponent(photo.visit.public_user_id)}/visits`
+          ? `/users/${encodeURIComponent(photo.visit.public_user_id)}`
           : null,
       photoSrc: `/api/photo/${photo.id}?size=small`,
       onOpenPhoto: () => openPhotoAt(index),
@@ -1351,7 +1351,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             <PhotoPosterAvatar photo={featuredPhoto} size={32} />
             {!featuredPhoto.visit?.is_own && featuredPhoto.visit?.public_user_id ? (
               <Link
-                href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}/visits`}
+                href={`/users/${encodeURIComponent(featuredPhoto.visit.public_user_id)}`}
                 className="min-w-0 truncate text-sm font-bold underline"
               >
                 {getPhotoUserLabel(featuredPhoto)}

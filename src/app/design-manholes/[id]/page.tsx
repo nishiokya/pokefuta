@@ -102,7 +102,7 @@ export default async function Page({ params }: Props) {
   const nearbyDesignItems = nearbyDesignManholes(designManhole, allDesignManholes);
   // タグ（ガンダム・野球など）。押すと同じタグの写真の一覧へ。作品ガイドへは下の紐付けのカードから
   const groupTags = cardTags(tagData, designManhole.id, 6);
-  const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}/visits` : null;
+  const submitterHref = submitterPublicId ? `/users/${encodeURIComponent(submitterPublicId)}` : null;
 
   const title = displayTitle(designManhole.title);
   const pageUrl = `${SITE_URL}/design-manholes/${designManhole.id}`;

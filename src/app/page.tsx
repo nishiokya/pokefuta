@@ -458,7 +458,7 @@ export default function HomePage() {
                   {legends.slice(0, 3).map((legend) => (
                     <li key={legend.id}>
                       <Link
-                        href={`/users/${encodeURIComponent(legend.id)}/visits`}
+                        href={`/users/${encodeURIComponent(legend.id)}`}
                         className="group flex w-12 flex-col items-center sm:w-[4.5rem] lg:w-20 xl:w-16"
                         title={`${legend.name}（🏆 LEGEND）のスタンプ帳`}
                       >
@@ -641,7 +641,7 @@ export default function HomePage() {
                       return (
                         <Link
                           key={`collapsed-${item.public_user_id}`}
-                          href={`/users/${encodeURIComponent(item.public_user_id)}/visits`}
+                          href={`/users/${encodeURIComponent(item.public_user_id)}`}
                           className="group relative aspect-square overflow-hidden rounded-[8px] bg-[#2E2346] shadow-sm ring-1 ring-[#7B63A8]/15 transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFB347]"
                           aria-label={[summary, collapsedTier ? REGULAR_BADGE_LABEL[collapsedTier] : null, item.busiestDay >= 3 ? `1日で${item.busiestDay}枚ハシゴ` : null, '投稿をすべて見る'].filter(Boolean).join('、')}
                         >
@@ -766,7 +766,7 @@ export default function HomePage() {
                               カード全体のリンクより上に重ねる（z-[2]）。公開ID が無い投稿者は文字だけ */}
                           {posterLabel && (visit.public_user_id ? (
                             <PosterLink
-                              href={`/users/${encodeURIComponent(visit.public_user_id)}/visits`}
+                              href={`/users/${encodeURIComponent(visit.public_user_id)}`}
                               ariaLabel={`${visit.display_name}のスタンプ帳${regularLabel ? `（${regularLabel}）` : ''}`}
                               className="mt-1 flex min-w-0 max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs font-semibold text-white/90 hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB347]"
                             >

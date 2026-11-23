@@ -72,7 +72,7 @@ export default function CommentItem({
         <div className="mb-0.5 flex items-center gap-2">
           {comment.user.public_user_id ? (
             <Link
-              href={`/users/${comment.user.public_user_id}/visits`}
+              href={`/users/${comment.user.public_user_id}`}
               className="font-pixelJp text-xs font-bold text-[#2c2a26] underline decoration-[#e9dfc7] underline-offset-2"
             >
               {label}

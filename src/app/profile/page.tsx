@@ -213,7 +213,7 @@ export default function ProfilePage() {
                   入力した内容は
                   {profile?.publicUserId ? (
                     <Link
-                      href={`/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+                      href={`/users/${encodeURIComponent(profile.publicUserId)}`}
                       className="mx-0.5 font-bold text-[#bf5640] underline underline-offset-2"
                     >
                       共有ページ
@@ -340,7 +340,7 @@ export default function ProfilePage() {
                 公開設定にした訪問記録は、誰でも見られるスタンプ帳ページにまとまります。
               </p>
               <Link
-                href={`/users/${encodeURIComponent(profile.publicUserId)}/visits`}
+                href={`/users/${encodeURIComponent(profile.publicUserId)}`}
                 className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#bf5640]/30 bg-[#fdf1ec] px-4 py-2 font-pixelJp text-xs font-bold text-[#bf5640]"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
