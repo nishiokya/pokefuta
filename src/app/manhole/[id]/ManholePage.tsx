@@ -20,7 +20,7 @@ import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
 import PosterAvatar from '@/components/users/PosterAvatar';
-import { photoAiTags, photoObjectPosition, type PhotoAiTags } from '@/lib/photo-ai-tags';
+import { AI_TAG_HELP, photoAiTags, photoObjectPosition, type AiTag, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
 import ManholeGiftSection from '@/components/manhole/ManholeGiftSection';
@@ -127,6 +127,34 @@ function PhotoOverlayTags({ photo, alignEnd = false }: { photo: Photo; alignEnd?
       <LandscapePhotoBadge isLandscape={photo.is_landscape} overlay />
       <AiPhotoTags photo={photo} overlay />
     </span>
+  );
+}
+
+/**
+ * 上の写真（代表＋2枚）に付いたタグを、住所の欄に1行でまとめて出す。
+ * 以前は写真の右上に重ねていたが、いいねボタンと場所を取り合い、蓋の絵柄にも被っていた。
+ */
+function GalleryPhotoTagsRow({ photos }: { photos: Photo[] }) {
+  const landscape = photos.some((photo) => photo.is_landscape);
+  const tags = new Map<string, AiTag>();
+  for (const photo of photos) for (const tag of photoAiTags(photo)) if (!tags.has(tag.key)) tags.set(tag.key, tag);
+  if (!landscape && tags.size === 0) return null;
+  return (
+    <div className="flex items-start gap-3 py-1">
+      <dt className="shrink-0 pt-0.5 font-bold text-[#9b917e]">タグ</dt>
+      <dd className="flex min-w-0 flex-1 flex-wrap gap-1" title={AI_TAG_HELP}>
+        <LandscapePhotoBadge isLandscape={landscape} />
+        {[...tags.values()].map((tag) => (
+          <span
+            key={tag.key}
+            className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-900 ring-1 ring-indigo-200"
+            aria-label={tag.ai ? `${tag.label}（AIによる自動判定）` : `${tag.label}（撮影時刻と場所から自動判定）`}
+          >
+            {tag.label}
+          </span>
+        ))}
+      </dd>
+    </div>
   );
 }
 
@@ -1377,33 +1405,34 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               </div>
             </div>
           ) : (
-            <div className="relative flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {/*
-                枚数と「写真を追加」は写真の左上に重ねる。以前は写真の下に
-                「N人が撮影・全N枚 ／ ＋写真を追加」の1行を取っていた。
+                枚数・「写真を追加」・ギフトは写真の上の行に出す。以前は写真の左上に重ねていて、
+                蓋の絵柄に被っていた。
               */}
-              <div className="pointer-events-none absolute left-2.5 top-2.5 z-[2] flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657] shadow-sm">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-white px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#6f6657]">
                   <ImageIcon className="h-3 w-3" strokeWidth={2.2} />写真 {allDisplayPhotos.length}枚
                 </span>
                 <button
                   type="button"
                   onClick={() => router.push(isLoggedIn ? `/upload?manhole_id=${params.id}` : `/login?redirect=${encodeURIComponent(`/upload?manhole_id=${params.id}`)}`)}
-                  className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full bg-[#bf5640]/95 px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-[#a8483a]"
+                  className="inline-flex items-center gap-0.5 rounded-full bg-[#bf5640] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-white transition-colors hover:bg-[#a8483a]"
                 >
                   <Plus className="h-3 w-3" strokeWidth={2.6} />追加
                 </button>
+                {giftAvailableManholeId === manhole.id && (
+                  <a
+                    href="#gift-heading"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#e9dfc7] bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#723928]"
+                  >
+                    <Gift aria-hidden="true" className="h-3 w-3" />
+                    ギフト配布中
+                  </a>
+                )}
               </div>
-              {giftAvailableManholeId === manhole.id && (
-                <a
-                  href="#gift-heading"
-                  className="absolute left-2.5 top-11 z-[3] inline-flex items-center gap-1 rounded-full bg-[#fffdf7] px-2.5 py-1 font-pixelJp text-[11px] font-bold text-[#723928] shadow-sm"
-                >
-                  <Gift aria-hidden="true" className="h-3 w-3" />
-                  ギフト配布中
-                </a>
-              )}
               {allDisplayPhotos.length === 1 ? (
+                <div className="relative">
                 <button
                   type="button"
                   onClick={() => openPhotoAt(0)}
@@ -1426,9 +1455,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       </span>
                     </span>
                   )}
-                  <span className="absolute right-3 top-3 z-[1] flex max-w-[55%] justify-end">
-                    <PhotoOverlayTags photo={allDisplayPhotos[0]} alignEnd />
-                  </span>
                   <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
                     <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
                     <span className="min-w-0 truncate text-xs font-bold">{getPhotoUserLabel(allDisplayPhotos[0])}</span>
@@ -1439,21 +1465,37 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     )}
                   </div>
                 </button>
+                  {allDisplayPhotos[0].visit?.id && (
+                    <span className="absolute right-2 top-2 z-[3]">
+                      <PhotoLikeButton
+                        visitId={allDisplayPhotos[0].visit.id}
+                        isLoggedIn={isLoggedIn}
+                        loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                        variant="gallery"
+                      />
+                    </span>
+                  )}
+                </div>
               ) : (
                 <div className="grid h-[250px] grid-cols-3 grid-rows-2 gap-2 lg:h-[420px]">
                   {galleryPreviewPhotos.map((photo, index) => {
                     const isRepresentative = index === 0;
                     const isOnlySecondary = galleryPreviewPhotos.length === 2 && index === 1;
                     return (
-                      <button
+                      <div
                         key={photo.id}
+                        className={`relative ${
+                          isRepresentative ? 'col-span-2 row-span-2' : isOnlySecondary ? 'row-span-2' : ''
+                        }`}
+                      >
+                      <button
                         type="button"
                         onClick={() => openPhotoAt(index)}
                         aria-label={`${getPhotoUserLabel(photo)}さんの${photo.is_landscape ? '周辺の風景' : '蓋の写真'}を全体表示`}
-                        className={`group relative overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
+                        className={`group relative block h-full w-full overflow-hidden border border-[#e9dfc7] bg-[#ece2cd] p-0 shadow-sm ${
                           isRepresentative
-                            ? 'col-span-2 row-span-2 rounded-l-[16px] lg:rounded-l-[18px]'
-                            : `${isOnlySecondary ? 'row-span-2' : ''} rounded-r-[13px] lg:rounded-r-[15px]`
+                            ? 'rounded-l-[16px] lg:rounded-l-[18px]'
+                            : 'rounded-r-[13px] lg:rounded-r-[15px]'
                         }`}
                       >
                         <img
@@ -1463,10 +1505,6 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           style={{ objectPosition: photoObjectPosition(photo.ai_tags) }}
                           loading={isRepresentative ? 'eager' : 'lazy'}
                         />
-                        {/* 代表写真の左上は「写真 N枚／追加」が重なるので、タグは右上に寄せる */}
-                        <span className={`absolute top-2 z-[2] flex ${isRepresentative ? 'right-2 max-w-[55%] justify-end' : 'left-2 right-2'}`}>
-                          <PhotoOverlayTags photo={photo} alignEnd={isRepresentative} />
-                        </span>
                         {/* 代表写真にだけ、ひとことを1行の吹き出しで重ねる。全文を載せると
                             蓋の絵柄が隠れるので、続きは下の「訪れた人のひとこと」で読ませる。 */}
                         {isRepresentative && getPhotoCaption(photo) && (
@@ -1493,6 +1531,17 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                           )}
                         </span>
                       </button>
+                      {photo.visit?.id && (
+                    <span className="absolute right-2 top-2 z-[3]">
+                      <PhotoLikeButton
+                        visitId={photo.visit.id}
+                        isLoggedIn={isLoggedIn}
+                        loginHref={`/login?redirect=${encodeURIComponent(`/manhole/${params.id}`)}`}
+                        variant="gallery"
+                      />
+                    </span>
+                  )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1531,6 +1580,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                 <dd className="font-bold leading-snug text-[#2c2a26]">{landmarkLabel(manhole)}</dd>
               </div>
             )}
+            <GalleryPhotoTagsRow photos={representativePhoto ? galleryPreviewPhotos : []} />
             {manhole.pokemons && manhole.pokemons.length > 0 && (
               <div className="flex items-start gap-3 py-1">
                 <dt className="shrink-0 pt-1 font-bold text-[#9b917e]">登場ポケモン</dt>
@@ -1691,6 +1741,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                     <dd className="font-bold leading-snug text-[#2c2a26]">{landmarkLabel(manhole)}</dd>
                   </div>
                 )}
+                <GalleryPhotoTagsRow photos={representativePhoto ? galleryPreviewPhotos : []} />
               </dl>
             </div>
           </div>
