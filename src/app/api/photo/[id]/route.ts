@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey, photoObjectKeys } from '@/lib/storage';
 import { photoRedirectCachePolicy } from '@/lib/photo-redirect-cache';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
@@ -191,7 +191,7 @@ export async function GET(
 }
 
 // Delete a photo
-export async function DELETE(
+async function handleDELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -247,6 +247,7 @@ export async function DELETE(
     if (!snapshotLock.ok) {
       return NextResponse.json({
         success: false,
+        code: SNAPSHOT_LOCK_FAILED_CODE,
         error: 'Temporarily unavailable. Please try again.'
       }, { status: 503 });
     }
@@ -301,3 +302,6 @@ export async function DELETE(
     }, { status: 500 });
   }
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const DELETE = withOwnSnapshotUnlock(handleDELETE);

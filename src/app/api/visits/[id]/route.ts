@@ -5,7 +5,7 @@ import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -54,7 +54,7 @@ import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
  *       404:
  *         description: 訪問記録が見つからない
  */
-export async function PATCH(
+async function handlePATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -179,6 +179,7 @@ export async function PATCH(
     if (!snapshotLock.ok) {
       return NextResponse.json({
         success: false,
+        code: SNAPSHOT_LOCK_FAILED_CODE,
         error: 'Temporarily unavailable. Please try again.'
       }, { status: 503 });
     }
@@ -228,7 +229,7 @@ export async function PATCH(
 }
 
 // Delete a visit and all photos attached to it.
-export async function DELETE(
+async function handleDELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -288,6 +289,7 @@ export async function DELETE(
     if (!snapshotLock.ok) {
       return NextResponse.json({
         success: false,
+        code: SNAPSHOT_LOCK_FAILED_CODE,
         error: 'Temporarily unavailable. Please try again.'
       }, { status: 503 });
     }
@@ -360,3 +362,7 @@ export async function DELETE(
     }, { status: 500 });
   }
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const PATCH = withOwnSnapshotUnlock(handlePATCH);
+export const DELETE = withOwnSnapshotUnlock(handleDELETE);

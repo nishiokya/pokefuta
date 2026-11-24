@@ -20,6 +20,8 @@ export const SUBMISSION_ERROR_CODES = [
   'DB_PERMISSION_DENIED',
   /** R2 などストレージ層の失敗 */
   'STORAGE_ERROR',
+  /** 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置けず、書き込みを断った（src/lib/user-snapshot.ts） */
+  'SNAPSHOT_LOCK_FAILED',
   /** 分類できなかった。増えているなら分類を足す */
   'UNEXPECTED',
 ] as const;

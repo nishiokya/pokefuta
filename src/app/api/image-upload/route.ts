@@ -14,7 +14,7 @@ import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -166,7 +166,7 @@ import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -367,6 +367,7 @@ export async function POST(request: NextRequest) {
     if (!snapshotLock.ok) {
       return NextResponse.json({
         success: false,
+        code: SNAPSHOT_LOCK_FAILED_CODE,
         error: 'Temporarily unavailable. Please try again.'
       }, { status: 503 });
     }
@@ -827,3 +828,6 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const POST = withOwnSnapshotUnlock(handlePOST);

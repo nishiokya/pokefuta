@@ -7,7 +7,7 @@ import {
   normalizeFriendCode,
 } from '@/lib/pokemon-go-friend-code';
 import { INSTAGRAM_HOSTS, INSTAGRAM_SITE, X_HOSTS, X_SITE, normalizeSocialUrl } from '@/lib/social-url';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
@@ -100,7 +100,7 @@ export async function GET() {
   });
 }
 
-export async function PATCH(request: Request) {
+async function handlePATCH(request: Request) {
   const supabase = createRouteHandlerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -160,7 +160,7 @@ export async function PATCH(request: Request) {
   // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
   const snapshotLock = await lockOwnSnapshot(supabase);
   if (!snapshotLock.ok) {
-    return NextResponse.json({ error: 'いまは保存できません。少し待ってからもう一度お試しください。' }, { status: 503 });
+    return NextResponse.json({ code: SNAPSHOT_LOCK_FAILED_CODE, error: 'いまは保存できません。少し待ってからもう一度お試しください。' }, { status: 503 });
   }
 
   // PostgREST は body のキー名で版を選ぶ。3項目を載せなければ4引数版に解決される。
@@ -219,3 +219,6 @@ export async function PATCH(request: Request) {
     },
   });
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const PATCH = withOwnSnapshotUnlock(handlePATCH);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -18,7 +18,7 @@ import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
  *       401:
  *         description: 未認証
  */
-export async function POST(_request: NextRequest) {
+async function handlePOST(_request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -37,6 +37,7 @@ export async function POST(_request: NextRequest) {
     if (!snapshotLock.ok) {
       return NextResponse.json({
         success: false,
+        code: SNAPSHOT_LOCK_FAILED_CODE,
         error: 'Temporarily unavailable. Please try again.'
       }, { status: 503 });
     }
@@ -76,3 +77,6 @@ export async function POST(_request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const POST = withOwnSnapshotUnlock(handlePOST);

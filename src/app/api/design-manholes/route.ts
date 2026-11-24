@@ -25,7 +25,7 @@ import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
-import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
+import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -85,7 +85,7 @@ function optionalText(value: FormDataEntryValue | null, maxLength: number): stri
  *       409: { description: 50m以内に未確認の公式ポケふた候補がある }
  *       503: { description: 投稿受付を一時停止中、または公式ポケふたとの照合を実行できない }
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   // 受付停止中は何もせず閉じる。R2 に上げてから消す無駄も、
   // 古いJSを掴んだクライアントへの誤った「時間をおいて」案内も避ける。
   if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
       : ({ ok: true, publicUserId: null, nonce: null } as const);
     if (!snapshotLock.ok) {
       return NextResponse.json(
-        { success: false, error: 'Temporarily unavailable. Please try again.' },
+        { success: false, code: SNAPSHOT_LOCK_FAILED_CODE, error: 'Temporarily unavailable. Please try again.' },
         { status: 503 }
       );
     }
@@ -420,3 +420,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
+export const POST = withOwnSnapshotUnlock(handlePOST);

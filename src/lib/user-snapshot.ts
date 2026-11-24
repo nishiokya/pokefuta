@@ -1,4 +1,5 @@
 import 'server-only';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
@@ -310,6 +311,9 @@ async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<st
   return undefined;
 }
 
+/** 503 で書き込みを断ったときに返す code（src/lib/api-error-code.ts） */
+export const SNAPSHOT_LOCK_FAILED_CODE = 'SNAPSHOT_LOCK_FAILED' as const;
+
 export type OwnSnapshotLock =
   | { ok: true; publicUserId: string | null; nonce: string | null; deferred?: boolean }
   | { ok: false };
@@ -320,6 +324,13 @@ export type OwnSnapshotLock =
  * 本人の app_user がまだ無い人（初めての投稿など）は公開スタンプ帳も JSON も無いので、ロック無しで ok。
  */
 export async function lockOwnSnapshot(supabase: SupabaseClient<any>): Promise<OwnSnapshotLock> {
+  const lock = await acquireOwnSnapshotLock(supabase);
+  // withOwnSnapshotUnlock の中なら、書き込みが失敗・例外で終わっても最後に外す
+  if (lock.ok && (lock.nonce || lock.deferred)) heldLocks.getStore()?.push({ lock, supabase });
+  return lock;
+}
+
+async function acquireOwnSnapshotLock(supabase: SupabaseClient<any>): Promise<OwnSnapshotLock> {
   const store = snapshotStore();
   if (!store) return { ok: true, publicUserId: null, nonce: null };
   const publicUserId = await resolveOwnPublicUserId(supabase);
@@ -355,6 +366,15 @@ async function placeLock(store: R2StorageAdapter, publicUserId: string): Promise
  * 失敗・時間切れならロックはそのまま期限で切れる（その後の表示が DB の変更後の内容で作り直す）。
  */
 export async function unlockOwnSnapshot(lock: OwnSnapshotLock, supabase?: SupabaseClient<any>): Promise<void> {
+  const held = heldLocks.getStore();
+  if (held) {
+    const index = held.findIndex((item) => item.lock === lock);
+    if (index >= 0) held.splice(index, 1);
+  }
+  return releaseOwnSnapshotLock(lock, supabase);
+}
+
+async function releaseOwnSnapshotLock(lock: OwnSnapshotLock, supabase?: SupabaseClient<any>): Promise<void> {
   const store = snapshotStore();
   if (!store || !lock.ok) return;
   if (lock.deferred) {
@@ -367,7 +387,7 @@ export async function unlockOwnSnapshot(lock: OwnSnapshotLock, supabase?: Supaba
       console.error('[user-snapshot] STALE: could not lock after a first-time write; a snapshot (if any) may be served for up to a day');
       return;
     }
-    return unlockOwnSnapshot(placed);
+    return releaseOwnSnapshotLock(placed);
   }
   if (!lock.publicUserId || !lock.nonce) return;
   const { publicUserId, nonce } = lock;
@@ -396,4 +416,29 @@ export async function unlockOwnSnapshot(lock: OwnSnapshotLock, supabase?: Supaba
   } catch (error) {
     console.warn('[user-snapshot] unlock failed; the lock expires by itself:', error);
   }
+}
+
+type HeldLock = { lock: OwnSnapshotLock; supabase: SupabaseClient<any> };
+const heldLocks = new AsyncLocalStorage<HeldLock[]>();
+
+/**
+ * 書き込みのルートハンドラを包む。中で置いたロックのうち外していないもの（失敗・例外で抜けた書き込み）を、
+ * 応答を返す前に外す。外さないと15分間その人の公開スタンプ帳が毎回 DB から読まれる（PR の Codex レビュー）。
+ * 外すときは今の DB から作り直すので、書き込みが途中で失敗していても DB と同じ内容になる。
+ */
+export function withOwnSnapshotUnlock<A extends unknown[], R>(
+  handler: (...args: A) => Promise<R>,
+): (...args: A) => Promise<R> {
+  return (...args: A) => {
+    const held: HeldLock[] = [];
+    return heldLocks.run(held, async () => {
+      try {
+        return await handler(...args);
+      } finally {
+        for (const item of held.splice(0)) {
+          await releaseOwnSnapshotLock(item.lock, item.supabase);
+        }
+      }
+    });
+  };
 }
