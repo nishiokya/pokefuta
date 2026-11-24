@@ -5,7 +5,7 @@ import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
+import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -60,6 +60,8 @@ export async function PATCH(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
+    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
+    const ownPublicUserId = resolveOwnPublicUserId(supabase);
     const visitId = params.id;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -198,7 +200,7 @@ export async function PATCH(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await refreshOwnUserSnapshot(supabase);
+    await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
 
     return NextResponse.json({
       success: true,
@@ -224,6 +226,8 @@ export async function DELETE(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
+    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
+    const ownPublicUserId = resolveOwnPublicUserId(supabase);
     const visitId = params.id;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -322,7 +326,7 @@ export async function DELETE(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await refreshOwnUserSnapshot(supabase);
+    await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
 
     return NextResponse.json({
       success: true,

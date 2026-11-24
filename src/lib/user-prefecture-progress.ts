@@ -267,6 +267,10 @@ async function loadPublicUserPrefectureProgressImpl(
   if (!snapshot) {
     return null;
   }
+  // 県別の訪問だけが読めなかったとき。呼び出し側（本文は .catch(() => null)）が県別の欄だけを落とす
+  if (snapshot.missing?.progress) {
+    throw new Error('Failed to load public prefecture progress');
+  }
   const appUserRow = snapshot.profile;
   const totalIdsByPrefecture = new Map<string, Set<number>>();
   const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();

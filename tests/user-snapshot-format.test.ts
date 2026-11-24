@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   USER_SNAPSHOT_MAX_AGE_MS,
   USER_SNAPSHOT_VERSION,
-  isSnapshotUserId,
+  normalizeSnapshotUserId,
   parseUserSnapshot,
   userSnapshotKey,
 } from '../src/lib/user-snapshot-format.ts';
@@ -44,11 +44,16 @@ test('別の人・別の版・壊れた JSON は読まない', () => {
   assert.equal(parseUserSnapshot('{', ID, NOW), null);
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ cards: null })), ID, NOW), null);
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ counts: { plush: 0 } })), ID, NOW), null);
+  // 一部が欠けたもの・作り直せなかった印は読まない
+  assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ missing: { cards: true } })), ID, NOW), null);
+  assert.equal(parseUserSnapshot(JSON.stringify({ v: USER_SNAPSHOT_VERSION, tombstone: true, publicUserId: ID, at: new Date(NOW).toISOString() }), ID, NOW), null);
 });
 
 test('キーは公開ID（UUID）だけから作り、版で分ける', () => {
   assert.equal(userSnapshotKey(ID), `snapshots/users/v${USER_SNAPSHOT_VERSION}/${ID}.json`);
-  assert.ok(isSnapshotUserId(ID));
-  assert.ok(!isSnapshotUserId('../x'));
-  assert.ok(!isSnapshotUserId(`${ID}/x`));
+  assert.equal(normalizeSnapshotUserId(ID), ID);
+  // 大文字の URL でも同じキーになる（書き込み後の作り直しから漏れない）
+  assert.equal(normalizeSnapshotUserId(` ${ID.toUpperCase()} `), ID);
+  assert.equal(normalizeSnapshotUserId('../x'), null);
+  assert.equal(normalizeSnapshotUserId(`${ID}/x`), null);
 });

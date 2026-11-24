@@ -7,13 +7,14 @@ import { loadPublicVisitStats } from '@/lib/public-visit-stats';
 import {
   USER_SNAPSHOT_CARD_LIMIT,
   USER_SNAPSHOT_VERSION,
-  isSnapshotUserId,
+  normalizeSnapshotUserId,
   parseUserSnapshot,
   userSnapshotKey,
   type SnapshotCardRow,
   type SnapshotProfileRow,
   type SnapshotProgressRow,
   type UserSnapshot,
+  type UserSnapshotTombstone,
 } from '@/lib/user-snapshot-format';
 
 /**
@@ -25,17 +26,27 @@ import {
  * サーバー内で完結し egress がかからない。
  *
  * 鮮度（非公開に戻した訪問が残らないこと）の守り方:
- * - 本人の書き込み（投稿・訪問の編集/削除・まとめて公開・写真の削除・プロフィール・アイコン）の直後に
- *   refreshOwnUserSnapshot() で作り直す。
- * - 書き戻しは条件つき（読んだときの ETag / 無いときだけ）。DB を読んでから書くまでの間に
- *   別の書き込みが入っていたら書かない。古い内容で新しい内容を上書きしない。
- * - 作り直せなかったら消す。次の表示は DB から読む。
- * - アプリを通らない変更（自動採点・マイグレーション）は寿命（1日）で拾う。
+ * - 本人の書き込み（投稿・訪問の編集/削除・まとめて公開・写真の削除・プロフィール・アイコン・
+ *   デザインマンホールの投稿）の直後に refreshOwnUserSnapshot() で作り直す。
+ * - 書き戻しはすべて条件つき（R2 を読んだときの ETag のままなら / 無いときだけ）。R2 を先に読み、
+ *   そのあと DB を読むので、その間にほかの書き込みが入っていたら ETag が変わって書けない。
+ *   古い内容で新しい内容を上書きしない（R2 は PutObject の If-Match / If-None-Match に対応している）。
+ * - 作り直せなかったら、消すのではなく「作り直せなかった印」を上書きで置く。印も ETag を変えるので、
+ *   その前から走っていた表示の書き戻しを弾ける（消すと「無いときだけ書く」が通ってしまう）。
+ * - アプリを通らない変更（自動採点・マイグレーション・審査）は寿命（1日）で拾う。
+ *
+ * 残る穴: 書き込みの直後に R2 が丸ごと使えない（印も置けない）と、最大で寿命のあいだ古い JSON が残る。
+ * そのときは `[user-snapshot] STALE` をエラーで出す（CloudWatch で拾える）。
  *
  * JSON は R2 のバケット内で非公開（公開 URL を作らない）。サーバーが S3 API で読むだけ。
  */
 
 const R2_READ_TIMEOUT_MS = 1500;
+const R2_WRITE_TIMEOUT_MS = 2000;
+/** 書き込み API に足す待ち時間の上限。超えたら作り直しをやめて印を置く */
+const REFRESH_BUDGET_MS = 4000;
+/** PostgREST の1回の上限（supabase/config.toml の max_rows）。これより多い訪問はページを分けて読む */
+const PAGE_ROWS = 1000;
 const CONTENT_TYPE = 'application/json; charset=utf-8';
 
 let adapter: R2StorageAdapter | null | undefined;
@@ -63,6 +74,16 @@ function liveClient(): SupabaseClient<Database> | null {
       fetch: (input, init) => fetch(input as RequestInfo, { ...(init as RequestInit), cache: 'no-store' }),
     },
   });
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 /** 件数 RPC。失敗は null（スナップショットを保存しない印）。表示は 0 にする */
@@ -93,38 +114,70 @@ async function avatarRpc(client: SupabaseClient<Database>, publicUserId: string)
   }
 }
 
-type Built = { snapshot: UserSnapshot; complete: boolean };
+async function loadCards(client: SupabaseClient<Database>, publicUserId: string): Promise<SnapshotCardRow[]> {
+  const { data, error } = await client
+    .from('public_user_visit_card')
+    .select(
+      'id, manhole_id, shot_at, comment, created_at,' +
+      ' manhole_title, manhole_prefecture, manhole_municipality, manhole_pokemons,' +
+      ' latest_photo_id, latest_photo_is_landscape, latest_photo_ai_tags'
+    )
+    .eq('public_user_id', publicUserId)
+    .order('shot_at', { ascending: false })
+    .limit(USER_SNAPSHOT_CARD_LIMIT);
+  if (error) throw new Error(error.message);
+  return (data || []) as unknown as SnapshotCardRow[];
+}
 
 /**
- * DB から作る。利用者がいなければ null。プロフィール・訪問の読み出しの失敗は例外（ページは今までどおり 500）。
- * 件数・アイコンの失敗は 0 / なしで表示を続けるが、complete=false にして保存しない。
+ * 蓋のある公開訪問の全件（県別の進み具合用）。1回の上限（1000行）を超える人がいるのでページを分けて読む。
+ * 以前は県別ページが県で絞って読んでいたので、全県で1000件を超えてもその県の分は欠けなかった。
  */
-async function buildUserSnapshot(publicUserId: string): Promise<Built | null> {
-  const client = liveClient();
-  if (!client) throw new Error('Supabase client is not configured');
-
-  const [profileResult, avatar, cardsResult, progressResult, stats, designManhole, plush, snow] = await Promise.all([
-    client.rpc('get_public_profile' as never, { p_user_id: publicUserId } as never),
-    avatarRpc(client, publicUserId),
-    client
-      .from('public_user_visit_card')
-      .select(
-        'id, manhole_id, shot_at, comment, created_at,' +
-        ' manhole_title, manhole_prefecture, manhole_municipality, manhole_pokemons,' +
-        ' latest_photo_id, latest_photo_is_landscape, latest_photo_ai_tags'
-      )
-      .eq('public_user_id', publicUserId)
-      .order('shot_at', { ascending: false })
-      .limit(USER_SNAPSHOT_CARD_LIMIT),
-    client
+async function loadProgressRows(client: SupabaseClient<Database>, publicUserId: string): Promise<SnapshotProgressRow[]> {
+  const rows: SnapshotProgressRow[] = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const { data, error } = await client
       .from('public_user_visit_card')
       .select(
         'manhole_id, shot_at, created_at, manhole_prefecture,' +
         ' latest_photo_id, latest_photo_created_at, latest_photo_is_landscape'
       )
       .eq('public_user_id', publicUserId)
-      .not('manhole_id', 'is', null),
-    loadPublicVisitStats(client, publicUserId),
+      .not('manhole_id', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_ROWS - 1);
+    if (error) throw new Error(error.message);
+    const page = (data || []) as unknown as SnapshotProgressRow[];
+    rows.push(...page);
+    if (page.length < PAGE_ROWS) return rows;
+  }
+}
+
+type Built = { snapshot: UserSnapshot; complete: boolean };
+
+/**
+ * DB から作る。利用者がいなければ null。プロフィールが読めなければ例外（ページは今までどおり 500）。
+ * カード・県別・件数・アイコンの失敗は、その部分だけを欠けた扱い（missing / 0 / なし）にして complete=false。
+ * complete=false は R2 に保存しない。
+ */
+async function buildUserSnapshot(publicUserId: string): Promise<Built | null> {
+  const client = liveClient();
+  if (!client) throw new Error('Supabase client is not configured');
+
+  const settle = <T>(promise: Promise<T>) => promise.then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => {
+      console.warn('[user-snapshot] partial read failed:', error);
+      return { ok: false as const };
+    },
+  );
+
+  const [profileResult, avatar, cards, progress, stats, designManhole, plush, snow] = await Promise.all([
+    client.rpc('get_public_profile' as never, { p_user_id: publicUserId } as never),
+    avatarRpc(client, publicUserId),
+    settle(loadCards(client, publicUserId)),
+    settle(loadProgressRows(client, publicUserId)),
+    settle(loadPublicVisitStats(client, publicUserId)),
     countRpc(client, 'get_public_design_manhole_count', publicUserId),
     countRpc(client, 'get_public_plush_visit_count', publicUserId),
     countRpc(client, 'get_public_snow_visit_count', publicUserId),
@@ -133,8 +186,11 @@ async function buildUserSnapshot(publicUserId: string): Promise<Built | null> {
   if (profileResult.error) throw new Error(profileResult.error.message);
   const profile = (profileResult.data as SnapshotProfileRow[] | null)?.[0] ?? null;
   if (!profile) return null;
-  if (cardsResult.error) throw new Error(cardsResult.error.message);
-  if (progressResult.error) throw new Error(progressResult.error.message);
+
+  const missing: NonNullable<UserSnapshot['missing']> = {};
+  if (!cards.ok) missing.cards = true;
+  if (!progress.ok) missing.progress = true;
+  if (!stats.ok) missing.stats = true;
 
   const snapshot: UserSnapshot = {
     v: USER_SNAPSHOT_VERSION,
@@ -142,12 +198,14 @@ async function buildUserSnapshot(publicUserId: string): Promise<Built | null> {
     publicUserId,
     profile,
     avatarPhotoId: avatar ?? null,
-    cards: (cardsResult.data || []) as unknown as SnapshotCardRow[],
-    progressRows: (progressResult.data || []) as unknown as SnapshotProgressRow[],
-    stats,
+    cards: cards.ok ? cards.value : [],
+    progressRows: progress.ok ? progress.value : [],
+    stats: stats.ok ? stats.value : { totalVisits: 0, prefectureCount: 0 },
     counts: { designManhole: designManhole ?? 0, plush: plush ?? 0, snow: snow ?? 0 },
   };
-  const complete = avatar !== undefined && designManhole !== null && plush !== null && snow !== null;
+  const complete = Object.keys(missing).length === 0
+    && avatar !== undefined && designManhole !== null && plush !== null && snow !== null;
+  if (Object.keys(missing).length > 0) snapshot.missing = missing;
   return { snapshot, complete };
 }
 
@@ -158,6 +216,7 @@ async function readSnapshot(store: R2StorageAdapter, publicUserId: string): Prom
     const object = await store.getText(userSnapshotKey(publicUserId), R2_READ_TIMEOUT_MS);
     if (!object) return { snapshot: null, etag: null, exists: false, ok: true };
     return {
+      // 古い・別の版・作り直せなかった印は null（＝作り直す）
       snapshot: parseUserSnapshot(object.body, publicUserId),
       etag: object.etag,
       exists: true,
@@ -169,16 +228,30 @@ async function readSnapshot(store: R2StorageAdapter, publicUserId: string): Prom
   }
 }
 
-/** 読んだときの状態が変わっていなければ書く。変わっていたら何もしない（新しい方を残す） */
-async function writeIfUnchanged(store: R2StorageAdapter, read: ReadResult, built: Built): Promise<boolean> {
-  const key = userSnapshotKey(built.snapshot.publicUserId);
-  const body = JSON.stringify(built.snapshot);
+/** 読んだときの状態が変わっていなければ書く。変わっていたら false（新しい方を残す） */
+async function writeIfUnchanged(store: R2StorageAdapter, read: ReadResult, snapshot: UserSnapshot): Promise<boolean> {
+  const key = userSnapshotKey(snapshot.publicUserId);
+  const body = JSON.stringify(snapshot);
   if (read.exists) {
     // ETag が取れないと条件をつけられないので書かない
     if (!read.etag) return false;
-    return store.putTextIf(key, body, { contentType: CONTENT_TYPE, ifMatch: read.etag });
+    return store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifMatch: read.etag });
   }
-  return store.putTextIf(key, body, { contentType: CONTENT_TYPE, ifNoneMatch: '*' });
+  return store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifNoneMatch: '*' });
+}
+
+/** 作り直せなかった印を上書きで置く。置けなければ例外 */
+async function putTombstone(store: R2StorageAdapter, publicUserId: string): Promise<void> {
+  const tombstone: UserSnapshotTombstone = {
+    v: USER_SNAPSHOT_VERSION,
+    tombstone: true,
+    publicUserId,
+    at: new Date().toISOString(),
+  };
+  await store.putTextIf(userSnapshotKey(publicUserId), JSON.stringify(tombstone), {
+    contentType: CONTENT_TYPE,
+    timeoutMs: R2_WRITE_TIMEOUT_MS,
+  });
 }
 
 /**
@@ -186,10 +259,12 @@ async function writeIfUnchanged(store: R2StorageAdapter, read: ReadResult, built
  * 利用者がいなければ null。1リクエストの中ではページ本文・generateMetadata・OGP で使い回す。
  */
 export const loadUserSnapshot = cache(async (publicUserId: string): Promise<UserSnapshot | null> => {
-  const id = publicUserId.trim();
-  if (!id) return null;
-  const store = isSnapshotUserId(id) ? snapshotStore() : null;
-  if (!store) return (await buildUserSnapshot(id))?.snapshot ?? null;
+  const raw = publicUserId.trim();
+  if (!raw) return null;
+  const id = normalizeSnapshotUserId(raw);
+  const store = id ? snapshotStore() : null;
+  // UUID でない ID は今までどおり DB に渡す（DB が null かエラーを返す）
+  if (!id || !store) return (await buildUserSnapshot(id ?? raw))?.snapshot ?? null;
 
   const read = await readSnapshot(store, id);
   if (read.snapshot) return read.snapshot;
@@ -199,7 +274,7 @@ export const loadUserSnapshot = cache(async (publicUserId: string): Promise<User
   // 読み出しに失敗したときは、そこにある版が分からないので書かない
   if (built.complete && read.ok) {
     try {
-      await writeIfUnchanged(store, read, built);
+      await writeIfUnchanged(store, read, built.snapshot);
     } catch (error) {
       console.warn('[user-snapshot] write failed:', error);
     }
@@ -208,51 +283,69 @@ export const loadUserSnapshot = cache(async (publicUserId: string): Promise<User
 });
 
 /**
- * 本人の書き込みのあとに呼ぶ。その人のスナップショットを今の DB から作り直す。
- * 作り直せなかったら消す（古い JSON を残さない）。失敗しても例外は投げない（書き込み自体は成功している）。
- *
- * supabase は書き込みに使ったログイン中のクライアント。公開IDは get_own_profile で引く
- * （get_public_user_ids は公開訪問が0件になった人を返さないので、最後の1件を非公開にしたときに引けない）。
+ * 本人の書き込みの直後に作り直す。
+ * 作り直せなかったら「作り直せなかった印」を置く（古い JSON を残さない）。
+ * 失敗しても例外は投げない（書き込み自体は成功している）。待ち時間は REFRESH_BUDGET_MS まで。
  */
-export async function refreshOwnUserSnapshot(supabase: SupabaseClient<any>): Promise<void> {
-  const store = snapshotStore();
-  if (!store) return;
-
-  let publicUserId: string | null = null;
-  try {
-    const { data, error } = await supabase.rpc('get_own_profile' as never);
-    if (error) throw error;
-    const row = ((data as unknown as { public_user_id?: string | null }[] | null) || [])[0];
-    publicUserId = row?.public_user_id ?? null;
-  } catch (error) {
-    console.error('[user-snapshot] could not resolve own public id; snapshot may be stale for up to a day:', error);
-    return;
-  }
-  if (!publicUserId || !isSnapshotUserId(publicUserId)) return;
-
-  const key = userSnapshotKey(publicUserId);
-  // 2回まで: 1回目の間にほかの書き込み（同じ人のまとめて投稿など）が先に書いたら、読み直して作り直す
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
+async function refreshUserSnapshot(store: R2StorageAdapter, publicUserId: string): Promise<void> {
+  const attempt = async (): Promise<boolean> => {
+    // 2回まで: 1回目の間にほかの書き込み（同じ人のまとめて投稿など）が先に書いたら、読み直して作り直す
+    for (let i = 0; i < 2; i += 1) {
       const read = await readSnapshot(store, publicUserId);
-      if (!read.ok) break;
+      if (!read.ok) return false;
       const built = await buildUserSnapshot(publicUserId);
-      if (!built) {
-        if (read.exists) await store.delete(key);
-        return;
-      }
-      if (!built.complete) break;
-      if (await writeIfUnchanged(store, read, built)) return;
+      if (!built || !built.complete) return false;
+      if (await writeIfUnchanged(store, read, built.snapshot)) return true;
+    }
+    return false;
+  };
+
+  try {
+    if (await withTimeout(attempt(), REFRESH_BUDGET_MS, 'snapshot refresh')) return;
+  } catch (error) {
+    console.warn('[user-snapshot] refresh failed:', error);
+  }
+
+  try {
+    await putTombstone(store, publicUserId);
+  } catch (error) {
+    console.error('[user-snapshot] STALE: could not invalidate; the old snapshot may be served for up to a day:', publicUserId, error);
+  }
+}
+
+/**
+ * 本人の公開ID（app_user.id）。書き込みの「前」に呼んでおく。
+ * get_public_user_ids は公開訪問が0件になった人を返さないので使わない（最後の1件を非公開にしたときに引けない）。
+ * 失敗したら null。そのときは書き込み後にもう一度引く。
+ */
+export async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<string | null> {
+  for (let i = 0; i < 2; i += 1) {
+    try {
+      const { data, error } = await supabase.rpc('get_own_profile' as never);
+      if (error) throw error;
+      const row = ((data as unknown as { public_user_id?: string | null }[] | null) || [])[0];
+      return row?.public_user_id ? normalizeSnapshotUserId(row.public_user_id) : null;
     } catch (error) {
-      console.warn('[user-snapshot] refresh failed:', error);
-      break;
+      console.warn('[user-snapshot] get_own_profile failed:', error);
     }
   }
+  return null;
+}
 
-  // 作り直せなかった。古い JSON が配られ続けないよう消す（次の表示は DB から読んで作る）
-  try {
-    await store.delete(key);
-  } catch (error) {
-    console.error('[user-snapshot] could not delete a stale snapshot; it may be served for up to a day:', error);
+/**
+ * 本人の書き込みのあとに呼ぶ。supabase は書き込みに使ったログイン中のクライアント。
+ * publicUserId は書き込みの前に resolveOwnPublicUserId で引いたもの（渡さなければここで引く）。
+ */
+export async function refreshOwnUserSnapshot(
+  supabase: SupabaseClient<any>,
+  publicUserId?: string | null,
+): Promise<void> {
+  const store = snapshotStore();
+  if (!store) return;
+  const id = publicUserId ?? (await resolveOwnPublicUserId(supabase));
+  if (!id) {
+    console.error('[user-snapshot] STALE: could not resolve own public id; the snapshot may be served for up to a day');
+    return;
   }
+  await refreshUserSnapshot(store, id);
 }

@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey, photoObjectKeys } from '@/lib/storage';
 import { photoRedirectCachePolicy } from '@/lib/photo-redirect-cache';
-import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
+import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
@@ -197,6 +197,8 @@ export async function DELETE(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
+    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
+    const ownPublicUserId = resolveOwnPublicUserId(supabase);
     const photoId = params.id;
 
     // ✅ 1. 認証チェック
@@ -274,7 +276,7 @@ export async function DELETE(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await refreshOwnUserSnapshot(supabase);
+    await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
 
     return NextResponse.json({
       success: true,

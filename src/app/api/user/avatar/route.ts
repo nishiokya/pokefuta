@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
+import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
 
 // プロフィールのアイコン（自分の公開訪問の写真から1枚）を読む・選ぶ。
 //
@@ -35,6 +35,8 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const supabase = createRouteHandlerClient();
+  // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
+  const ownPublicUserId = resolveOwnPublicUserId(supabase);
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return json({ error: 'ログインが必要です。' }, 401);
@@ -65,7 +67,7 @@ export async function PUT(request: Request) {
   }
 
   // 公開スタンプ帳のスナップショット（R2）のアイコンを作り直す
-  await refreshOwnUserSnapshot(supabase);
+  await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
 
   return json({ success: true, photoId: (data as unknown as string | null) ?? null });
 }

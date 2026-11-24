@@ -49,6 +49,10 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
 
   const snapshot = await loadUserSnapshot(trimmedUserId);
   if (!snapshot) return null;
+  // カードか件数が読めなかった（R2 に無く、DB の一部が失敗した）ときは、今までどおりページを失敗にする
+  if (snapshot.missing?.cards || snapshot.missing?.stats) {
+    throw new Error('Failed to load public visits');
+  }
 
   const appUserRow = snapshot.profile;
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;

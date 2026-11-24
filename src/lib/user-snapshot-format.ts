@@ -14,6 +14,13 @@ export const USER_SNAPSHOT_VERSION = 1;
  */
 export const USER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * 作り直せなかったときに、消す代わりに置く印。読む側は「無い」と同じに扱う。
+ * 消してしまうと、その前から DB を読んでいた表示が「無いときだけ書く」条件で古い内容を書き戻せる。
+ * 印を置けば ETag が変わるので、その書き戻しは条件で弾かれる（PR の Codex レビュー）。
+ */
+export type UserSnapshotTombstone = { v: typeof USER_SNAPSHOT_VERSION; tombstone: true; publicUserId: string; at: string };
+
 export type SnapshotProfileRow = {
   display_name: string | null;
   bio?: string | null;
@@ -62,18 +69,28 @@ export type UserSnapshot = {
   progressRows: SnapshotProgressRow[];
   stats: { totalVisits: number; prefectureCount: number };
   counts: { designManhole: number; plush: number; snow: number };
+  /**
+   * 一部が読めなかったときだけ入る（R2 には保存しない）。読めなかった部分を使う側は例外にする。
+   * 以前は県別・カード・件数を別々に読んでいて、1つの失敗がほかの表示を巻き込まなかった。それを保つ
+   */
+  missing?: { cards?: true; progress?: true; stats?: true };
 };
 
-/** R2 のキー。公開IDは URL にも出ている値なので、キーに入れてよい */
+/** R2 のキー。公開IDは URL にも出ている値なので、キーに入れてよい。必ず normalizeSnapshotUserId を通した値で呼ぶ */
 export function userSnapshotKey(publicUserId: string): string {
   return `snapshots/users/v${USER_SNAPSHOT_VERSION}/${publicUserId}.json`;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** スナップショットを置いてよい公開IDか（キーに変な文字を入れない） */
-export function isSnapshotUserId(value: string): boolean {
-  return UUID_RE.test(value);
+/**
+ * スナップショットのキーに使う形（小文字の UUID）にする。UUID でなければ null（スナップショットを使わない）。
+ * DB は大文字の UUID も同じ人として返すが、R2 のキーは大文字・小文字を区別する。
+ * 大文字の URL で作られた JSON は、書き込み後の作り直し（小文字の公開ID）から漏れる（PR の Codex レビュー）。
+ */
+export function normalizeSnapshotUserId(value: string): string | null {
+  const lower = value.trim().toLowerCase();
+  return UUID_RE.test(lower) ? lower : null;
 }
 
 /**
@@ -102,5 +119,6 @@ export function parseUserSnapshot(
   if (!data.stats || typeof data.stats.totalVisits !== 'number' || typeof data.stats.prefectureCount !== 'number') return null;
   if (!data.counts || typeof data.counts.designManhole !== 'number' || typeof data.counts.plush !== 'number' || typeof data.counts.snow !== 'number') return null;
   if (data.avatarPhotoId !== null && typeof data.avatarPhotoId !== 'string') return null;
+  if (data.missing !== undefined) return null;
   return data as UserSnapshot;
 }

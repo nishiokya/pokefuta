@@ -139,12 +139,13 @@ export class R2StorageAdapter implements StorageAdapter {
 
   /**
    * 条件つきの書き込み。ifMatch はその ETag のときだけ、ifNoneMatch: '*' は無いときだけ書く。
-   * 条件が合わなかったら false（ほかの書き込みが先に入った）。それ以外の失敗は例外。
+   * 条件が合わなかったら false（ほかの書き込みが先に入った）。それ以外の失敗・時間切れは例外。
+   * 条件をどちらも付けなければ、ふつうの上書き。
    */
   async putTextIf(
     key: string,
     body: string,
-    options: { contentType: string; ifMatch?: string; ifNoneMatch?: '*' },
+    options: { contentType: string; timeoutMs: number; ifMatch?: string; ifNoneMatch?: '*' },
   ): Promise<boolean> {
     try {
       await this.s3Client.send(new PutObjectCommand({
@@ -155,7 +156,7 @@ export class R2StorageAdapter implements StorageAdapter {
         CacheControl: 'private, no-store',
         IfMatch: options.ifMatch,
         IfNoneMatch: options.ifNoneMatch,
-      }));
+      }), { abortSignal: AbortSignal.timeout(options.timeoutMs) });
       return true;
     } catch (error: any) {
       if (error?.$metadata?.httpStatusCode === 412 || error?.name === 'PreconditionFailed') return false;

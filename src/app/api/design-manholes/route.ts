@@ -25,6 +25,7 @@ import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
+import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -103,6 +104,8 @@ export async function POST(request: NextRequest) {
   try {
     // 1. 認証（image-upload と同じ cookie セッション方式）
     const supabase = createRouteHandlerClient({ cookies });
+    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
+    const ownPublicUserId = resolveOwnPublicUserId(supabase);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       return NextResponse.json(
@@ -300,6 +303,11 @@ export async function POST(request: NextRequest) {
       throw new Error(insertError?.message || 'Failed to insert design manhole', {
         cause: insertError,
       });
+    }
+
+    // 公開スタンプ帳のデザインマンホールの枚数（ステッカー）を作り直す。審査待ちは数に入らないので公開したときだけ
+    if (inserted.status === 'published') {
+      await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
     }
 
     return NextResponse.json(
