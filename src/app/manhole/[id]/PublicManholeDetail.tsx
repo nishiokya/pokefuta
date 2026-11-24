@@ -1,0 +1,169 @@
+import type { Metadata } from 'next';
+import { cache } from 'react';
+import { notFound } from 'next/navigation';
+import ManholePage from './ManholePage';
+import { loadPhotoForOgp } from '@/lib/manhole-ogp';
+import { loadManholeDetail } from '@/lib/manhole-detail-payload';
+import { parseManholeIdParam } from '@/lib/manhole-detail';
+import { serializeJsonLd } from '@/lib/json-ld';
+import {
+  manholeHeading,
+  manholeLocationLabel,
+  manholePlaceLabel,
+  pokemonText,
+  type ManholeLabelSource,
+} from '@/lib/manhole-label';
+import { getSortedTitles } from '@/lib/shared-photo';
+import { OGP_IMAGE_VERSION, SITE_NAME, SITE_URL, pageTitle } from '@/lib/constants';
+import type { ManholeTitle } from '@/types/database';
+
+const getManholeDetail = cache(loadManholeDetail);
+
+type ManholeMetaSource = ManholeLabelSource & { titles?: ManholeTitle[] | null };
+
+/**
+ * title / description / JSON-LD は**ここ**が作る。
+ *
+ * 以前は `ManholePage.tsx` の `useEffect` が同じ3点を別ルールで上書きしており、
+ * クローラとOGPが見るサーバ側の値と、人が見るクライアント側の値が食い違っていた。
+ * しかも図鑑（data.pokefuta.com）と形式が揃っていたのは**クライアント側だけ**で、
+ * 揃っている方が検索エンジンには届いていなかった。
+ *
+ * 文言の形式は図鑑の `generate_manhole_pages.py` に合わせる:
+ *   title = 「{都道府県}{市区町村}のポケふた｜{ポケモン}」
+ *   h1    = 「{都道府県}{市区町村}のポケふた（{ポケモン}）」（→ ManholePage.tsx）
+ * ただし `og:title` は図鑑と同じく**称号を前置きする**。共有カードでは称号が効くが、
+ * `<title>` に入れると同じ蓋の title が両サイトで別物になるため、そこだけ分けている。
+ */
+function buildManholeMeta(manhole: ManholeMetaSource) {
+  const locationLabel = manholeLocationLabel(manhole);
+  const placeLabel = manholePlaceLabel(manhole);
+  const pokemons = pokemonText(manhole.pokemons);
+  const topTitle = getSortedTitles(manhole.titles)[0];
+  const title = pageTitle(`${placeLabel}｜${pokemons}`);
+
+  return {
+    title,
+    ogTitle: topTitle ? `${topTitle.label} | ${placeLabel} | ${SITE_NAME}` : title,
+    description: `${locationLabel}にある、${pokemons}が描かれたポケモンマンホール「ポケふた」の場所、写真、訪問記録を確認できます。経路案内や写真登録にも対応。`,
+  };
+}
+
+export async function buildDetailMetadata(id: string, photoId?: string): Promise<Metadata> {
+  // 単体GET と同じ判定を使う。Number() に任せると `82.0` や `0x52` が 82 になり、
+  // サーバ描画は中身を出すのに単体GETは 400 を返す食い違いが起きる。
+  const manholeId = parseManholeIdParam(id);
+  if (manholeId === null) {
+    return { title: `マンホールが見つかりません | ${SITE_NAME}` };
+  }
+
+  // 本文と同じ入り口を使う。`fetchSnapshotManhole()` は「引けない」と「無い」を
+  // どちらも null に潰すので、ここだけ別経路にすると Page 側の 404 / 500 の
+  // 切り分けとズレる。metadata 自体はどちらでも同じ文言でよい（HTTPステータスを
+  // 決めるのは Page の側で、障害時はそちらが投げてエラーページになる）。
+  const result = await getManholeDetail(manholeId);
+  if (!result.ok) {
+    return { title: `マンホールが見つかりません | ${SITE_NAME}` };
+  }
+  const manhole = result.payload.manhole;
+
+  const { title, ogTitle, description } = buildManholeMeta(manhole);
+  const validPhotoId = photoId ? (await loadPhotoForOgp(photoId, manholeId))?.id : undefined;
+
+  const pageUrl = `${SITE_URL}/manhole/${manholeId}`;
+  const canonicalUrl = validPhotoId ? `${pageUrl}?photo=${validPhotoId}` : pageUrl;
+  const ogImageUrl = validPhotoId
+    ? `${SITE_URL}/manhole/${manholeId}/opengraph-image?photo=${validPhotoId}&v=${OGP_IMAGE_VERSION}`
+    : `${SITE_URL}/manhole/${manholeId}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      type: 'website',
+      title: ogTitle,
+      description,
+      url: canonicalUrl,
+      siteName: SITE_NAME,
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: ogTitle }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: ogTitle,
+      description,
+      images: [ogImageUrl],
+    },
+  };
+}
+
+export default async function PublicManholeDetail({ params }: { params: { id: string } }) {
+  const manholeId = parseManholeIdParam(params.id);
+  // 詳細の素材をサーバで組み立てて `ManholePage` に渡す。
+  //
+  // 以前は蓋そのものだけを引いて JSON-LD に使い、本文は `ManholePage` が
+  // マウント後に `/api/manholes/{id}` を叩いてから描いていた。そのため
+  // **初期HTMLに h1 も本文も1文字も入っていなかった**（本番の /manhole/82 で
+  // h1 が0個）。図鑑側は同じ蓋を66KBのHTMLとして返しており、図鑑から渡ってきた
+  // 人が最初に見るのが空白とローディングになっていた。
+  // 不正なidと存在しないidは本物の 404 を返す。以前は「マンホールが見つかりません」
+  // の本文を **HTTP 200 で** 配っており、検索エンジンには実在するページとして見える
+  // （ソフト404）。同じ作りの `design-manholes/[id]/page.tsx` は既に notFound()。
+  if (manholeId === null) {
+    notFound();
+  }
+
+  // **スナップショットが一時的に引けないだけの場合を 404 にしない。**
+  // 404 は「このURLは存在しない」という恒久的な意味で、障害の数分のあいだに
+  // クロールされると実在するページがインデックスから落ちる。API 側は同じ状況で
+  // 503 を返しており、ここだけ 404 にすると非対称になる。
+  // 投げればエラー境界（`error.tsx`）が 500 で受ける。
+  const result = await getManholeDetail(manholeId);
+  if (!result.ok) {
+    if (result.reason === 'not-found') notFound();
+    throw new Error(`Manhole snapshot is temporarily unavailable (id=${manholeId})`);
+  }
+
+  const payload = result.payload;
+  const manhole = payload.manhole;
+
+  // JSON-LD もサーバで出す。クライアントで `document.head` に差し込んでいた頃は、
+  // JS を実行しないクローラには構造化データが1件も届いていなかった。
+  // 形は図鑑の TouristAttraction に合わせる（name は h1、address / geo つき）。
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristAttraction',
+    name: manholeHeading(manhole),
+    description: buildManholeMeta(manhole).description,
+    url: `${SITE_URL}/manhole/${manhole.id}`,
+    ...(manhole.address
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            addressRegion: manhole.prefecture,
+            addressLocality: manhole.city || manhole.municipality || undefined,
+            streetAddress: manhole.address,
+          },
+        }
+      : {}),
+    ...(manhole.latitude != null && manhole.longitude != null
+      ? {
+          geo: {
+            '@type': 'GeoCoordinates',
+            latitude: manhole.latitude,
+            longitude: manhole.longitude,
+          },
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+      <ManholePage initial={payload} />
+    </>
+  );
+}

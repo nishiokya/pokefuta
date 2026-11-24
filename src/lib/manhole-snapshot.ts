@@ -137,19 +137,11 @@ export async function fetchSnapshotNames(
 ): Promise<Map<number, string>> {
   // 名前は見た目だけの情報なので、data.pokefuta.com が遅い・落ちているときに
   // 訪問・口コミの API ごと待たせない。時間切れなら空の Map（表示は title に落ちる）
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), timeoutMs);
-  });
-  try {
-    const snapshot = await Promise.race([fetchManholeSnapshot(), timeout]);
-    if (!snapshot) {
-      console.warn(`Snapshot names unavailable within ${timeoutMs}ms; falling back to title`);
-    }
-    return new Map((snapshot?.manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
-  } finally {
-    clearTimeout(timer);
+  const manholes = await loadCachedManholes({ timeoutMs });
+  if (!manholes) {
+    console.warn(`Snapshot names unavailable within ${timeoutMs}ms; falling back to title`);
   }
+  return new Map((manholes ?? []).map((manhole) => [manhole.id, manhole.name]));
 }
 
 /** 蓋オブジェクトにスナップショットの `name` を足す。id が無い・見つからないときはそのまま。 */

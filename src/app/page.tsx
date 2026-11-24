@@ -234,7 +234,7 @@ export default function HomePage() {
 
   const loadSiteStats = async () => {
     try {
-      const response = await fetch('/api/site-stats');
+      const response = await fetch('/api/site-stats?view=home', { credentials: 'omit' });
       if (!response.ok) return;
       const data = await response.json();
       if (!data?.success) return;

@@ -84,6 +84,18 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // 共有 URL は既存のまま、公開状態を確認する動的 OGP メタデータだけ別ルートにする。
+        {
+          source: '/manhole/:id',
+          has: [{ type: 'query', key: 'photo', value: '.+' }],
+          destination: '/manhole/:id/shared-photo',
+        },
+      ],
+    };
+  },
   redirects: async () => [
     // www 付きは apex へまとめる。www でも 200 を返していて、Search Console で重複の扱いになっていた。
     // CloudFront のキャッシュは host ごとに分かれている（www で取っても apex は Miss）ので、
