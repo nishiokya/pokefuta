@@ -119,6 +119,51 @@ export class R2StorageAdapter implements StorageAdapter {
   }
 
   /**
+   * 小さなテキストのオブジェクトを ETag つきで読む。無ければ null。
+   * 公開ページ用のスナップショット（src/lib/user-snapshot.ts）が、書き戻すときの条件に ETag を使う。
+   */
+  async getText(key: string, timeoutMs: number): Promise<{ body: string; etag: string | null } | null> {
+    try {
+      const response = await this.s3Client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+        { abortSignal: AbortSignal.timeout(timeoutMs) },
+      );
+      const body = await response.Body?.transformToString();
+      if (body === undefined) return null;
+      return { body, etag: response.ETag ?? null };
+    } catch (error: any) {
+      if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * 条件つきの書き込み。ifMatch はその ETag のときだけ、ifNoneMatch: '*' は無いときだけ書く。
+   * 条件が合わなかったら false（ほかの書き込みが先に入った）。それ以外の失敗は例外。
+   */
+  async putTextIf(
+    key: string,
+    body: string,
+    options: { contentType: string; ifMatch?: string; ifNoneMatch?: '*' },
+  ): Promise<boolean> {
+    try {
+      await this.s3Client.send(new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: options.contentType,
+        CacheControl: 'private, no-store',
+        IfMatch: options.ifMatch,
+        IfNoneMatch: options.ifNoneMatch,
+      }));
+      return true;
+    } catch (error: any) {
+      if (error?.$metadata?.httpStatusCode === 412 || error?.name === 'PreconditionFailed') return false;
+      throw error;
+    }
+  }
+
+  /**
    * Get the public URL for a key (if bucket is configured for public access)
    */
   getPublicUrl(key: string): string {

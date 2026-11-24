@@ -6,6 +6,7 @@ import type { Database } from '@/types/database';
 import { findEarnedCompletion } from '@/lib/prefecture-earned';
 import { loadCachedManholes } from '@/lib/manhole-snapshot';
 import { sortCatalog } from '@/lib/manhole-catalog-sort';
+import { loadUserSnapshot } from '@/lib/user-snapshot';
 
 export type PublicPrefectureProgress = {
   name: string;
@@ -248,30 +249,25 @@ async function loadPublicUserPrefectureProgressImpl(
   userId: string,
   onlyPrefecture?: string
 ): Promise<PublicUserPrefectureProgress | null> {
-  // プロフィールと訪問は常に取り直し、カタログだけキャッシュに載せる
-  const liveClient = getPublicLiveClient();
+  // プロフィールと訪問は公開スタンプ帳のスナップショット（src/lib/user-snapshot.ts）から、カタログはキャッシュから
   const catalogClient = getPublicCatalogClient();
 
-  if (!liveClient || !catalogClient) {
+  if (!catalogClient) {
     throw new Error('Supabase client is not configured');
   }
 
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const [profileResult, manholeRows] = await Promise.all([
-    liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
+  const [snapshot, manholeRows] = await Promise.all([
+    loadUserSnapshot(trimmedUserId),
     loadManholeCatalog(catalogClient),
   ]);
 
-  if (profileResult.error) {
-    throw new Error(profileResult.error.message);
-  }
-
-  const appUserRow = (profileResult.data as PublicProfileRow[] | null)?.[0] ?? null;
-  if (!appUserRow) {
+  if (!snapshot) {
     return null;
   }
+  const appUserRow = snapshot.profile;
   const totalIdsByPrefecture = new Map<string, Set<number>>();
   const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();
   const pokemonsByManhole = new Map<number, string[]>();
@@ -312,27 +308,11 @@ async function loadPublicUserPrefectureProgressImpl(
 
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
-  // 公開IDで直接引く。auth_uid は使わない（ビューの内側で結合に使われるだけ）。
-  // 最新写真が要るのでカード用ビュー。集計だけなら base を使うこと。
-  // 非公開に戻した訪問が残らないよう live 側で取る（キャッシュしない）。
-  let visitsQuery = liveClient
-    .from('public_user_visit_card')
-    .select(
-      'manhole_id, shot_at, created_at, manhole_prefecture,' +
-      ' latest_photo_id, latest_photo_created_at, latest_photo_is_landscape'
-    )
-    .eq('public_user_id', trimmedUserId)
-    .not('manhole_id', 'is', null);
-  if (onlyPrefecture !== undefined) {
-    // 県別のページ・OGP はその県しか見せないので、全県の訪問を読まない。
-    // 県ごとの集計は訪問の manhole_prefecture で分けているので、その県の数字は全件で読んだときと同じ
-    visitsQuery = visitsQuery.eq('manhole_prefecture', onlyPrefecture);
-  }
-  const { data: visits, error: visitsError } = await visitsQuery;
-
-  if (visitsError) {
-    throw new Error(visitsError.message);
-  }
+  // 蓋のある公開訪問の全件（スナップショットの progressRows）。県別のページはその県の分だけを使う。
+  // 県ごとの集計は訪問の manhole_prefecture で分けているので、その県の数字は全件で数えたときと同じ
+  const visits = onlyPrefecture === undefined
+    ? snapshot.progressRows
+    : snapshot.progressRows.filter((row) => row.manhole_prefecture === onlyPrefecture);
 
   // 県で絞ったときは、その県の訪問が0件でも「0枚訪問」の県として返す（下の集計に進む）
   if (onlyPrefecture === undefined && (!visits || visits.length === 0)) {

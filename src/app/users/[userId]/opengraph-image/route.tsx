@@ -14,8 +14,7 @@ import { SITE_NAME } from '@/lib/constants';
 import { badgeRank, lidImageUrl } from '@/lib/badge-catalog';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
-import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
-import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
+import { loadPublicStickerCounts } from '@/lib/sticker-counts';
 import { buildPublicStampbookBadges, type PublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion } from '@/lib/stampbook-ogp-version';
 import { fetchRegularBadges } from '@/lib/regular-badges';
@@ -302,13 +301,9 @@ export async function GET(request: Request, { params }: RouteContext) {
       });
     }
 
-    const [designManholeCount, plushCount, snowCount] = progress
-      ? await timed(timings, 'counts', Promise.all([
-          loadPublicDesignManholeCount(visitsData.userId),
-          loadPublicPlushVisitCount(visitsData.userId),
-          loadPublicSnowVisitCount(visitsData.userId),
-        ]))
-      : [0, 0, 0];
+    const { designManholeCount, plushCount, snowCount } = progress
+      ? await timed(timings, 'counts', loadPublicStickerCounts(visitsData.userId))
+      : { designManholeCount: 0, plushCount: 0, snowCount: 0 };
     const badges = progress
       ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount, plushCount, snowCount })
       : null;

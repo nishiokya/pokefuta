@@ -7,6 +7,7 @@ import {
   normalizeFriendCode,
 } from '@/lib/pokemon-go-friend-code';
 import { INSTAGRAM_HOSTS, INSTAGRAM_SITE, X_HOSTS, X_SITE, normalizeSocialUrl } from '@/lib/social-url';
+import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
@@ -177,6 +178,9 @@ export async function PATCH(request: Request) {
     console.error('Failed to update public profile:', error);
     return NextResponse.json({ error: 'プロフィールを保存できませんでした。' }, { status: 500 });
   }
+
+  // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す（募集スイッチ OFF のコードを残さない）
+  await refreshOwnUserSnapshot(supabase);
 
   // 保存後の値を読み直して返す。
   //

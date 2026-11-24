@@ -22,8 +22,7 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion, type StampbookOgpVersionInput } from '@/lib/stampbook-ogp-version';
-import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
-import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
+import { loadPublicStickerCounts } from '@/lib/sticker-counts';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -140,15 +139,13 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives, designManholeCount, plushCount, snowCount] = await Promise.all([
+  const [data, progress, snapshot, representatives, { designManholeCount, plushCount, snowCount }] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
     fetchManholeSnapshot().catch(() => null),
     fetchPokemonRepresentatives(),
-    loadPublicDesignManholeCount(params.userId),
-    loadPublicPlushVisitCount(params.userId),
-    loadPublicSnowVisitCount(params.userId),
+    loadPublicStickerCounts(params.userId),
   ]);
 
   if (!data) notFound();

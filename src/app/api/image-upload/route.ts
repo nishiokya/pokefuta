@@ -14,6 +14,7 @@ import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
+import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -534,6 +535,9 @@ export async function POST(request: NextRequest) {
         console.warn('Failed to set gift availability after upload:', error);
       }
     }
+
+    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
+    await refreshOwnUserSnapshot(supabase);
 
     return NextResponse.json({
       success: true,

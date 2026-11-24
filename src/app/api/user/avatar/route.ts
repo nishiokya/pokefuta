@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
+import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
 
 // プロフィールのアイコン（自分の公開訪問の写真から1枚）を読む・選ぶ。
 //
@@ -62,6 +63,9 @@ export async function PUT(request: Request) {
     console.error('Failed to set avatar photo:', error);
     return json({ error: 'アイコンを保存できませんでした。' }, 500);
   }
+
+  // 公開スタンプ帳のスナップショット（R2）のアイコンを作り直す
+  await refreshOwnUserSnapshot(supabase);
 
   return json({ success: true, photoId: (data as unknown as string | null) ?? null });
 }

@@ -5,6 +5,7 @@ import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
+import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -196,6 +197,9 @@ export async function PATCH(
       }, { status: 500 });
     }
 
+    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
+    await refreshOwnUserSnapshot(supabase);
+
     return NextResponse.json({
       success: true,
       visit_id: updated.id,
@@ -316,6 +320,9 @@ export async function DELETE(
         details: deleteVisitError.message
       }, { status: 500 });
     }
+
+    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
+    await refreshOwnUserSnapshot(supabase);
 
     return NextResponse.json({
       success: true,

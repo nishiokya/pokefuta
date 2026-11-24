@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey, photoObjectKeys } from '@/lib/storage';
 import { photoRedirectCachePolicy } from '@/lib/photo-redirect-cache';
+import { refreshOwnUserSnapshot } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
@@ -271,6 +272,9 @@ export async function DELETE(
         details: deleteError.message
       }, { status: 500 });
     }
+
+    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
+    await refreshOwnUserSnapshot(supabase);
 
     return NextResponse.json({
       success: true,

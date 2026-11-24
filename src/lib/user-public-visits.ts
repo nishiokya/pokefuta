@@ -1,11 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
-import {
-  FALLBACK_DISPLAY_NAME,
-  getPublicLiveClient,
-  type PublicProfileRow,
-} from '@/lib/user-prefecture-progress';
-import { loadPublicVisitStats } from '@/lib/public-visit-stats';
+import { FALLBACK_DISPLAY_NAME } from '@/lib/user-prefecture-progress';
+import { loadUserSnapshot } from '@/lib/user-snapshot';
 
 export type PublicVisitManhole = {
   id: number;
@@ -45,78 +41,21 @@ export type PublicUserVisits = {
   isTruncated: boolean;
 };
 
-/** public_user_visit_card の行。ビューは平坦なので埋め込みの配列/オブジェクト分岐が要らない */
-type VisitPublicRow = {
-  id: string;
-  manhole_id: number | null;
-  shot_at: string | null;
-  comment: string | null;
-  created_at: string | null;
-  manhole_title: string | null;
-  manhole_prefecture: string | null;
-  manhole_municipality: string | null;
-  manhole_pokemons: string[] | null;
-  latest_photo_id: string | null;
-  latest_photo_is_landscape: boolean | null;
-  latest_photo_ai_tags: unknown;
-};
-
-const VISIT_LIMIT = 500;
 async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
-  // プロフィールも訪問も常に取り直す。非公開に戻した訪問の comment・写真ID・日時が
-  // キャッシュで生き残ると、「もう見せたくない」という操作が効かなくなる。
-  const liveClient = getPublicLiveClient();
-
-  if (!liveClient) {
-    throw new Error('Supabase client is not configured');
-  }
-
+  // 公開スタンプ帳のスナップショット（R2、無ければ DB から作る）から組み立てる。
+  // 非公開に戻した訪問が残らない仕組みは src/lib/user-snapshot.ts に書いた（書き込みの直後に作り直す）。
   const trimmedUserId = userId.trim();
   if (!trimmedUserId) return null;
 
-  const [{ data: userInfo, error: userInfoError }, avatarPhotoId] = await Promise.all([
-    liveClient.rpc('get_public_profile' as never, { p_user_id: trimmedUserId } as never),
-    loadPublicAvatarPhotoId(liveClient, trimmedUserId),
-  ]);
+  const snapshot = await loadUserSnapshot(trimmedUserId);
+  if (!snapshot) return null;
 
-  if (userInfoError) {
-    throw new Error(userInfoError.message);
-  }
-
-  const appUserRow = (userInfo as PublicProfileRow[] | null)?.[0] ?? null;
-  if (!appUserRow) {
-    return null;
-  }
-
+  const appUserRow = snapshot.profile;
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
-  // 公開IDで直接引く。auth_uid は使わない。
-  // note / shot_location はビューの列に無いので、うっかり選ぶこと自体ができない。
-  //
-  // カード一覧(500件上限)と、正確な総数・都道府県数の集計を並列取得。
-  // 500件上限だけで totalVisits/prefectureCount を計算すると、公開訪問が500件を超える
-  // ユーザーで数値が実態より小さく出てしまうため、集計は別に出す（本人の共有文と同じ関数）。
-  const [{ data: visits, error: visitsError }, stats] = await Promise.all([
-    liveClient
-      .from('public_user_visit_card')
-      .select(
-        'id, manhole_id, shot_at, comment, created_at,' +
-        ' manhole_title, manhole_prefecture, manhole_municipality, manhole_pokemons,' +
-        ' latest_photo_id, latest_photo_is_landscape, latest_photo_ai_tags'
-      )
-      .eq('public_user_id', trimmedUserId)
-      .order('shot_at', { ascending: false })
-      .limit(VISIT_LIMIT),
-    loadPublicVisitStats(liveClient, trimmedUserId),
-  ]);
-
-  if (visitsError) {
-    throw new Error(visitsError.message);
-  }
-
-  const visitRows = ((visits || []) as unknown as VisitPublicRow[]);
-
-  const publicVisits: PublicVisit[] = visitRows.map((visit) => ({
+  // note / shot_location はビューの列に無いので、スナップショットにも入らない。
+  // 総数・都道府県数はカード（500件上限）からではなく、全件の集計（本人の共有文と同じ関数）を使う。
+  const publicVisits: PublicVisit[] = snapshot.cards.map((visit) => ({
     id: visit.id,
     manholeId: visit.manhole_id,
     shotAt: visit.shot_at,
@@ -138,7 +77,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
   }));
 
   // 件数が取れなかったとき（null → 0）でも、一覧に出している枚数より小さくはしない
-  const totalVisits = Math.max(stats.totalVisits, publicVisits.length);
+  const totalVisits = Math.max(snapshot.stats.totalVisits, publicVisits.length);
 
   return {
     userId: trimmedUserId,
@@ -148,36 +87,12 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     instagramUrl: appUserRow.instagram_url || null,
     pokemonGoFriendCode: appUserRow.pokemon_go_friend_code || null,
     pokemonGoFriendNote: appUserRow.pokemon_go_friend_note || null,
-    avatarPhotoId,
+    avatarPhotoId: snapshot.avatarPhotoId,
     totalVisits,
-    prefectureCount: stats.prefectureCount,
+    prefectureCount: snapshot.stats.prefectureCount,
     visits: publicVisits,
     isTruncated: totalVisits > publicVisits.length,
   };
-}
-
-/**
- * 公開ページのアイコン。取れなければ null（アイコン無し）で、ページは落とさない。
- * マイグレーション（20261106150000）の適用前にデプロイが先に出た窓でも、
- * 公開ページそのものが 500 にならないようにする。
- */
-async function loadPublicAvatarPhotoId(
-  client: NonNullable<ReturnType<typeof getPublicLiveClient>>,
-  userId: string
-): Promise<string | null> {
-  try {
-    const { data, error } = await client.rpc(
-      'get_public_avatar_photo_id' as never,
-      { p_user_id: userId } as never
-    );
-    if (error) {
-      console.warn('Failed to load public avatar:', error.message);
-      return null;
-    }
-    return typeof data === 'string' ? data : null;
-  } catch {
-    return null;
-  }
 }
 
 export const loadPublicUserVisits = cache(loadPublicUserVisitsImpl);
