@@ -1026,7 +1026,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   // Every photo on this manhole, always visible — no "+N" gate, nobody's shot stays hidden.
   // 上の枠（galleryPreviewPhotos）に全部出ている枚数なら重ねて出さない。
-  const allPhotosGrid = allDisplayPhotos.length > galleryPreviewPhotos.length || (!representativePhoto && allDisplayPhotos.length > 0) ? (
+  // ただし自分の写真があるときは出す。ひとことの編集・削除はこの一覧のマスにしか無い。
+  const allPhotosGrid =
+    allDisplayPhotos.length > galleryPreviewPhotos.length ||
+    (!representativePhoto && allDisplayPhotos.length > 0) ||
+    allDisplayPhotos.some((photo) => photo.visit?.is_own) ? (
     <div className="rounded-[14px] border border-[#e9dfc7] bg-[#fffdf7] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-pixelJp text-xs font-bold text-[#2c2a26]">
@@ -1631,7 +1635,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             コメント欄と地図を挟んで2回出ていた。上の枠に全部収まる3枚以下なら出さない。
           */}
           {allPhotosGrid}
-          {/* 上の枠に全部収まる蓋は allPhotosGrid が無いので、タグの注釈をここで出す（拡大表示にはタグが出る） */}
+          {/* 上の枠に全部収まる蓋は allPhotosGrid が無いので、タグの注釈をここで出す（タグは住所の欄に出る） */}
           {!allPhotosGrid && (
             <AiTagNote show={allDisplayPhotos.some((p) => photoAiTags(p).length > 0)} />
           )}
