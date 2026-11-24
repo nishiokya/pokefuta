@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { storage } from '@/lib/storage';
@@ -49,9 +50,24 @@ export function getManholeLocationLabel(manhole: Pick<SharedPhoto['manhole'], 'p
   return `${manhole.prefecture}${manhole.municipality || ''}`;
 }
 
+// 写真の詳細ページは generateMetadata と本文で同じ写真を読む。React の cache() で
+// 1リクエストの中の2回目以降を使い回し、DB への問い合わせを1本にする。巡回が来たとき
+// 写真1枚の取得が DB の呼び出しの大半を占めていた（2026-11-23、1時間に約3万本）。
+// cache() は引数を同一性で比べるので、オプションのオブジェクトではなく真偽値で受ける。
 export async function loadPublicSharedPhoto(
   photoId: string,
   options: { includeSignedUrl?: boolean } = {}
+): Promise<SharedPhoto | null> {
+  return loadPublicSharedPhotoCached(photoId, options.includeSignedUrl === true);
+}
+
+const loadPublicSharedPhotoCached = cache(
+  (photoId: string, includeSignedUrl: boolean) => loadPublicSharedPhotoUncached(photoId, { includeSignedUrl }),
+);
+
+async function loadPublicSharedPhotoUncached(
+  photoId: string,
+  options: { includeSignedUrl?: boolean }
 ): Promise<SharedPhoto | null> {
   const clients = createShareSupabaseClients();
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { Calendar, Camera, ChevronRight, Heart, Image as ImageIcon, MapPin, MessageCircle, Sparkles, UserRound } from 'lucide-react';
 import ShareButtons from '@/components/ShareButtons';
@@ -76,7 +77,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+// 写真の詳細ページに来た UA を1行だけ CloudWatch に残す。Amplify のアクセスログは
+// pokefuta.com の分を選べず、全写真を巡回したクローラーの正体が分からなかった（2026-11-23）。
+// IP やクッキーは出さない。grep しやすいよう接頭辞を固定する
+function logPhotoPageUserAgent(photoId: string) {
+  try {
+    const ua = headers().get('user-agent') ?? '';
+    console.log(`[photo-page-ua] ${JSON.stringify({ photo: photoId, ua: ua.slice(0, 300) })}`);
+  } catch {
+    // ログが出せなくても表示は止めない
+  }
+}
+
 export default async function SharedPhotoPage({ params }: PageProps) {
+  logPhotoPageUserAgent(params.photoId);
   const photo = await loadPublicSharedPhoto(params.photoId);
 
   if (!photo) notFound();
