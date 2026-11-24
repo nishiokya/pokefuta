@@ -1009,12 +1009,27 @@ export default function HomePage() {
             </p>
           </section>
         )}
-        {feedSettled && (featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
+        {feedSettled && (showTenKMap || featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
           <section className="mt-8" aria-busy={featureLoadsDone < FEATURE_LOADS}>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
               特集
             </h2>
+            {showTenKMap && (
+              <Link
+                href="/features/10k-map"
+                className="group mb-2 flex items-center gap-3 rounded-lg bg-[#FFF8EB] p-2 shadow-sm transition hover:shadow"
+              >
+                <img src="/noprecache/features/10k-map/thumb.webp" alt="" width={64} height={64} loading="lazy" fetchPriority="low" className="h-16 w-16 shrink-0 rounded-lg border-2 border-white object-cover shadow-sm" />
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-[#4D3A69] sm:text-sm">みんなの写真1万枚でつくった日本地図</p>
+                  <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                    公開写真が10,000枚を超えました。投稿順に地図が埋まる動画
+                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
+                </div>
+              </Link>
+            )}
             <div className="grid grid-cols-2 gap-2">
             {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる。
                 特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
@@ -1112,6 +1127,9 @@ export default function HomePage() {
 
 // 特集で取り終わるのを待つ数（デザインふたと、雪景色・ぬいぐるみの交互の枠）
 const FEATURE_LOADS = 2;
+// 公開写真1万枚の記念カード（/features/10k-map）。記念なので期間を決めて自動で外す（この日の終わりまで出す）
+const TEN_K_MAP_UNTIL = '2026-12-21';
+const showTenKMap = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) <= TEN_K_MAP_UNTIL;
 
 // 特集カードを取り終わるまでの枠。本物のカードと同じ並び・同じ文字の大きさで高さをそろえる
 function FeatureCardPlaceholder() {
