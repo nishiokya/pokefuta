@@ -24,7 +24,13 @@ export const SITE_URL = 'https://pokefuta.com';
  * 20261018: 共通 OG 画像が 500 を返していたのを、ブランドのカードで描き直したため更新
  */
 export const OGP_IMAGE_VERSION = '20261018-fallback-card';
-export const OGP_IMAGE_URL = `${SITE_URL}/opengraph-image?v=${OGP_IMAGE_VERSION}`;
+/**
+ * サイト共通の OG 画像（layout と /design-manholes）。公開写真を敷き詰めた固定の絵なので、
+ * 実行時に描かず tools/build-site-ogp.js で焼いた静的ファイルを指す。
+ * 中身を変えたらファイル名の日付ごと変えること（URL が変わらないと SNS が古い画像を配り続ける）。
+ * 20261124: 右半分が空の枠だった /opengraph-image から差し替え
+ */
+export const OGP_IMAGE_URL = `${SITE_URL}/ogp/site-card-20261124.jpg`;
 
 /**
  * 訪問写真を配信する署名URLの寿命（秒）。
