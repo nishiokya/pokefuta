@@ -14,7 +14,7 @@ import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
+import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -169,8 +169,8 @@ import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snaps
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
-    const ownPublicUserId = resolveOwnPublicUserId(supabase);
+    // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
+    const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
 
     // ✅ 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
@@ -539,7 +539,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
+    await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
 
     return NextResponse.json({
       success: true,

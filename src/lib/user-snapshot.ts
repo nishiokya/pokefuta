@@ -27,7 +27,8 @@ import {
  *
  * 鮮度（非公開に戻した訪問が残らないこと）の守り方:
  * - 本人の書き込み（投稿・訪問の編集/削除・まとめて公開・写真の削除・プロフィール・アイコン・
- *   デザインマンホールの投稿）の直後に refreshOwnUserSnapshot() で作り直す。
+ *   デザインマンホールの投稿）では、始める前に beginOwnSnapshotWrite() で印を置き、
+ *   成功したあとに finishOwnSnapshotWrite() で作り直す。
  * - 書き戻しはすべて条件つき（R2 を読んだときの ETag のままなら / 無いときだけ）。R2 を先に読み、
  *   そのあと DB を読むので、その間にほかの書き込みが入っていたら ETag が変わって書けない。
  *   古い内容で新しい内容を上書きしない（R2 は PutObject の If-Match / If-None-Match に対応している）。
@@ -35,16 +36,15 @@ import {
  *   その前から走っていた表示の書き戻しを弾ける（消すと「無いときだけ書く」が通ってしまう）。
  * - アプリを通らない変更（自動採点・マイグレーション・審査）は寿命（1日）で拾う。
  *
- * 残る穴: 書き込みの直後に R2 が丸ごと使えない（印も置けない）と、最大で寿命のあいだ古い JSON が残る。
- * そのときは `[user-snapshot] STALE` をエラーで出す（CloudWatch で拾える）。
+ * 残る穴: 前の印もあとの作り直し・印もすべて失敗する（R2 か DB がその間ずっと使えない）と、
+ * 最大で寿命のあいだ古い JSON が残る。そのときは `[user-snapshot] STALE` をエラーで出す（CloudWatch で拾える）。
+ * 自分の訪問の表示名が、いいね・コメントのついでの upsert_app_user で変わる分（未カスタマイズの名前だけ）は寿命で拾う。
  *
  * JSON は R2 のバケット内で非公開（公開 URL を作らない）。サーバーが S3 API で読むだけ。
  */
 
 const R2_READ_TIMEOUT_MS = 1500;
 const R2_WRITE_TIMEOUT_MS = 2000;
-/** 書き込み API に足す待ち時間の上限。超えたら作り直しをやめて印を置く */
-const REFRESH_BUDGET_MS = 4000;
 /** PostgREST の1回の上限（supabase/config.toml の max_rows）。これより多い訪問はページを分けて読む */
 const PAGE_ROWS = 1000;
 const CONTENT_TYPE = 'application/json; charset=utf-8';
@@ -282,12 +282,14 @@ export const loadUserSnapshot = cache(async (publicUserId: string): Promise<User
   return built.snapshot;
 });
 
+/** 作り直しに使う時間の上限。超えたら打ち切って印を置く（印の書き込みは R2_WRITE_TIMEOUT_MS まで別にかかる） */
+const REFRESH_TIMEOUT_MS = 3000;
+const RESOLVE_TIMEOUT_MS = 1500;
+
 /**
- * 本人の書き込みの直後に作り直す。
- * 作り直せなかったら「作り直せなかった印」を置く（古い JSON を残さない）。
- * 失敗しても例外は投げない（書き込み自体は成功している）。待ち時間は REFRESH_BUDGET_MS まで。
+ * 作り直す。できなければ「作り直せなかった印」を置く。どちらもできなければ false。
  */
-async function refreshUserSnapshot(store: R2StorageAdapter, publicUserId: string): Promise<void> {
+async function refreshUserSnapshot(store: R2StorageAdapter, publicUserId: string): Promise<boolean> {
   const attempt = async (): Promise<boolean> => {
     // 2回まで: 1回目の間にほかの書き込み（同じ人のまとめて投稿など）が先に書いたら、読み直して作り直す
     for (let i = 0; i < 2; i += 1) {
@@ -301,27 +303,35 @@ async function refreshUserSnapshot(store: R2StorageAdapter, publicUserId: string
   };
 
   try {
-    if (await withTimeout(attempt(), REFRESH_BUDGET_MS, 'snapshot refresh')) return;
+    if (await withTimeout(attempt(), REFRESH_TIMEOUT_MS, 'snapshot refresh')) return true;
   } catch (error) {
     console.warn('[user-snapshot] refresh failed:', error);
   }
+  return tryTombstone(store, publicUserId);
+}
 
+async function tryTombstone(store: R2StorageAdapter, publicUserId: string): Promise<boolean> {
   try {
     await putTombstone(store, publicUserId);
+    return true;
   } catch (error) {
-    console.error('[user-snapshot] STALE: could not invalidate; the old snapshot may be served for up to a day:', publicUserId, error);
+    console.warn('[user-snapshot] could not put a tombstone:', error);
+    return false;
   }
 }
 
 /**
- * 本人の公開ID（app_user.id）。書き込みの「前」に呼んでおく。
- * get_public_user_ids は公開訪問が0件になった人を返さないので使わない（最後の1件を非公開にしたときに引けない）。
- * 失敗したら null。そのときは書き込み後にもう一度引く。
+ * 本人の公開ID（app_user.id）。get_public_user_ids は公開訪問が0件になった人を返さないので使わない
+ * （最後の1件を非公開にしたときに引けない）。失敗・時間切れは null。
  */
-export async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<string | null> {
+async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<string | null> {
   for (let i = 0; i < 2; i += 1) {
     try {
-      const { data, error } = await supabase.rpc('get_own_profile' as never);
+      const { data, error } = await withTimeout(
+        Promise.resolve(supabase.rpc('get_own_profile' as never)),
+        RESOLVE_TIMEOUT_MS,
+        'get_own_profile',
+      );
       if (error) throw error;
       const row = ((data as unknown as { public_user_id?: string | null }[] | null) || [])[0];
       return row?.public_user_id ? normalizeSnapshotUserId(row.public_user_id) : null;
@@ -332,20 +342,43 @@ export async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Pro
   return null;
 }
 
+export type OwnSnapshotWrite = Promise<{ publicUserId: string | null; invalidated: boolean }>;
+
 /**
- * 本人の書き込みのあとに呼ぶ。supabase は書き込みに使ったログイン中のクライアント。
- * publicUserId は書き込みの前に resolveOwnPublicUserId で引いたもの（渡さなければここで引く）。
+ * 本人の書き込みを始める前に呼ぶ（await しなくてよい。書き込みと並べて走らせる）。
+ * 公開IDを引き、先に「作り直せなかった印」を置いておく。
+ * こうしておくと、書き込みのあとの作り直しと印の両方が失敗しても（R2 が書き込みの途中から使えなくなっても）、
+ * 書き込み前の JSON はもう配られない。印を見た表示は DB から読む。
  */
-export async function refreshOwnUserSnapshot(
-  supabase: SupabaseClient<any>,
-  publicUserId?: string | null,
-): Promise<void> {
+export function beginOwnSnapshotWrite(supabase: SupabaseClient<any>): OwnSnapshotWrite {
+  const store = snapshotStore();
+  if (!store) return Promise.resolve({ publicUserId: null, invalidated: true });
+  return (async () => {
+    const publicUserId = await resolveOwnPublicUserId(supabase);
+    if (!publicUserId) return { publicUserId: null, invalidated: false };
+    return { publicUserId, invalidated: await tryTombstone(store, publicUserId) };
+  })();
+}
+
+/**
+ * 本人の書き込みが成功したあとに呼ぶ。今の DB から作り直す（できなければ印を置く）。
+ * 例外は投げない（書き込み自体は成功している）。待ち時間はおおむね RESOLVE + REFRESH + 印の書き込みまで。
+ *
+ * 書き込みの前の印も、あとの作り直し・印も、すべて失敗したときだけ古い JSON が寿命（1日）まで残る。
+ * そのときは `[user-snapshot] STALE` をエラーで出す。
+ */
+export async function finishOwnSnapshotWrite(supabase: SupabaseClient<any>, begun: OwnSnapshotWrite): Promise<void> {
   const store = snapshotStore();
   if (!store) return;
-  const id = publicUserId ?? (await resolveOwnPublicUserId(supabase));
-  if (!id) {
-    console.error('[user-snapshot] STALE: could not resolve own public id; the snapshot may be served for up to a day');
+  const before = await begun;
+  const publicUserId = before.publicUserId ?? (await resolveOwnPublicUserId(supabase));
+  if (!publicUserId) {
+    // 公開IDが引けない＝ app_user がまだ無い人（公開スタンプ帳も無い）か、DB に届かない
+    console.error('[user-snapshot] STALE: could not resolve own public id; a snapshot (if any) may be served for up to a day');
     return;
   }
-  await refreshUserSnapshot(store, id);
+  const after = await refreshUserSnapshot(store, publicUserId);
+  if (!after && !before.invalidated) {
+    console.error('[user-snapshot] STALE: could not invalidate; the old snapshot may be served for up to a day:', publicUserId);
+  }
 }

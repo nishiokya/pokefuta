@@ -25,7 +25,7 @@ import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
-import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
+import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
   try {
     // 1. 認証（image-upload と同じ cookie セッション方式）
     const supabase = createRouteHandlerClient({ cookies });
-    // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
-    const ownPublicUserId = resolveOwnPublicUserId(supabase);
+    // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
+    const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       return NextResponse.json(
@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
 
     // 公開スタンプ帳のデザインマンホールの枚数（ステッカー）を作り直す。審査待ちは数に入らないので公開したときだけ
     if (inserted.status === 'published') {
-      await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
+      await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
     }
 
     return NextResponse.json(

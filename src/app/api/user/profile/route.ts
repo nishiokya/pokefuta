@@ -7,7 +7,7 @@ import {
   normalizeFriendCode,
 } from '@/lib/pokemon-go-friend-code';
 import { INSTAGRAM_HOSTS, INSTAGRAM_SITE, X_HOSTS, X_SITE, normalizeSocialUrl } from '@/lib/social-url';
-import { refreshOwnUserSnapshot, resolveOwnPublicUserId } from '@/lib/user-snapshot';
+import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
@@ -102,8 +102,8 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = createRouteHandlerClient();
-  // 公開ID（app_user.id）は変わらないので、書き込みの前に引いておく（公開スタンプ帳のスナップショットの作り直し用）
-  const ownPublicUserId = resolveOwnPublicUserId(supabase);
+  // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
+  const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -182,7 +182,7 @@ export async function PATCH(request: Request) {
   }
 
   // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す（募集スイッチ OFF のコードを残さない）
-  await refreshOwnUserSnapshot(supabase, await ownPublicUserId);
+  await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
 
   // 保存後の値を読み直して返す。
   //
