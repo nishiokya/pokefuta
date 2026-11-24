@@ -158,6 +158,12 @@ function GalleryPhotoTagsRow({ photos }: { photos: Photo[] }) {
   );
 }
 
+/** 撮った人のプロフィールへのリンク先。自分の写真と公開IDの無い写真は null */
+const posterProfileHref = (photo: Photo) =>
+  !photo.visit?.is_own && photo.visit?.public_user_id
+    ? `/users/${encodeURIComponent(photo.visit.public_user_id)}`
+    : null;
+
 /** 写真の上に重ねる一言。ゴミ判定を通ったものだけ、改行を空白に畳んで返す */
 const getPhotoCaption = (photo: Photo) =>
   isMeaningfulVisitComment(photo.visit?.comment)
@@ -1459,16 +1465,24 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                       </span>
                     </span>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white">
-                    <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
-                    <span className="min-w-0 truncate text-xs font-bold">{getPhotoUserLabel(allDisplayPhotos[0])}</span>
-                    {allDisplayPhotos[0].visit?.shot_at && (
-                      <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
-                        {formatPhotoDate(allDisplayPhotos[0].visit!.shot_at)}
-                      </span>
-                    )}
-                  </div>
                 </button>
+                {/* 名前はボタンの外に重ねて、撮った人のプロフィールへのリンクにする
+                    （全画面表示を写真だけにしたので、ここが入口になる） */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 overflow-hidden rounded-b-[16px] bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-12 text-left text-white lg:rounded-b-[18px]">
+                  <PhotoPosterAvatar photo={allDisplayPhotos[0]} size={32} />
+                  {posterProfileHref(allDisplayPhotos[0]) ? (
+                      <Link href={posterProfileHref(allDisplayPhotos[0])!} className="pointer-events-auto min-w-0 truncate text-xs font-bold underline decoration-white/60 underline-offset-2 hover:text-white/80">
+                        {getPhotoUserLabel(allDisplayPhotos[0])}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate text-xs font-bold">{getPhotoUserLabel(allDisplayPhotos[0])}</span>
+                    )}
+                  {allDisplayPhotos[0].visit?.shot_at && (
+                    <span className="ml-auto shrink-0 font-['Outfit'] text-[11px] opacity-90">
+                      {formatPhotoDate(allDisplayPhotos[0].visit!.shot_at)}
+                    </span>
+                  )}
+                </div>
                   {allDisplayPhotos[0].visit?.id && (
                     <span className="absolute right-2 top-2 z-[3]">
                       <PhotoLikeButton
@@ -1521,20 +1535,26 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
                             </span>
                           </span>
                         )}
-                        <span className={`absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-3 text-left text-white ${isRepresentative ? 'items-center' : 'flex-col items-start'}`}>
-                          <span className="flex w-full min-w-0 flex-1 items-center gap-1">
-                            <PhotoPosterAvatar photo={photo} size={isRepresentative ? 32 : 26} />
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">
-                              {getPhotoUserLabel(photo)}
-                            </span>
-                          </span>
-                          {photo.visit?.shot_at && (
-                            <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
-                              {formatPhotoDate(photo.visit.shot_at)}
-                            </span>
-                          )}
-                        </span>
                       </button>
+                      <span className={`pointer-events-none absolute inset-x-0 bottom-0 flex gap-1 overflow-hidden bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-3 text-left text-white ${
+                        isRepresentative ? 'items-center rounded-bl-[16px] lg:rounded-bl-[18px]' : 'flex-col items-start rounded-br-[13px] lg:rounded-br-[15px]'
+                      }`}>
+                        <span className="flex w-full min-w-0 flex-1 items-center gap-1">
+                          <PhotoPosterAvatar photo={photo} size={isRepresentative ? 32 : 26} />
+                          {posterProfileHref(photo) ? (
+                      <Link href={posterProfileHref(photo)!} className="pointer-events-auto min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs underline decoration-white/60 underline-offset-2 hover:text-white/80">
+                        {getPhotoUserLabel(photo)}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-[11px] font-bold lg:text-xs">{getPhotoUserLabel(photo)}</span>
+                    )}
+                        </span>
+                        {photo.visit?.shot_at && (
+                          <span className="shrink-0 font-['Outfit'] text-[10px] opacity-90 lg:text-[11px]">
+                            {formatPhotoDate(photo.visit.shot_at)}
+                          </span>
+                        )}
+                      </span>
                       {photo.visit?.id && (
                     <span className="absolute right-2 top-2 z-[3]">
                       <PhotoLikeButton
