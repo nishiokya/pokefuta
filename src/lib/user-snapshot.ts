@@ -251,6 +251,7 @@ const lockBody = (publicUserId: string, holders: Record<string, number>): UserSn
   lock: true,
   publicUserId,
   holders,
+  gen: crypto.randomUUID(),
 });
 
 /**
@@ -310,7 +311,7 @@ async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<st
 }
 
 export type OwnSnapshotLock =
-  | { ok: true; publicUserId: string | null; nonce: string | null }
+  | { ok: true; publicUserId: string | null; nonce: string | null; deferred?: boolean }
   | { ok: false };
 
 /**
@@ -323,8 +324,14 @@ export async function lockOwnSnapshot(supabase: SupabaseClient<any>): Promise<Ow
   if (!store) return { ok: true, publicUserId: null, nonce: null };
   const publicUserId = await resolveOwnPublicUserId(supabase);
   if (publicUserId === undefined) return { ok: false };
-  if (publicUserId === null) return { ok: true, publicUserId: null, nonce: null };
+  // 本人の app_user がまだ無い（初めての保存）。公開スタンプ帳もまだ無いはずだが、同時に来たほかの保存が
+  // 先に行を作り、その間に表示が JSON を置くことはあり得る。なので書き込みのあとで公開IDを引き直し、
+  // ロックを置いてから作り直す（deferred）
+  if (publicUserId === null) return { ok: true, publicUserId: null, nonce: null, deferred: true };
+  return placeLock(store, publicUserId);
+}
 
+async function placeLock(store: R2StorageAdapter, publicUserId: string): Promise<OwnSnapshotLock> {
   const nonce = crypto.randomUUID();
   try {
     for (let i = 0; i < 3; i += 1) {
@@ -347,9 +354,22 @@ export async function lockOwnSnapshot(supabase: SupabaseClient<any>): Promise<Ow
  * ほかにロック中の人がいなければ今の DB から作り直して置き換える。いれば自分の印だけ外す。
  * 失敗・時間切れならロックはそのまま期限で切れる（その後の表示が DB の変更後の内容で作り直す）。
  */
-export async function unlockOwnSnapshot(lock: OwnSnapshotLock): Promise<void> {
+export async function unlockOwnSnapshot(lock: OwnSnapshotLock, supabase?: SupabaseClient<any>): Promise<void> {
   const store = snapshotStore();
-  if (!store || !lock.ok || !lock.publicUserId || !lock.nonce) return;
+  if (!store || !lock.ok) return;
+  if (lock.deferred) {
+    // 初めての保存だった。いま行があれば、ロックを置いてから作り直す
+    if (!supabase) return;
+    const publicUserId = await resolveOwnPublicUserId(supabase);
+    if (publicUserId === null) return;
+    const placed = publicUserId === undefined ? ({ ok: false } as const) : await placeLock(store, publicUserId);
+    if (!placed.ok) {
+      console.error('[user-snapshot] STALE: could not lock after a first-time write; a snapshot (if any) may be served for up to a day');
+      return;
+    }
+    return unlockOwnSnapshot(placed);
+  }
+  if (!lock.publicUserId || !lock.nonce) return;
   const { publicUserId, nonce } = lock;
 
   const attempt = async (): Promise<void> => {

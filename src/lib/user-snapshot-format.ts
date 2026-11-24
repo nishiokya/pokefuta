@@ -22,15 +22,21 @@ export const USER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * 読んだ古い内容（非公開にする前の訪問など）が保存されてしまう（PR の Codex レビュー）。
  *
  * 書き込みのあとの作り直しが失敗してもロックは期限で切れる。そのあとの表示は DB の変更後に読むので、古い内容は戻らない。
- * 期限は書き込み1回にかかる時間より十分長くする。
+ * 期限は書き込み1回にかかる時間（リクエストの時間切れ）より十分長くする。切れても困るのは、
+ * 期限切れ後の表示が DB の変更前を読んで保存し、かつ書き込み後の作り直しも失敗したときだけ。
  */
-export const USER_SNAPSHOT_LOCK_MS = 5 * 60 * 1000;
+export const USER_SNAPSHOT_LOCK_MS = 15 * 60 * 1000;
 
 export type UserSnapshotLock = {
   v: typeof USER_SNAPSHOT_VERSION;
   lock: true;
   publicUserId: string;
   holders: Record<string, number>;
+  /**
+   * 書き換えるたびに新しくする値。holders が前と同じに戻っても本文（＝ ETag）が前と同じにならないようにする。
+   * 同じに戻ると、昔の ETag を条件にした書き込みが通ってしまう（ABA。PR の Codex レビュー）
+   */
+  gen: string;
 };
 
 /** ロックなら期限内の印だけを返す（空なら、だれも書き込み中でない＝無いのと同じ）。ロックでなければ null */

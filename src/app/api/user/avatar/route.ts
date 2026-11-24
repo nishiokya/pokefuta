@@ -72,7 +72,7 @@ export async function PUT(request: Request) {
   }
 
   // 公開スタンプ帳のスナップショット（R2）のアイコンを作り直す
-  await unlockOwnSnapshot(snapshotLock);
+  await unlockOwnSnapshot(snapshotLock, supabase);
 
   return json({ success: true, photoId: (data as unknown as string | null) ?? null });
 }
