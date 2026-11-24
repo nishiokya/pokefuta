@@ -142,6 +142,12 @@ export async function GET(
       }, { status: 404 });
     }
 
+    const isPublicRedirect = visit?.is_public === true && !readCookies;
+    // CloudFront のヒットはここを通らない。公開サムネイルの残りの実行回数を 1% サンプルで測る。
+    if (isPublicRedirect && size === 'small' && Math.random() < 0.01) {
+      console.info('public photo thumbnail origin sample (1%)');
+    }
+
     // Determine which storage key to use based on size
     let storageKey = photo.storage_key;
 
@@ -165,9 +171,7 @@ export async function GET(
     // CDN に置き、SSR の起動を減らす（#282。寿命の決め方は photo-redirect-cache.ts）。
     // stale-while-revalidate は署名URLの寿命を超えて配り続けうるので使わない。
     // Private photos must not enter shared caches.
-    const { cacheControl, signedUrlTtlSeconds } = photoRedirectCachePolicy(
-      visit?.is_public === true && !readCookies
-    );
+    const { cacheControl, signedUrlTtlSeconds } = photoRedirectCachePolicy(isPublicRedirect);
     const signedUrl = await storage.getSignedUrl(storageKey, signedUrlTtlSeconds);
 
     // Redirect to the signed URL

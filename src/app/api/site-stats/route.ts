@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import { createAnonClient } from '@/lib/supabase/anon';
 import { fetchSiteStatsSnapshot } from '@/lib/manhole-snapshot';
 
 /**
@@ -16,7 +15,7 @@ import { fetchSiteStatsSnapshot } from '@/lib/manhole-snapshot';
  * RPC は集計値を1行返すだけで行は返さないため、旧実装で問題だった
  * リクエスト毎の重い読み出し（auth admin API の全ユーザー走査）とは
  * 負荷の桁が違う。加えて下の Cache-Control で CDN 側に 60 秒持たせるので、
- * 実際に DB へ届くのは最大でも 1 分に 1 回。
+ * 同じ CDN キャッシュが効く範囲では DB への呼び出しを減らせる。
  *
  * 残りのフィールド（latest_*_at, posts_last_7d など）は引き続き
  * data.pokefuta.com のスナップショット由来。こちらは現在形の文言に
@@ -29,6 +28,7 @@ import { fetchSiteStatsSnapshot } from '@/lib/manhole-snapshot';
 export const dynamic = 'force-dynamic';
 
 const LIVE_COUNTS_CACHE = 'public, s-maxage=60, stale-while-revalidate=300';
+const HOME_COUNTS_CACHE = 'public, s-maxage=300, stale-while-revalidate=300';
 
 type LiveCounts = {
   manholes: number | null;
@@ -39,22 +39,6 @@ type LiveCounts = {
   /** status='published' のみ。デザインマンホール一覧で見える枚数と一致する */
   design_manholes: number | null;
 };
-
-/**
- * 集計は誰が見ても同じなので、クッキーを読まない anon クライアントで呼ぶ。
- *
- * createRouteHandlerClient を使ってはいけない。あれはリクエストのクッキーに
- * 束縛されていてセッション更新時に Set-Cookie を書きうるため、この応答に付けた
- * `Cache-Control: public` と組み合わさると、CDN が誰かの Set-Cookie を
- * 他人に配りうる。ここはユーザー文脈が要らないので、そもそも持たせない。
- */
-function createAnonClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
 
 async function fetchLiveCounts(): Promise<LiveCounts | null> {
   try {
@@ -119,7 +103,37 @@ function emptyStats(): Record<string, unknown> {
   };
 }
 
-export async function GET() {
+async function getHomeCounts() {
+  const live = await fetchLiveCounts();
+  // トップで使うのは公開写真数と公開デザインふた数だけ。通常は DB 1回で返す。
+  if (live?.public_posts != null && live.design_manholes != null) {
+    return NextResponse.json({
+      success: true,
+      public_posts: live.public_posts,
+      design_manholes: live.design_manholes,
+    }, { headers: { 'Cache-Control': HOME_COUNTS_CACHE } });
+  }
+
+  const snapshot = await fetchSiteStatsSnapshot();
+  const publicPosts = live?.public_posts ?? snapshot?.public_posts ?? null;
+  const designManholes = live?.design_manholes ?? null;
+  const success = publicPosts != null || designManholes != null;
+
+  return NextResponse.json({
+    success,
+    public_posts: publicPosts,
+    design_manholes: designManholes,
+  }, {
+    status: success ? 200 : 503,
+    headers: { 'Cache-Control': success ? 'public, s-maxage=60' : 'no-store' },
+  });
+}
+
+export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.get('view') === 'home') {
+    return getHomeCounts();
+  }
+
   // スナップショットと件数は互いに独立なので並列で取る
   const [snapshot, live] = await Promise.all([fetchSiteStatsSnapshot(), fetchLiveCounts()]);
 
