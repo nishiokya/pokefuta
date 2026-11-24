@@ -75,7 +75,10 @@ export default function ManholeGiftSection({ manholeId, isLoggedIn, onAvailabili
     } catch (error) { setMessage(error instanceof Error ? error.message : '更新できませんでした。'); }
     finally { setSaving(false); }
   };
-  if (!loaded || (!givers.length && !own)) return null;
+  // 自分の欄は「配布中」か「まだ印を付けられる（撮影から10日以内）」ときだけ出す。
+  // 10日を過ぎた記録しか無い人に押せないボタンと注意書きだけを見せても意味がない。
+  const ownActionable = Boolean(own && (own.gift_until || own.can_offer));
+  if (!loaded || (!givers.length && !ownActionable)) return null;
   const otherGivers = givers.filter((giver) => !giver.is_own);
   return <section className="my-5 rounded-2xl border border-[#e9dfc7] bg-[#fffdf7] p-4" aria-labelledby="gift-heading">
     <h2 id="gift-heading" className="flex scroll-mt-24 items-center gap-2 font-pixelJp text-base font-bold text-[#6A4D36]"><Gift className="h-5 w-5 text-[#bf5640]"/>このポケふたのギフト</h2>
@@ -134,7 +137,7 @@ export default function ManholeGiftSection({ manholeId, isLoggedIn, onAvailabili
         </p>
       </>
     )}
-    {isLoggedIn && own && <div className="mt-4 border-t border-[#eee4d3] pt-3">
+    {isLoggedIn && own && ownActionable && <div className="mt-4 border-t border-[#eee4d3] pt-3">
       <h3 className="text-sm font-bold text-[#4F3828]">自分のギフト配布</h3>
       {own.gift_until && (
         <p className="mt-1 text-xs text-[#6f6657]">
