@@ -1020,7 +1020,7 @@ export default function HomePage() {
                 href="/features/10k-map"
                 className="group mb-2 flex items-center gap-3 rounded-lg bg-[#FFF8EB] p-2 shadow-sm transition hover:shadow"
               >
-                <img src="/features/10k-map/thumb.webp" alt="" width={64} height={64} loading="lazy" fetchPriority="low" className="h-16 w-16 shrink-0 rounded-lg border-2 border-white object-cover shadow-sm" />
+                <img src="/noprecache/features/10k-map/thumb.webp" alt="" width={64} height={64} loading="lazy" fetchPriority="low" className="h-16 w-16 shrink-0 rounded-lg border-2 border-white object-cover shadow-sm" />
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold text-[#4D3A69] sm:text-sm">みんなの写真1万枚でつくった日本地図</p>
                   <p className="text-[11px] text-[#6A4D36] sm:text-xs">

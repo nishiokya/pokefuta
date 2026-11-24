@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 
-// 公開写真が1万枚を超えた記念（2026-11-24）。動画・画像は public/features/10k-map/ に置いた静的ファイル。
+// 公開写真が1万枚を超えた記念（2026-11-24）。動画・画像は public/noprecache/features/10k-map/ に置いた静的ファイル
+// （next-pwa は public/ を service worker で先読みするので、noprecache/ に置いてページを開くまで読ませない）。
 // 数字は 2026-11-23 時点の公開写真（10,161枚）。動画の作り方は vault の作業ログにある。
 
 const TITLE = 'みんなの写真1万枚でつくった日本地図';
@@ -39,8 +40,8 @@ export default function TenThousandMapPage() {
 
         <video
           className="mx-auto mt-5 block w-full max-w-[480px] rounded-xl bg-[#FFF8EB] shadow-sm"
-          src="/features/10k-map/map.mp4"
-          poster="/features/10k-map/poster.webp"
+          src="/noprecache/features/10k-map/map.mp4"
+          poster="/noprecache/features/10k-map/poster.webp"
           width={720}
           height={900}
           controls
