@@ -94,6 +94,11 @@ function pickHeroPhotos(visits: FeedVisit[]): FeedVisit[] {
   return picked;
 }
 
+/** 1万以上は「1万」「2万」のように万で丸める（「以上」は呼び出し側で付ける） */
+function formatPostCount(n: number): string {
+  return n >= 10000 ? `${Math.floor(n / 10000)}万` : n.toLocaleString('ja-JP');
+}
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   // 最初の投稿の取得が終わったか。loading はページ送りのたびに true に戻るので、
@@ -102,9 +107,11 @@ export default function HomePage() {
   const [feed, setFeed] = useState<FeedVisit[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
-  // フィードのページ送りに使う数。totalPosts（写真の総数）は撮影位置の無い投稿も含むので使わない
   const [giftManholes, setGiftManholes] = useState<GiftManhole[]>([]);
-  const [feedTotal, setFeedTotal] = useState<number | null>(null);
+  // 次のページがあるか。総数は数えず（重いので）、1件多めに取って決める
+  const [feedHasNext, setFeedHasNext] = useState(false);
+  // 取り直しても取れなかった。空の「まだ投稿がありません」と見分ける
+  const [feedFailed, setFeedFailed] = useState(false);
   // 公開中(status='published')のみ。デザインマンホール一覧で見える枚数と一致する
   const [designManholes, setDesignManholes] = useState<number | null>(null);
   // PC のヒーロー右に敷く写真。最初のページの投稿から取り、ページ送りでは差し替えない
@@ -113,7 +120,6 @@ export default function HomePage() {
   const [rareLoading, setRareLoading] = useState(true);
   const [completion, setCompletion] = useState<CompletionRollup | null>(null);
   // 取得が終わったか（成否を問わない）。終わるまで残りの文を出さないための旗。
-  const [completionLoaded, setCompletionLoaded] = useState(false);
   // 特集（ぬいぐるみと旅するポケふた）の入口に出す写真と枚数。取れなければ特集を出さない
   // undefined は取得中（ヒーローに枠を確保しておく）、null は取れなかった・0枚
   // LEGEND の人（ヒーローの「LEGEND を目指そう」のカード）。regulars.json と同じ取得で読む
@@ -183,26 +189,41 @@ export default function HomePage() {
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  // 1回だけの失敗で空にしない。CDN のキャッシュが切れた直後の1回は DB が温まっておらず
+  // statement timeout で 500 になることがあり、もう一度叩けばたいてい返る（2026-11-24）
+  const fetchFeedPage = async (offset: number) => {
+    const url = `/api/visits?with_photos=true&with_location=true&limit=${feedPerPage + 1}&offset=${offset}&order_by=created_at&with_latest_comment=true&with_gift_availability=true`;
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 800));
+      try {
+        const response = await fetch(url, { credentials: 'omit' });
+        if (!response.ok) throw new Error(`Failed to load feed (${response.status})`);
+        const data = await response.json();
+        if (!data?.success) throw new Error('Feed response was not success');
+        return Array.isArray(data.visits) ? (data.visits as FeedVisit[]) : [];
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  };
+
   const loadFeed = async () => {
     setLoading(true);
     try {
       const offset = (currentPage - 1) * feedPerPage;
-      const response = await fetch(
-        `/api/visits?with_photos=true&with_location=true&limit=${feedPerPage}&offset=${offset}&order_by=created_at&with_latest_comment=true&with_gift_availability=true`,
-        { credentials: 'omit' }
-      );
-      if (!response.ok) throw new Error('Failed to load feed');
-      const data = await response.json();
-      if (!data?.success) throw new Error('Feed response was not success');
-
-      const visits: FeedVisit[] = Array.isArray(data.visits) ? data.visits : [];
+      const fetched = await fetchFeedPage(offset);
+      const visits = fetched.slice(0, feedPerPage);
       setFeed(visits);
-      const matched = data?.pagination?.matched;
-      setFeedTotal(typeof matched === 'number' ? matched : null);
+      setFeedHasNext(fetched.length > feedPerPage);
+      setFeedFailed(false);
       if (currentPage === 1) setHeroPhotos((prev) => prev ?? pickHeroPhotos(visits));
     } catch (error) {
       console.error('Failed to load feed:', error);
       setFeed([]);
+      setFeedHasNext(false);
+      setFeedFailed(true);
       // 取れなかったときはヒーローのモザイクを枠ごと消す（null のままだと空の枠が残る）
       if (currentPage === 1) setHeroPhotos((prev) => prev ?? []);
     } finally {
@@ -281,8 +302,6 @@ export default function HomePage() {
       setCompletion(data as CompletionRollup);
     } catch {
       // ignore
-    } finally {
-      setCompletionLoaded(true);
     }
   };
 
@@ -308,10 +327,8 @@ export default function HomePage() {
   );
   const sameDayCounts = sameDayVisitorCounts(sortedFeed);
   const feedById = new Map(sortedFeed.map((visit) => [visit.id, visit]));
-  const totalFeedCount = feedTotal && feedTotal > 0 ? feedTotal : null;
-  const totalPages = totalFeedCount ? Math.max(1, Math.ceil(totalFeedCount / feedPerPage)) : null;
-  const canGoNext = totalPages ? currentPage < totalPages : feed.length === feedPerPage;
-  const showPagination = totalPages ? totalPages > 1 : currentPage > 1 || feed.length === feedPerPage;
+  const canGoNext = feedHasNext;
+  const showPagination = currentPage > 1 || feedHasNext;
 
   // PC の右レール（未ログイン向けの「写真ゼロを埋めよう」募集カード）は外した。
   // 登録導線はヒーロー内のボタンが担っており重複していた上に、レールが出ると
@@ -366,24 +383,14 @@ export default function HomePage() {
                 折り返し候補になるため、幅次第で「枚。」だけが次行に落ちる。
                 枚数は日々増えて桁も変わるので、幅で回避せず構造で止める。
               */}
+              {/*
+                1万枚を超えたので、細かい数字より「日本全国から集まっている」ことを主役にして投稿を呼びかける
+                （2026-11-24）。以前の「写真がまだ無いのは N 都道府県の M 枚だけ」は外した。1万以上は
+                万で丸める（日々増える数字で文の長さが変わらないように）
+              */}
               {totalPosts != null && totalPosts > 0 ? (
                 <>
-                  ポケふたの写真が <span className="whitespace-nowrap"><b>{totalPosts}</b> 枚</span>集まっています。
-                  {/*
-                    残り枚数だけを出していたときは、全国の残りが十数枚しかなく
-                    埋まるのも遅いので、数字が何週間も動かなかった。動かない数字は
-                    進捗として読めない。残っている蓋は少数の都道府県に固まって
-                    いるので、都道府県を単位にして「残りN都道府県」を主役にし、
-                    枚数はその内訳として添える。
-                  */}
-                  {/*
-                    取得が終わるまでは残りの文を出さない。先に枚数版を出して
-                    から県版へ差し替えると、長さの違う文がヒーローの中で
-                    書き換わって行が送られる。
-                  */}
-                  {completionLoaded && completion && completion.incompleteCount > 0 && (
-                    <>写真がまだ無いのは <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.incompleteCount}</b> 都道府県</span>の <span className="whitespace-nowrap"><b className="text-[#B5483C]">{completion.missingTotal}</b> 枚だけ。</span></>
-                  )}
+                  日本全国からポケふたの写真が <span className="whitespace-nowrap"><b>{formatPostCount(totalPosts)}</b> 枚{totalPosts >= 10000 ? '以上' : ''}</span>集まっています！旅の思い出の投稿をお願いします。
                 </>
               ) : (
                 <>全国のポケふたを旅して写真を記録しよう。まだ写真がない場所がたくさんあります。</>
@@ -622,7 +629,18 @@ export default function HomePage() {
                 最新の投稿
               </h2>
 
-              {sortedFeed.length === 0 ? (
+              {sortedFeed.length === 0 && feedFailed ? (
+                <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
+                  <p className="text-sm font-bold text-[#6B6B6B]">投稿を読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => loadFeed()}
+                    className="mt-3 min-h-11 rounded-lg bg-white px-4 text-sm font-bold text-[#7B63A8] shadow-sm transition hover:bg-[#FFB347]/20"
+                  >
+                    もう一度読み込む
+                  </button>
+                </div>
+              ) : sortedFeed.length === 0 ? (
                 <div className="rounded-[8px] border border-[#7B63A8]/15 bg-[#FFF8EB] px-5 py-10 text-center shadow-sm">
                   <p className="text-sm font-bold text-[#6B6B6B]">まだ投稿がありません</p>
                 </div>
@@ -869,7 +887,7 @@ export default function HomePage() {
                   </button>
 
                   <div className="min-w-16 text-center text-sm font-bold text-[#6B6B6B]">
-                    {totalPages ? `${currentPage} / ${totalPages}` : currentPage}
+                    {currentPage}
                   </div>
 
                   <button

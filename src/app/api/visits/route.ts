@@ -225,9 +225,11 @@ export async function GET(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     const viewerUserId = session?.user?.id ?? null;
 
-    // with_location の指定時だけ総数を数える。トップのページ送りは写真の総数ではなく、
-    // この絞り込みで残る訪問の数で決めないと、最後のページの先に空のページが出る
-    const selectOptions = withLocation ? { count: 'exact' as const } : undefined;
+    // 総数は数えない。以前は with_location のときだけ count: 'exact' で数えていたが、
+    // 公開訪問が1万件近くになり、写真との結合ごと数えるのが重くなった。CDN のキャッシュが
+    // 切れた直後の1回が statement timeout（anon は約3秒）で 500 になり、トップのフィードが
+    // 空のまま出ることがあった（2026-11-24）。次のページの有無は、呼び出し側が limit を
+    // 1件多めに求めて判断する
 
     // Build query
     let query;
@@ -266,7 +268,7 @@ export async function GET(request: NextRequest) {
             height,
             created_at
           )
-        `, selectOptions)
+        `)
         .eq('user_id', viewerUserId);
     } else {
       // ✅ 未ログイン時: 公開(is_public=true)の訪問記録を返す（noteは返さない）
@@ -301,7 +303,7 @@ export async function GET(request: NextRequest) {
             height,
             created_at
           )
-        `, selectOptions)
+        `)
         .eq('is_public', true);
     }
 
@@ -314,7 +316,7 @@ export async function GET(request: NextRequest) {
       query = query.not('shot_location', 'is', null);
     }
 
-    const { data: visits, error, count } = await query
+    const { data: visits, error } = await query
       .order(orderBy, { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -580,7 +582,6 @@ export async function GET(request: NextRequest) {
         limit,
         offset,
         total: filteredVisits.length,
-        ...(withLocation && typeof count === 'number' ? { matched: count } : {}),
       }
     }, {
       headers: {
@@ -590,7 +591,9 @@ export async function GET(request: NextRequest) {
         // セッション更新の Set-Cookie が共有キャッシュに乗ると別人に配られる。
         'Cache-Control': viewerUserId || hasSupabaseAuthCookie()
           ? 'private, no-store'
-          : withGiftAvailability ? 'public, s-maxage=30' : 'public, s-maxage=60, stale-while-revalidate=300',
+          // ギフトの有無は 30 秒で入れ替えるが、切れた直後に待たせると DB の重さがそのまま
+          // 利用者に出るので、裏で取り直す間は古い応答を返す
+          : withGiftAvailability ? 'public, s-maxage=30, stale-while-revalidate=120' : 'public, s-maxage=60, stale-while-revalidate=300',
       },
     });
 
