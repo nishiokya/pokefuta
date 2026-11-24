@@ -13,8 +13,10 @@ import {
   type SnapshotCardRow,
   type SnapshotProfileRow,
   type SnapshotProgressRow,
+  USER_SNAPSHOT_LOCK_MS,
+  parseUserSnapshotLock,
   type UserSnapshot,
-  type UserSnapshotTombstone,
+  type UserSnapshotLock,
 } from '@/lib/user-snapshot-format';
 
 /**
@@ -27,18 +29,15 @@ import {
  *
  * 鮮度（非公開に戻した訪問が残らないこと）の守り方:
  * - 本人の書き込み（投稿・訪問の編集/削除・まとめて公開・写真の削除・プロフィール・アイコン・
- *   デザインマンホールの投稿）では、始める前に beginOwnSnapshotWrite() で印を置き、
- *   成功したあとに finishOwnSnapshotWrite() で作り直す。
- * - 書き戻しはすべて条件つき（R2 を読んだときの ETag のままなら / 無いときだけ）。R2 を先に読み、
- *   そのあと DB を読むので、その間にほかの書き込みが入っていたら ETag が変わって書けない。
- *   古い内容で新しい内容を上書きしない（R2 は PutObject の If-Match / If-None-Match に対応している）。
- * - 作り直せなかったら、消すのではなく「作り直せなかった印」を上書きで置く。印も ETag を変えるので、
- *   その前から走っていた表示の書き戻しを弾ける（消すと「無いときだけ書く」が通ってしまう）。
+ *   デザインマンホールの公開投稿）は、DB を変える直前に lockOwnSnapshot() でロックを置く。置けなければ書き込みを断る（503）。
+ *   ロックの間、表示は DB から読むだけで R2 に書き戻さない。
+ * - 書き込みのあと unlockOwnSnapshot() で今の DB から作り直してロックを外す。ほかの書き込みがまだロック中なら、
+ *   自分の印だけ外して作り直しはその人に任せる。作り直せなかったらロックはそのまま期限（5分）で切れ、
+ *   その後の表示が DB の変更後の内容で作り直す。
+ * - 表示からの書き戻しは条件つき（R2 を読んだときの ETag のままなら / 無いときだけ）。R2 を先に読み、
+ *   そのあと DB を読むので、その間にロックが置かれたら書けない（R2 は PutObject の If-Match / If-None-Match に対応）。
  * - アプリを通らない変更（自動採点・マイグレーション・審査）は寿命（1日）で拾う。
- *
- * 残る穴: 前の印もあとの作り直し・印もすべて失敗する（R2 か DB がその間ずっと使えない）と、
- * 最大で寿命のあいだ古い JSON が残る。そのときは `[user-snapshot] STALE` をエラーで出す（CloudWatch で拾える）。
- * 自分の訪問の表示名が、いいね・コメントのついでの upsert_app_user で変わる分（未カスタマイズの名前だけ）は寿命で拾う。
+ *   自分の表示名が、いいね・コメントのついでの upsert_app_user で変わる分（未カスタマイズの名前だけ）も寿命で拾う。
  *
  * JSON は R2 のバケット内で非公開（公開 URL を作らない）。サーバーが S3 API で読むだけ。
  */
@@ -209,53 +208,54 @@ async function buildUserSnapshot(publicUserId: string): Promise<Built | null> {
   return { snapshot, complete };
 }
 
-type ReadResult = { snapshot: UserSnapshot | null; etag: string | null; exists: boolean; ok: boolean };
+type ReadResult = {
+  ok: boolean;
+  exists: boolean;
+  etag: string | null;
+  snapshot: UserSnapshot | null;
+  /** ロックなら期限内の印（空ならだれも書き込み中でない）。ロックでなければ null */
+  holders: Record<string, number> | null;
+};
 
-async function readSnapshot(store: R2StorageAdapter, publicUserId: string): Promise<ReadResult> {
+async function readObject(store: R2StorageAdapter, publicUserId: string): Promise<ReadResult> {
   try {
     const object = await store.getText(userSnapshotKey(publicUserId), R2_READ_TIMEOUT_MS);
-    if (!object) return { snapshot: null, etag: null, exists: false, ok: true };
+    if (!object) return { ok: true, exists: false, etag: null, snapshot: null, holders: null };
     return {
-      // 古い・別の版・作り直せなかった印は null（＝作り直す）
-      snapshot: parseUserSnapshot(object.body, publicUserId),
-      etag: object.etag,
-      exists: true,
       ok: true,
+      exists: true,
+      etag: object.etag,
+      // 古い・別の版・ロックは null（＝作り直す）
+      snapshot: parseUserSnapshot(object.body, publicUserId),
+      holders: parseUserSnapshotLock(object.body, publicUserId),
     };
   } catch (error) {
     console.warn('[user-snapshot] read failed; reading from the DB:', error);
-    return { snapshot: null, etag: null, exists: false, ok: false };
+    return { ok: false, exists: false, etag: null, snapshot: null, holders: null };
   }
 }
 
-/** 読んだときの状態が変わっていなければ書く。変わっていたら false（新しい方を残す） */
-async function writeIfUnchanged(store: R2StorageAdapter, read: ReadResult, snapshot: UserSnapshot): Promise<boolean> {
-  const key = userSnapshotKey(snapshot.publicUserId);
-  const body = JSON.stringify(snapshot);
+/** 読んだときの状態が変わっていなければ書く。変わっていたら false。ETag が取れなければ書かない */
+async function putIfUnchanged(store: R2StorageAdapter, read: ReadResult, publicUserId: string, value: unknown): Promise<boolean> {
+  const key = userSnapshotKey(publicUserId);
+  const body = JSON.stringify(value);
   if (read.exists) {
-    // ETag が取れないと条件をつけられないので書かない
     if (!read.etag) return false;
     return store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifMatch: read.etag });
   }
   return store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifNoneMatch: '*' });
 }
 
-/** 作り直せなかった印を上書きで置く。置けなければ例外 */
-async function putTombstone(store: R2StorageAdapter, publicUserId: string): Promise<void> {
-  const tombstone: UserSnapshotTombstone = {
-    v: USER_SNAPSHOT_VERSION,
-    tombstone: true,
-    publicUserId,
-    at: new Date().toISOString(),
-  };
-  await store.putTextIf(userSnapshotKey(publicUserId), JSON.stringify(tombstone), {
-    contentType: CONTENT_TYPE,
-    timeoutMs: R2_WRITE_TIMEOUT_MS,
-  });
-}
+const lockBody = (publicUserId: string, holders: Record<string, number>): UserSnapshotLock => ({
+  v: USER_SNAPSHOT_VERSION,
+  lock: true,
+  publicUserId,
+  holders,
+});
 
 /**
  * 公開スタンプ帳のデータ。R2 にあればそれ、無い・古い・読めないときは DB から作って置いておく。
+ * 書き込み中のロックがあるときは DB から読むだけで置かない。
  * 利用者がいなければ null。1リクエストの中ではページ本文・generateMetadata・OGP で使い回す。
  */
 export const loadUserSnapshot = cache(async (publicUserId: string): Promise<UserSnapshot | null> => {
@@ -266,15 +266,16 @@ export const loadUserSnapshot = cache(async (publicUserId: string): Promise<User
   // UUID でない ID は今までどおり DB に渡す（DB が null かエラーを返す）
   if (!id || !store) return (await buildUserSnapshot(id ?? raw))?.snapshot ?? null;
 
-  const read = await readSnapshot(store, id);
+  const read = await readObject(store, id);
   if (read.snapshot) return read.snapshot;
 
   const built = await buildUserSnapshot(id);
   if (!built) return null;
-  // 読み出しに失敗したときは、そこにある版が分からないので書かない
-  if (built.complete && read.ok) {
+  const locked = read.holders !== null && Object.keys(read.holders).length > 0;
+  // 読み出しに失敗したとき（そこにある版が分からない）・書き込み中のときは書かない
+  if (built.complete && read.ok && !locked) {
     try {
-      await writeIfUnchanged(store, read, built.snapshot);
+      await putIfUnchanged(store, read, id, built.snapshot);
     } catch (error) {
       console.warn('[user-snapshot] write failed:', error);
     }
@@ -282,49 +283,15 @@ export const loadUserSnapshot = cache(async (publicUserId: string): Promise<User
   return built.snapshot;
 });
 
-/** 作り直しに使う時間の上限。超えたら打ち切って印を置く（印の書き込みは R2_WRITE_TIMEOUT_MS まで別にかかる） */
-const REFRESH_TIMEOUT_MS = 3000;
 const RESOLVE_TIMEOUT_MS = 1500;
-
-/**
- * 作り直す。できなければ「作り直せなかった印」を置く。どちらもできなければ false。
- */
-async function refreshUserSnapshot(store: R2StorageAdapter, publicUserId: string): Promise<boolean> {
-  const attempt = async (): Promise<boolean> => {
-    // 2回まで: 1回目の間にほかの書き込み（同じ人のまとめて投稿など）が先に書いたら、読み直して作り直す
-    for (let i = 0; i < 2; i += 1) {
-      const read = await readSnapshot(store, publicUserId);
-      if (!read.ok) return false;
-      const built = await buildUserSnapshot(publicUserId);
-      if (!built || !built.complete) return false;
-      if (await writeIfUnchanged(store, read, built.snapshot)) return true;
-    }
-    return false;
-  };
-
-  try {
-    if (await withTimeout(attempt(), REFRESH_TIMEOUT_MS, 'snapshot refresh')) return true;
-  } catch (error) {
-    console.warn('[user-snapshot] refresh failed:', error);
-  }
-  return tryTombstone(store, publicUserId);
-}
-
-async function tryTombstone(store: R2StorageAdapter, publicUserId: string): Promise<boolean> {
-  try {
-    await putTombstone(store, publicUserId);
-    return true;
-  } catch (error) {
-    console.warn('[user-snapshot] could not put a tombstone:', error);
-    return false;
-  }
-}
+/** 書き込みのあとの作り直しにかける時間の上限。超えたらやめる（ロックは期限で切れる） */
+const UNLOCK_TIMEOUT_MS = 4000;
 
 /**
  * 本人の公開ID（app_user.id）。get_public_user_ids は公開訪問が0件になった人を返さないので使わない
- * （最後の1件を非公開にしたときに引けない）。失敗・時間切れは null。
+ * （最後の1件を非公開にしたときに引けない）。失敗・時間切れは undefined、本人の行が無ければ null。
  */
-async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<string | null> {
+async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<string | null | undefined> {
   for (let i = 0; i < 2; i += 1) {
     try {
       const { data, error } = await withTimeout(
@@ -339,46 +306,74 @@ async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<st
       console.warn('[user-snapshot] get_own_profile failed:', error);
     }
   }
-  return null;
+  return undefined;
 }
 
-export type OwnSnapshotWrite = Promise<{ publicUserId: string | null; invalidated: boolean }>;
+export type OwnSnapshotLock =
+  | { ok: true; publicUserId: string | null; nonce: string | null }
+  | { ok: false };
 
 /**
- * 本人の書き込みを始める前に呼ぶ（await しなくてよい。書き込みと並べて走らせる）。
- * 公開IDを引き、先に「作り直せなかった印」を置いておく。
- * こうしておくと、書き込みのあとの作り直しと印の両方が失敗しても（R2 が書き込みの途中から使えなくなっても）、
- * 書き込み前の JSON はもう配られない。印を見た表示は DB から読む。
+ * 本人の書き込みが DB を変える直前に呼ぶ（認証・入力の確認が済んでから）。
+ * ok: false なら書き込みをしないで 503 を返すこと（ロックを置けないまま非公開にすると、古い JSON が残り得る）。
+ * 本人の app_user がまだ無い人（初めての投稿など）は公開スタンプ帳も JSON も無いので、ロック無しで ok。
  */
-export function beginOwnSnapshotWrite(supabase: SupabaseClient<any>): OwnSnapshotWrite {
+export async function lockOwnSnapshot(supabase: SupabaseClient<any>): Promise<OwnSnapshotLock> {
   const store = snapshotStore();
-  if (!store) return Promise.resolve({ publicUserId: null, invalidated: true });
-  return (async () => {
-    const publicUserId = await resolveOwnPublicUserId(supabase);
-    if (!publicUserId) return { publicUserId: null, invalidated: false };
-    return { publicUserId, invalidated: await tryTombstone(store, publicUserId) };
-  })();
-}
+  if (!store) return { ok: true, publicUserId: null, nonce: null };
+  const publicUserId = await resolveOwnPublicUserId(supabase);
+  if (publicUserId === undefined) return { ok: false };
+  if (publicUserId === null) return { ok: true, publicUserId: null, nonce: null };
 
-/**
- * 本人の書き込みが成功したあとに呼ぶ。今の DB から作り直す（できなければ印を置く）。
- * 例外は投げない（書き込み自体は成功している）。待ち時間はおおむね RESOLVE + REFRESH + 印の書き込みまで。
- *
- * 書き込みの前の印も、あとの作り直し・印も、すべて失敗したときだけ古い JSON が寿命（1日）まで残る。
- * そのときは `[user-snapshot] STALE` をエラーで出す。
- */
-export async function finishOwnSnapshotWrite(supabase: SupabaseClient<any>, begun: OwnSnapshotWrite): Promise<void> {
-  const store = snapshotStore();
-  if (!store) return;
-  const before = await begun;
-  const publicUserId = before.publicUserId ?? (await resolveOwnPublicUserId(supabase));
-  if (!publicUserId) {
-    // 公開IDが引けない＝ app_user がまだ無い人（公開スタンプ帳も無い）か、DB に届かない
-    console.error('[user-snapshot] STALE: could not resolve own public id; a snapshot (if any) may be served for up to a day');
-    return;
+  const nonce = crypto.randomUUID();
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      const read = await readObject(store, publicUserId);
+      if (!read.ok) break;
+      const holders = { ...(read.holders ?? {}), [nonce]: Date.now() + USER_SNAPSHOT_LOCK_MS };
+      if (await putIfUnchanged(store, read, publicUserId, lockBody(publicUserId, holders))) {
+        return { ok: true, publicUserId, nonce };
+      }
+    }
+  } catch (error) {
+    console.warn('[user-snapshot] lock failed:', error);
   }
-  const after = await refreshUserSnapshot(store, publicUserId);
-  if (!after && !before.invalidated) {
-    console.error('[user-snapshot] STALE: could not invalidate; the old snapshot may be served for up to a day:', publicUserId);
+  console.error('[user-snapshot] could not lock the snapshot; refusing the write');
+  return { ok: false };
+}
+
+/**
+ * 本人の書き込みのあとに呼ぶ（成功・失敗どちらでも）。例外は投げない。
+ * ほかにロック中の人がいなければ今の DB から作り直して置き換える。いれば自分の印だけ外す。
+ * 失敗・時間切れならロックはそのまま期限で切れる（その後の表示が DB の変更後の内容で作り直す）。
+ */
+export async function unlockOwnSnapshot(lock: OwnSnapshotLock): Promise<void> {
+  const store = snapshotStore();
+  if (!store || !lock.ok || !lock.publicUserId || !lock.nonce) return;
+  const { publicUserId, nonce } = lock;
+
+  const attempt = async (): Promise<void> => {
+    for (let i = 0; i < 3; i += 1) {
+      const read = await readObject(store, publicUserId);
+      if (!read.ok) return;
+      const others = { ...(read.holders ?? {}) };
+      delete others[nonce];
+      if (Object.keys(others).length > 0) {
+        // ほかの書き込みがまだ途中。作り直しは最後に終わる人に任せ、自分の印だけ外す
+        if (await putIfUnchanged(store, read, publicUserId, lockBody(publicUserId, others))) return;
+        continue;
+      }
+      // ロックが自分の印だけ（または自分の印がもう期限切れ）。R2 を読んだあとに DB を読むので、
+      // 書き込みの後の内容になる。その間にほかの人がロックを置いたら ETag が変わって書けない
+      const built = await buildUserSnapshot(publicUserId);
+      const next = built?.complete ? built.snapshot : lockBody(publicUserId, {});
+      if (await putIfUnchanged(store, read, publicUserId, next)) return;
+    }
+  };
+
+  try {
+    await withTimeout(attempt(), UNLOCK_TIMEOUT_MS, 'snapshot unlock');
+  } catch (error) {
+    console.warn('[user-snapshot] unlock failed; the lock expires by itself:', error);
   }
 }

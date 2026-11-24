@@ -5,7 +5,7 @@ import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
+import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -60,8 +60,6 @@ export async function PATCH(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
-    const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
     const visitId = params.id;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -175,6 +173,16 @@ export async function PATCH(
       }
     }
 
+    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
+    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
+    const snapshotLock = await lockOwnSnapshot(supabase);
+    if (!snapshotLock.ok) {
+      return NextResponse.json({
+        success: false,
+        error: 'Temporarily unavailable. Please try again.'
+      }, { status: 503 });
+    }
+
     // visit には updated_at トリガーが無いので明示的に更新する。
     // RLS(users_update_own_visits) に加えて user_id でも絞り、DELETE と同じ多層防御にする。
     const { data: updated, error: updateError } = await supabase
@@ -200,7 +208,7 @@ export async function PATCH(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
+    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json({
       success: true,
@@ -226,8 +234,6 @@ export async function DELETE(
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
-    const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
     const visitId = params.id;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -275,6 +281,16 @@ export async function DELETE(
 
     const photosToDelete = visitPhotos || [];
     const deletedPhotoIds = photosToDelete.map((photo) => photo.id);
+
+    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
+    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
+    const snapshotLock = await lockOwnSnapshot(supabase);
+    if (!snapshotLock.ok) {
+      return NextResponse.json({
+        success: false,
+        error: 'Temporarily unavailable. Please try again.'
+      }, { status: 503 });
+    }
 
     for (const photo of photosToDelete) {
       // サムネイルも消す。残すと CDN に残った ?size=small の転送先がまだ表示できる（#282）
@@ -326,7 +342,7 @@ export async function DELETE(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
+    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json({
       success: true,

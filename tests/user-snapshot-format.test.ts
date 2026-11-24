@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   USER_SNAPSHOT_MAX_AGE_MS,
   USER_SNAPSHOT_VERSION,
+  USER_SNAPSHOT_LOCK_MS,
   normalizeSnapshotUserId,
+  parseUserSnapshotLock,
   parseUserSnapshot,
   userSnapshotKey,
 } from '../src/lib/user-snapshot-format.ts';
@@ -46,7 +48,7 @@ test('別の人・別の版・壊れた JSON は読まない', () => {
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ counts: { plush: 0 } })), ID, NOW), null);
   // 一部が欠けたもの・作り直せなかった印は読まない
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ missing: { cards: true } })), ID, NOW), null);
-  assert.equal(parseUserSnapshot(JSON.stringify({ v: USER_SNAPSHOT_VERSION, tombstone: true, publicUserId: ID, at: new Date(NOW).toISOString() }), ID, NOW), null);
+  assert.equal(parseUserSnapshot(JSON.stringify({ v: USER_SNAPSHOT_VERSION, lock: true, publicUserId: ID, holders: {} }), ID, NOW), null);
 });
 
 test('キーは公開ID（UUID）だけから作り、版で分ける', () => {
@@ -56,4 +58,14 @@ test('キーは公開ID（UUID）だけから作り、版で分ける', () => {
   assert.equal(normalizeSnapshotUserId(` ${ID.toUpperCase()} `), ID);
   assert.equal(normalizeSnapshotUserId('../x'), null);
   assert.equal(normalizeSnapshotUserId(`${ID}/x`), null);
+});
+
+test('ロックは期限内の印だけを数える（切れたら無いのと同じ）', () => {
+  const lock = (holders: Record<string, unknown>, id = ID) => JSON.stringify({ v: USER_SNAPSHOT_VERSION, lock: true, publicUserId: id, holders });
+  assert.deepEqual(parseUserSnapshotLock(lock({ a: NOW + 1000, b: NOW - 1 }), ID, NOW), { a: NOW + 1000 });
+  assert.deepEqual(parseUserSnapshotLock(lock({ a: NOW + USER_SNAPSHOT_LOCK_MS * 3 }), ID, NOW), {});
+  assert.deepEqual(parseUserSnapshotLock(lock({ a: 'x' }), ID, NOW), {});
+  // ロックでないもの・別の人のロックは null
+  assert.equal(parseUserSnapshotLock(JSON.stringify(snapshot()), ID, NOW), null);
+  assert.equal(parseUserSnapshotLock(lock({ a: NOW + 1000 }, '00000000-0000-4000-8000-000000000002'), ID, NOW), null);
 });

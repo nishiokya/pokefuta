@@ -15,11 +15,45 @@ export const USER_SNAPSHOT_VERSION = 1;
 export const USER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * 作り直せなかったときに、消す代わりに置く印。読む側は「無い」と同じに扱う。
- * 消してしまうと、その前から DB を読んでいた表示が「無いときだけ書く」条件で古い内容を書き戻せる。
- * 印を置けば ETag が変わるので、その書き戻しは条件で弾かれる（PR の Codex レビュー）。
+ * 書き込み中のロック。本人の書き込みが DB を変える前に置き、終わったら外す（作り直した JSON で置き換える）。
+ *
+ * holders は「書き込み中の人の印 → 期限（ミリ秒）」。期限内の印が1つでもある間は、
+ * 表示の側は DB から読むだけで R2 に書き戻さない。書き戻せると、ロックを置いたあと DB が変わる前に
+ * 読んだ古い内容（非公開にする前の訪問など）が保存されてしまう（PR の Codex レビュー）。
+ *
+ * 書き込みのあとの作り直しが失敗してもロックは期限で切れる。そのあとの表示は DB の変更後に読むので、古い内容は戻らない。
+ * 期限は書き込み1回にかかる時間より十分長くする。
  */
-export type UserSnapshotTombstone = { v: typeof USER_SNAPSHOT_VERSION; tombstone: true; publicUserId: string; at: string };
+export const USER_SNAPSHOT_LOCK_MS = 5 * 60 * 1000;
+
+export type UserSnapshotLock = {
+  v: typeof USER_SNAPSHOT_VERSION;
+  lock: true;
+  publicUserId: string;
+  holders: Record<string, number>;
+};
+
+/** ロックなら期限内の印だけを返す（空なら、だれも書き込み中でない＝無いのと同じ）。ロックでなければ null */
+export function parseUserSnapshotLock(
+  body: string,
+  publicUserId: string,
+  now: number = Date.now(),
+): Record<string, number> | null {
+  let data: any;
+  try {
+    data = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!data || data.lock !== true || data.publicUserId !== publicUserId) return null;
+  if (!data.holders || typeof data.holders !== 'object') return {};
+  const active: Record<string, number> = {};
+  for (const [nonce, until] of Object.entries(data.holders)) {
+    // 未来すぎる期限（時計のずれ・壊れた値）は信用しない
+    if (typeof until === 'number' && until > now && until <= now + USER_SNAPSHOT_LOCK_MS * 2) active[nonce] = until;
+  }
+  return active;
+}
 
 export type SnapshotProfileRow = {
   display_name: string | null;

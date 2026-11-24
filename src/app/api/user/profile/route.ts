@@ -7,7 +7,7 @@ import {
   normalizeFriendCode,
 } from '@/lib/pokemon-go-friend-code';
 import { INSTAGRAM_HOSTS, INSTAGRAM_SITE, X_HOSTS, X_SITE, normalizeSocialUrl } from '@/lib/social-url';
-import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
+import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
 
 // Keep these limits in sync with database/migrations/025_add_public_user_profiles.sql.
 // The API gives users friendly errors; the database constraints remain the final guard.
@@ -102,8 +102,6 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = createRouteHandlerClient();
-  // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
-  const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -158,6 +156,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: `フレンド募集の一言は${FRIEND_NOTE_MAX}文字以内で入力してください。` }, { status: 400 });
   }
 
+  // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
+  // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
+  const snapshotLock = await lockOwnSnapshot(supabase);
+  if (!snapshotLock.ok) {
+    return NextResponse.json({ error: 'いまは保存できません。少し待ってからもう一度お試しください。' }, { status: 503 });
+  }
+
   // PostgREST は body のキー名で版を選ぶ。3項目を載せなければ4引数版に解決される。
   const { error } = legacyPayload
     ? await supabase.rpc('update_own_public_profile', {
@@ -182,7 +187,7 @@ export async function PATCH(request: Request) {
   }
 
   // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す（募集スイッチ OFF のコードを残さない）
-  await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
+  await unlockOwnSnapshot(snapshotLock);
 
   // 保存後の値を読み直して返す。
   //

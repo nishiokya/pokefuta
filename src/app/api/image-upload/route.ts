@@ -14,7 +14,7 @@ import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapshot';
+import { lockOwnSnapshot, unlockOwnSnapshot } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -169,8 +169,6 @@ import { beginOwnSnapshotWrite, finishOwnSnapshotWrite } from '@/lib/user-snapsh
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    // 公開スタンプ帳のスナップショット（R2）に、書き込みの前に「作り直し待ち」の印を置く（書き込みと並べて走る）
-    const ownSnapshotWrite = beginOwnSnapshotWrite(supabase);
 
     // ✅ 認証チェック
     const { data: { session } } = await supabase.auth.getSession();
@@ -363,6 +361,16 @@ export async function POST(request: NextRequest) {
       reusedVisitId = existingVisit.id;
     }
 
+    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
+    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
+    const snapshotLock = await lockOwnSnapshot(supabase);
+    if (!snapshotLock.ok) {
+      return NextResponse.json({
+        success: false,
+        error: 'Temporarily unavailable. Please try again.'
+      }, { status: 503 });
+    }
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
@@ -539,7 +547,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await finishOwnSnapshotWrite(supabase, ownSnapshotWrite);
+    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json({
       success: true,
