@@ -13,6 +13,10 @@
  *   node tools/build-site-ogp.js              # マニフェストどおりに焼き直す
  *   node tools/build-site-ogp.js --bootstrap  # 公開データから選び直してマニフェストを更新
  *
+ * 投稿者の写真を焼き込むので、写真の削除・非公開はこの画像に自動では反映されない
+ * （public/ogp/manhole-photo-mosaic-left-600x630.webp、/features/10k-map の動画も同じ）。
+ * 月に1回ほど --bootstrap で、その時点の公開写真から選び直して焼き直す。
+ *
  * 出力のファイル名に日付を入れている。中身を変えたら名前を変え、constants.ts の
  * OGP_IMAGE_URL も合わせること（URL が変わらないと SNS が古い画像を配り続ける）。
  *
