@@ -7,14 +7,15 @@ import { deriveSmallKey, storage } from '@/lib/storage';
 import {
   FALLBACK_INSTALLED_PREFECTURE_COUNT,
   getProgressClient,
-  loadPublicUserPrefectureProgress,
+  prefectureProgressFromSnapshot,
 } from '@/lib/user-prefecture-progress';
-import { PublicVisit, loadPublicUserVisits } from '@/lib/user-public-visits';
+import { PublicVisit, publicUserVisitsFromSnapshot } from '@/lib/user-public-visits';
+import { loadUserSnapshot } from '@/lib/user-snapshot';
 import { SITE_NAME } from '@/lib/constants';
 import { badgeRank, lidImageUrl } from '@/lib/badge-catalog';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
-import { loadPublicStickerCounts } from '@/lib/sticker-counts';
+import { publicStickerCountsFromSnapshot } from '@/lib/sticker-counts';
 import { buildPublicStampbookBadges, type PublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion } from '@/lib/stampbook-ogp-version';
 import { fetchRegularBadges } from '@/lib/regular-badges';
@@ -90,13 +91,13 @@ function successHeaders(timings: Timings, cacheStatus: string, degraded: boolean
     'Content-Type': 'image/png',
     'Server-Timing': serverTiming(timings),
     'X-OGP-Cache': cacheStatus,
-    // URL の ?v= に公開内容の印が入るので、訪問・写真・表示名が変われば URL ごと変わる。
-    // ただし CDN は1日まで: 非公開に戻した写真が配られ続けないように、
-    // また印に入れていない入力（デザインマンホール・ステッカー数、図鑑の総数）のずれも1〜2日で解消する
-    // 一部の入力が取れずに欠けた描画（degraded）は CDN にも長く載せない
+    // URL の ?v= と PNG のキーに DB の版（rev）が入るので、公開内容が変われば URL ごと変わる。
+    // ただしルートは ?v= を見ずに今の内容を返すので、旧 URL（SNS に貼られた古い og:image）の応答が CDN に残る。
+    // 非公開に戻した訪問・写真が旧 URL で配られ続けないように、CDN・ブラウザとも5分まで（stale-while-revalidate なし）。
+    // PNG は R2 に置いてあるので、CDN が切れても描き直しはしない（数百 ms）
     'Cache-Control': degraded
       ? 'public, max-age=60, s-maxage=300'
-      : 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
+      : 'public, max-age=300, s-maxage=300',
   };
 }
 
@@ -257,8 +258,11 @@ export async function GET(request: Request, { params }: RouteContext) {
   const timings: Timings = new Map();
   const startedAt = performance.now();
   try {
-    const visitsData = await timed(timings, 'visits', loadPublicUserVisits(params.userId));
-    if (!visitsData) {
+    // Route Handler では React の cache が効かないので、スナップショットはここで1回だけ取り、
+    // 訪問・県別・ステッカー・PNG のキーを同じ時点のデータから作る
+    const userSnapshot = await timed(timings, 'visits', loadUserSnapshot(params.userId));
+    const visitsData = userSnapshot ? publicUserVisitsFromSnapshot(params.userId, userSnapshot) : null;
+    if (!userSnapshot || !visitsData) {
       return new Response('Not found', {
         status: 404,
         headers: { 'Cache-Control': 'public, max-age=300' },
@@ -282,7 +286,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     const [progress, fontData, snapshot, representatives, regularBadges] = await timed(timings, 'stage1', Promise.all([
-      timed(timings, 'progress', loadPublicUserPrefectureProgress(params.userId).catch(() => null)),
+      timed(timings, 'progress', prefectureProgressFromSnapshot(params.userId, userSnapshot).catch(() => null)),
       timed(timings, 'font', loadNotoSansCjk()),
       // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
       timed(timings, 'snapshot', fetchManholeSnapshot().catch(() => null)),
@@ -301,9 +305,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       });
     }
 
-    const { designManholeCount, plushCount, snowCount } = progress
-      ? await timed(timings, 'counts', loadPublicStickerCounts(visitsData.userId))
-      : { designManholeCount: 0, plushCount: 0, snowCount: 0 };
+    const { designManholeCount, plushCount, snowCount } = publicStickerCountsFromSnapshot(userSnapshot);
     const badges = progress
       ? buildPublicStampbookBadges({ userId: visitsData.userId, progress, snapshot, representatives, designManholeCount, plushCount, snowCount })
       : null;

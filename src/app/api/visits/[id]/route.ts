@@ -5,7 +5,6 @@ import { Database } from '@/types/database';
 import { storage, photoObjectKeys } from '@/lib/storage';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -54,7 +53,7 @@ import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnS
  *       404:
  *         description: 訪問記録が見つからない
  */
-async function handlePATCH(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -173,17 +172,6 @@ async function handlePATCH(
       }
     }
 
-    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-    const snapshotLock = await lockOwnSnapshot(supabase);
-    if (!snapshotLock.ok) {
-      return NextResponse.json({
-        success: false,
-        code: SNAPSHOT_LOCK_FAILED_CODE,
-        error: 'Temporarily unavailable. Please try again.'
-      }, { status: 503 });
-    }
-
     // visit には updated_at トリガーが無いので明示的に更新する。
     // RLS(users_update_own_visits) に加えて user_id でも絞り、DELETE と同じ多層防御にする。
     const { data: updated, error: updateError } = await supabase
@@ -208,9 +196,6 @@ async function handlePATCH(
       }, { status: 500 });
     }
 
-    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock);
-
     return NextResponse.json({
       success: true,
       visit_id: updated.id,
@@ -229,7 +214,7 @@ async function handlePATCH(
 }
 
 // Delete a visit and all photos attached to it.
-async function handleDELETE(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -283,17 +268,6 @@ async function handleDELETE(
     const photosToDelete = visitPhotos || [];
     const deletedPhotoIds = photosToDelete.map((photo) => photo.id);
 
-    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-    const snapshotLock = await lockOwnSnapshot(supabase);
-    if (!snapshotLock.ok) {
-      return NextResponse.json({
-        success: false,
-        code: SNAPSHOT_LOCK_FAILED_CODE,
-        error: 'Temporarily unavailable. Please try again.'
-      }, { status: 503 });
-    }
-
     for (const photo of photosToDelete) {
       // サムネイルも消す。残すと CDN に残った ?size=small の転送先がまだ表示できる（#282）
       for (const key of photoObjectKeys(photo.storage_key)) {
@@ -343,9 +317,6 @@ async function handleDELETE(
       }, { status: 500 });
     }
 
-    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock);
-
     return NextResponse.json({
       success: true,
       message: 'Visit deleted successfully',
@@ -362,7 +333,3 @@ async function handleDELETE(
     }, { status: 500 });
   }
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const PATCH = withOwnSnapshotUnlock(handlePATCH);
-export const DELETE = withOwnSnapshotUnlock(handleDELETE);

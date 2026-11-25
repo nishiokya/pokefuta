@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 // プロフィールのアイコン（自分の公開訪問の写真から1枚）を読む・選ぶ。
 //
@@ -33,7 +32,7 @@ export async function GET() {
   return json({ photoId: (data as unknown as string | null) ?? null });
 }
 
-async function handlePUT(request: Request) {
+export async function PUT(request: Request) {
   const supabase = createRouteHandlerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -51,13 +50,6 @@ async function handlePUT(request: Request) {
     return json({ error: '写真を選んでください。' }, 400);
   }
 
-  // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-  // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-  const snapshotLock = await lockOwnSnapshot(supabase);
-  if (!snapshotLock.ok) {
-    return json({ code: SNAPSHOT_LOCK_FAILED_CODE, error: 'いまは保存できません。少し待ってからもう一度お試しください。' }, 503);
-  }
-
   const { data, error } = await supabase.rpc(
     'set_own_avatar_photo' as never,
     { p_photo_id: photoId } as never
@@ -71,11 +63,5 @@ async function handlePUT(request: Request) {
     return json({ error: 'アイコンを保存できませんでした。' }, 500);
   }
 
-  // 公開スタンプ帳のスナップショット（R2）のアイコンを作り直す
-  await unlockOwnSnapshot(snapshotLock);
-
   return json({ success: true, photoId: (data as unknown as string | null) ?? null });
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const PUT = withOwnSnapshotUnlock(handlePUT);

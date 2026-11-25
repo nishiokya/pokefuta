@@ -22,7 +22,8 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion, type StampbookOgpVersionInput } from '@/lib/stampbook-ogp-version';
-import { loadPublicStickerCounts } from '@/lib/sticker-counts';
+import { publicStickerCountsFromSnapshot } from '@/lib/sticker-counts';
+import { loadUserSnapshot } from '@/lib/user-snapshot';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
@@ -139,16 +140,18 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives, { designManholeCount, plushCount, snowCount }] = await Promise.all([
+  const [data, progress, snapshot, representatives, userSnapshot] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
     fetchManholeSnapshot().catch(() => null),
     fetchPokemonRepresentatives(),
-    loadPublicStickerCounts(params.userId),
+    // 上の2つと同じスナップショット（React の cache で1リクエスト1回）
+    loadUserSnapshot(params.userId),
   ]);
 
-  if (!data) notFound();
+  if (!data || !userSnapshot) notFound();
+  const { designManholeCount, plushCount, snowCount } = publicStickerCountsFromSnapshot(userSnapshot);
 
   // 都道府県・ポケモンのバッジ（金・銀・銅）とステッカー。OGP 画像と同じ組み立て
   const badges = (() => {

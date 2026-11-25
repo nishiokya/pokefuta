@@ -6,7 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { storage, deriveSmallKey, photoObjectKeys } from '@/lib/storage';
 import { photoRedirectCachePolicy } from '@/lib/photo-redirect-cache';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // 公開写真はクッキーを読まずに anon で引く（#275）。クッキーを読まないと Next が
@@ -191,7 +190,7 @@ export async function GET(
 }
 
 // Delete a photo
-async function handleDELETE(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -241,17 +240,6 @@ async function handleDELETE(
       }, { status: 403 });
     }
 
-    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-    const snapshotLock = await lockOwnSnapshot(supabase);
-    if (!snapshotLock.ok) {
-      return NextResponse.json({
-        success: false,
-        code: SNAPSHOT_LOCK_FAILED_CODE,
-        error: 'Temporarily unavailable. Please try again.'
-      }, { status: 503 });
-    }
-
     // ✅ 4. R2から画像ファイルを削除（サムネイルも。残すと CDN に残った
     // ?size=small の転送先がまだ表示できる。#282）
     for (const key of photoObjectKeys(photo.storage_key)) {
@@ -284,9 +272,6 @@ async function handleDELETE(
       }, { status: 500 });
     }
 
-    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock);
-
     return NextResponse.json({
       success: true,
       message: 'Photo deleted successfully',
@@ -302,6 +287,3 @@ async function handleDELETE(
     }, { status: 500 });
   }
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const DELETE = withOwnSnapshotUnlock(handleDELETE);

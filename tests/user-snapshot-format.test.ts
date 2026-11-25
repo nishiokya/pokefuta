@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {
   USER_SNAPSHOT_MAX_AGE_MS,
   USER_SNAPSHOT_VERSION,
-  USER_SNAPSHOT_LOCK_MS,
+  isSnapshotRev,
   normalizeSnapshotUserId,
-  parseUserSnapshotLock,
   parseUserSnapshot,
+  snapshotFromDb,
+  snapshotRevToken,
   userSnapshotKey,
 } from '../src/lib/user-snapshot-format.ts';
 
@@ -17,6 +18,7 @@ const snapshot = (over: Record<string, unknown> = {}) => ({
   v: USER_SNAPSHOT_VERSION,
   generatedAt: new Date(NOW - 60_000).toISOString(),
   publicUserId: ID,
+  rev: '3.1.7',
   profile: { display_name: 'テスト' },
   avatarPhotoId: null,
   cards: [],
@@ -46,8 +48,11 @@ test('別の人・別の版・壊れた JSON は読まない', () => {
   assert.equal(parseUserSnapshot('{', ID, NOW), null);
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ cards: null })), ID, NOW), null);
   assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ counts: { plush: 0 } })), ID, NOW), null);
-  // 一部が欠けたもの・作り直せなかった印は読まない
-  assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ missing: { cards: true } })), ID, NOW), null);
+  // 版（rev）が無い・形が違うものは読まない（ロック方式のころの v1 の JSON・ロックも）
+  assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ rev: undefined })), ID, NOW), null);
+  assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ rev: 3 })), ID, NOW), null);
+  assert.equal(parseUserSnapshot(JSON.stringify(snapshot({ rev: '3.1' })), ID, NOW), null);
+  assert.equal(parseUserSnapshot(JSON.stringify({ ...snapshot(), v: 1 }), ID, NOW), null);
   assert.equal(parseUserSnapshot(JSON.stringify({ v: USER_SNAPSHOT_VERSION, lock: true, publicUserId: ID, holders: {} }), ID, NOW), null);
 });
 
@@ -60,12 +65,29 @@ test('キーは公開ID（UUID）だけから作り、版で分ける', () => {
   assert.equal(normalizeSnapshotUserId(`${ID}/x`), null);
 });
 
-test('ロックは期限内の印だけを数える（切れたら無いのと同じ）', () => {
-  const lock = (holders: Record<string, unknown>, id = ID) => JSON.stringify({ v: USER_SNAPSHOT_VERSION, lock: true, publicUserId: id, holders });
-  assert.deepEqual(parseUserSnapshotLock(lock({ a: NOW + 1000, b: NOW - 1 }), ID, NOW), { a: NOW + 1000 });
-  assert.deepEqual(parseUserSnapshotLock(lock({ a: NOW + USER_SNAPSHOT_LOCK_MS * 3 }), ID, NOW), {});
-  assert.deepEqual(parseUserSnapshotLock(lock({ a: 'x' }), ID, NOW), {});
-  // ロックでないもの・別の人のロックは null
-  assert.equal(parseUserSnapshotLock(JSON.stringify(snapshot()), ID, NOW), null);
-  assert.equal(parseUserSnapshotLock(lock({ a: NOW + 1000 }, '00000000-0000-4000-8000-000000000002'), ID, NOW), null);
+test('版の形と OGP 用の表し方（キーに使える文字だけ・区切りの違う組は別の値）', () => {
+  assert.ok(isSnapshotRev('0.0.0'));
+  assert.ok(isSnapshotRev('12.3.45'));
+  assert.equal(isSnapshotRev('12.3'), false);
+  assert.equal(isSnapshotRev('1.2.3.4'), false);
+  assert.equal(isSnapshotRev('-1.2.3'), false);
+  assert.equal(isSnapshotRev(12), false);
+  assert.equal(snapshotRevToken('12.3.45'), 'r12-3-45');
+  assert.match(snapshotRevToken('12.3.45'), /^[A-Za-z0-9-]+$/);
+  assert.notEqual(snapshotRevToken('1.23.45'), snapshotRevToken('12.3.45'));
+});
+
+test('DB の戻り値: NULL は利用者なし、形が違えば例外（黙って空のページにしない）', () => {
+  const db = { rev: '3.1.7', profile: { display_name: 'テスト' }, avatarPhotoId: null, cards: [], progressRows: [], stats: { totalVisits: 0, prefectureCount: 0 }, counts: { designManhole: 0, plush: 0, snow: 0 } };
+  const built = snapshotFromDb(db, ID, NOW);
+  assert.equal(built?.rev, '3.1.7');
+  assert.equal(built?.publicUserId, ID);
+  assert.equal(built?.v, USER_SNAPSHOT_VERSION);
+  // 作ったものはそのまま R2 から読める
+  assert.ok(parseUserSnapshot(JSON.stringify(built), ID, NOW));
+  assert.equal(snapshotFromDb(null, ID, NOW), null);
+  assert.throws(() => snapshotFromDb({ ...db, rev: null }, ID, NOW));
+  assert.throws(() => snapshotFromDb({ ...db, cards: null }, ID, NOW));
+  // プロフィールの行が無いときは名前なしで出す
+  assert.deepEqual(snapshotFromDb({ ...db, profile: null }, ID, NOW)?.profile, { display_name: null });
 });

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler';
 import { cookies } from 'next/headers';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -18,7 +17,7 @@ import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnS
  *       401:
  *         description: 未認証
  */
-async function handlePOST(_request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -29,17 +28,6 @@ async function handlePOST(_request: NextRequest) {
         success: false,
         error: 'Authentication required'
       }, { status: 401 });
-    }
-
-    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-    const snapshotLock = await lockOwnSnapshot(supabase);
-    if (!snapshotLock.ok) {
-      return NextResponse.json({
-        success: false,
-        code: SNAPSHOT_LOCK_FAILED_CODE,
-        error: 'Temporarily unavailable. Please try again.'
-      }, { status: 503 });
     }
 
     // visit には updated_at トリガーが無いので明示的に更新する。
@@ -61,9 +49,6 @@ async function handlePOST(_request: NextRequest) {
       }, { status: 500 });
     }
 
-    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock);
-
     return NextResponse.json({
       success: true,
       published_count: updated?.length ?? 0
@@ -77,6 +62,3 @@ async function handlePOST(_request: NextRequest) {
     }, { status: 500 });
   }
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const POST = withOwnSnapshotUnlock(handlePOST);

@@ -7,6 +7,7 @@ import { findEarnedCompletion } from '@/lib/prefecture-earned';
 import { loadCachedManholes } from '@/lib/manhole-snapshot';
 import { sortCatalog } from '@/lib/manhole-catalog-sort';
 import { loadUserSnapshot } from '@/lib/user-snapshot';
+import type { UserSnapshot } from '@/lib/user-snapshot-format';
 
 export type PublicPrefectureProgress = {
   name: string;
@@ -249,7 +250,19 @@ async function loadPublicUserPrefectureProgressImpl(
   userId: string,
   onlyPrefecture?: string
 ): Promise<PublicUserPrefectureProgress | null> {
-  // プロフィールと訪問は公開スタンプ帳のスナップショット（src/lib/user-snapshot.ts）から、カタログはキャッシュから
+  const snapshot = await loadUserSnapshot(userId);
+  return snapshot ? prefectureProgressFromSnapshot(userId, snapshot, onlyPrefecture) : null;
+}
+
+/**
+ * 公開スタンプ帳のスナップショット（src/lib/user-snapshot.ts）とカタログ（キャッシュ）から県別の進み具合を作る。
+ * Route Handler（OGP）は入口で1回 loadUserSnapshot して、同じスナップショットを渡す。
+ */
+export async function prefectureProgressFromSnapshot(
+  userId: string,
+  snapshot: UserSnapshot,
+  onlyPrefecture?: string
+): Promise<PublicUserPrefectureProgress> {
   const catalogClient = getPublicCatalogClient();
 
   if (!catalogClient) {
@@ -257,20 +270,7 @@ async function loadPublicUserPrefectureProgressImpl(
   }
 
   const trimmedUserId = userId.trim();
-  if (!trimmedUserId) return null;
-
-  const [snapshot, manholeRows] = await Promise.all([
-    loadUserSnapshot(trimmedUserId),
-    loadManholeCatalog(catalogClient),
-  ]);
-
-  if (!snapshot) {
-    return null;
-  }
-  // 県別の訪問だけが読めなかったとき。呼び出し側（本文は .catch(() => null)）が県別の欄だけを落とす
-  if (snapshot.missing?.progress) {
-    throw new Error('Failed to load public prefecture progress');
-  }
+  const manholeRows = await loadManholeCatalog(catalogClient);
   const appUserRow = snapshot.profile;
   const totalIdsByPrefecture = new Map<string, Set<number>>();
   const manholesByPrefecture = new Map<string, ManholeProgressRow[]>();

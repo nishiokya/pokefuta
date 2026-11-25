@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { FALLBACK_DISPLAY_NAME } from '@/lib/user-prefecture-progress';
 import { loadUserSnapshot } from '@/lib/user-snapshot';
+import type { UserSnapshot } from '@/lib/user-snapshot-format';
 
 export type PublicVisitManhole = {
   id: number;
@@ -39,21 +40,16 @@ export type PublicUserVisits = {
   prefectureCount: number;
   visits: PublicVisit[];
   isTruncated: boolean;
+  /** DB の版（スナップショットと同じ時点）。OGP の版に入れる（公開取り消しで画像の URL・キーを変える） */
+  snapshotRev: string;
 };
 
-async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
-  // 公開スタンプ帳のスナップショット（R2、無ければ DB から作る）から組み立てる。
-  // 非公開に戻した訪問が残らない仕組みは src/lib/user-snapshot.ts に書いた（書き込みの直後に作り直す）。
+/**
+ * 公開スタンプ帳のスナップショット（src/lib/user-snapshot.ts）から一覧を組み立てる。
+ * Route Handler（OGP）は入口で1回 loadUserSnapshot して、同じスナップショットをここと県別・ステッカーに渡す。
+ */
+export function publicUserVisitsFromSnapshot(userId: string, snapshot: UserSnapshot): PublicUserVisits {
   const trimmedUserId = userId.trim();
-  if (!trimmedUserId) return null;
-
-  const snapshot = await loadUserSnapshot(trimmedUserId);
-  if (!snapshot) return null;
-  // カードか件数が読めなかった（R2 に無く、DB の一部が失敗した）ときは、今までどおりページを失敗にする
-  if (snapshot.missing?.cards || snapshot.missing?.stats) {
-    throw new Error('Failed to load public visits');
-  }
-
   const appUserRow = snapshot.profile;
   const displayName = appUserRow.display_name || FALLBACK_DISPLAY_NAME;
 
@@ -80,7 +76,7 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     aiTags: visit.latest_photo_ai_tags ?? null,
   }));
 
-  // 件数が取れなかったとき（null → 0）でも、一覧に出している枚数より小さくはしない
+  // 一覧に出している枚数より小さくはしない
   const totalVisits = Math.max(snapshot.stats.totalVisits, publicVisits.length);
 
   return {
@@ -96,7 +92,13 @@ async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisit
     prefectureCount: snapshot.stats.prefectureCount,
     visits: publicVisits,
     isTruncated: totalVisits > publicVisits.length,
+    snapshotRev: snapshot.rev,
   };
+}
+
+async function loadPublicUserVisitsImpl(userId: string): Promise<PublicUserVisits | null> {
+  const snapshot = await loadUserSnapshot(userId);
+  return snapshot ? publicUserVisitsFromSnapshot(userId, snapshot) : null;
 }
 
 export const loadPublicUserVisits = cache(loadPublicUserVisitsImpl);

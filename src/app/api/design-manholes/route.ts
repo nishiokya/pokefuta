@@ -25,7 +25,6 @@ import {
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_CODE,
   DESIGN_MANHOLE_SUBMISSION_SUSPENDED_MESSAGE,
 } from '@/lib/design-manhole-submission-status';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 export const dynamic = 'force-dynamic';
 // supabase-js の PostgREST GET が Next の Data Cache に乗るのを防ぐ
@@ -85,7 +84,7 @@ function optionalText(value: FormDataEntryValue | null, maxLength: number): stri
  *       409: { description: 50m以内に未確認の公式ポケふた候補がある }
  *       503: { description: 投稿受付を一時停止中、または公式ポケふたとの照合を実行できない }
  */
-async function handlePOST(request: NextRequest) {
+export async function POST(request: NextRequest) {
   // 受付停止中は何もせず閉じる。R2 に上げてから消す無駄も、
   // 古いJSを掴んだクライアントへの誤った「時間をおいて」案内も避ける。
   if (DESIGN_MANHOLE_SUBMISSION_SUSPENDED) {
@@ -215,18 +214,6 @@ async function handlePOST(request: NextRequest) {
       }
     }
 
-    // 公開で投稿するときだけ、公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く
-    // （デザインマンホールの枚数が変わる。審査待ちは数に入らない）。置けなければ書き込まない
-    const snapshotLock = publicationStatus === 'published'
-      ? await lockOwnSnapshot(supabase)
-      : ({ ok: true, publicUserId: null, nonce: null } as const);
-    if (!snapshotLock.ok) {
-      return NextResponse.json(
-        { success: false, code: SNAPSHOT_LOCK_FAILED_CODE, error: 'Temporarily unavailable. Please try again.' },
-        { status: 503 }
-      );
-    }
-
     // 6. R2 アップロード + サムネイル生成
     const arrayBuffer = await file.arrayBuffer();
     // 申告の file.type だけでなく中身でも確かめる。違う形式を sharp に渡さない（src/lib/image-sniff.ts）
@@ -314,9 +301,6 @@ async function handlePOST(request: NextRequest) {
         cause: insertError,
       });
     }
-
-    // 公開スタンプ帳のデザインマンホールの枚数（ステッカー）を作り直す（ロックしていなければ何もしない）
-    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json(
       {
@@ -420,6 +404,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const POST = withOwnSnapshotUnlock(handlePOST);

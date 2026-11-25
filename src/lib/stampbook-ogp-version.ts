@@ -1,3 +1,5 @@
+import { snapshotRevToken } from './user-snapshot-format.ts';
+
 // 公開スタンプ帳の OGP 画像のバージョン。
 // og:image の URL（?v=）と、R2 に保存した生成済み PNG のキーの両方に使う。
 // テンプレートを変えたら TEMPLATE_VERSION を上げる。
@@ -6,9 +8,13 @@
 // 内容が変われば URL が変わり、古い画像は自然に使われなくなる。
 // 20261028: 称号・3つの輪・バッジのメダル・ステッカーをページと同じ見た目で載せた
 // 20261123: URL を /users/<id> に移し、印つきの長期キャッシュにした
-export const STAMPBOOK_OGP_TEMPLATE_VERSION = '20261123-userurl';
+// 20261125: DB の版（公開スタンプ帳スナップショットの rev）を印に入れた。非公開化・審査・自動採点など
+//           印の材料に出ない変更（ステッカー数・アイコン・写真の向き）でも URL とキーが変わる
+export const STAMPBOOK_OGP_TEMPLATE_VERSION = '20261125-rev';
 
 export type StampbookOgpVersionInput = {
+  /** DB の版（src/lib/user-snapshot-format.ts の UserSnapshot.rev） */
+  snapshotRev: string;
   totalVisits: number;
   prefectureCount: number;
   displayName: string;
@@ -41,5 +47,5 @@ function stampbookOgpStamp(data: StampbookOgpVersionInput): string {
 }
 
 export function stampbookOgpVersion(data: StampbookOgpVersionInput): string {
-  return `${STAMPBOOK_OGP_TEMPLATE_VERSION}-${stampbookOgpStamp(data)}`;
+  return `${STAMPBOOK_OGP_TEMPLATE_VERSION}-${snapshotRevToken(data.snapshotRev)}-${stampbookOgpStamp(data)}`;
 }

@@ -2,64 +2,17 @@
  * 公開スタンプ帳（/users/[userId] とその県別・OGP）のスナップショットの形。
  * 読み書きは src/lib/user-snapshot.ts。ここは DB にも R2 にも触らない（テストから読む）。
  *
- * 中身は公開ページがもともと anon で読んでいたものだけ（公開プロフィール RPC・公開訪問ビュー・公開件数 RPC）。
+ * 中身は公開ページがもともと anon で読んでいたものだけ（DB の get_public_user_snapshot が既存の公開面から作る）。
  */
 
-/** 形を変えたら上げる。古い版のオブジェクトは読まずに作り直す */
-export const USER_SNAPSHOT_VERSION = 1;
+/** 形を変えたら上げる。古い版のオブジェクトは読まずに作り直す（1 はロック方式のころの形） */
+export const USER_SNAPSHOT_VERSION = 2;
 
 /**
- * アプリを通らない変更（毎朝の自動採点の ai_tags・写真の向き、マイグレーションでの蓋の直し、
- * デザインマンホールの審査）を拾うための寿命。これを過ぎたら DB から作り直す。
+ * 版（rev）で拾えない変更のための寿命。蓋のカタログ（名称・県・ポケモン）は版に入れていない
+ * （全員の版を上げないため。公開データだけなので1日遅れてよい）。
  */
 export const USER_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-/**
- * 書き込み中のロック。本人の書き込みが DB を変える前に置き、終わったら外す（作り直した JSON で置き換える）。
- *
- * holders は「書き込み中の人の印 → 期限（ミリ秒）」。期限内の印が1つでもある間は、
- * 表示の側は DB から読むだけで R2 に書き戻さない。書き戻せると、ロックを置いたあと DB が変わる前に
- * 読んだ古い内容（非公開にする前の訪問など）が保存されてしまう（PR の Codex レビュー）。
- *
- * 書き込みのあとの作り直しが失敗してもロックは期限で切れる。そのあとの表示は DB の変更後に読むので、古い内容は戻らない。
- * 期限は書き込み1回にかかる時間（リクエストの時間切れ）より十分長くする。切れても困るのは、
- * 期限切れ後の表示が DB の変更前を読んで保存し、かつ書き込み後の作り直しも失敗したときだけ。
- */
-export const USER_SNAPSHOT_LOCK_MS = 15 * 60 * 1000;
-
-export type UserSnapshotLock = {
-  v: typeof USER_SNAPSHOT_VERSION;
-  lock: true;
-  publicUserId: string;
-  holders: Record<string, number>;
-  /**
-   * 書き換えるたびに新しくする値。holders が前と同じに戻っても本文（＝ ETag）が前と同じにならないようにする。
-   * 同じに戻ると、昔の ETag を条件にした書き込みが通ってしまう（ABA。PR の Codex レビュー）
-   */
-  gen: string;
-};
-
-/** ロックなら期限内の印だけを返す（空なら、だれも書き込み中でない＝無いのと同じ）。ロックでなければ null */
-export function parseUserSnapshotLock(
-  body: string,
-  publicUserId: string,
-  now: number = Date.now(),
-): Record<string, number> | null {
-  let data: any;
-  try {
-    data = JSON.parse(body);
-  } catch {
-    return null;
-  }
-  if (!data || data.lock !== true || data.publicUserId !== publicUserId) return null;
-  if (!data.holders || typeof data.holders !== 'object') return {};
-  const active: Record<string, number> = {};
-  for (const [nonce, until] of Object.entries(data.holders)) {
-    // 未来すぎる期限（時計のずれ・壊れた値）は信用しない
-    if (typeof until === 'number' && until > now && until <= now + USER_SNAPSHOT_LOCK_MS * 2) active[nonce] = until;
-  }
-  return active;
-}
 
 export type SnapshotProfileRow = {
   display_name: string | null;
@@ -97,24 +50,36 @@ export type SnapshotProgressRow = {
   latest_photo_created_at: string | null;
 };
 
+/** DB の get_public_user_snapshot の LIMIT と同じ */
 export const USER_SNAPSHOT_CARD_LIMIT = 500;
 
 export type UserSnapshot = {
   v: typeof USER_SNAPSHOT_VERSION;
   generatedAt: string;
   publicUserId: string;
+  /**
+   * DB の版（get_public_snapshot_rev と同じ形 "<a>.<b>.<c>"）。データと同じ時点で読んだ値。
+   * 今の版と違えば使わない（非公開化・削除・運用 SQL などの変更があった）
+   */
+  rev: string;
   profile: SnapshotProfileRow;
   avatarPhotoId: string | null;
   cards: SnapshotCardRow[];
   progressRows: SnapshotProgressRow[];
   stats: { totalVisits: number; prefectureCount: number };
   counts: { designManhole: number; plush: number; snow: number };
-  /**
-   * 一部が読めなかったときだけ入る（R2 には保存しない）。読めなかった部分を使う側は例外にする。
-   * 以前は県別・カード・件数を別々に読んでいて、1つの失敗がほかの表示を巻き込まなかった。それを保つ
-   */
-  missing?: { cards?: true; progress?: true; stats?: true };
 };
+
+const REV_RE = /^\d+\.\d+\.\d+$/;
+
+export function isSnapshotRev(value: unknown): value is string {
+  return typeof value === 'string' && REV_RE.test(value);
+}
+
+/** OGP の版・R2 のキーに入れる形（英数字とハイフンだけ。route の検証 /^[A-Za-z0-9-]+$/ を通る） */
+export function snapshotRevToken(rev: string): string {
+  return `r${rev.replace(/\./g, '-')}`;
+}
 
 /** R2 のキー。公開IDは URL にも出ている値なので、キーに入れてよい。必ず normalizeSnapshotUserId を通した値で呼ぶ */
 export function userSnapshotKey(publicUserId: string): string {
@@ -126,15 +91,52 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /**
  * スナップショットのキーに使う形（小文字の UUID）にする。UUID でなければ null（スナップショットを使わない）。
  * DB は大文字の UUID も同じ人として返すが、R2 のキーは大文字・小文字を区別する。
- * 大文字の URL で作られた JSON は、書き込み後の作り直し（小文字の公開ID）から漏れる（PR の Codex レビュー）。
  */
 export function normalizeSnapshotUserId(value: string): string | null {
   const lower = value.trim().toLowerCase();
   return UUID_RE.test(lower) ? lower : null;
 }
 
+/** 形だけを確かめる（DB から来た値にも、R2 から読んだ値にも使う） */
+function hasSnapshotShape(data: any): boolean {
+  if (!data || typeof data !== 'object') return false;
+  if (!isSnapshotRev(data.rev)) return false;
+  if (!data.profile || typeof data.profile !== 'object') return false;
+  if (!Array.isArray(data.cards) || !Array.isArray(data.progressRows)) return false;
+  if (!data.stats || typeof data.stats.totalVisits !== 'number' || typeof data.stats.prefectureCount !== 'number') return false;
+  if (!data.counts || typeof data.counts.designManhole !== 'number' || typeof data.counts.plush !== 'number' || typeof data.counts.snow !== 'number') return false;
+  if (data.avatarPhotoId !== null && typeof data.avatarPhotoId !== 'string') return false;
+  return true;
+}
+
 /**
- * 読んだ JSON を確かめる。版・持ち主・寿命のどれかが合わなければ null（＝DB から作り直す）。
+ * DB の get_public_user_snapshot の戻り値をスナップショットにする。NULL（公開IDが無い）なら null。
+ * 形が違えば例外（DB とアプリの版ずれ。黙って空のページにしない）。
+ */
+export function snapshotFromDb(data: unknown, publicUserId: string, now: number = Date.now()): UserSnapshot | null {
+  if (data === null || data === undefined) return null;
+  const raw = data as any;
+  const candidate = {
+    v: USER_SNAPSHOT_VERSION,
+    generatedAt: new Date(now).toISOString(),
+    publicUserId,
+    rev: raw?.rev,
+    profile: raw?.profile ?? null,
+    avatarPhotoId: raw?.avatarPhotoId ?? null,
+    cards: raw?.cards,
+    progressRows: raw?.progressRows,
+    stats: raw?.stats,
+    counts: raw?.counts,
+  };
+  // プロフィールの行が無い（公開ID はあるのにプロフィール関数が返さない）ことは今の定義では無いが、念のため名前なしで出す
+  if (candidate.profile === null) candidate.profile = { display_name: null };
+  if (!hasSnapshotShape(candidate)) throw new Error('get_public_user_snapshot returned an unexpected shape');
+  return candidate as UserSnapshot;
+}
+
+/**
+ * 読んだ JSON を確かめる。版・持ち主・寿命・形のどれかが合わなければ null（＝DB から作り直す）。
+ * DB の版（rev）との照合は呼び出し側（読んだ時点の版が要る）。
  */
 export function parseUserSnapshot(
   body: string,
@@ -154,11 +156,6 @@ export function parseUserSnapshot(
   if (!Number.isFinite(generated)) return null;
   // 未来の時刻（時計のずれ）も古いものと同じに扱う
   if (now - generated > USER_SNAPSHOT_MAX_AGE_MS || generated - now > 5 * 60 * 1000) return null;
-  if (!data.profile || typeof data.profile !== 'object') return null;
-  if (!Array.isArray(data.cards) || !Array.isArray(data.progressRows)) return null;
-  if (!data.stats || typeof data.stats.totalVisits !== 'number' || typeof data.stats.prefectureCount !== 'number') return null;
-  if (!data.counts || typeof data.counts.designManhole !== 'number' || typeof data.counts.plush !== 'number' || typeof data.counts.snow !== 'number') return null;
-  if (data.avatarPhotoId !== null && typeof data.avatarPhotoId !== 'string') return null;
-  if (data.missing !== undefined) return null;
+  if (!hasSnapshotShape(data)) return null;
   return data as UserSnapshot;
 }

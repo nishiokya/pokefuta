@@ -111,7 +111,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
           ]
         : [],
       headers: {
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        // 公開スタンプ帳のスナップショットから描く。非公開に戻した訪問が CDN に残らないよう5分まで（PR #501）
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
       },
     }
   );

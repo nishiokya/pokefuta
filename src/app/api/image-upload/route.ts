@@ -14,7 +14,6 @@ import { allowedUploadDistanceKm } from '@/lib/upload-nearby-candidates';
 import { PHOTO_SIGNED_URL_TTL_SECONDS } from '@/lib/constants';
 import { classifySubmissionError } from '@/lib/api-error-code';
 import { canOfferGift, giftUntilFor } from '@/lib/visit-gift';
-import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnSnapshotUnlock } from '@/lib/user-snapshot';
 
 /**
  * @swagger
@@ -166,7 +165,7 @@ import { SNAPSHOT_LOCK_FAILED_CODE, lockOwnSnapshot, unlockOwnSnapshot, withOwnS
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-async function handlePOST(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -361,17 +360,6 @@ async function handlePOST(request: NextRequest) {
       reusedVisitId = existingVisit.id;
     }
 
-    // 公開スタンプ帳のスナップショット（R2）に書き込み中のロックを置く。置けなければ書き込まない
-    // （ロックなしで非公開にすると、古い JSON が残り得る）。書き込みのあと unlockOwnSnapshot で作り直す
-    const snapshotLock = await lockOwnSnapshot(supabase);
-    if (!snapshotLock.ok) {
-      return NextResponse.json({
-        success: false,
-        code: SNAPSHOT_LOCK_FAILED_CODE,
-        error: 'Temporarily unavailable. Please try again.'
-      }, { status: 503 });
-    }
-
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
@@ -546,9 +534,6 @@ async function handlePOST(request: NextRequest) {
         console.warn('Failed to set gift availability after upload:', error);
       }
     }
-
-    // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json({
       success: true,
@@ -828,6 +813,3 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
-// 書き込みが失敗・例外で終わっても、置いた公開スタンプ帳のロックを外す（src/lib/user-snapshot.ts）
-export const POST = withOwnSnapshotUnlock(handlePOST);
