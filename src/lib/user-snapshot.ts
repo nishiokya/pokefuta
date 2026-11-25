@@ -46,6 +46,8 @@ import {
  */
 
 const R2_READ_TIMEOUT_MS = 1500;
+/** app_user.display_name の上限（CHECK app_user_display_name_length は char_length <= 40） */
+const APP_USER_DISPLAY_NAME_MAX = 40;
 const R2_WRITE_TIMEOUT_MS = 2000;
 /** PostgREST の1回の上限（supabase/config.toml の max_rows）。これより多い訪問はページを分けて読む */
 const PAGE_ROWS = 1000;
@@ -350,8 +352,12 @@ async function createOwnAppUser(supabase: SupabaseClient<any>): Promise<string |
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return undefined;
+    // 認証情報の名前が DB の上限（app_user_display_name_length、40文字）を超えると行を作れず、
+    // 毎回 503 になる。そのときは名前なしで作る（プロフィール保存なら直後に入力した名前が入る）
+    const metadataName = getAuthUserDisplayName(session.user);
+    const placeholderName = metadataName && [...metadataName].length <= APP_USER_DISPLAY_NAME_MAX ? metadataName : undefined;
     await withTimeout(
-      ensureAppUser(supabase, session.user.id, getAuthUserDisplayName(session.user)),
+      ensureAppUser(supabase, session.user.id, placeholderName),
       RESOLVE_TIMEOUT_MS,
       'upsert_app_user',
     );
