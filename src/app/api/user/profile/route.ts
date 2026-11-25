@@ -187,7 +187,7 @@ async function handlePATCH(request: Request) {
   }
 
   // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す（募集スイッチ OFF のコードを残さない）
-  await unlockOwnSnapshot(snapshotLock, supabase);
+  await unlockOwnSnapshot(snapshotLock);
 
   // 保存後の値を読み直して返す。
   //

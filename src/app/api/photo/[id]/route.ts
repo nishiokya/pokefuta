@@ -285,7 +285,7 @@ async function handleDELETE(
     }
 
     // 公開スタンプ帳のスナップショット（R2）を今の DB から作り直す。非公開に戻した訪問を残さないため
-    await unlockOwnSnapshot(snapshotLock, supabase);
+    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json({
       success: true,

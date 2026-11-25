@@ -316,7 +316,7 @@ async function handlePOST(request: NextRequest) {
     }
 
     // 公開スタンプ帳のデザインマンホールの枚数（ステッカー）を作り直す（ロックしていなければ何もしない）
-    await unlockOwnSnapshot(snapshotLock, supabase);
+    await unlockOwnSnapshot(snapshotLock);
 
     return NextResponse.json(
       {

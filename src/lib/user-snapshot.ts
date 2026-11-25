@@ -4,6 +4,8 @@ import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { R2StorageAdapter } from '@/lib/storage/r2';
+import { ensureAppUser } from '@/lib/auth/ensureAppUser';
+import { getAuthUserDisplayName } from '@/lib/auth/displayName';
 import { loadPublicVisitStats } from '@/lib/public-visit-stats';
 import {
   USER_SNAPSHOT_CARD_LIMIT,
@@ -33,7 +35,7 @@ import {
  *   デザインマンホールの公開投稿）は、DB を変える直前に lockOwnSnapshot() でロックを置く。置けなければ書き込みを断る（503）。
  *   ロックの間、表示は DB から読むだけで R2 に書き戻さない。
  * - 書き込みのあと unlockOwnSnapshot() で今の DB から作り直してロックを外す。ほかの書き込みがまだロック中なら、
- *   自分の印だけ外して作り直しはその人に任せる。作り直せなかったらロックはそのまま期限（5分）で切れ、
+ *   自分の印だけ外して作り直しはその人に任せる。作り直せなかったらロックはそのまま期限（15分）で切れ、
  *   その後の表示が DB の変更後の内容で作り直す。
  * - 表示からの書き戻しは条件つき（R2 を読んだときの ETag のままなら / 無いときだけ）。R2 を先に読み、
  *   そのあと DB を読むので、その間にロックが置かれたら書けない（R2 は PutObject の If-Match / If-None-Match に対応）。
@@ -315,31 +317,51 @@ async function resolveOwnPublicUserId(supabase: SupabaseClient<any>): Promise<st
 export const SNAPSHOT_LOCK_FAILED_CODE = 'SNAPSHOT_LOCK_FAILED' as const;
 
 export type OwnSnapshotLock =
-  | { ok: true; publicUserId: string | null; nonce: string | null; deferred?: boolean }
+  | { ok: true; publicUserId: string | null; nonce: string | null; lockedAt?: number }
   | { ok: false };
 
 /**
  * 本人の書き込みが DB を変える直前に呼ぶ（認証・入力の確認が済んでから）。
  * ok: false なら書き込みをしないで 503 を返すこと（ロックを置けないまま非公開にすると、古い JSON が残り得る）。
- * 本人の app_user がまだ無い人（初めての投稿など）は公開スタンプ帳も JSON も無いので、ロック無しで ok。
+ * 本人の app_user がまだ無い人（初めての保存）は、先に空の行を作ってから同じようにロックを置く。
  */
 export async function lockOwnSnapshot(supabase: SupabaseClient<any>): Promise<OwnSnapshotLock> {
   const lock = await acquireOwnSnapshotLock(supabase);
   // withOwnSnapshotUnlock の中なら、書き込みが失敗・例外で終わっても最後に外す
-  if (lock.ok && (lock.nonce || lock.deferred)) heldLocks.getStore()?.push({ lock, supabase });
+  if (lock.ok && lock.nonce) heldLocks.getStore()?.push(lock);
   return lock;
 }
 
 async function acquireOwnSnapshotLock(supabase: SupabaseClient<any>): Promise<OwnSnapshotLock> {
   const store = snapshotStore();
   if (!store) return { ok: true, publicUserId: null, nonce: null };
-  const publicUserId = await resolveOwnPublicUserId(supabase);
-  if (publicUserId === undefined) return { ok: false };
-  // 本人の app_user がまだ無い（初めての保存）。公開スタンプ帳もまだ無いはずだが、同時に来たほかの保存が
-  // 先に行を作り、その間に表示が JSON を置くことはあり得る。なので書き込みのあとで公開IDを引き直し、
-  // ロックを置いてから作り直す（deferred）
-  if (publicUserId === null) return { ok: true, publicUserId: null, nonce: null, deferred: true };
+  let publicUserId = await resolveOwnPublicUserId(supabase);
+  if (publicUserId === null) {
+    // 本人の app_user がまだ無い（初めての保存）。「行が無い」は確かめた時点の話で、同時に来たほかの保存が
+    // 先に行を作り、その間に表示が JSON を置くことはあり得る。なので書き込みの前に行を作って公開IDを確定し、
+    // ふつうにロックを置く。作る行は訪問0件・フレンド募集OFF（列の既定）なので、ロック前に見えても漏れるものはない
+    publicUserId = await createOwnAppUser(supabase);
+  }
+  if (!publicUserId) return { ok: false };
   return placeLock(store, publicUserId);
+}
+
+async function createOwnAppUser(supabase: SupabaseClient<any>): Promise<string | null | undefined> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return undefined;
+    await withTimeout(
+      ensureAppUser(supabase, session.user.id, getAuthUserDisplayName(session.user)),
+      RESOLVE_TIMEOUT_MS,
+      'upsert_app_user',
+    );
+  } catch (error) {
+    console.warn('[user-snapshot] could not create app_user before the write:', error);
+    return undefined;
+  }
+  const publicUserId = await resolveOwnPublicUserId(supabase);
+  if (publicUserId === null) console.error('[user-snapshot] app_user is still missing after upsert; refusing the write');
+  return publicUserId;
 }
 
 async function placeLock(store: R2StorageAdapter, publicUserId: string): Promise<OwnSnapshotLock> {
@@ -350,7 +372,7 @@ async function placeLock(store: R2StorageAdapter, publicUserId: string): Promise
       if (!read.ok) break;
       const holders = { ...(read.holders ?? {}), [nonce]: Date.now() + USER_SNAPSHOT_LOCK_MS };
       if (await putIfUnchanged(store, read, publicUserId, lockBody(publicUserId, holders))) {
-        return { ok: true, publicUserId, nonce };
+        return { ok: true, publicUserId, nonce, lockedAt: Date.now() };
       }
     }
   } catch (error) {
@@ -365,61 +387,56 @@ async function placeLock(store: R2StorageAdapter, publicUserId: string): Promise
  * ほかにロック中の人がいなければ今の DB から作り直して置き換える。いれば自分の印だけ外す。
  * 失敗・時間切れならロックはそのまま期限で切れる（その後の表示が DB の変更後の内容で作り直す）。
  */
-export async function unlockOwnSnapshot(lock: OwnSnapshotLock, supabase?: SupabaseClient<any>): Promise<void> {
+export async function unlockOwnSnapshot(lock: OwnSnapshotLock): Promise<void> {
   const held = heldLocks.getStore();
   if (held) {
-    const index = held.findIndex((item) => item.lock === lock);
+    const index = held.indexOf(lock);
     if (index >= 0) held.splice(index, 1);
   }
-  return releaseOwnSnapshotLock(lock, supabase);
+  return releaseOwnSnapshotLock(lock);
 }
 
-async function releaseOwnSnapshotLock(lock: OwnSnapshotLock, supabase?: SupabaseClient<any>): Promise<void> {
+async function releaseOwnSnapshotLock(lock: OwnSnapshotLock): Promise<void> {
   const store = snapshotStore();
   if (!store || !lock.ok) return;
-  if (lock.deferred) {
-    // 初めての保存だった。いま行があれば、ロックを置いてから作り直す
-    if (!supabase) return;
-    const publicUserId = await resolveOwnPublicUserId(supabase);
-    if (publicUserId === null) return;
-    const placed = publicUserId === undefined ? ({ ok: false } as const) : await placeLock(store, publicUserId);
-    if (!placed.ok) {
-      console.error('[user-snapshot] STALE: could not lock after a first-time write; a snapshot (if any) may be served for up to a day');
-      return;
-    }
-    return releaseOwnSnapshotLock(placed);
-  }
   if (!lock.publicUserId || !lock.nonce) return;
   const { publicUserId, nonce } = lock;
+  // ロックが書き込みの途中で切れていた。切れたあとの表示が変更前の DB を保存したかもしれないので、
+  // 下の作り直しが失敗したら古い内容が残り得る（Amplify の SSR は1リクエスト30秒で切れるので、ふつうは起きない）
+  const expiredDuringWrite = lock.lockedAt !== undefined && Date.now() - lock.lockedAt > USER_SNAPSHOT_LOCK_MS;
 
-  const attempt = async (): Promise<void> => {
+  const attempt = async (): Promise<boolean> => {
     for (let i = 0; i < 3; i += 1) {
       const read = await readObject(store, publicUserId);
-      if (!read.ok) return;
+      if (!read.ok) return false;
       const others = { ...(read.holders ?? {}) };
       delete others[nonce];
       if (Object.keys(others).length > 0) {
         // ほかの書き込みがまだ途中。作り直しは最後に終わる人に任せ、自分の印だけ外す
-        if (await putIfUnchanged(store, read, publicUserId, lockBody(publicUserId, others))) return;
+        if (await putIfUnchanged(store, read, publicUserId, lockBody(publicUserId, others))) return true;
         continue;
       }
       // ロックが自分の印だけ（または自分の印がもう期限切れ）。R2 を読んだあとに DB を読むので、
       // 書き込みの後の内容になる。その間にほかの人がロックを置いたら ETag が変わって書けない
       const built = await buildUserSnapshot(publicUserId);
       const next = built?.complete ? built.snapshot : lockBody(publicUserId, {});
-      if (await putIfUnchanged(store, read, publicUserId, next)) return;
+      if (await putIfUnchanged(store, read, publicUserId, next)) return true;
     }
+    return false;
   };
 
+  let released = false;
   try {
-    await withTimeout(attempt(), UNLOCK_TIMEOUT_MS, 'snapshot unlock');
+    released = await withTimeout(attempt(), UNLOCK_TIMEOUT_MS, 'snapshot unlock');
   } catch (error) {
     console.warn('[user-snapshot] unlock failed; the lock expires by itself:', error);
   }
+  if (!released && expiredDuringWrite) {
+    console.error('[user-snapshot] STALE: the lock expired during the write and the rebuild failed; a snapshot may be served for up to a day');
+  }
 }
 
-type HeldLock = { lock: OwnSnapshotLock; supabase: SupabaseClient<any> };
-const heldLocks = new AsyncLocalStorage<HeldLock[]>();
+const heldLocks = new AsyncLocalStorage<OwnSnapshotLock[]>();
 
 /**
  * 書き込みのルートハンドラを包む。中で置いたロックのうち外していないもの（失敗・例外で抜けた書き込み）を、
@@ -430,13 +447,13 @@ export function withOwnSnapshotUnlock<A extends unknown[], R>(
   handler: (...args: A) => Promise<R>,
 ): (...args: A) => Promise<R> {
   return (...args: A) => {
-    const held: HeldLock[] = [];
+    const held: OwnSnapshotLock[] = [];
     return heldLocks.run(held, async () => {
       try {
         return await handler(...args);
       } finally {
-        for (const item of held.splice(0)) {
-          await releaseOwnSnapshotLock(item.lock, item.supabase);
+        for (const lock of held.splice(0)) {
+          await releaseOwnSnapshotLock(lock);
         }
       }
     });
