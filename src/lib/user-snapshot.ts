@@ -3,17 +3,11 @@ import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { R2StorageAdapter } from '@/lib/storage/r2';
-import {
-  type UserSnapshot,
-  isSnapshotRev,
-  normalizeSnapshotUserId,
-  parseUserSnapshot,
-  snapshotFromDb,
-  userSnapshotKey,
-} from '@/lib/user-snapshot-format';
+import { type SnapshotStore, loadSnapshotWith } from '@/lib/user-snapshot-core';
+import { type UserSnapshot, isSnapshotRev } from '@/lib/user-snapshot-format';
 
 /**
- * 公開スタンプ帳のスナップショット（公開IDごとの JSON を R2 に置く）。
+ * 公開スタンプ帳のスナップショット（公開IDごとの JSON を R2 に置く）。手順は src/lib/user-snapshot-core.ts。
  *
  * なぜ: /users/[userId] は1回の表示でプロフィール・訪問カード・県別・件数3種・アイコンと
  * 約8本 Supabase を呼んでいた。Supabase の応答は中身のほかにヘッダが1本あたり約1.2KB つき、
@@ -40,8 +34,7 @@ const REV_TIMEOUT_MS = 3000;
 const CONTENT_TYPE = 'application/json; charset=utf-8';
 
 let adapter: R2StorageAdapter | null | undefined;
-function snapshotStore(): R2StorageAdapter | null {
-  if (process.env.USER_SNAPSHOT_R2 === 'off') return null;
+function r2(): R2StorageAdapter | null {
   if (adapter !== undefined) return adapter;
   // R2 以外の保存先（ローカルの Supabase Storage など）ではスナップショットを使わず、毎回 DB から読む
   const provider = process.env.STORAGE_PROVIDER ?? 'r2';
@@ -52,6 +45,17 @@ function snapshotStore(): R2StorageAdapter | null {
     adapter = null;
   }
   return adapter;
+}
+
+function snapshotStore(): SnapshotStore | null {
+  if (process.env.USER_SNAPSHOT_R2 === 'off') return null;
+  const store = r2();
+  if (!store) return null;
+  return {
+    get: (key) => store.getText(key, R2_READ_TIMEOUT_MS),
+    putIf: (key, body, condition) =>
+      store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ...condition }),
+  };
 }
 
 /** 毎回取り直す anon クライアント（Next.js の Data Cache に載せない） */
@@ -77,85 +81,39 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]).finally(() => clearTimeout(timer));
 }
 
-/** 今の版。公開ID が無ければ null、読めなければ undefined */
-async function fetchRev(client: SupabaseClient<Database>, publicUserId: string): Promise<string | null | undefined> {
-  try {
-    const { data, error } = await withTimeout(
-      Promise.resolve(client.rpc('get_public_snapshot_rev' as never, { p_user_id: publicUserId } as never)),
-      REV_TIMEOUT_MS,
-      'get_public_snapshot_rev',
-    );
-    if (error) throw new Error(error.message);
-    if (data === null) return null;
-    if (isSnapshotRev(data)) return data;
-    throw new Error('get_public_snapshot_rev returned an unexpected value');
-  } catch (error) {
-    console.warn('[user-snapshot] rev failed; not using the cached JSON:', error);
-    return undefined;
-  }
-}
-
-/** DB から1本で作る（版とデータが同じ時点）。公開ID が無ければ null。失敗は例外 */
-async function fetchSnapshot(client: SupabaseClient<Database>, publicUserId: string): Promise<UserSnapshot | null> {
-  const { data, error } = await client.rpc('get_public_user_snapshot' as never, { p_user_id: publicUserId } as never);
-  if (error) throw new Error(error.message);
-  return snapshotFromDb(data, publicUserId);
-}
-
-type ReadResult = { ok: boolean; exists: boolean; etag: string | null; snapshot: UserSnapshot | null };
-
-async function readObject(store: R2StorageAdapter, publicUserId: string): Promise<ReadResult> {
-  try {
-    const object = await store.getText(userSnapshotKey(publicUserId), R2_READ_TIMEOUT_MS);
-    if (!object) return { ok: true, exists: false, etag: null, snapshot: null };
-    // 古い・別の版の形・壊れたものは null（＝作り直す）
-    return { ok: true, exists: true, etag: object.etag, snapshot: parseUserSnapshot(object.body, publicUserId) };
-  } catch (error) {
-    console.warn('[user-snapshot] read failed; reading from the DB:', error);
-    return { ok: false, exists: false, etag: null, snapshot: null };
-  }
-}
-
-/**
- * 読んだときの状態が変わっていなければ置く（ETag が同じ / 無かったときだけ）。
- * ほかの表示が先に置いていたら置かない（どちらが新しいかは次の表示が版で判定する）。
- */
-async function putIfUnchanged(store: R2StorageAdapter, read: ReadResult, snapshot: UserSnapshot): Promise<void> {
-  if (!read.ok) return; // 読めなかった（そこにある版が分からない）
-  const key = userSnapshotKey(snapshot.publicUserId);
-  const body = JSON.stringify(snapshot);
-  try {
-    if (read.exists) {
-      if (!read.etag) return;
-      await store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifMatch: read.etag });
-    } else {
-      await store.putTextIf(key, body, { contentType: CONTENT_TYPE, timeoutMs: R2_WRITE_TIMEOUT_MS, ifNoneMatch: '*' });
-    }
-  } catch (error) {
-    console.warn('[user-snapshot] write failed:', error);
-  }
-}
-
 /**
  * 公開スタンプ帳のデータ。利用者がいなければ null。
  * ページ（Server Component）では React の cache で1リクエスト1回になる。Route Handler では cache が効かないので、
  * 入口で1回呼んで同じオブジェクトを使い回すこと（...FromSnapshot の関数に渡す）。
  */
 export const loadUserSnapshot = cache(async (publicUserId: string): Promise<UserSnapshot | null> => {
-  // 公開ID は UUID。それ以外は DB に聞くまでもなく利用者がいない
-  const id = normalizeSnapshotUserId(publicUserId);
-  if (!id) return null;
-
   const client = liveClient();
-  const store = snapshotStore();
-  if (!store) return fetchSnapshot(client, id);
-
-  const [read, rev] = await Promise.all([readObject(store, id), fetchRev(client, id)]);
-  if (rev === null) return null; // 404。1本で終わる
-  if (rev !== undefined && read.snapshot && read.snapshot.rev === rev) return read.snapshot;
-
-  const snapshot = await fetchSnapshot(client, id);
-  // 置く版は、データと同じ時点で読んだ snapshot.rev（先に読んだ rev ではない）
-  if (snapshot) await putIfUnchanged(store, read, snapshot);
-  return snapshot;
+  return loadSnapshotWith(
+    {
+      store: snapshotStore(),
+      async rev(id) {
+        try {
+          const { data, error } = await withTimeout(
+            Promise.resolve(client.rpc('get_public_snapshot_rev' as never, { p_user_id: id } as never)),
+            REV_TIMEOUT_MS,
+            'get_public_snapshot_rev',
+          );
+          if (error) throw new Error(error.message);
+          if (data === null) return null;
+          if (isSnapshotRev(data)) return data;
+          throw new Error('get_public_snapshot_rev returned an unexpected value');
+        } catch (error) {
+          console.warn('[user-snapshot] rev failed; not using the cached JSON:', error);
+          return undefined;
+        }
+      },
+      async full(id) {
+        const { data, error } = await client.rpc('get_public_user_snapshot' as never, { p_user_id: id } as never);
+        if (error) throw new Error(error.message);
+        return data;
+      },
+      warn: (message, error) => console.warn(message, error),
+    },
+    publicUserId,
+  );
 });

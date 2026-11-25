@@ -100,6 +100,13 @@ DDL 後は PostgREST がスキーマを認識しているかも確かめる。�
 | `npm run verify:photo-rotation` | 写真の向きの差し替え `scoring.apply_photo_rotation` が自動採点の自己点検の許可リストに入り属性の退行を検出すること、photo_scorer だけが呼べること、差し替え・楽観ロック・入力検査・戻し方 | `supabase start` でローカルスタックが起動 |
 | `npm run verify:app-user-visibility` | app_user の列権限と RLS を実際にロールを切り替えて確認（anon が1列も読めないこと、他人の行が見えないこと、プロフィール系 RPC が権限で落ちないこと） | `supabase start` でローカルスタックが起動 |
 | `npm run verify:comment-guardrails` | 蓋コメントの制約・通報の RLS・公開ID/表示名の条件一致を実際に書き込んで確認 | `supabase start` でローカルスタックが起動 |
+| `npm run verify:user-snapshot-rev` | 公開スタンプ帳スナップショットの版（変更ログ）: 権限、公開取り消し・運用 SQL・採点・付け替えで版が変わること、関係ない人は変わらないこと。二接続の競合は `tools/verify-user-snapshot-rev-race.sh` | `supabase start` でローカルスタックが起動 |
+
+**公開スタンプ帳のスナップショット（R2 の JSON）は DB の版で失効する。** visit / photo / app_user / design_manhole の
+変更はトリガで `user_snapshot_change` に記録され、版が変われば次の表示で作り直す（運用 SQL も拾う）。
+公開面の条件（`public_user_visit_base` / `_card` のビュー、`get_public_*` 関数）を変えるマイグレーションは、
+最後に `SELECT public.invalidate_all_user_snapshots();` を呼ぶ（DML のトリガでは定義の変更を拾えない）。
+公開面に新しい表を足すときは、その表にも同じトリガを付ける（PR #501、`20261125120000_user_snapshot_change_log.sql`）。
 
 **列単位 GRANT のテーブルは `select=*` で読めない。** PostgREST の `*` は全列に展開されるので、
 GRANT していない列（`photo.exif` 等）まで要求して **42501** で落ちる。

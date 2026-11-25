@@ -60,6 +60,9 @@ COMMENT ON TABLE public.user_snapshot_change IS
 -- ---------------------------------------------------------------------------
 -- 2. トリガ関数（表ごとに1つ。INSERT / UPDATE / DELETE の遷移表を見る）
 --
+-- search_path は pg_catalog, pg_temp（pg_temp を最後に）。'' にすると型名（text・uuid）が pg_temp を先に探し、
+-- 一時ドメインで乗っ取られる（CLAUDE.md・verify:photo-scorer）。表・関数は全部 public. で修飾する。
+--
 -- UPDATE は id で突き合わせず、「無視する列」を除いた行の集合で NEW EXCEPT OLD / OLD EXCEPT NEW を取り、
 -- 両側の行から記録する（主キーを変えた行も拾う）。無視する列以外が1つでも変われば記録する（新しい列は既定で記録側）。
 -- ---------------------------------------------------------------------------
@@ -68,7 +71,7 @@ CREATE OR REPLACE FUNCTION public.user_snapshot_log_visit()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
@@ -97,7 +100,7 @@ CREATE OR REPLACE FUNCTION public.user_snapshot_log_photo()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   -- 持ち主は引かない（visit_id で記録し、読む側がその時点の持ち主で合計する）
@@ -132,7 +135,7 @@ CREATE OR REPLACE FUNCTION public.user_snapshot_log_app_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   -- auth_uid（その人の訪問・デザインマンホールと同じ鍵）と公開ID（id）の両方に記録する。
@@ -172,7 +175,7 @@ CREATE OR REPLACE FUNCTION public.user_snapshot_log_design_manhole()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
@@ -202,7 +205,7 @@ CREATE OR REPLACE FUNCTION public.user_snapshot_log_all()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   INSERT INTO public.user_snapshot_change (auth_uid, app_user_id, visit_id) VALUES (NULL, NULL, NULL);
@@ -215,7 +218,7 @@ CREATE OR REPLACE FUNCTION public.invalidate_all_user_snapshots()
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   INSERT INTO public.user_snapshot_change (auth_uid, app_user_id, visit_id) VALUES (NULL, NULL, NULL);
 $$;
@@ -280,7 +283,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT
     (
@@ -302,7 +305,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT public.user_snapshot_rev_of(p_user_id);
 $$;
@@ -315,7 +318,7 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT pg_catalog.jsonb_build_object(
     'rev', public.user_snapshot_rev_of(p_user_id),
