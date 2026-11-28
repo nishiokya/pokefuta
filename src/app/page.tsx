@@ -25,6 +25,8 @@ import AiTagNote from '@/components/AiTagNote';
 import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
+import { fetchCoverPhotos } from '@/lib/manhole-cover-photos-client';
+import type { CoverPhoto } from '@/lib/manhole-cover-photos';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { formatDateJa, formatDateJaJst } from '@/lib/date';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
@@ -108,6 +110,9 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [giftManholes, setGiftManholes] = useState<GiftManhole[]>([]);
+  // ギフト一覧のサムネは蓋の代表写真（詳細ページ・近くの蓋と同じ選び方）。
+  // ギフトを配る訪問の写真は周辺風景だけのこともあり、それだと写真が出せない
+  const [giftCoverPhotos, setGiftCoverPhotos] = useState<Record<string, CoverPhoto>>({});
   // 次のページがあるか。総数は数えず（重いので）、1件多めに取って決める
   const [feedHasNext, setFeedHasNext] = useState(false);
   // 取り直しても取れなかった。空の「まだ投稿がありません」と見分ける
@@ -162,7 +167,13 @@ export default function HomePage() {
     fetch('/api/features/gifts', { credentials: 'omit' })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
-        if (Array.isArray(data?.manholes)) setGiftManholes(data.manholes);
+        if (!Array.isArray(data?.manholes)) return;
+        const manholes = data.manholes as GiftManhole[];
+        setGiftManholes(manholes);
+        if (manholes.length === 0) return;
+        fetchCoverPhotos(manholes.map((manhole) => manhole.id))
+          .then(({ photos }) => setGiftCoverPhotos(photos))
+          .catch(() => {});
       })
       .catch(() => {});
     loadSiteStats();
@@ -583,8 +594,8 @@ export default function HomePage() {
                     href={`/manhole/${manhole.id}#gift-heading`}
                     className="group flex h-full items-center gap-2 rounded-lg border border-[#e9dfc7] bg-[#fffdf7] p-2.5 text-[#4F3828] shadow-sm transition hover:border-[#B5483C]/45 sm:gap-3"
                   >
-                    {manhole.photo_id ? (
-                      <img src={`/api/photo/${manhole.photo_id}?size=small`} alt="" width={48} height={48} loading="lazy" className="h-12 w-12 shrink-0 rounded-md bg-[#EFE4CC] object-cover" />
+                    {giftCoverPhotos[String(manhole.id)] || manhole.photo_id ? (
+                      <img src={giftCoverPhotos[String(manhole.id)]?.thumbnail_url ?? `/api/photo/${manhole.photo_id}?size=small`} alt="" width={48} height={48} loading="lazy" className="h-12 w-12 shrink-0 rounded-md bg-[#EFE4CC] object-cover" />
                     ) : (
                       <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#fdf1ec] text-[#B5483C]">
                         <Gift className="h-5 w-5" />
