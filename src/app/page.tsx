@@ -11,6 +11,7 @@ import {
   Award,
   MapPin,
   MessageCircle,
+  Snowflake,
   Sparkles,
   Stamp,
   TrendingUp,
@@ -22,7 +23,7 @@ import LandscapePhotoBadge from '@/components/LandscapePhotoBadge';
 import RegularBadge from '@/components/RegularBadge';
 import AiPhotoTags from '@/components/AiPhotoTags';
 import AiTagNote from '@/components/AiTagNote';
-import { photoAiBoxes, photoAiTags, photoBoxZoom, photoObjectPosition } from '@/lib/photo-ai-tags';
+import { photoAiTags, photoObjectPosition } from '@/lib/photo-ai-tags';
 import RecentComments from '@/components/comments/RecentComments';
 import { fetchAllManholes, pickManholesWithoutPhotos } from '@/lib/manhole-list-client';
 import { fetchCoverPhotos } from '@/lib/manhole-cover-photos-client';
@@ -42,7 +43,7 @@ import NearViewportImg from '@/components/NearViewportImg';
 import PosterLink from '@/components/PosterLink';
 import PosterAvatar from '@/components/users/PosterAvatar';
 import { EMPTY_REGULAR_BADGES, LEGEND_MIN_MANHOLES, REGULAR_BADGE_LABEL, fetchRegularSnapshot, type RegularLegend } from '@/lib/regular-badges';
-import { otherFeature, pickRotatingFeature, type RotatingFeature } from '@/lib/top-feature-rotation';
+import { pickRotatingFeature, type RotatingFeature } from '@/lib/top-feature-rotation';
 import {
   EMPTY_NEW_POKEFUTA_WANTED,
   NEW_POKEFUTA_UPLOAD_PATH,
@@ -133,11 +134,11 @@ export default function HomePage() {
   const [newWanted, setNewWanted] = useState(EMPTY_NEW_POKEFUTA_WANTED);
   // 特集（デザインふた）の入口に出す新着の写真。枚数は designManholes（サイト統計）を使う
   const [designFeature, setDesignFeature] = useState<Array<{ id: string; title: string | null; photo_url: string }> | null>(null);
-  // 図鑑のぬいぐるみ特集へのカードに表示する写真
-  const [plushFeature, setPlushFeature] = useState<{ count: number; photos: Array<{ id: string; ai_tags?: unknown }> } | null>(null);
-  const [snowFeature, setSnowFeature] = useState<{ count: number; photos: Array<{ id: string }> } | null>(null);
-  // 取り終わった特集の数（デザインふたと、雪景色・ぬいぐるみの交互の枠）。FEATURE_LOADS に届くまで枠を出しておく
-  const [featureLoadsDone, setFeatureLoadsDone] = useState(0);
+  // 図鑑の雪景色・ぬいぐるみ特集へのカード（1回ごとに交互）。写真も枚数も出さないリンクだけ。
+  // 以前は写真館の API で DB から最大300枚を読んでいたが、RLS が写真の全行で走って時間切れが続いた（2026-11-28）
+  const [rotatingFeature, setRotatingFeature] = useState<RotatingFeature | null>(null);
+  // デザインふたの特集を取り終わったか。取り終わるまで枠を出しておく
+  const [designFeatureLoaded, setDesignFeatureLoaded] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [regularBadges, setRegularBadges] = useState(EMPTY_REGULAR_BADGES);
   // スマホ（Tailwind の sm 未満）か。幅が分かるまでは null（口コミの置き場所を決めない）
@@ -180,7 +181,7 @@ export default function HomePage() {
     loadRareManholes();
     loadCompletion();
     loadDesignFeature();
-    loadRotatingFeature();
+    pickRotatingFeatureCard();
     fetchRegularSnapshot().then(({ badges, legends: loaded }) => {
       setRegularBadges(badges);
       setLegends(loaded);
@@ -258,36 +259,15 @@ export default function HomePage() {
     }
   };
 
-  // 雪景色とぬいぐるみは1回ごとに交互に1枚だけ出し、出す方だけ読む（写真3枚と API 1本を減らしてフィードの写真を先に出す）。
-  // 選んだ方が取れない・0枚なら、もう一方を出す
-  const loadRotatingFeature = async () => {
+  // 雪景色とぬいぐるみは1回ごとに交互にどちらか1枚だけ出す（前回の分は localStorage に覚える）
+  const pickRotatingFeatureCard = () => {
     let storage: Storage | null = null;
     try {
       storage = window.localStorage;
     } catch {
       storage = null;
     }
-    const first = pickRotatingFeature(storage);
-    try {
-      if (!(await loadFeatureCard(first))) await loadFeatureCard(otherFeature(first));
-    } finally {
-      setFeatureLoadsDone((n) => n + 1);
-    }
-  };
-
-  // 取れて1枚以上あれば true
-  const loadFeatureCard = async (feature: RotatingFeature): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/features/${feature}`);
-      if (!response.ok) return false;
-      const data = await response.json();
-      if (!data?.success || typeof data.count !== 'number' || !Array.isArray(data.photos) || data.count <= 0) return false;
-      if (feature === 'plush') setPlushFeature({ count: data.count, photos: data.photos });
-      else setSnowFeature({ count: data.count, photos: data.photos });
-      return true;
-    } catch {
-      return false;
-    }
+    setRotatingFeature(pickRotatingFeature(storage));
   };
 
   const loadDesignFeature = async () => {
@@ -300,7 +280,7 @@ export default function HomePage() {
     } catch {
       // ignore
     } finally {
-      setFeatureLoadsDone((n) => n + 1);
+      setDesignFeatureLoaded(true);
     }
   };
 
@@ -1020,8 +1000,8 @@ export default function HomePage() {
             </p>
           </section>
         )}
-        {feedSettled && (showTenKMap || featureLoadsDone < FEATURE_LOADS || (designFeature && designFeature.length > 0) || (plushFeature && plushFeature.count > 0) || (snowFeature && snowFeature.count > 0)) && (
-          <section className="mt-8" aria-busy={featureLoadsDone < FEATURE_LOADS}>
+        {feedSettled && (showTenKMap || rotatingFeature || !designFeatureLoaded || (designFeature && designFeature.length > 0)) && (
+          <section className="mt-8" aria-busy={!designFeatureLoaded}>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold sm:mb-4">
               <Sparkles className="h-5 w-5 text-[#7B63A8]" />
               特集
@@ -1042,66 +1022,41 @@ export default function HomePage() {
               </Link>
             )}
             <div className="grid grid-cols-2 gap-2">
-            {/* 雪景色とぬいぐるみは交互にどちらか1枚（loadRotatingFeature）。デザインふたと2列で並べる。
-                特集の写真は fetchPriority=low にして、フィードの先頭の写真（LCP）を先に読ませる */}
-            {snowFeature && snowFeature.count > 0 ? (
-              <Link
+            {/* 雪景色とぬいぐるみは交互にどちらか1枚（pickRotatingFeatureCard）。デザインふたと2列で並べる。
+                行き先は図鑑のギャラリー。写真と枚数は出さない（DB を読まない。#488 でページは図鑑へ移した） */}
+            {rotatingFeature === 'snow' ? (
+              <a
                 href="https://data.pokefuta.com/gallery/snow/"
-                className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
+                className="group flex min-w-0 items-center gap-2 rounded-lg bg-sky-50 p-2 shadow-sm transition hover:shadow sm:gap-3"
               >
-                <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                  {snowFeature.photos.slice(0, 3).map((photo) => (
-                    <img key={photo.id} src={`/api/photo/${photo.id}?size=small`} alt="" width={56} height={56} loading="lazy" fetchPriority="low" className="h-14 w-14 rounded-lg border-2 border-white object-cover shadow-sm" />
-                  ))}
-                </div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm sm:h-14 sm:w-14">
+                  <Snowflake className="h-5 w-5 sm:h-7 sm:w-7" aria-hidden="true" />
+                </span>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-extrabold text-sky-950 sm:text-sm">雪景色のポケふた</p>
                   <p className="text-[11px] text-slate-600 sm:text-xs">
-                    写真 {snowFeature.count}枚
-                    <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                    <span className="hidden sm:inline">ポケふた図鑑で </span>
+                    <span className="font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
                   </p>
                 </div>
-              </Link>
-            ) : plushFeature && plushFeature.count > 0 ? (
-            <Link
-              href="https://data.pokefuta.com/gallery/plush/"
-              className="group flex min-w-0 flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:flex-row sm:items-center sm:gap-3"
-            >
-              {/* 特集ページと同じく、蓋（丸）とぬいぐるみ（右下のステッカー）をそれぞれ切り抜いて小さく並べる */}
-              <div className="flex shrink-0 gap-1 max-sm:[zoom:0.72]">
-                {plushFeature.photos.slice(0, 3).map((photo) => {
-                  const { lid, plush } = photoAiBoxes(photo.ai_tags);
-                  const lidClip = lid ? photoBoxZoom(photo.ai_tags, lid, 1.04) : undefined;
-                  const plushClip = plush ? photoBoxZoom(photo.ai_tags, plush, 1.12) : undefined;
-                  const src = `/api/photo/${photo.id}?size=small`;
-                  return (
-                    <div key={photo.id} className="relative h-14 w-14">
-                      <div className="absolute left-0 top-0 h-[46px] w-[46px] overflow-hidden rounded-full border-2 border-white bg-[#EFE4CC] shadow-sm">
-                        <img src={src} alt="" width={56} height={56} loading="lazy" fetchPriority="low"
-                          className={lidClip ? undefined : 'h-full w-full object-cover'}
-                          style={lidClip ?? { objectPosition: photoObjectPosition(photo.ai_tags) }} />
-                      </div>
-                      {plushClip && (
-                        <div className="absolute bottom-0 right-0 h-[26px] w-[26px] rotate-[4deg] overflow-hidden rounded-[7px] border-2 border-white bg-[#EFE4CC] shadow">
-                          <img src={src} alt="" width={26} height={26} loading="lazy" fetchPriority="low" style={plushClip} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">
-                  ぬいぐるみと旅するポケふた
-                  <span className="hidden shrink-0 rounded-full bg-[#7B63A8] px-1.5 py-0.5 text-[10px] font-extrabold text-white sm:inline">ベータ</span>
-                </p>
-                <p className="text-[11px] text-[#6A4D36] sm:text-xs">
-                  写真 {plushFeature.count}枚
-                  <span className="ml-1 font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
-                </p>
-              </div>
-            </Link>
-            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
+              </a>
+            ) : rotatingFeature === 'plush' ? (
+              <a
+                href="https://data.pokefuta.com/gallery/plush/"
+                className="group flex min-w-0 items-center gap-2 rounded-lg bg-white p-2 shadow-sm transition hover:shadow sm:gap-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F6EFFB] text-[#7B63A8] shadow-sm sm:h-14 sm:w-14">
+                  <Heart className="h-5 w-5 sm:h-7 sm:w-7" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-extrabold text-[#4A4A4A] sm:text-sm">ぬいぐるみと旅するポケふた</p>
+                  <p className="text-[11px] text-[#6A4D36] sm:text-xs">
+                    <span className="hidden sm:inline">ポケふた図鑑で </span>
+                    <span className="font-bold text-[#7B63A8] group-hover:underline">見る ›</span>
+                  </p>
+                </div>
+              </a>
+            ) : null}
 
             {designFeature && designFeature.length > 0 ? (
             <Link
@@ -1125,7 +1080,7 @@ export default function HomePage() {
                 </p>
               </div>
             </Link>
-            ) : featureLoadsDone < FEATURE_LOADS && <FeatureCardPlaceholder />}
+            ) : !designFeatureLoaded && <FeatureCardPlaceholder />}
             </div>
           </section>
         )}
@@ -1136,8 +1091,6 @@ export default function HomePage() {
   );
 }
 
-// 特集で取り終わるのを待つ数（デザインふたと、雪景色・ぬいぐるみの交互の枠）
-const FEATURE_LOADS = 2;
 // 公開写真1万枚の記念カード（/features/10k-map）。記念なので期間を決めて自動で外す（この日の終わりまで出す）
 const TEN_K_MAP_UNTIL = '2026-12-21';
 const showTenKMap = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) <= TEN_K_MAP_UNTIL;
