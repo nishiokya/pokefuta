@@ -589,6 +589,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
 
   const startCommentEdit = (photo: Photo) => {
     if (!photo.visit?.id || !photo.visit.is_own) return;
+    // 「ひとことを足しませんか」のお礼を残していた訪問は、ここで頼む相手から外す。
+    // 残すと編集を閉じたあとに空の入力欄で出直し、保存で今のひとことを上書きしてしまう
+    setSavedTipVisit(null);
     setEditingCommentVisitId(photo.visit.id);
     setCommentDraft(photo.visit.comment ?? '');
     setCommentSaveError(null);
