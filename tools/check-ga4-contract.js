@@ -525,9 +525,9 @@ for (const helper of ['visitTipPromptView', 'visitTipSaved']) {
     `${helper} がどこからも呼ばれていない（ひとことの計測に穴が空く）`
   );
 }
-// 投稿画面・投稿完了画面の2か所から saved が出ていること
-// （蓋の詳細は掲示板の入力欄に一本化し、p_comment_posted で数える）
-for (const surface of ['upload_form', 'upload_complete']) {
+// 投稿画面・投稿完了画面・蓋の詳細の「ひとこと無しの自分の訪問」の3か所から saved が出ていること
+// （蓋の詳細の掲示板の入力欄は p_comment_posted で数える）
+for (const surface of ['upload_form', 'upload_complete', 'manhole_own_visit']) {
   // JSX 属性（surface="upload_complete"）とオブジェクト（surface: 'upload_form'）の両方を拾う
   expect(
     callerCode.includes(`'${surface}'`) || callerCode.includes(`"${surface}"`),

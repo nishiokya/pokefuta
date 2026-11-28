@@ -14,11 +14,15 @@ interface Props {
   description?: string;
   /** 保存できた本文。呼び出し側が画面上の写真のひとことを差し替えるのに使う */
   onSaved?: (comment: string) => void;
+  /** 先頭に出して目立たせる候補（蓋にまだ駐車場の情報が無いときの「駐車場あり」） */
+  highlightSuggestion?: string;
 }
 
 /**
- * 「次に来る人へひとこと」を後から書くフォーム。投稿完了画面で使う。
- * （蓋の詳細では入力欄を掲示板の1つにまとめたので使わない）
+ * 「次に来る人へひとこと」を後から書くフォーム。投稿完了画面と、蓋の詳細の
+ * 「ひとこと無しで投稿した自分の訪問」への呼びかけ（manhole_own_visit）で使う。
+ * 蓋の詳細の入力欄は掲示板に一本化してあり、こちらは自分の訪問のひとこと（図鑑の
+ * 「訪れた人のひとこと」と「口コミから」の元）を書く口として別に出す。
  * 書き先は掲示板ではなく**訪問のひとこと（visit.comment）**。写真と一緒に並び、
  * 代表写真の吹き出しにも載るので、書いた人から見て反映先が分かりやすい。
  */
@@ -29,6 +33,7 @@ export default function NextVisitorTipForm({
   title,
   description,
   onSaved,
+  highlightSuggestion,
 }: Props) {
   const [draft, setDraft] = useState('');
   const [usedSuggestion, setUsedSuggestion] = useState(false);
@@ -101,6 +106,7 @@ export default function NextVisitorTipForm({
         <SuggestionChips
           value={draft}
           disabled={saving}
+          highlight={highlightSuggestion}
           onPick={(next) => {
             setDraft(next);
             setUsedSuggestion(true);

@@ -22,6 +22,7 @@ import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
 import SuggestionChips from '@/components/comments/SuggestionChips';
 import { collectVisitComments } from '@/lib/visit-comment-quality';
 import { VISIT_COMMENT_MAX_LENGTH } from '@/lib/visit-tip';
+import { MISSING_PARKING_MESSAGE, PARKING_SUGGESTION, parseReviewTips } from '@/lib/review-tips';
 import { canOfferGift } from '@/lib/visit-gift';
 import { pageTitle } from '@/lib/constants';
 import { DESIGN_MANHOLE_SUBMISSION_SUSPENDED } from '@/lib/design-manhole-submission-status';
@@ -148,7 +149,8 @@ function UploadPageInner() {
   // 同じ蓋に前の人が残したひとこと（最新の1件）。何を書けばいいかの手本として見せる
   const [previousTip, setPreviousTip] = useState<string | null>(null);
   // 完了画面で「ひとことを後から残す」ための訪問ID
-  const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number; giftStatus: 'published' | 'skipped' | null } | null>(null);
+  // missingParking: 図鑑の口コミの集計で、この蓋にまだ駐車場の情報が無い（投稿完了画面で名指しして頼む）
+  const [completedVisit, setCompletedVisit] = useState<{ visitId: string; manholeId?: number; giftStatus: 'published' | 'skipped' | null; missingParking?: boolean } | null>(null);
   const [isPublic, setIsPublic] = useState<boolean>(true); // 公開設定（デフォルト: 公開）
   const [giftPreferenceKey, setGiftPreferenceKey] = useState<string | null>(null);
   const [offerGift, setOfferGift] = useState(false);
@@ -857,6 +859,7 @@ function UploadPageInner() {
           visitId: uploadResult.visit_id,
           manholeId: photo.matchedManhole?.id,
           giftStatus: wantsGift ? (uploadResult.gift_until ? 'published' : 'skipped') : null,
+          missingParking: parseReviewTips(photo.matchedManhole)?.missing === 'parking',
         });
       }
 
@@ -980,6 +983,8 @@ function UploadPageInner() {
 
   // 蓋が決まったら、前の人のひとことを1件取ってくる。失敗しても投稿には関係ないので黙って諦める
   const matchedManholeId = selectedPhoto?.matchedManhole?.id;
+  // 一覧（data.pokefuta.com の manholes.json）の蓋には、図鑑が口コミから集計した review_tips が載っている
+  const missingParkingForForm = parseReviewTips(selectedPhoto?.matchedManhole)?.missing === 'parking';
   useEffect(() => {
     setPreviousTip(null);
     if (!matchedManholeId) return;
@@ -1096,7 +1101,12 @@ function UploadPageInner() {
                 visitId={completedVisit.visitId}
                 manholeId={completedVisit.manholeId}
                 surface="upload_complete"
-                title="次に来る人へ、ひとことどうですか？"
+                title={
+                  completedVisit.missingParking
+                    ? `${MISSING_PARKING_MESSAGE}。次に来る人へ、ひとことどうですか？`
+                    : '次に来る人へ、ひとことどうですか？'
+                }
+                highlightSuggestion={completedVisit.missingParking ? PARKING_SUGGESTION : undefined}
                 description={
                   isPublic
                     ? '蓋のページのコメント欄に、あなたの写真と一緒に並びます'
@@ -1622,6 +1632,11 @@ function UploadPageInner() {
                 <p className="mt-0.5 text-xs text-[#2A2A2A]/60">
                   公開設定がONの場合、蓋のページのコメント欄に写真と一緒に並びます
                 </p>
+                {missingParkingForForm && (
+                  <p className="mt-1.5 rounded-md bg-[#fff4dc] px-2.5 py-1.5 text-xs font-bold text-[#8a5a00]">
+                    {MISSING_PARKING_MESSAGE}。分かれば教えてください
+                  </p>
+                )}
                 {previousTip && (
                   <p className="mt-1.5 rounded-md bg-white/70 px-2.5 py-1.5 text-xs text-[#2A2A2A]/70">
                     <span className="font-bold">前に来た人は: </span>
@@ -1640,6 +1655,7 @@ function UploadPageInner() {
                 <div className="mt-1.5">
                   <SuggestionChips
                     value={visitComment}
+                    highlight={missingParkingForForm ? PARKING_SUGGESTION : undefined}
                     onPick={(next) => {
                       setVisitComment(next.slice(0, VISIT_COMMENT_MAX_LENGTH));
                       setUsedTipSuggestion(true);
