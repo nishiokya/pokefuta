@@ -121,6 +121,18 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
     };
   }, [open]);
 
+  const subItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: 'var(--chrome-tap-min)',
+    padding: '0 10px',
+    borderRadius: 8,
+    color: 'var(--chrome-pc-nav)',
+    fontSize: 13,
+    fontWeight: 700,
+    textDecoration: 'none',
+  };
+
   const itemStyle = (current: boolean): React.CSSProperties => ({
     display: 'block',
     padding: '9px 10px',
@@ -209,9 +221,15 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
             <b style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>図鑑</b>
             <small style={{ display: 'block', fontSize: 11, color: 'var(--chrome-pc-nav)' }}>調べる・探す</small>
           </a>
-          {/* 区切り線の下はサイトではなく外部リンク。写真館・図鑑と同じ大きい2行項目にはしない
-              （図鑑側の .site-switch__sep / .site-switch__sub と同じ見た目） */}
+          {/* 区切り線の下は小さい1行のリンク。写真館・図鑑と同じ大きい2行項目にはしない
+              （図鑑側の .site-switch__sep / .site-switch__sub と同じ見た目・同じ並び） */}
           <hr style={{ margin: '6px 4px', border: 0, borderTop: '1px solid var(--chrome-accent-border)' }} />
+          <Link href="/design-manholes" onClick={closeAndRestoreFocus} style={subItemStyle}>
+            デザインふた
+          </Link>
+          <Link href="/about" onClick={closeAndRestoreFocus} style={subItemStyle}>
+            このサイトについて
+          </Link>
           <a
             href={BLOG_URL}
             target="_blank"
@@ -220,17 +238,7 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
               trackBlogLinkClick({ surface: 'site_switch' });
               closeAndRestoreFocus();
             }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: 'var(--chrome-tap-min)',
-              padding: '0 10px',
-              borderRadius: 8,
-              color: 'var(--chrome-pc-nav)',
-              fontSize: 13,
-              fontWeight: 700,
-              textDecoration: 'none',
-            }}
+            style={subItemStyle}
           >
             {BLOG_TITLE}
           </a>
