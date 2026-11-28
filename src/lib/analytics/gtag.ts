@@ -688,6 +688,8 @@ export const pokefutaEvents = {
 
   // --- SNS導線系 ---
   xLinkClick:          (p?: PokefutaEventParams) => trackEvent('p_x_link_click', p),
+  /** 開発ブログ（はてなブログ）へのリンク。surface: header / site_switch / footer */
+  blogLinkClick:       (p?: PokefutaEventParams) => trackEvent('p_blog_link_click', p),
 
   // --- Pokémon GO フレンド募集（GO_FRIEND_EVENTS の順） ---
   /** プロフィール編集画面に到達。設定率の分母。 */

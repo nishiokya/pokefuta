@@ -108,6 +108,7 @@ export function useAnalytics() {
 
   // --- SNS導線系 ---
   const trackXLinkClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.xLinkClick(p), []);
+  const trackBlogLinkClick = useCallback((p?: PokefutaEventParams) => pokefutaEvents.blogLinkClick(p), []);
 
   // --- 後方互換用 ---
   const trackSearch = useCallback(
@@ -193,6 +194,7 @@ export function useAnalytics() {
 
     // SNS導線系
     trackXLinkClick,
+    trackBlogLinkClick,
 
     // 内部エラー追跡
     trackApiError,

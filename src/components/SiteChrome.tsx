@@ -26,6 +26,10 @@ import { NAV_ITEMS, isSubmissionPage, NavKey, resolveChrome } from '@/lib/siteNa
 
 const DATA_SITE_URL = 'https://data.pokefuta.com/';
 const X_ACCOUNT_URL = 'https://x.com/pokemonmanhole';
+// 運営の開発ブログ（はてなブログ）。PC ヘッダー右のボタンは X からこちらへ張り替えた（2026-11）。
+// X は SP フッターに残している
+const BLOG_URL = 'https://mookie.hatenablog.com/';
+const BLOG_TITLE = '開発ブログ（はてなブログ）';
 const ROUND = 'var(--chrome-font)';
 
 // ─────────────────────────────────────────────
@@ -81,6 +85,7 @@ type ChromeState = {
  */
 function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
   const pathname = usePathname();
+  const { trackBlogLinkClick } = useAnalytics();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -203,6 +208,31 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
           <a href={DATA_SITE_URL} onClick={closeAndRestoreFocus} style={itemStyle(false)}>
             <b style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>図鑑</b>
             <small style={{ display: 'block', fontSize: 11, color: 'var(--chrome-pc-nav)' }}>調べる・探す</small>
+          </a>
+          {/* 区切り線の下はサイトではなく外部リンク。写真館・図鑑と同じ大きい2行項目にはしない
+              （図鑑側の .site-switch__sep / .site-switch__sub と同じ見た目） */}
+          <hr style={{ margin: '6px 4px', border: 0, borderTop: '1px solid var(--chrome-accent-border)' }} />
+          <a
+            href={BLOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              trackBlogLinkClick({ surface: 'site_switch' });
+              closeAndRestoreFocus();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              minHeight: 'var(--chrome-tap-min)',
+              padding: '0 10px',
+              borderRadius: 8,
+              color: 'var(--chrome-pc-nav)',
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            {BLOG_TITLE}
           </a>
       </div>
     </div>
@@ -360,7 +390,7 @@ function pcNavLinkStyle(isActive: boolean): React.CSSProperties {
 }
 
 function PcTopNav({ user, authLoaded, activeNav, pathname, ownAvatarPhotoId }: ChromeState) {
-  const { trackXLinkClick, trackSubmissionEntry } = useAnalytics();
+  const { trackBlogLinkClick, trackSubmissionEntry } = useAnalytics();
   const isLoggedIn = authLoaded && user !== null;
   const isUploading = isActivePath(pathname, '/upload');
 
@@ -415,16 +445,17 @@ function PcTopNav({ user, authLoaded, activeNav, pathname, ownAvatarPhotoId }: C
         <Info size={18} strokeWidth={2} />
       </Link>
 
+      {/* 文字のボタンなので、アイコン用の32px角ではなく幅を中身に合わせる */}
       <a
-        href={X_ACCOUNT_URL}
+        href={BLOG_URL}
         target="_blank"
         rel="noopener noreferrer"
-        style={pcIconBtn}
-        title="公式X @pokemonmanhole"
-        aria-label="公式X @pokemonmanhole"
-        onClick={() => trackXLinkClick({ surface: 'header', source_app: 'tracker', is_logged_in: isLoggedIn })}
+        style={{ ...pcIconBtn, width: 'auto', padding: '0 12px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}
+        title={BLOG_TITLE}
+        aria-label={BLOG_TITLE}
+        onClick={() => trackBlogLinkClick({ surface: 'header', is_logged_in: isLoggedIn })}
       >
-        <XLogo className="h-[15px] w-[15px]" />
+        ブログ
       </a>
 
       {isLoggedIn && (
@@ -544,7 +575,7 @@ const footerLinkStyle: React.CSSProperties = {
 };
 
 function SpUtilityFooter({ user, authLoaded }: ChromeState) {
-  const { trackXLinkClick } = useAnalytics();
+  const { trackXLinkClick, trackBlogLinkClick } = useAnalytics();
 
   // pb-nav-safe はフッター自身に付ける。
   // ページ側の pb-nav-safe は children の内側にあるのでフッターを保護できず、
@@ -573,7 +604,17 @@ function SpUtilityFooter({ user, authLoaded }: ChromeState) {
             このサイトについて
           </Link>
         </div>
-        <div className="mt-1 flex items-center justify-center">
+        <div className="mt-1 flex items-center justify-center gap-x-2">
+          <a
+            href={BLOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-2"
+            style={footerLinkStyle}
+            onClick={() => trackBlogLinkClick({ surface: 'footer', is_logged_in: authLoaded && user !== null })}
+          >
+            ブログ
+          </a>
           <a
             href={X_ACCOUNT_URL}
             target="_blank"
