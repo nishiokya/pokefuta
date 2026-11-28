@@ -201,28 +201,27 @@ export default async function UserVisitsPage({ params }: PageProps) {
             */}
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6">
               <div className="min-w-0">
-                {/* 本人の X・Instagram は名前の横にロゴだけで置く。名前が長くて入らなければ下へ回る */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  {/* アイコンは本人が選んだときだけ出す。未設定の人に人のマークを足して行を詰まらせない */}
-                  {data.avatarPhotoId && (
+                {/*
+                  アイコン（本人が選んだマンホールの写真）がある人は、X・Instagram をアイコンの横に置き、名前は次の行に1行で出す。
+                  以前は名前の後ろに置いていて、スマホでは名前が折り返したあとの3行目に X だけが落ちていた。
+                  アイコンの無い人は従来どおり名前の横（入らなければ下へ回る）
+                */}
+                {data.avatarPhotoId && (
+                  <div className="mb-2 flex items-center gap-3">
                     <UserAvatar
                       photoId={data.avatarPhotoId}
                       size={56}
                       alt={`${data.displayName}のアイコン`}
                     />
-                  )}
+                    <SocialLinks xUrl={xUrl} instagramUrl={instagramUrl} />
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <UserRegularBadge userId={data.userId} />
                   <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
                     {data.displayName}のスタンプ帳
                   </h1>
-                  {(xUrl || instagramUrl) && (
-                    <div className="flex gap-2">
-                      {xUrl && <SocialLink href={xUrl} label="X" icon={<XLogo className="h-4 w-4" />} />}
-                      {instagramUrl && (
-                        <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
-                      )}
-                    </div>
-                  )}
+                  {!data.avatarPhotoId && <SocialLinks xUrl={xUrl} instagramUrl={instagramUrl} />}
                 </div>
                 {data.bio && (
                   <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
@@ -398,6 +397,18 @@ export default async function UserVisitsPage({ params }: PageProps) {
         </section>
       </main>
 
+    </div>
+  );
+}
+
+function SocialLinks({ xUrl, instagramUrl }: { xUrl: string | null; instagramUrl: string | null }) {
+  if (!xUrl && !instagramUrl) return null;
+  return (
+    <div className="flex gap-2">
+      {xUrl && <SocialLink href={xUrl} label="X" icon={<XLogo className="h-4 w-4" />} />}
+      {instagramUrl && (
+        <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
+      )}
     </div>
   );
 }
