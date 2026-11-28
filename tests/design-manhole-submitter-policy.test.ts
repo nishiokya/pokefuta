@@ -40,7 +40,7 @@ test('公開スタンプ帳のデザインマンホール一覧: published だ�
   );
   const body = sql.replace(/^--.*$/gm, '');
   assert.match(body, /AND d\.status = 'published'/);
-  assert.match(body, /SELECT d\.id, d\.title, d\.created_at\n/);
+  assert.match(body, /SELECT d\.id, d\.title, d\.description, d\.created_at\n/);
   assert.doesNotMatch(body, /RETURNS TABLE \([^)]*(created_by|storage_key|latitude|longitude|exif)/);
   assert.match(body, /SET search_path TO public, pg_temp/);
   assert.match(body, /REVOKE ALL ON FUNCTION public\.get_public_design_manholes\(uuid\) FROM PUBLIC;/);

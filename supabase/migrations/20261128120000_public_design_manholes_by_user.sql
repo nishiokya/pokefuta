@@ -16,6 +16,7 @@ CREATE OR REPLACE FUNCTION public.get_public_design_manholes(p_user_id uuid)
 RETURNS TABLE (
   id uuid,
   title text,
+  description text,
   created_at timestamp with time zone
 )
 LANGUAGE sql
@@ -23,7 +24,7 @@ STABLE
 SECURITY DEFINER
 SET search_path TO public, pg_temp
 AS $function$
-  SELECT d.id, d.title, d.created_at
+  SELECT d.id, d.title, d.description, d.created_at
   FROM public.design_manhole d
   JOIN public.app_user au ON au.auth_uid = d.created_by
   WHERE au.id = p_user_id
@@ -36,5 +37,5 @@ REVOKE ALL ON FUNCTION public.get_public_design_manholes(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_public_design_manholes(uuid) TO anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.get_public_design_manholes(uuid) IS
-  '公開IDの人が公開(published)したデザインマンホールを新しい順に最大60件（id・title・created_at）。'
+  '公開IDの人が公開(published)したデザインマンホールを新しい順に最大60件（id・title・description・created_at）。'
   ' 公開スタンプ帳用。条件は get_public_design_manhole_count と同じ。created_by・storage_key・緯度経度は返さない。';

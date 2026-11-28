@@ -23,8 +23,8 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion, type StampbookOgpVersionInput } from '@/lib/stampbook-ogp-version';
-import { loadPublicDesignManholeCount, loadPublicDesignManholes, type PublicDesignManhole } from '@/lib/design-manhole-submitter';
-import { formatDateJaJst } from '@/lib/date';
+import { loadPublicDesignManholeCount, loadPublicDesignManholes } from '@/lib/design-manhole-submitter';
+import OwnDesignManholeCard from '@/components/DesignManhole/OwnDesignManholeCard';
 import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
@@ -308,10 +308,11 @@ export default async function UserVisitsPage({ params }: PageProps) {
                 {Math.max(designManholeCount, designManholes.length)}枚
               </span>
             </h2>
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6">
+            {/* カードと列数は本人の一覧（/visits/design-manholes）と同じ */}
+            <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
               {designManholes.map((dm) => (
                 <li key={dm.id}>
-                  <DesignManholeTile item={dm} />
+                  <OwnDesignManholeCard item={dm} eager={false} />
                 </li>
               ))}
             </ul>
@@ -486,31 +487,6 @@ function CtaCard({
         ひらく
         <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
       </span>
-    </Link>
-  );
-}
-
-// 訪問のカードと同じ大きさで並べ、デザインマンホールの紫の縁で見分ける。押すと詳細ページへ
-function DesignManholeTile({ item }: { item: PublicDesignManhole }) {
-  const title = item.title || 'デザインマンホール';
-  return (
-    <Link
-      href={`/design-manholes/${item.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <div className="relative aspect-square overflow-hidden bg-[#EFE4CC] sm:aspect-[4/3]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={item.photo_url}
-          alt=""
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          loading="lazy"
-        />
-      </div>
-      <div className="p-1.5 sm:p-2.5">
-        <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">{title}</p>
-        <p className="mt-1 text-[11px] font-semibold text-[#6A4D36]">投稿 {formatDateJaJst(item.created_at)}</p>
-      </div>
     </Link>
   );
 }
