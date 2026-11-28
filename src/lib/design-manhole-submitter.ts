@@ -1,6 +1,5 @@
 import 'server-only';
 import { getPublicLiveClient } from '@/lib/user-prefecture-progress';
-import { publishedPhotoUrl, type OwnDesignManhole } from '@/lib/own-design-manholes';
 
 // どちらも作者の取り下げ（hidden 化・公開訪問を非公開に戻す）がすぐ効くよう、キャッシュに載せない
 // クライアントで取れなかった・RPC が失敗したときは null / 0 にして、ページ全体は落とさない
@@ -23,45 +22,6 @@ export async function loadPublicDesignManholeCount(publicUserId: string): Promis
   } catch (error) {
     console.warn('Failed to load design manhole count:', error);
     return 0;
-  }
-}
-
-/**
- * 公開IDの人が公開したデザインマンホール（公開スタンプ帳の「投稿したデザインマンホール」用）。新しい順に最大60件。
- * 見た目を本人の一覧（/visits/design-manholes）と揃えるため、同じカードが受け取る OwnDesignManhole の形で返す。
- * 本人の一覧の RPC（get_own_design_manholes）は auth.uid() で絞るので、他の人のページでは使えない。
- * RPC が無い（本番へのマイグレーション適用前）・失敗したときは空にして、節ごと出さない
- */
-export async function loadPublicDesignManholes(publicUserId: string): Promise<OwnDesignManhole[]> {
-  const client = getPublicLiveClient();
-  if (!client) return [];
-  try {
-    const { data, error } = await client.rpc(
-      'get_public_design_manholes' as never,
-      { p_user_id: publicUserId } as never
-    );
-    if (error) {
-      console.warn('Failed to load design manholes:', error);
-      return [];
-    }
-    if (!Array.isArray(data)) return [];
-    return (data as Array<Record<string, unknown>>)
-      .filter((row) => typeof row.id === 'string' && typeof row.created_at === 'string')
-      .map((row) => {
-        const id = row.id as string;
-        return {
-          id,
-          title: typeof row.title === 'string' && row.title ? row.title : null,
-          description: typeof row.description === 'string' && row.description ? row.description : null,
-          status: 'published' as const,
-          created_at: row.created_at as string,
-          photo_url: publishedPhotoUrl(id),
-          href: `/design-manholes/${id}`,
-        };
-      });
-  } catch (error) {
-    console.warn('Failed to load design manholes:', error);
-    return [];
   }
 }
 

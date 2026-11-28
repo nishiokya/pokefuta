@@ -7,7 +7,6 @@ import {
   Instagram,
   Map as MapIcon,
   MapPin,
-  Palette,
   Search,
   Sparkles,
   Stamp,
@@ -23,8 +22,7 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion, type StampbookOgpVersionInput } from '@/lib/stampbook-ogp-version';
-import { loadPublicDesignManholeCount, loadPublicDesignManholes } from '@/lib/design-manhole-submitter';
-import OwnDesignManholeCard from '@/components/DesignManhole/OwnDesignManholeCard';
+import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
 import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
@@ -142,7 +140,7 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives, designManholeCount, plushCount, snowCount, designManholes] = await Promise.all([
+  const [data, progress, snapshot, representatives, designManholeCount, plushCount, snowCount] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
@@ -151,7 +149,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
     loadPublicDesignManholeCount(params.userId),
     loadPublicPlushVisitCount(params.userId),
     loadPublicSnowVisitCount(params.userId),
-    loadPublicDesignManholes(params.userId),
   ]);
 
   if (!data) notFound();
@@ -295,30 +292,6 @@ export default async function UserVisitsPage({ params }: PageProps) {
               {badges.pokemon.length > 0 && <CollectionStampShelf title="ポケモンバッジ" initialCount={16} items={badges.pokemon} />}
               <StickerStrip stickers={badges.stickers} />
             </div>
-          </section>
-        )}
-
-        {/* 本人が投稿して公開中のデザインマンホール。1枚も無い人・取れなかったときは節ごと出さない */}
-        {designManholes.length > 0 && (
-          <section className="mt-8">
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
-              <Palette className="h-5 w-5 text-[#7B63A8]" />
-              投稿したデザインマンホール
-              <span className="text-sm font-bold text-[#8C6A4A]">
-                {Math.max(designManholeCount, designManholes.length)}枚
-              </span>
-            </h2>
-            {/* カードと列数は本人の一覧（/visits/design-manholes）と同じ */}
-            <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              {designManholes.map((dm) => (
-                <li key={dm.id}>
-                  <OwnDesignManholeCard item={dm} eager={false} />
-                </li>
-              ))}
-            </ul>
-            {designManholeCount > designManholes.length && (
-              <p className="mt-2 text-xs text-[#6A4D36]">新しい{designManholes.length}枚を表示しています。</p>
-            )}
           </section>
         )}
 

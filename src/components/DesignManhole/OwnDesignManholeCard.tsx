@@ -3,7 +3,7 @@ import { formatDateJaJst } from '@/lib/date';
 import { OWN_DESIGN_MANHOLE_STATUS_LABEL, type OwnDesignManhole } from '@/lib/own-design-manholes';
 
 /**
- * 自分の投稿の一覧（/visits/design-manholes）と、公開スタンプ帳（/users/[userId]）の「投稿したデザインマンホール」のカード。DesignManholeCard の本人向けの軽い版。
+ * 自分の投稿の一覧（/visits/design-manholes）のカード。DesignManholeCard の本人向けの軽い版。
  * 投稿者名・アバターは出さない。状態ラベル（確認待ち・移した）は写真の左上に重ねる。
  * href が null（確認待ち）のカードはリンクにしない。
  */
