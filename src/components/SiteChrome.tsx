@@ -85,7 +85,6 @@ type ChromeState = {
  */
 function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
   const pathname = usePathname();
-  const { trackBlogLinkClick } = useAnalytics();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -222,7 +221,8 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
             <small style={{ display: 'block', fontSize: 11, color: 'var(--chrome-pc-nav)' }}>調べる・探す</small>
           </a>
           {/* 区切り線の下は小さい1行のリンク。写真館・図鑑と同じ大きい2行項目にはしない
-              （図鑑側の .site-switch__sep / .site-switch__sub と同じ見た目・同じ並び） */}
+              （図鑑側の .site-switch__sep / .site-switch__sub と同じ見た目・同じ並び）。
+              ブログは PC ヘッダーと SP フッターにあるので、メニューには入れない */}
           <hr style={{ margin: '6px 4px', border: 0, borderTop: '1px solid var(--chrome-accent-border)' }} />
           <Link href="/design-manholes" onClick={closeAndRestoreFocus} style={subItemStyle}>
             デザインふた
@@ -230,18 +230,6 @@ function SiteSwitcher({ variant }: { variant: 'sp' | 'pc' }) {
           <Link href="/about" onClick={closeAndRestoreFocus} style={subItemStyle}>
             このサイトについて
           </Link>
-          <a
-            href={BLOG_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              trackBlogLinkClick({ surface: 'site_switch' });
-              closeAndRestoreFocus();
-            }}
-            style={subItemStyle}
-          >
-            {BLOG_TITLE}
-          </a>
       </div>
     </div>
   );
