@@ -7,6 +7,7 @@ import {
   Instagram,
   Map as MapIcon,
   MapPin,
+  Palette,
   Search,
   Sparkles,
   Stamp,
@@ -22,7 +23,8 @@ import StickerStrip from '@/components/visits/StickerStrip';
 import { pokemonDexUrl } from '@/lib/pokemonSlug';
 import { buildPublicStampbookBadges } from '@/lib/public-stampbook-badges';
 import { stampbookOgpVersion, type StampbookOgpVersionInput } from '@/lib/stampbook-ogp-version';
-import { loadPublicDesignManholeCount } from '@/lib/design-manhole-submitter';
+import { loadPublicDesignManholeCount, loadPublicDesignManholes, type PublicDesignManhole } from '@/lib/design-manhole-submitter';
+import { formatDateJaJst } from '@/lib/date';
 import { loadPublicPlushVisitCount, loadPublicSnowVisitCount } from '@/lib/sticker-counts';
 import { fetchManholeSnapshot } from '@/lib/manhole-snapshot';
 import { fetchPokemonRepresentatives } from '@/lib/pokemon-representatives';
@@ -140,7 +142,7 @@ function groupVisitsByPrefecture(visits: PublicVisit[]): PrefectureGroup[] {
 }
 
 export default async function UserVisitsPage({ params }: PageProps) {
-  const [data, progress, snapshot, representatives, designManholeCount, plushCount, snowCount] = await Promise.all([
+  const [data, progress, snapshot, representatives, designManholeCount, plushCount, snowCount, designManholes] = await Promise.all([
     loadPublicUserVisits(params.userId),
     loadPublicUserPrefectureProgress(params.userId).catch(() => null),
     // ステッカーの判定に蓋のテーマ（hashtags）が要る。スナップショットは1時間キャッシュされる
@@ -149,6 +151,7 @@ export default async function UserVisitsPage({ params }: PageProps) {
     loadPublicDesignManholeCount(params.userId),
     loadPublicPlushVisitCount(params.userId),
     loadPublicSnowVisitCount(params.userId),
+    loadPublicDesignManholes(params.userId),
   ]);
 
   if (!data) notFound();
@@ -201,28 +204,27 @@ export default async function UserVisitsPage({ params }: PageProps) {
             */}
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6">
               <div className="min-w-0">
-                {/* 本人の X・Instagram は名前の横にロゴだけで置く。名前が長くて入らなければ下へ回る */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  {/* アイコンは本人が選んだときだけ出す。未設定の人に人のマークを足して行を詰まらせない */}
-                  {data.avatarPhotoId && (
+                {/*
+                  アイコン（本人が選んだマンホールの写真）がある人は、X・Instagram をアイコンの横に置き、名前は次の行に1行で出す。
+                  以前は名前の後ろに置いていて、スマホでは名前が折り返したあとの3行目に X だけが落ちていた。
+                  アイコンの無い人は従来どおり名前の横（入らなければ下へ回る）
+                */}
+                {data.avatarPhotoId && (
+                  <div className="mb-2 flex items-center gap-3">
                     <UserAvatar
                       photoId={data.avatarPhotoId}
                       size={56}
                       alt={`${data.displayName}のアイコン`}
                     />
-                  )}
+                    <SocialLinks xUrl={xUrl} instagramUrl={instagramUrl} />
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <UserRegularBadge userId={data.userId} />
                   <h1 className="text-3xl font-extrabold leading-tight tracking-normal text-[#4F3828] sm:text-5xl lg:text-4xl">
                     {data.displayName}のスタンプ帳
                   </h1>
-                  {(xUrl || instagramUrl) && (
-                    <div className="flex gap-2">
-                      {xUrl && <SocialLink href={xUrl} label="X" icon={<XLogo className="h-4 w-4" />} />}
-                      {instagramUrl && (
-                        <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
-                      )}
-                    </div>
-                  )}
+                  {!data.avatarPhotoId && <SocialLinks xUrl={xUrl} instagramUrl={instagramUrl} />}
                 </div>
                 {data.bio && (
                   <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#6A4D36] sm:text-base">
@@ -293,6 +295,29 @@ export default async function UserVisitsPage({ params }: PageProps) {
               {badges.pokemon.length > 0 && <CollectionStampShelf title="ポケモンバッジ" initialCount={16} items={badges.pokemon} />}
               <StickerStrip stickers={badges.stickers} />
             </div>
+          </section>
+        )}
+
+        {/* 本人が投稿して公開中のデザインマンホール。1枚も無い人・取れなかったときは節ごと出さない */}
+        {designManholes.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#4F3828]">
+              <Palette className="h-5 w-5 text-[#7B63A8]" />
+              投稿したデザインマンホール
+              <span className="text-sm font-bold text-[#8C6A4A]">
+                {Math.max(designManholeCount, designManholes.length)}枚
+              </span>
+            </h2>
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6">
+              {designManholes.map((dm) => (
+                <li key={dm.id}>
+                  <DesignManholeTile item={dm} />
+                </li>
+              ))}
+            </ul>
+            {designManholeCount > designManholes.length && (
+              <p className="mt-2 text-xs text-[#6A4D36]">新しい{designManholes.length}枚を表示しています。</p>
+            )}
           </section>
         )}
 
@@ -402,6 +427,18 @@ export default async function UserVisitsPage({ params }: PageProps) {
   );
 }
 
+function SocialLinks({ xUrl, instagramUrl }: { xUrl: string | null; instagramUrl: string | null }) {
+  if (!xUrl && !instagramUrl) return null;
+  return (
+    <div className="flex gap-2">
+      {xUrl && <SocialLink href={xUrl} label="X" icon={<XLogo className="h-4 w-4" />} />}
+      {instagramUrl && (
+        <SocialLink href={instagramUrl} label="Instagram" icon={<Instagram className="h-4 w-4" />} />
+      )}
+    </div>
+  );
+}
+
 // ロゴだけの丸いボタン。以前は「X」の文字のロゴの横に「X」の名前も付けていて「X x」に見えた
 function SocialLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
   return (
@@ -449,6 +486,31 @@ function CtaCard({
         ひらく
         <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
       </span>
+    </Link>
+  );
+}
+
+// 訪問のカードと同じ大きさで並べ、デザインマンホールの紫の縁で見分ける。押すと詳細ページへ
+function DesignManholeTile({ item }: { item: PublicDesignManhole }) {
+  const title = item.title || 'デザインマンホール';
+  return (
+    <Link
+      href={`/design-manholes/${item.id}`}
+      className="group flex h-full flex-col overflow-hidden rounded-[8px] border border-[#7B63A8]/25 bg-[#FFF8EB] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="relative aspect-square overflow-hidden bg-[#EFE4CC] sm:aspect-[4/3]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.photo_url}
+          alt=""
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
+      </div>
+      <div className="p-1.5 sm:p-2.5">
+        <p className="truncate font-pixelJp text-[12px] font-bold leading-tight text-[#4F3828]">{title}</p>
+        <p className="mt-1 text-[11px] font-semibold text-[#6A4D36]">投稿 {formatDateJaJst(item.created_at)}</p>
+      </div>
     </Link>
   );
 }

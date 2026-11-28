@@ -25,6 +25,46 @@ export async function loadPublicDesignManholeCount(publicUserId: string): Promis
   }
 }
 
+export type PublicDesignManhole = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  photo_url: string;
+};
+
+/**
+ * 公開IDの人が公開したデザインマンホール（公開スタンプ帳の「投稿したデザインマンホール」用）。新しい順に最大60件。
+ * RPC が無い（本番へのマイグレーション適用前）・失敗したときは空にして、節ごと出さない
+ */
+export async function loadPublicDesignManholes(publicUserId: string): Promise<PublicDesignManhole[]> {
+  const client = getPublicLiveClient();
+  if (!client) return [];
+  try {
+    const { data, error } = await client.rpc(
+      'get_public_design_manholes' as never,
+      { p_user_id: publicUserId } as never
+    );
+    if (error) {
+      console.warn('Failed to load design manholes:', error);
+      return [];
+    }
+    if (!Array.isArray(data)) return [];
+    return (data as Array<{ id: unknown; title: unknown; created_at: unknown }>)
+      .filter((row): row is { id: string; title: string | null; created_at: string } =>
+        typeof row.id === 'string' && typeof row.created_at === 'string')
+      .map((row) => ({
+        id: row.id,
+        title: typeof row.title === 'string' && row.title ? row.title : null,
+        created_at: row.created_at,
+        // 公開中の写真は共有キャッシュされる公開ルート（own-design-manholes の publishedPhotoUrl と同じ）
+        photo_url: `/api/design-manholes/${encodeURIComponent(row.id)}/photo?size=small`,
+      }));
+  } catch (error) {
+    console.warn('Failed to load design manholes:', error);
+    return [];
+  }
+}
+
 /** デザインマンホールの投稿者の公開ID。公開スタンプ帳へリンクできない人は null */
 export async function loadDesignManholeSubmitterPublicId(designManholeId: string): Promise<string | null> {
   const client = getPublicLiveClient();

@@ -32,3 +32,16 @@ test('自分のデザインマンホール枚数: anon の実行権限を別の�
   assert.match(revoke, /REVOKE ALL ON FUNCTION public\.get_own_design_manhole_count\(\) FROM anon;/);
   assert.doesNotMatch(revoke.replace(/^--.*$/gm, ''), /GRANT/);
 });
+
+test('公開スタンプ帳のデザインマンホール一覧: published だけ・created_by などを返さない', () => {
+  const sql = readFileSync(
+    fileURLToPath(new URL('../supabase/migrations/20261128120000_public_design_manholes_by_user.sql', import.meta.url)),
+    'utf8'
+  );
+  const body = sql.replace(/^--.*$/gm, '');
+  assert.match(body, /AND d\.status = 'published'/);
+  assert.match(body, /SELECT d\.id, d\.title, d\.created_at\n/);
+  assert.doesNotMatch(body, /RETURNS TABLE \([^)]*(created_by|storage_key|latitude|longitude|exif)/);
+  assert.match(body, /SET search_path TO public, pg_temp/);
+  assert.match(body, /REVOKE ALL ON FUNCTION public\.get_public_design_manholes\(uuid\) FROM PUBLIC;/);
+});
