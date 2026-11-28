@@ -358,10 +358,10 @@ export const VISIT_TIP_EVENTS = [
 ] as const;
 
 /**
- * ひとことの書き込み口。投稿画面 / 投稿完了画面。
- * 蓋の詳細は入力欄を掲示板に一本化したので、そちらは p_comment_posted で数える。
+ * ひとことの書き込み口。投稿画面 / 投稿完了画面 / 蓋の詳細で「ひとこと無しの自分の訪問」に頼むカード。
+ * 蓋の詳細の掲示板の入力欄は p_comment_posted で数える（こちらには入れない）。
  */
-export type VisitTipSurface = 'upload_form' | 'upload_complete';
+export type VisitTipSurface = 'upload_form' | 'upload_complete' | 'manhole_own_visit';
 
 export interface VisitTipEventParams extends GAEventParams {
   /** 発生箇所。GA4 予約語の source は使わない。 */

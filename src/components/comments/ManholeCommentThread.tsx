@@ -7,6 +7,7 @@ import { commentThreadState, pokefutaEvents } from '@/lib/analytics/gtag';
 import CommentComposer from './CommentComposer';
 import CommentItem, { type PublicComment } from './CommentItem';
 import PosterRegularBadge from '@/components/PosterRegularBadge';
+import { MISSING_PARKING_MESSAGE, PARKING_SUGGESTION } from '@/lib/review-tips';
 
 const PAGE_SIZE = 50;
 
@@ -62,6 +63,11 @@ interface Props {
    * この間に「0件」と判定すると、ひとことがある蓋でも最初のコメントのカードが一瞬出る。
    */
   photosLoading?: boolean;
+  /**
+   * 図鑑の口コミの集計で、この蓋にまだ駐車場の情報が無い（`review_tips.missing`）。
+   * 最初の1件を頼むカードで名指しし、候補の「駐車場あり」を先頭に出す
+   */
+  missingParking?: boolean;
 }
 
 /**
@@ -78,6 +84,7 @@ export default function ManholeCommentThread({
   surface = 'manhole_detail',
   photoComments = [],
   viewerHasVisited = false,
+  missingParking = false,
   photosLoading = false,
 }: Props) {
   const [comments, setComments] = useState<PublicComment[]>([]);
@@ -379,6 +386,7 @@ export default function ManholeCommentThread({
       onSuggestionPick={() => {
         usedSuggestionRef.current = true;
       }}
+      highlightSuggestion={missingParking ? PARKING_SUGGESTION : undefined}
     />
   );
 
@@ -423,7 +431,9 @@ export default function ManholeCommentThread({
                 {viewerHasVisited ? '行ったあなたへ: 次の人へのアドバイスを' : 'この蓋の最初のコメントを書こう'}
               </p>
               <p className="mb-3 mt-1 font-pixelJp text-[11.5px] leading-relaxed text-[#8b816f]">
-                見つけた場所・駐車場・行き方など。次に来る人の役に立ちます。
+                {missingParking
+                  ? `${MISSING_PARKING_MESSAGE}。見つけた場所・行き方とあわせて、次に来る人の役に立ちます。`
+                  : '見つけた場所・駐車場・行き方など。次に来る人の役に立ちます。'}
               </p>
             </>
           )}

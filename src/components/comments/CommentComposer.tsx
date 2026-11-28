@@ -21,6 +21,8 @@ interface Props {
   placeholder?: string;
   /** 候補ボタンで文を足した。used_suggestion の集計は親が持つ */
   onSuggestionPick?: () => void;
+  /** 先頭に出して目立たせる候補（SuggestionChips の highlight） */
+  highlightSuggestion?: string;
 }
 
 export default function CommentComposer({
@@ -34,6 +36,7 @@ export default function CommentComposer({
   onLoginPromptClick,
   placeholder = 'この場所のことを書いてみる（駐車場、行き方、見つけたときのこと…）',
   onSuggestionPick,
+  highlightSuggestion,
 }: Props) {
   // ログイン判定が返る前は、どちらの顔も出さない。
   // ここで未ログイン扱いにすると、ログイン済みの人に一瞬ログインCTAが出て、
@@ -102,6 +105,7 @@ export default function CommentComposer({
       <SuggestionChips
         value={value}
         disabled={submitting}
+        highlight={highlightSuggestion}
         onPick={(next) => {
           // 候補から書き始めた場合も「書き始めた」に数える（キーストロークが無いので）
           if (value.length === 0) onComposeStart();

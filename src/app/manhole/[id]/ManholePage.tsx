@@ -23,6 +23,9 @@ import PosterAvatar from '@/components/users/PosterAvatar';
 import { AI_TAG_HELP, photoAiTags, photoObjectPosition, type AiTag, type PhotoAiTags } from '@/lib/photo-ai-tags';
 import TitleReport from '@/components/TitleReport';
 import ManholeCommentThread, { type PhotoCommentEntry } from '@/components/comments/ManholeCommentThread';
+import ReviewTipChips from '@/components/visit-tip/ReviewTipChips';
+import NextVisitorTipForm from '@/components/visit-tip/NextVisitorTipForm';
+import { MISSING_PARKING_MESSAGE, PARKING_SUGGESTION, ownVisitNeedingTip, parseReviewTips } from '@/lib/review-tips';
 import ManholeGiftSection from '@/components/manhole/ManholeGiftSection';
 import { useAnalytics } from '@/lib/hooks/useAnalytics';
 import {
@@ -358,6 +361,9 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   // 「すべての写真」でコメントをその場に重ねて開いている写真。拡大表示へ飛ばさずに読ませる
   const [openGridCommentPhotoId, setOpenGridCommentPhotoId] = useState<string | null>(null);
   const [editingCommentVisitId, setEditingCommentVisitId] = useState<string | null>(null);
+  // 蓋の詳細の「ひとことを足しませんか」で保存した訪問。保存すると写真のひとことが入って
+  // 頼む相手から外れるが、お礼を出すためにカードはそのまま残す
+  const [savedTipVisit, setSavedTipVisit] = useState<{ visitId: string; isPublic: boolean } | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
   const [commentSaveError, setCommentSaveError] = useState<string | null>(null);
@@ -785,6 +791,11 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
   const photoState: 'none' | 'mine' | 'community' =
     photos.length === 0 ? 'none' : myPhotos.length > 0 ? 'mine' : 'community';
   const hasMyLidPhoto = myPhotos.some(photo => !photo.is_landscape);
+  // 図鑑が口コミから集計した旅情報（manholes.json の review_tips）。無い日は何も出さない
+  const reviewTips = parseReviewTips(manhole);
+  const missingParking = reviewTips?.missing === 'parking';
+  // ひとこと無しで投稿した自分の訪問。蓋の詳細で一度だけ頼む（書き先は訪問のひとこと）
+  const ownVisitForTip = savedTipVisit ?? (isLoggedIn && !photosLoading ? ownVisitNeedingTip(photos) : null);
   const safeIdx = Math.min(selectedPhotoIdx, Math.max(0, allDisplayPhotos.length - 1));
   const featuredPhoto = allDisplayPhotos[safeIdx] ?? null;
   const galleryPreviewPhotos = allDisplayPhotos.slice(0, 3);
@@ -1639,6 +1650,43 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
             写真のひとことと掲示板を1本にした欄。写真一覧より前に置き、
             現地の案内を写真を見る前に確認できるようにする。
           */}
+          <ReviewTipChips reviewTips={reviewTips} />
+
+          {/*
+            ひとこと無しで投稿した自分の訪問への呼びかけ。書き先は掲示板ではなく訪問のひとこと
+            （visit.comment）で、写真と一緒にコメント欄に並び、図鑑の「訪れた人のひとこと」
+            「口コミから」の元にもなる。保存したら写真のひとことを差し替えるのでカードは消える。
+          */}
+          {ownVisitForTip && editingCommentVisitId === null && (
+            <NextVisitorTipForm
+              key={ownVisitForTip.visitId}
+              visitId={ownVisitForTip.visitId}
+              manholeId={manhole.id}
+              surface="manhole_own_visit"
+              title={
+                missingParking
+                  ? `${MISSING_PARKING_MESSAGE}。あなたの訪問にひとことを足しませんか？`
+                  : 'あなたの訪問に、次に来る人へのひとことを足しませんか？'
+              }
+              description={
+                ownVisitForTip.isPublic
+                  ? '写真と一緒にコメント欄に並び、ポケふた図鑑の「訪れた人のひとこと」にも載ります'
+                  : 'この記録は非公開なので、あなただけが見られます'
+              }
+              highlightSuggestion={missingParking ? PARKING_SUGGESTION : undefined}
+              onSaved={(comment) => {
+                setSavedTipVisit(ownVisitForTip);
+                setPhotos((prev) =>
+                  prev.map((photo) =>
+                    photo.visit?.id === ownVisitForTip.visitId
+                      ? { ...photo, visit: { ...photo.visit, comment } }
+                      : photo
+                  )
+                );
+              }}
+            />
+          )}
+
           {manhole && (
             <ManholeCommentThread
               manholeId={manhole.id}
@@ -1647,6 +1695,7 @@ export default function ManholeDetailPage({ initial = null }: { initial?: Manhol
               photoComments={photoCommentEntries}
               viewerHasVisited={myPhotos.length > 0}
               photosLoading={photosLoading}
+              missingParking={missingParking}
             />
           )}
 
